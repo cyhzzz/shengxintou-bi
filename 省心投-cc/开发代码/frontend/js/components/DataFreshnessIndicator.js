@@ -360,17 +360,24 @@ class DataFreshnessIndicator {
             if (systemConfigItem) {
                 // 展开系统配置子菜单
                 const submenu = systemConfigItem.querySelector('.submenu');
-                if (submenu) {
+                if (submenu && !systemConfigItem.classList.contains('expanded')) {
                     submenu.style.display = 'block';
                     systemConfigItem.classList.add('expanded');
                 }
 
-                // 跳转到数据导入页面
+                // 找到"数据导入"菜单项并模拟点击
                 setTimeout(() => {
-                    window.location.hash = 'data-import';
-                }, 100);
+                    const dataImportItem = document.querySelector('.submenu .nav-item[data-report="data-import"]');
+                    if (dataImportItem) {
+                        // 模拟点击菜单项，触发完整的路由切换逻辑
+                        dataImportItem.click();
+                    } else {
+                        console.error('[DataFreshnessIndicator] 未找到数据导入菜单项');
+                    }
+                }, 150);
             } else {
-                // 如果找不到菜单项，直接跳转
+                console.error('[DataFreshnessIndicator] 未找到系统配置菜单项');
+                // 备用方案：直接使用 hash
                 window.location.hash = 'data-import';
             }
         }
