@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据导入 - 省心投 BI</title>
+
+    <!-- CSS样式 -->
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/themes.css">
+</head>
+<body data-theme="light">
+    <div class="app-container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-left">
+                <button id="backToDashboard" class="btn btn-ghost">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    返回仪表板
+                </button>
+            </div>
+            <h1 class="page-title">数据导入</h1>
+            <div class="header-right">
+                <button id="themeToggle" class="btn btn-ghost">
+                    <span class="icon-theme">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="import-container">
+                <!-- 导入说明 -->
+                <div class="import-intro">
+                    <h2>导入业务数据</h2>
+                    <p>支持以下类型的数据文件导入，请选择相应的数据类型并上传对应的 CSV 文件。</p>
+                </div>
+
+                <!-- 数据类型选择 -->
+                <div class="data-type-selector">
+                    <h3>选择数据类型</h3>
+                    <div class="type-grid">
+                        <div class="type-card" data-type="tencent">
+                            <div class="type-icon">📊</div>
+                            <div class="type-name">腾讯广告数据</div>
+                            <div class="type-desc">日级广告投放数据</div>
+                        </div>
+                        <div class="type-card" data-type="douyin">
+                            <div class="type-icon">🎵</div>
+                            <div class="type-name">抖音广告数据</div>
+                            <div class="type-desc">日级广告投放数据</div>
+                        </div>
+                        <div class="type-card" data-type="xiaohongshu">
+                            <div class="type-icon">📕</div>
+                            <div class="type-name">小红书广告数据</div>
+                            <div class="type-desc">日级广告投放数据</div>
+                        </div>
+                        <div class="type-card" data-type="xhs-notes">
+                            <div class="type-icon">📝</div>
+                            <div class="type-name">小红书笔记数据</div>
+                            <div class="type-desc">笔记互动数据</div>
+                        </div>
+                        <div class="type-card" data-type="conversion">
+                            <div class="type-icon">🎯</div>
+                            <div class="type-name">后端转化数据</div>
+                            <div class="type-desc">开户和线索数据</div>
+                        </div>
+                        <div class="type-card" data-type="mapping">
+                            <div class="type-icon">🔗</div>
+                            <div class="type-name">代理商映射</div>
+                            <div class="type-desc">账号代理商关系</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 文件上传区 -->
+                <div class="upload-section">
+                    <h3>上传文件</h3>
+                    <div class="upload-dropzone" id="dropzone">
+                        <input type="file" id="fileInput" accept=".csv" style="display: none;">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-text">点击选择文件或拖拽文件到此处</p>
+                        <p class="upload-hint">支持 .csv 格式文件，最大 50MB</p>
+                    </div>
+                </div>
+
+                <!-- 选中文件信息 -->
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <h3>文件信息</h3>
+                    <div class="file-details">
+                        <div class="file-item">
+                            <span class="file-label">文件名:</span>
+                            <span class="file-value" id="fileName">-</span>
+                        </div>
+                        <div class="file-item">
+                            <span class="file-label">文件大小:</span>
+                            <span class="file-value" id="fileSize">-</span>
+                        </div>
+                        <div class="file-item">
+                            <span class="file-label">数据类型:</span>
+                            <span class="file-value" id="dataType">-</span>
+                        </div>
+                    </div>
+                    <div class="upload-actions">
+                        <button id="clearFile" class="btn btn-secondary">清除文件</button>
+                        <button id="startImport" class="btn btn-primary" disabled>开始导入</button>
+                    </div>
+                </div>
+
+                <!-- 导入进度 -->
+                <div class="import-progress" id="importProgress" style="display: none;">
+                    <h3>导入进度</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-status" id="progressStatus">准备中...</p>
+                </div>
+
+                <!-- 导入结果 -->
+                <div class="import-result" id="importResult" style="display: none;">
+                    <h3>导入结果</h3>
+                    <div class="result-content" id="resultContent"></div>
+                    <div class="result-actions">
+                        <button id="closeResult" class="btn btn-primary">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/config.js"></script>
+    <script src="js/utils/api.js"></script>
+    <script src="js/utils/formatHelper.js"></script>
+    <script src="js/components/ThemeToggle.js"></script>
+    <script src="js/components/DataImport.js"></script>
+    <script>
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化主题切换
+            const themeToggle = new ThemeToggle('#themeToggle');
+
+            // 初始化数据导入组件
+            const dataImport = new DataImport();
+
+            // 返回仪表板
+            document.getElementById('backToDashboard').addEventListener('click', () => {
+                window.location.href = '/';
+            });
+        });
+    </script>
+</body>
+</html>

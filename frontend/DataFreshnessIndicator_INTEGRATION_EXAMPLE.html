@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据新鲜度指示器 - 集成示例</title>
+
+    <!-- 引入组件样式 -->
+    <link rel="stylesheet" href="css/data-freshness-indicator.css">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .example-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .example-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .code-block {
+            background: #f5f7fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .code-block code {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 数据新鲜度指示器 - 集成示例</h1>
+
+        <!-- 示例 1: 默认用法 -->
+        <div class="example-section">
+            <div class="example-title">示例 1: 默认用法（推荐）</div>
+            <div id="data-freshness-indicator"></div>
+        </div>
+
+        <!-- 示例 2: 自定义容器 -->
+        <div class="example-section">
+            <div class="example-title">示例 2: 自定义容器 ID</div>
+            <div id="my-freshness-indicator"></div>
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="example-section">
+            <div class="example-title">使用说明</div>
+            <div class="code-block">
+<code><strong>1. 在 index.html 中引入文件：</strong>
+
+&lt;!-- 在 &lt;head&gt; 中 --&gt;
+&lt;link rel="stylesheet" href="css/data-freshness-indicator.css"&gt;
+
+&lt;!-- 在 &lt;/body&gt; 之前 --&gt;
+&lt;script src="js/utils/api.js"&gt;&lt;/script&gt;
+&lt;script src="js/components/DataFreshnessIndicator.js"&gt;&lt;/script&gt;
+
+<strong>2. 添加容器元素：</strong>
+
+&lt;div id="data-freshness-indicator"&gt;&lt;/div&gt;
+
+<strong>3. 初始化组件：</strong>
+
+&lt;script&gt;
+    // 使用默认配置
+    const indicator = new DataFreshnessIndicator();
+
+    // 或使用自定义配置
+    const indicator = new DataFreshnessIndicator({
+        containerId: 'my-freshness-indicator',
+        refreshInterval: 10 * 60 * 1000,  // 10 分钟
+        onUpdateClick: () => {
+            window.location.hash = 'data-import';
+        }
+    });
+&lt;/script&gt;</code>
+            </div>
+        </div>
+
+        <!-- 配置说明 -->
+        <div class="example-section">
+            <div class="example-title">配置选项</div>
+            <div class="code-block">
+<code><strong>可用配置：</strong>
+
+{
+    containerId: string,           // 容器 ID，默认 'data-freshness-indicator'
+    refreshInterval: number,        // 自动刷新间隔（毫秒），默认 5 分钟
+    onUpdateClick: function         // 点击"立即更新"按钮的回调
+}
+
+<strong>示例：</strong>
+
+const indicator = new DataFreshnessIndicator({
+    containerId: 'dashboard-freshness',
+    refreshInterval: 3 * 60 * 1000,  // 3 分钟刷新一次
+    onUpdateClick: () => {
+        console.log('跳转到数据导入页面');
+        window.location.hash = 'data-import';
+    }
+});</code>
+            </div>
+        </div>
+
+        <!-- 公共方法 -->
+        <div class="example-section">
+            <div class="example-title">公共方法</div>
+            <div class="code-block">
+<code><strong>手动刷新数据：</strong>
+
+await indicator.refresh();
+
+<strong>展开详情列表：</strong>
+
+indicator.expand();
+
+<strong>折叠详情列表：</strong>
+
+indicator.collapse();
+
+<strong>销毁组件：</strong>
+
+indicator.destroy();</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入必要的依赖 -->
+    <script src="js/utils/api.js"></script>
+
+    <!-- 引入组件 -->
+    <script src="js/components/DataFreshnessIndicator.js"></script>
+
+    <!-- 初始化示例 -->
+    <script>
+        // 示例 1: 使用默认配置
+        const defaultIndicator = new DataFreshnessIndicator();
+
+        // 示例 2: 使用自定义配置
+        const customIndicator = new DataFreshnessIndicator({
+            containerId: 'my-freshness-indicator',
+            refreshInterval: 10 * 60 * 1000,  // 10 分钟
+            onUpdateClick: () => {
+                alert('跳转到数据导入页面');
+                // window.location.hash = 'data-import';
+            }
+        });
+    </script>
+</body>
+</html>

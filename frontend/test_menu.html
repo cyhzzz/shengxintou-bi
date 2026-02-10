@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>菜单测试页面</title>
+</head>
+<body>
+    <h1>小红书报表菜单测试</h1>
+    <div id="menu-content"></div>
+
+    <script>
+        // 读取实际的index.html文件内容
+        fetch('/index.html?t=' + Date.now())
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('menu-content').innerHTML = html;
+
+                // 检查创作分析菜单
+                const creationMenu = document.querySelectorAll('[data-report="xhs-notes-creation"]');
+                console.log('创作分析菜单数量:', creationMenu.length);
+
+                // 检查小红书子菜单
+                const xhsSubmenu = document.querySelectorAll('.submenu .nav-item');
+                console.log('小红书子菜单数量:', xhsSubmenu.length);
+                xhsSubmenu.forEach((item, index) => {
+                    console.log(`子菜单${index + 1}:`, item.getAttribute('data-report'));
+                });
+            });
+    </script>
+</body>
+</html>

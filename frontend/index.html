@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 禁用缓存 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>省心投平台 - 互联网广告投放分析平台</title>
+
+    <!-- 强制隐藏特定菜单和卡片 -->
+    <style>
+        /* 隐藏创作分析菜单 */
+        /* 隐藏小红书笔记-创作分析菜单 */
+        .nav-item[data-report="xhs-notes-creation"] {
+            display: none !important;
+        }
+    </style>
+
+    <!-- CSS样式 -->
+    <link rel="stylesheet" href="css/variables.css?v=1.2">
+    <link rel="stylesheet" href="css/reset.css?v=1.1">
+    <link rel="stylesheet" href="css/layout.css?v=1.1">
+    <link rel="stylesheet" href="css/components.css?v=1.2">
+    <link rel="stylesheet" href="css/themes.css?v=1.1">
+    <link rel="stylesheet" href="css/enhanced-interactions.css?v=1.1">
+
+    <!-- Structured Clarity Design System (v1.1) -->
+    <link rel="stylesheet" href="css/structured-clarity-components.css?v=1.7">
+
+    <!-- 数据新鲜度指示器 v2.0 -->
+    <link rel="stylesheet" href="css/data-freshness-indicator-v2.css?v=2.0">
+
+    <!-- Structured Clarity Components (v1.1) -->
+    <script src="js/StructuredClarityComponents.js?v=1.1"></script>
+
+    <!-- ECharts图表库 - 延迟加载,仅在需要时加载 -->
+    <script>
+        // ECharts 延迟加载器
+        (function() {
+            let echartsLoaded = false;
+            let loadPromise = null;
+
+            window.loadECharts = function() {
+                if (echartsLoaded) {
+                    return Promise.resolve(window.echarts);
+                }
+
+                if (loadPromise) {
+                    return loadPromise;
+                }
+
+                loadPromise = new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'libs/echarts.min.js';
+                    script.onload = () => {
+                        echartsLoaded = true;
+                        console.log('[性能优化] ECharts 已按需加载');
+                        resolve(window.echarts);
+                    };
+                    script.onerror = () => {
+                        reject(new Error('ECharts 加载失败'));
+                    };
+                    document.head.appendChild(script);
+                });
+
+                return loadPromise;
+            };
+        })();
+    </script>
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico?v=1.2.1" type="image/x-icon">
+</head>
+<body data-theme="light">
+    <!-- 页面容器 -->
+    <div class="app-container">
+
+        <!-- 左侧导航栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="icon/LOGO.svg" class="logo-icon" alt="申万宏源">
+                    <img src="icon/省心投.svg" class="logo-text-icon" alt="省心投">
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <!-- 数据概览（主页） -->
+                    <li class="nav-item active" data-report="dashboard">
+                        <img src="icon/主页.svg" class="nav-icon" alt="数据概览">
+                        <span>数据概览</span>
+                    </li>
+
+                    <!-- 厂商分析 -->
+                    <li class="nav-item" data-report="agency-analysis">
+                        <img src="icon/厂商分析.svg" class="nav-icon" alt="厂商分析">
+                        <span>厂商分析</span>
+                    </li>
+
+                    <!-- 小红书报表（二级菜单） -->
+                    <li class="nav-item has-submenu" data-report="xhs-notes">
+                        <div class="submenu-trigger">
+                            <img src="icon/小红书报表.svg" class="nav-icon" alt="小红书报表">
+                            <span>小红书报表</span>
+                        </div>
+                        <ul class="submenu">
+                            <li class="nav-item" data-report="xhs-notes-list">
+                                <img src="icon/笔记列表.svg" class="nav-icon" alt="笔记列表">
+                                <span>笔记列表</span>
+                            </li>
+                            <li class="nav-item" data-report="xhs-notes-operation">
+                                <img src="icon/运营分析.svg" class="nav-icon" alt="运营分析">
+                                <span>运营分析</span>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- 线索明细 -->
+                    <li class="nav-item" data-report="leads-detail">
+                        <img src="icon/线索明细.svg" class="nav-icon" alt="线索明细">
+                        <span>线索明细</span>
+                    </li>
+
+                    <!-- 转化漏斗 -->
+                    <li class="nav-item" data-report="conversion-funnel">
+                        <img src="icon/转化漏斗.svg" class="nav-icon" alt="转化漏斗">
+                        <span>转化漏斗</span>
+                    </li>
+
+                    <!-- 分割线 -->
+                    <li class="nav-divider"></li>
+
+                    <!-- 报告生成 -->
+                    <li class="nav-item" data-report="report-generation">
+                        <img src="icon/报告生成.svg" class="nav-icon" alt="报告生成">
+                        <span>报告生成</span>
+                    </li>
+
+                    <!-- 系统配置 (一级菜单，包含二级菜单) -->
+                    <li class="nav-item has-submenu" data-report="system-config">
+                        <div class="submenu-trigger">
+                            <img src="icon/系统配置.svg" class="nav-icon" alt="系统配置">
+                            <span>系统配置</span>
+                        </div>
+                        <ul class="submenu">
+                            <li class="nav-item" data-report="data-import">
+                                <img src="icon/数据导入.svg" class="nav-icon" alt="数据导入">
+                                <span>数据导入</span>
+                            </li>
+                            <li class="nav-item" data-report="account-management">
+                                <img src="icon/账号管理.svg" class="nav-icon" alt="账号管理">
+                                <span>账号管理</span>
+                            </li>
+                            <li class="nav-item" data-report="abbreviation-management">
+                                <img src="icon/简称管理.svg" class="nav-icon" alt="简称管理">
+                                <span>简称管理</span>
+                            </li>
+                            <li class="nav-item" data-report="database-backup">
+                                <img src="icon/数据同步.svg" class="nav-icon" alt="数据同步">
+                                <span>数据同步</span>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <div class="main-container">
+
+            <!-- 顶部栏 -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <div class="breadcrumb-container">
+                        <span class="breadcrumb-brand">省心投</span>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current" id="currentReport">数据概览</span>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <!-- 主题切换按钮 -->
+                    <button class="theme-toggle" id="themeToggle" title="切换主题">
+                        <i class="icon-moon"></i>
+                    </button>
+
+                    <!-- 帮助按钮 -->
+                    <button class="help-btn" id="helpBtn" title="帮助">
+                        <img src="icon/帮助.svg" class="help-icon" alt="帮助">
+                    </button>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <main class="content-area" id="contentArea">
+                <!-- 数据卡片区域 -->
+                <section class="metrics-cards" id="metricCardsContainer">
+                    <!-- 数据卡片将通过 JavaScript 动态生成 -->
+                </section>
+
+                <!-- 主内容区 -->
+                <div id="mainContent">
+                    <!-- 动态内容将通过 JavaScript 生成 -->
+                </div>
+            </main>
+
+        </div>
+    </div>
+
+    <!-- 帮助弹窗 -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal-container">
+            <!-- 弹窗头部 -->
+            <div class="modal-header">
+                <h3 class="modal-title">关于省心投平台</h3>
+                <button class="modal-close" id="closeHelpModal">&times;</button>
+            </div>
+
+            <!-- 弹窗内容 -->
+            <div class="modal-body">
+                <div class="help-content">
+                    <!-- 项目简介 -->
+                    <section class="help-section">
+                        <h4 class="help-section-title">项目简介</h4>
+                        <div style="text-align: center; margin: 16px 0;">
+                            <img src="icon/logo-横版.png" alt="省心投 logo" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        </div>
+                        <p class="help-text">
+                            省心投平台是一个轻量级互联网广告投放分析平台，提供多平台广告数据聚合、分析和可视化功能。
+                        </p>
+                        <p class="help-text" style="color: var(--warning-color); margin-top: 12px;">
+                            ⚠️ 本平台仅供申万宏源证券 - 财富管理事业部 - 渠道建设部内部使用，数据仅供参考。
+                        </p>
+                    </section>
+
+                    <!-- 核心功能 -->
+                    <section class="help-section">
+                        <h4 class="help-section-title">核心功能</h4>
+                        <ul class="help-list">
+                            <li><strong>数据概览</strong> - 整体数据概览，展示核心指标和趋势</li>
+                            <li><strong>厂商分析</strong> - 代理商投放和转化数据分析</li>
+                            <li><strong>小红书报表</strong> - 笔记列表、运营分析</li>
+                            <li><strong>线索明细</strong> - 所有客户线索到转化的数据明细</li>
+                            <li><strong>转化漏斗</strong> - 从转化率角度针对性查看和分析</li>
+                        </ul>
+                    </section>
+
+                    <!-- 支持的平台 -->
+                    <section class="help-section">
+                        <h4 class="help-section-title">支持平台</h4>
+                        <div class="help-content">
+                            <p class="help-text" style="margin-bottom: 8px;"><strong>外部广告数据：</strong></p>
+                            <div class="platform-tags" style="margin-bottom: 16px;">
+                                <span class="platform-tag">巨量引擎（抖音）</span>
+                                <span class="platform-tag">腾讯广告（腾讯）</span>
+                                <span class="platform-tag">聚光平台（小红书）</span>
+                            </div>
+
+                            <p class="help-text" style="margin-bottom: 8px;"><strong>后端转化数据：</strong>包括全部平台来源的客户线索数据</p>
+                            <div class="platform-tags">
+                                <span class="platform-tag">腾讯</span>
+                                <span class="platform-tag">抖音</span>
+                                <span class="platform-tag">小红书</span>
+                                <span class="platform-tag">高德</span>
+                                <span class="platform-tag">云极</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 版本信息 -->
+                    <section class="help-section">
+                        <h4 class="help-section-title">版本信息</h4>
+                        <p class="help-text" id="versionInfoText">
+                            加载中...
+                        </p>
+                    </section>
+
+                    <!-- 创建者信息 -->
+                    <section class="help-section creator-section">
+                        <div class="creator-info">
+                            <img src="icon/陈元昊肖像.svg" class="creator-avatar" alt="陈元昊">
+                            <div class="creator-details">
+                                <p class="creator-name">创建者：陈元昊</p>
+                                <p class="creator-org">申万宏源证券 - 财富管理事业部 - 产品经理</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- 弹窗底部 -->
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="closeHelpModalBtn">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <!-- 只加载必需的核心脚本,其他模块动态加载 -->
+    <!-- PerformanceHelper 由 main.js 动态加载，此处移除静态加载以避免重复声明 -->
+    <script src="js/config.js?v=1.0"></script>
+    <script src="js/utils/MetadataManager.js?v=1.0"></script>
+    <script src="js/utils/EventManager.js?v=1.0"></script>
+    <script src="js/utils/api-dedup.js?v=1.0"></script>
+    <script src="js/utils/formatHelper.js?v=1.0"></script>
+    <script src="js/components/MultiSelectDropdown.js?v=1.0"></script>
+    <script src="js/components/MultiSelectForm.js?v=1.0"></script>
+    <script src="js/components/DataFreshnessIndicator.js?v=1.0"></script>
+    <script src="js/components/HelpModal.js?v=1.0"></script>
+    <script src="js/utils/DynamicLoader.js?v=1.0"></script>
+
+    <!-- 小红书运营报表模块化版本 (v2.1) - 7个子模块 (协调器通过DynamicLoader动态加载) -->
+    <script src="js/reports/modules_temp/XhsOverviewMetrics.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsEmployeeConversion.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsCreatorContentTable.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsCreatorConversionTable.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsTopNotesRanking.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsCreatorAnnualRanking.js?v=2.1.1"></script>
+    <script src="js/reports/modules_temp/XhsAgencyRanking.js?v=2.1.1"></script>
+    <!-- 注意：协调器通过DynamicLoader动态加载，不在这里静态加载，避免重复声明 -->
+
+    <script src="js/main.js?v=1.3"></script>
+</body>
+</html>

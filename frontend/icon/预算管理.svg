@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 金币/硬币 -->
+    <ellipse cx="10" cy="10" rx="7" ry="3" fill="#D2DAE8" opacity="0.5"/>
+    <ellipse cx="10" cy="8" rx="7" ry="3" fill="#A3ADC4" opacity="0.7"/>
+    <ellipse cx="10" cy="6" rx="7" ry="3" fill="#55698F"/>
+    <!-- 货币符号 -->
+    <text x="7" y="7.5" font-family="Arial" font-size="6" font-weight="bold" fill="#FFF">¥</text>
+  </g>
+</svg>

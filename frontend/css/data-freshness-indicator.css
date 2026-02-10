@@ -1,0 +1,379 @@
+/**
+ * 数据新鲜度状态指示器组件样式
+ *
+ * 遵循 Structured Clarity 设计系统
+ * 使用 CSS 变量和 BEM 命名规范
+ *
+ * @version 1.0.0
+ * @date 2026-02-04
+ */
+
+/* ============================================
+   组件容器
+   ============================================ */
+
+.data-freshness-indicator {
+    --freshness-bg: #ffffff;
+    --freshness-border: var(--border-color, #e8e8e8);
+    --freshness-border-radius: var(--border-radius, 8px);
+    --freshness-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --freshness-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing: 12px;
+    --spacing-lg: 16px;
+
+    --text-primary: var(--text-primary, #333333);
+    --text-secondary: var(--text-secondary, #666666);
+    --text-disabled: var(--text-disabled, #999999);
+
+    --status-normal: #52c41a;
+    --status-warning: #faad14;
+    --status-critical: #f5222d;
+
+    background-color: var(--freshness-bg);
+    border: 1px solid var(--freshness-border);
+    border-radius: var(--freshness-border-radius);
+    box-shadow: var(--freshness-shadow);
+    margin-bottom: var(--spacing-lg);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.data-freshness-indicator:hover {
+    box-shadow: var(--freshness-hover-shadow);
+}
+
+/* ============================================
+   加载状态
+   ============================================ */
+
+.freshness-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing);
+    padding: var(--spacing-lg);
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary-color, #1890ff);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   错误状态
+   ============================================ */
+
+.freshness-error {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    padding: var(--spacing-lg);
+    background-color: #fff2f0;
+    border: 1px solid #ffccc7;
+}
+
+.freshness-error .error-icon {
+    font-size: 18px;
+}
+
+.freshness-error .error-message {
+    flex: 1;
+    color: var(--status-critical);
+    font-size: 14px;
+}
+
+/* ============================================
+   摘要行
+   ============================================ */
+
+.freshness-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing) var(--spacing-lg);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid transparent;
+}
+
+.freshness-summary:hover {
+    background-color: var(--bg-hover, #f5f7fa);
+}
+
+.freshness-icon {
+    font-size: 18px;
+}
+
+.freshness-text {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.freshness-warning {
+    color: var(--status-warning);
+    font-size: 13px;
+    font-weight: normal;
+}
+
+.freshness-status-icon {
+    font-size: 16px;
+}
+
+.freshness-toggle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+/* ============================================
+   详情列表
+   ============================================ */
+
+.freshness-details {
+    background-color: var(--bg-page, #f5f7fa);
+    border-top: 1px solid var(--freshness-border);
+}
+
+.freshness-list {
+    padding: var(--spacing);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* ============================================
+   数据项
+   ============================================ */
+
+.freshness-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    padding: var(--spacing);
+    background-color: var(--freshness-bg);
+    border: 1px solid var(--freshness-border);
+    border-radius: var(--border-radius, 4px);
+    transition: all 0.2s ease;
+}
+
+.freshness-item:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* 状态修饰符 */
+
+.freshness-item.status-normal {
+    border-left: 3px solid var(--status-normal);
+}
+
+.freshness-item.status-warning {
+    border-left: 3px solid var(--status-warning);
+    background-color: #fffbe6;
+}
+
+.freshness-item.status-critical {
+    border-left: 3px solid var(--status-critical);
+    background-color: #fff1f0;
+}
+
+/* 数据项内部元素 */
+
+.item-status {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.item-date {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.item-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.item-days-ago {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.item-status-label {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+/* 状态标签颜色 */
+
+.freshness-item.status-normal .item-status-label {
+    background-color: #f6ffed;
+    color: var(--status-normal);
+    border: 1px solid #b7eb8f;
+}
+
+.freshness-item.status-warning .item-status-label {
+    background-color: #fffbe6;
+    color: var(--status-warning);
+    border: 1px solid #ffe58f;
+}
+
+.freshness-item.status-critical .item-status-label {
+    background-color: #fff1f0;
+    color: var(--status-critical);
+    border: 1px solid #ffccc7;
+}
+
+/* ============================================
+   操作按钮区域
+   ============================================ */
+
+.freshness-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing) var(--spacing);
+    border-top: 1px solid var(--freshness-border);
+    background-color: var(--freshness-bg);
+}
+
+/* ============================================
+   响应式设计
+   ============================================ */
+
+@media (max-width: 768px) {
+    .freshness-summary {
+        padding: var(--spacing-sm);
+        font-size: 13px;
+    }
+
+    .freshness-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .item-meta {
+        align-items: flex-start;
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .freshness-actions {
+        flex-direction: column;
+    }
+
+    .freshness-actions .btn {
+        width: 100%;
+    }
+}
+
+/* ============================================
+   动画效果
+   ============================================ */
+
+.freshness-details {
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 摘要行悬停效果 */
+.freshness-summary:hover .freshness-toggle {
+    transform: scale(1.1);
+}
+
+/* ============================================
+   深色主题支持（可选）
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+    .data-freshness-indicator {
+        --freshness-bg: #1f1f1f;
+        --freshness-border: #333333;
+        --freshness-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .freshness-summary:hover {
+        background-color: #2a2a2a;
+    }
+
+    .freshness-details {
+        background-color: #141414;
+    }
+
+    .freshness-item {
+        background-color: #1f1f1f;
+    }
+
+    .freshness-item.status-warning {
+        background-color: #2b2100;
+    }
+
+    .freshness-item.status-critical {
+        background-color: #2a0a0a;
+    }
+}
+
+/* ============================================
+   打印样式
+   ============================================ */
+
+@media print {
+    .data-freshness-indicator {
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+
+    .freshness-actions {
+        display: none;
+    }
+
+    .freshness-toggle {
+        display: none;
+    }
+}

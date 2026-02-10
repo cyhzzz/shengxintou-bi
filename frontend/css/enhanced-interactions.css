@@ -1,0 +1,1065 @@
+/**
+ * 省心投 BI - 增强交互和动画
+ * 提升用户体验和视觉精致度
+ */
+
+/* ========================================
+   全局动画曲线
+   ======================================== */
+:root {
+    /* 更精致的动画曲线 */
+    --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+    --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    /* 动画时长 */
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 350ms;
+}
+
+/* ========================================
+   页面加载动画
+   ======================================== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* 页面加载动画 - 分阶段淡入 */
+.app-container {
+    animation: fadeIn var(--duration-normal) var(--ease-out-quart);
+}
+
+.sidebar {
+    animation: slideInLeft var(--duration-normal) var(--ease-out-quart);
+}
+
+.main-container > * {
+    animation: fadeInUp var(--duration-normal) var(--ease-out-quart) backwards;
+}
+
+.main-container > *:nth-child(1) { animation-delay: 50ms; }
+.main-container > *:nth-child(2) { animation-delay: 100ms; }
+.main-container > *:nth-child(3) { animation-delay: 150ms; }
+
+/* ========================================
+   增强按钮交互
+   ======================================== */
+.button,
+.date-btn,
+.tab-btn,
+.btn {
+    position: relative;
+    overflow: hidden;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+/* 按钮hover时的微妙提升 */
+.button:hover,
+.date-btn:hover,
+.tab-btn:hover,
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+}
+
+/* 按钮按下效果 */
+.button:active,
+.date-btn:active,
+.tab-btn:active,
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮涟漪效果 */
+.button::before,
+.date-btn::before,
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width var(--duration-slow) var(--ease-out-quart),
+                height var(--duration-slow) var(--ease-out-quart);
+}
+
+.button:active::before,
+.date-btn:active::before,
+.btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* 主要按钮样式增强 */
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(24, 144, 255, 0.4);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(24, 144, 255, 0.3);
+}
+
+/* ========================================
+   卡片和容器增强
+   ======================================== */
+.metric-card,
+.chart-section,
+.filter-bar {
+    transition: all var(--duration-normal) var(--ease-out-quart);
+    animation: scaleIn var(--duration-normal) var(--ease-out-quart);
+}
+
+/* 卡片hover效果 */
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.chart-section:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
+   表格交互增强
+   ======================================== */
+.data-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.data-table thead tr {
+    background: linear-gradient(180deg, var(--bg-content) 0%, var(--bg-hover) 100%);
+}
+
+.data-table th {
+    position: relative;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: var(--font-size-sm);
+    padding: 16px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.data-table tbody tr {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    animation: fadeIn 0.3s ease-out backwards;
+}
+
+.data-table tbody tr:nth-child(1) { animation-delay: 0ms; }
+.data-table tbody tr:nth-child(2) { animation-delay: 20ms; }
+.data-table tbody tr:nth-child(3) { animation-delay: 40ms; }
+.data-table tbody tr:nth-child(4) { animation-delay: 60ms; }
+.data-table tbody tr:nth-child(5) { animation-delay: 80ms; }
+
+.data-table tbody tr:hover {
+    background-color: var(--bg-hover);
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.data-table td {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ========================================
+   侧边栏导航交互
+   ======================================== */
+.nav-item {
+    position: relative;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.nav-item.active {
+    background-color: #D8D8D8;
+}
+
+.nav-item.has-submenu.active {
+    background-color: transparent;
+}
+
+.nav-item.has-submenu.active > .submenu-trigger {
+    background-color: #D8D8D8;
+}
+
+.nav-item:hover {
+    transform: translateX(4px);
+}
+
+.nav-item.has-submenu:hover {
+    transform: none;
+}
+
+.nav-item.has-submenu:hover > .submenu-trigger {
+    transform: translateX(4px);
+}
+
+.nav-item i {
+    transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.nav-item:hover i,
+.nav-item.has-submenu:hover > .submenu-trigger i {
+    transform: scale(1.1);
+}
+
+/* 二级菜单动画 - 向下展开 */
+.nav-item.has-submenu > .submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--duration-slow) var(--ease-out-expo),
+                opacity var(--duration-normal) var(--ease-out-quart);
+    opacity: 0;
+}
+
+.nav-item.has-submenu.expanded > .submenu {
+    max-height: 500px;
+    opacity: 1;
+}
+
+/* ========================================
+   筛选器交互增强
+   ======================================== */
+.filter-bar {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="dark"] .filter-bar {
+    background: rgba(31, 31, 31, 0.9);
+}
+
+.filter-group label {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+}
+
+/* 多选下拉框增强 */
+.multi-select-dropdown {
+    animation: scaleIn var(--duration-fast) var(--ease-out-quart);
+    transform-origin: top center;
+}
+
+.multi-select-option {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.multi-select-option:hover {
+    background-color: var(--bg-hover);
+    transform: translateX(4px);
+}
+
+.multi-select-option input[type="checkbox"] {
+    transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.multi-select-option input[type="checkbox"]:checked {
+    transform: scale(1.2);
+}
+
+/* ========================================
+   加载状态
+   ======================================== */
+.loading {
+    position: relative;
+}
+
+.loading::after {
+    content: '...';
+    animation: pulse 1.5s steps(4, end) infinite;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 骨架屏加载效果 */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-hover) 25%,
+        var(--bg-content) 50%,
+        var(--bg-hover) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--border-radius);
+}
+
+/* ========================================
+   标签交互
+   ======================================== */
+.tag {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    cursor: pointer;
+}
+
+.tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tag-close {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.tag:hover .tag-close {
+    transform: rotate(90deg);
+}
+
+/* 平台标签hover效果 */
+.platform-tag {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.platform-tag:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* ========================================
+   表单元素增强
+   ======================================== */
+input,
+select,
+textarea {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+.date-input {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.date-input:focus {
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+}
+
+/* ========================================
+   分页交互
+   ======================================== */
+.pagination-controls {
+    display: flex;
+    gap: var(--spacing);
+    align-items: center;
+}
+
+.pagination-btn {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.pagination-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(24, 144, 255, 0.2);
+}
+
+.pagination-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pagination-info {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* ========================================
+   图表容器增强
+   ======================================== */
+.chart-container {
+    transition: all var(--duration-normal) var(--ease-out-quart);
+}
+
+.chart-container:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ========================================
+   指标卡片增强
+   ======================================== */
+.metric-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    opacity: 0;
+    transition: opacity var(--duration-normal) var(--ease-out-quart);
+}
+
+.metric-card:hover::before {
+    opacity: 1;
+}
+
+.card-value {
+    transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.metric-card:hover .card-value {
+    transform: scale(1.05);
+}
+
+.card-trend {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.metric-card:hover .card-trend {
+    transform: translateX(4px);
+}
+
+/* ========================================
+   空状态和错误状态
+   ======================================== */
+.empty-state,
+.error-state {
+    text-align: center;
+    padding: 60px 20px;
+    animation: fadeInUp var(--duration-normal) var(--ease-out-quart);
+}
+
+.empty-state-icon,
+.error-icon {
+    font-size: 64px;
+    margin-bottom: var(--spacing-lg);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.error-icon {
+    animation: none;
+}
+
+/* ========================================
+   工具提示增强
+   ======================================== */
+[data-tooltip] {
+    position: relative;
+    cursor: help;
+}
+
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    padding: 8px 12px;
+    background: var(--text-primary);
+    color: var(--bg-content);
+    font-size: var(--font-size-sm);
+    border-radius: var(--border-radius);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    z-index: 1000;
+}
+
+[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-12px);
+}
+
+/* ========================================
+   焦点状态
+   ======================================== */
+:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* ========================================
+   滚动条样式
+   ======================================== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-page);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color-dark);
+    border-radius: 4px;
+    transition: background var(--duration-fast) var(--ease-out-quart);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* ========================================
+   响应式和可访问性
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+    .button,
+    .date-btn,
+    .btn {
+        border-width: 2px;
+    }
+
+    .data-table th {
+        border-bottom-width: 3px;
+    }
+}
+
+/* ========================================
+   特殊效果
+   ======================================== */
+
+/* 玻璃态效果（可选）*/
+.glass-effect {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+[data-theme="dark"] .glass-effect {
+    background: rgba(31, 31, 31, 0.7);
+}
+
+/* 细微的网格背景 */
+.grid-pattern {
+    background-image:
+        linear-gradient(var(--border-color-light) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border-color-light) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -1px -1px;
+}
+
+/* ========================================
+   状态反馈
+   ======================================== */
+
+/* 成功状态动画 */
+@keyframes successPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+    }
+}
+
+.success-pulse {
+    animation: successPulse 0.6s ease-out;
+}
+
+/* 加载骨架屏 */
+.skeleton-card {
+    height: 120px;
+    background: var(--bg-content);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    position: relative;
+}
+
+.skeleton-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* ========================================
+   性能优化
+   ======================================== */
+
+/* GPU加速 */
+.metric-card,
+.chart-section,
+.filter-bar,
+.nav-item,
+.button,
+.btn,
+.data-table tbody tr {
+    will-change: transform;
+}
+
+/* 减少重绘 */
+.data-table tbody {
+    contain: content style;
+}
+
+/* ========================================
+   微交互细节
+   ======================================== */
+
+/* 顶部栏用户信息 */
+.user-info {
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    cursor: pointer;
+}
+
+.user-info:hover {
+    transform: scale(1.02);
+}
+
+.user-avatar {
+    transition: transform var(--duration-fast) var(--ease-spring);
+}
+
+.user-info:hover .user-avatar {
+    transform: rotate(5deg) scale(1.1);
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+    transition: all var(--duration-normal) var(--ease-out-expo);
+}
+
+.theme-toggle:hover {
+    transform: rotate(180deg);
+}
+
+.theme-toggle i {
+    transition: all var(--duration-normal) var(--ease-out-expo);
+}
+
+/* 帮助按钮 */
+.help-btn:hover i {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+/* ========================================
+   数据展示增强
+   ======================================== */
+
+/* 数字滚动动画（需要JS支持） */
+.number-animate {
+    display: inline-block;
+    transition: all var(--duration-normal) var(--ease-out-quart);
+}
+
+/* 进度条动画 */
+.progress-bar {
+    position: relative;
+    height: 4px;
+    background: var(--bg-hover);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    transition: width var(--duration-slow) var(--ease-out-expo);
+}
+
+/* ========================================
+   转场动画
+   ======================================== */
+
+/* 内容区域切换动画 */
+.content-area > * {
+    animation: fadeInUp var(--duration-normal) var(--ease-out-quart);
+}
+
+/* 图表加载动画 */
+.chart-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+}
+
+.chart-loading::before {
+    content: '';
+    width: 50px;
+    height: 50px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ========================================
+   行内编辑样式
+   ======================================== */
+
+/* 可编辑单元格 */
+.editable-cell {
+    position: relative;
+    cursor: pointer;
+    padding: 8px 12px !important;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+    user-select: none;
+}
+
+.editable-cell:hover {
+    background-color: var(--bg-selected);
+    border-radius: 4px;
+}
+
+.editable-cell:hover .edit-icon {
+    opacity: 1;
+}
+
+.editable-value {
+    display: inline-block;
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.editable-value.empty {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.edit-icon {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-out-quart);
+    color: var(--primary-color);
+}
+
+/* 编辑器容器 */
+.editable-editor-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    min-width: 300px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    animation: fadeInDown var(--duration-normal) var(--ease-out-quart);
+    margin-top: 4px;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.editable-editor {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.editable-editor .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-hover);
+}
+
+.editable-editor .editor-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.editable-editor .editor-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.editable-editor .editor-close:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.editable-editor .editor-body {
+    padding: 16px;
+}
+
+.editable-editor .editor-select-section,
+.editable-editor .editor-input-section {
+    margin-bottom: 12px;
+}
+
+.editable-editor .editor-select-section:last-child,
+.editable-editor .editor-input-section:last-child {
+    margin-bottom: 0;
+}
+
+.editable-editor .editor-select-section label,
+.editable-editor .editor-input-section label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.editable-editor .editor-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: white;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.editable-editor .editor-select:hover {
+    border-color: var(--primary-color);
+}
+
+.editable-editor .editor-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.editable-editor .editor-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: white;
+    transition: all var(--duration-fast) var(--ease-out-quart);
+}
+
+.editable-editor .editor-input:hover {
+    border-color: var(--primary-color);
+}
+
+.editable-editor .editor-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.editable-editor .editor-divider {
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    margin: 12px 0;
+    position: relative;
+}
+
+.editable-editor .editor-divider::before,
+.editable-editor .editor-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 20px);
+    height: 1px;
+    background: var(--border-color);
+}
+
+.editable-editor .editor-divider::before {
+    left: 0;
+}
+
+.editable-editor .editor-divider::after {
+    right: 0;
+}
+
+.editable-editor .editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-hover);
+}
+
+/* 通知样式 */
+.notification {
+    animation: slideInRight 0.3s ease-out;
+}
+
+.notification--success {
+    background: var(--success-color) !important;
+}
+
+.notification--error {
+    background: var(--error-color) !important;
+}
+
+.notification--info {
+    background: var(--info-color) !important;
+}
+
+/* 确保编辑器在表格单元格中正确显示 */
+.data-table tbody tr {
+    position: static;
+}
+
+.editable-cell {
+    position: relative;
+}

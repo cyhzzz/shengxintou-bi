@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 空文档图标 -->
+    <path d="M4,2 L12,2 L16,6 L16,18 L4,18 Z" fill="#D2DAE8" opacity="0.3"/>
+    <path d="M12,2 L12,6 L16,6" fill="#A3ADC4" opacity="0.4"/>
+    <circle cx="10" cy="10" r="3" fill="none" stroke="#55698F" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+    <text x="8" y="12" font-family="Arial" font-size="10" fill="#55698F" opacity="0.4">∅</text>
+  </g>
+</svg>
