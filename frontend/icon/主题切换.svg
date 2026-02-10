@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 月亮 -->
+    <path d="M10,3 C10,3 14,5 14,10 C14,15 10,17 10,17 C10,17 15,15 15,10 C15,5 10,3 10,3 Z" fill="#D2DAE8" opacity="0.5"/>
+    <path d="M10,4 C10,4 13,6 13,10 C13,14 10,16 10,16 C10,16 14,14 14,10 C14,6 10,4 10,4 Z" fill="#A3ADC4" opacity="0.7"/>
+    <circle cx="11" cy="10" r="2" fill="#55698F"/>
+  </g>
+</svg>

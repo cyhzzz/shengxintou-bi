@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 垃圾桶 -->
+    <path d="M6,5 L14,5 L13,17 L7,17 Z" fill="#D2DAE8" opacity="0.5"/>
+    <path d="M6,5 L14,5 L13,17 L7,17 Z" stroke="#A3ADC4" stroke-width="1.5" fill="none"/>
+    <!-- 盖子 -->
+    <rect x="4" y="3" width="12" height="2" rx="0.5" fill="#55698F"/>
+    <!-- 把手 -->
+    <path d="M8,3 L8,1.5 C8,1.5 8,1 10,1 C12,1 12,1.5 12,1.5 L12,3" stroke="#55698F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- 垂直线 -->
+    <line x1="8" y1="7" x2="8" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+    <line x1="10" y1="7" x2="10" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+    <line x1="12" y1="7" x2="12" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

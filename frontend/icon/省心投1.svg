@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 24" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality;">
+  <!-- 左侧图标区域：更有设计感的组合图标 -->
+  <g transform="translate(0, 2)">
+    <!-- 后层：浅色文档背景 -->
+    <path fill="#D2DAE8" opacity="0.3" d="M3,1 L15,1 L19,5 L19,19 L3,19 Z" transform="translate(1, 0)"/>
+
+    <!-- 中层：数据图表背景 -->
+    <rect x="4" y="6" width="12" height="10" rx="1" fill="#A3ADC4" opacity="0.4"/>
+
+    <!-- 柱状图 - 三根柱子 -->
+    <rect x="6" y="11" width="2" height="5" rx="0.3" fill="#55698F" opacity="0.6"/>
+    <rect x="9" y="9" width="2" height="7" rx="0.3" fill="#55698F" opacity="0.8"/>
+    <rect x="12" y="7" width="2" height="9" rx="0.3" fill="#55698F"/>
+
+    <!-- 上升趋势箭头 -->
+    <path fill="none" stroke="#165DFF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"
+          d="M5,14 L8,10 L11,12 L14,6" opacity="0"/>
+
+    <!-- 右上角对勾徽章 -->
+    <circle cx="17" cy="5" r="4" fill="#52C41A"/>
+    <circle cx="17" cy="5" r="3" fill="#FFFFFF" opacity="0.2"/>
+    <path fill="none" stroke="#FFFFFF" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+          d="M15.5,5 L16.5,6 L18.5,4"/>
+
+    <!-- 装饰性虚线圆环 -->
+    <circle cx="10" cy="10" r="8" fill="none" stroke="#A3ADC4" stroke-width="0.5" stroke-dasharray="1.5 1.5" opacity="0.5"/>
+  </g>
+
+  <!-- 右侧文字：省心投 -->
+  <text x="26" y="16" font-family="华文中宋, STZhong, SimSun, serif" font-size="14" font-weight="bold" fill="#00469D" letter-spacing="1">省心投</text>
+</svg>

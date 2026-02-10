@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 放大镜 -->
+    <circle cx="8" cy="8" r="5" stroke="#D2DAE8" stroke-width="2" fill="none" opacity="0.5"/>
+    <circle cx="8" cy="8" r="3.5" stroke="#A3ADC4" stroke-width="1.5" fill="none"/>
+    <circle cx="8" cy="8" r="2" fill="#55698F" opacity="0.3"/>
+    <line x1="11.5" y1="11.5" x2="16" y2="16" stroke="#55698F" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

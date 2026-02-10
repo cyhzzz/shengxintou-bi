@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 成功圆圈 -->
+    <circle cx="10" cy="10" r="8" fill="#E6F7FF" opacity="0.8"/>
+    <circle cx="10" cy="10" r="6" fill="#BAE7FF" opacity="0.6"/>
+    <!-- 对勾 -->
+    <path d="M6.5,10 L8.5,12 L13.5,7" stroke="#1890FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

@@ -1,0 +1,487 @@
+/**
+ * 数据新鲜度状态指示器样式 - v2.0
+ * 基于 Structured Clarity 设计系统
+ * 极简美学：无卡片包裹，状态标签式设计
+ */
+
+/* ============ 容器 ============ */
+.data-freshness-indicator {
+    margin-bottom: var(--spacing-xl);
+    padding: 0;
+}
+
+/* ============ 折叠状态 - 摘要行 ============ */
+.freshness-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid transparent;
+    transition: all var(--transition-fast);
+}
+
+.freshness-summary:hover {
+    /* 移除底部边框，保持极简 */
+}
+
+/* 摘要左侧 - 文本和状态指示器 */
+.freshness-summary__left {
+    display: flex;
+    align-items: center;  /* 垂直居中 */
+    gap: var(--spacing);
+}
+
+/* 数据状态图标 */
+.freshness-summary__icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.freshness-summary__icon-img {
+    width: 20px;
+    height: 20px;
+}
+
+.freshness-summary__text {
+    font-family: "PingFang SC", "Microsoft YaHei", "Source Han Sans CN", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    letter-spacing: 0.3px;
+}
+
+/* 状态统计圆点 */
+.freshness-summary__dots {
+    display: flex;
+    gap: 6px;
+}
+
+.freshness-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-border);
+    transition: background var(--transition-fast);
+}
+
+.freshness-dot--normal {
+    background: var(--color-success);
+}
+
+.freshness-dot--warning {
+    background: var(--color-warning);
+}
+
+.freshness-dot--critical {
+    background: var(--color-error);
+}
+
+/* 摘要右侧 - 切换图标 */
+.freshness-summary__toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--color-text-tertiary);
+    transition: all var(--transition-fast);
+}
+
+.freshness-summary__toggle svg {
+    width: 16px;
+    height: 16px;
+    transition: transform var(--transition-normal);
+}
+
+.freshness-summary--expanded .freshness-summary__toggle svg {
+    transform: rotate(180deg);
+}
+
+/* ============ 展开状态 - 详细列表 ============ */
+.freshness-details {
+    margin-top: var(--spacing-xs);  /* 减少展开内容顶部间距 */
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 数据源列表 - 紧凑横向布局 */
+.freshness-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;  /* 减少行间距，与卡片边距一致 */
+    margin-bottom: var(--spacing-md);
+}
+
+/* 业务分组 - 横向布局（占满空间，左侧对齐数据状态行） */
+.freshness-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-xs) 0;
+    margin-bottom: 4px;  /* 减少行间距 */
+    width: 100%;
+}
+
+/* 左侧图标占位符（与数据状态图标对齐） */
+.freshness-group__icon-spacer {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.freshness-group__label {
+    font-family: "PingFang SC", "Microsoft YaHei", "Source Han Sans CN", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    letter-spacing: 0.3px;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.freshness-group__content {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;  /* 减少卡片之间的间距 */
+    align-items: center;
+    flex: 1;
+}
+
+/* 单个数据项 - 固定宽度 + 统一样式 */
+.freshness-item--compact {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);  /* 减少左右padding */
+    margin: 0 4px;  /* 卡片之间的左右边距 */
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    transition: all var(--transition-fast);
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+}
+
+.freshness-item--compact:hover {
+    border-color: var(--color-primary);
+    background: var(--color-hover);
+}
+
+.freshness-item__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.freshness-item__name {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.freshness-item__date {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+}
+
+.freshness-item__separator {
+    display: none;  /* 不再使用分隔符 */
+}
+
+/* 数据项左侧 */
+.freshness-item__left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+/* 数据项右侧 */
+.freshness-item__right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    flex-shrink: 0;
+}
+.freshness-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: var(--spacing-sm);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    transition: all var(--transition-fast);
+}
+
+.freshness-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transform: translateY(-1px);
+}
+
+/* 数据项左侧 */
+.freshness-item__left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    min-width: 0;
+}
+
+/* 状态图标 */
+.freshness-item__icon {
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.freshness-item__icon--normal {
+    color: var(--color-success);
+}
+
+.freshness-item__icon--warning {
+    color: var(--color-warning);
+}
+
+.freshness-item__icon--critical {
+    color: var(--color-error);
+}
+
+/* 数据源名称 */
+.freshness-item__name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+/* 数据项右侧 */
+.freshness-item__right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+    flex-shrink: 0;
+}
+
+/* 日期显示 */
+.freshness-item__date {
+    font-size: 12px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--color-text-secondary);
+    font-weight: 400;
+}
+
+/* 状态标签 - 极简设计 */
+.freshness-item__status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.freshness-item__status--normal {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--color-success);
+}
+
+.freshness-item__status--warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--color-warning);
+}
+
+.freshness-item__status--critical {
+    background: rgba(245, 34, 34, 0.1);
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+/* ============ 操作按钮区域 ============ */
+.freshness-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+}
+
+/* 按钮样式增强 */
+.freshness-actions .btn {
+    font-size: 12px;
+    padding: var(--spacing-xs) var(--spacing);
+    height: auto;
+}
+
+.freshness-actions .btn--primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.freshness-actions .btn--primary:hover {
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+}
+
+/* ============ 响应式 ============ */
+@media (max-width: 768px) {
+    .freshness-list {
+        grid-template-columns: 1fr;
+    }
+
+    .freshness-item {
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        align-items: flex-start;
+    }
+
+    .freshness-item__right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+/* ============ 加载状态 ============ */
+.freshness-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.freshness-loading::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-border);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============ 错误状态 ============ */
+.freshness-error {
+    padding: var(--spacing);
+    text-align: center;
+    color: var(--color-error);
+    font-size: 13px;
+}
+
+/* ============ 状态徽章（更小尺寸的指示器） ============ */
+.freshness-badges {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.freshness-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.freshness-badge--normal {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--color-success);
+}
+
+.freshness-badge--warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--color-warning);
+}
+
+.freshness-badge--critical {
+    background: rgba(245, 34, 34, 0.1);
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+/* ============ 微交互效果 ============ */
+.freshness-item {
+    animation: slideUp 0.3s ease-out backwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 为每个item添加延迟，创造阶梯式动画效果 */
+.freshness-item:nth-child(1) { animation-delay: 0.05s; }
+.freshness-item:nth-child(2) { animation-delay: 0.1s; }
+.freshness-item:nth-child(3) { animation-delay: 0.15s; }
+.freshness-item:nth-child(4) { animation-delay: 0.2s; }
+.freshness-item:nth-child(5) { animation-delay: 0.25s; }
+.freshness-item:nth-child(6) { animation-delay: 0.3s; }
+
+/* ============ 特殊状态：严重警告时的视觉强化 ============ */
+.freshness-indicator--critical .freshness-summary__text {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* 摘要文本颜色 - 有严重警告时 */
+.freshness-indicator--critical .freshness-summary__text {
+    color: var(--color-error);
+    font-weight: 600;
+}
+
+/* ============ 深色主题适配 ============ */
+[data-theme="dark"] .freshness-item {
+    background: var(--color-bg-primary);
+    border-color: var(--color-border);
+}
+
+[data-theme="dark"] .freshness-item__status {
+    opacity: 0.9;
+}

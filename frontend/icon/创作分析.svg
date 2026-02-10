@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 画布背景 -->
+    <rect x="3" y="3" width="14" height="14" rx="2" fill="#D2DAE8" opacity="0.5"/>
+    <!-- 创作工具面板 -->
+    <rect x="5" y="5" width="10" height="10" rx="1" fill="#A3ADC4" opacity="0.6"/>
+    <!-- 铅笔/笔 -->
+    <path d="M7,14 L9,12 L12,12 L14,10 L12,8 L10,10 L7,10 L5,12 Z" fill="#55698F" opacity="0.7"/>
+    <path d="M14,8 L16,6 L15,5 L13,7 Z" fill="#55698F"/>
+    <line x1="14" y1="8" x2="16" y2="6" stroke="#55698F" stroke-width="0.5" stroke-linecap="round"/>
+    <!-- 创作元素 - 色块 -->
+    <rect x="6" y="6" width="2" height="2" rx="0.5" fill="#55698F" opacity="0.4"/>
+    <rect x="9" y="6" width="2" height="2" rx="0.5" fill="#55698F" opacity="0.6"/>
+    <rect x="12" y="6" width="2" height="2" rx="0.5" fill="#55698F" opacity="0.8"/>
+    <!-- 创作元素 - 图标 -->
+    <circle cx="7" cy="11" r="1" fill="#55698F" opacity="0.5"/>
+    <rect x="9" y="10" width="3" height="2" rx="0.3" fill="#55698F" opacity="0.5"/>
+    <!-- 分析曲线 -->
+    <path d="M6,13 Q8,12 10,13 T14,12" stroke="#55698F" stroke-width="1" fill="none" opacity="0.6"/>
+  </g>
+</svg>

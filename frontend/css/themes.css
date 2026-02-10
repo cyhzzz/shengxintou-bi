@@ -1,0 +1,40 @@
+/**
+ * 省心投 BI - 主题样式
+ * 深色和浅色主题的特定样式
+ */
+
+/* ========================================
+   主题过渡动画
+   ======================================== */
+body {
+    transition: background-color var(--transition), color var(--transition);
+}
+
+.sidebar,
+.topbar,
+.content-area {
+    transition: background-color var(--transition), border-color var(--transition);
+}
+
+/* ========================================
+   浅色主题（默认）
+   ======================================== */
+[data-theme="light"] {
+    /* 浅色主题的特定样式 */
+}
+
+/* ========================================
+   深色主题
+   ======================================== */
+[data-theme="dark"] {
+    /* 深色主题的特定样式 */
+
+    /* 卡片阴影调整 */
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 深色主题下的图表样式调整 */
+[data-theme="dark"] .chart-container {
+    /* ECharts 会自动适配主题 */
+}

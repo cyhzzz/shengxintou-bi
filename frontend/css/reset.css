@@ -1,0 +1,62 @@
+/**
+ * 省心投 BI - 样式重置
+ */
+
+/* 清除默认样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    color: var(--text-primary);
+    background-color: #F2F3F8;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 列表 */
+ul, ol {
+    list-style: none;
+}
+
+/* 链接 */
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* 图片 */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* 表格 */
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+/* 表单元素 */
+button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 齿轮 -->
+    <circle cx="10" cy="10" r="3" fill="#55698F"/>
+    <circle cx="10" cy="10" r="6" fill="#D2DAE8" opacity="0.5"/>
+    <circle cx="10" cy="10" r="5" fill="none" stroke="#A3ADC4" stroke-width="2" stroke-dasharray="2 2"/>
+    <!-- 齿轮齿 -->
+    <path d="M10,1 L10,3 M10,17 L10,19 M1,10 L3,10 M17,10 L19,10" stroke="#55698F" stroke-width="2" stroke-linecap="round"/>
+    <path d="M3.22,3.22 L4.64,4.64 M15.36,15.36 L16.78,16.78 M3.22,16.78 L4.64,15.36 M15.36,4.64 L16.78,3.22" stroke="#55698F" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Structured Clarity - Component Demo</title>
+  <link rel="stylesheet" href="css/structured-clarity-components.css">
+  <style>
+    /* Demo-specific styles */
+    .demo-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: var(--color-text-primary);
+    }
+
+    .demo-section {
+      margin-bottom: 60px;
+    }
+
+    .demo-section__title {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--color-text-primary);
+    }
+
+    .demo-section__desc {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .demo-showcase {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .demo-showcase__item {
+      padding: 16px;
+      background: #F5F7FA;
+      border-radius: 8px;
+    }
+
+    .demo-showcase__label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #8A8D99;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .demo-showcase__item--full {
+      grid-column: 1 / -1;
+    }
+
+    .demo-interactive {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    /* State indicators */
+    .state-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      background: var(--color-bg-tertiary);
+      color: var(--color-text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .state-indicator::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Code preview */
+    .code-preview {
+      background: var(--color-text-primary);
+      color: var(--color-bg-secondary);
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    .code-preview .tag { color: #FAAD14; }
+    .code-preview .attr { color: #40A9FF; }
+    .code-preview .value { color: #52C41A; }
+    .code-preview .comment { color: var(--color-text-tertiary); }
+
+    /* Demo-specific utility classes for colors */
+    .demo-text-primary {
+      color: var(--color-text-primary);
+    }
+
+    .demo-text-secondary {
+      color: var(--color-text-secondary);
+    }
+
+    .text-tertiary {
+      color: var(--color-text-tertiary);
+    }
+
+    .demo-success {
+      color: var(--color-success);
+    }
+
+    .demo-error {
+      color: var(--color-error);
+    }
+
+    .demo-metric-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 4px;
+    }
+
+    .demo-metric-label {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+
+    /* Step line colors */
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background-color: var(--color-border-medium);
+    }
+
+    .step-line--success {
+      background-color: var(--color-success);
+    }
+  </style>
+  <script src="js/components/MultiSelectForm.js"></script>
+</head>
+<body>
+  <!-- Skip Navigation for Keyboard Users (可访问性: 快速跳转到主内容) -->
+  <a href="#main-content" class="skip-to-content">跳转到主内容</a>
+
+  <div class="demo-container" id="main-content">
+    <!-- Header -->
+    <div class="card" style="margin-bottom: 40px; border-left: 4px solid #1890FF;">
+      <div class="card__header" style="border-bottom: none; margin-bottom: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <div>
+            <h1 style="font-size: 28px; font-weight: 600; margin: 0 0 8px 0; color: var(--color-text-primary);">Structured Clarity</h1>
+            <p class="demo-text-secondary" style="margin: 0;">Component System v1.0 - Interactive Demo</p>
+          </div>
+          <button id="themeToggle" class="btn btn--outline" onclick="toggleDarkMode()" style="padding: 8px 16px;">
+            <span id="themeIcon">🌙</span>
+            <span id="themeText" style="margin-left: 6px;">深色模式</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. Card System -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">1. Card System</h2>
+      <p class="demo-section__desc">Modular containers with clear boundaries. Lines are structural, defining territories for information.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Default Card</div>
+          <div class="card">
+            <div class="card__header">
+              <h3 class="card__title">Card Title</h3>
+              <div class="card__actions">
+                <button class="btn btn--sm btn--ghost">Edit</button>
+              </div>
+            </div>
+            <div class="card__body">
+              <p class="demo-text-secondary" style="margin: 0;">Card body content goes here. The 1px border defines the information boundary.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Filter Card</div>
+          <div class="card">
+            <div class="card__header">
+              <h3 class="card__title">Data Filter</h3>
+              <div class="card__actions">
+                <button class="btn btn--secondary btn--sm">Export</button>
+                <button class="btn btn--primary btn--sm">Query</button>
+              </div>
+            </div>
+            <div class="card__body">
+              <p class="demo-text-secondary" style="margin: 0;">Filter controls for data selection with action buttons in header.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Metric Card</div>
+          <div class="card">
+            <div class="demo-metric-value">¥1,234</div>
+            <div class="demo-metric-label">Total Revenue</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-preview">
+        <span class="comment">&lt;!-- Default card --&gt;</span><br>
+        <span class="tag">&lt;div</span> <span class="attr">class=</span><span class="value">"card"</span><span class="tag">&gt;</span><br>
+        &nbsp;&nbsp;<span class="tag">&lt;div</span> <span class="attr">class=</span><span class="value">"card__header"</span><span class="tag">&gt;</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="tag">&lt;h3</span> <span class="attr">class=</span><span class="value">"card__title"</span><span class="tag">&gt;</span>Title<span class="tag">&lt;/h3&gt;</span><br>
+        &nbsp;&nbsp;<span class="tag">&lt;/div&gt;</span><br>
+        &nbsp;&nbsp;<span class="tag">&lt;div</span> <span class="attr">class=</span><span class="value">"card__body"</span><span class="tag">&gt;</span>...<span class="tag">&lt;/div&gt;</span><br>
+        <span class="tag">&lt;/div&gt;</span>
+      </div>
+    </section>
+
+    <!-- 2. Button System -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">2. Button System</h2>
+      <p class="demo-section__desc">Action communication through color, border, and background. Each variant signals intent.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Primary Button</div>
+          <div class="demo-interactive">
+            <button class="btn btn--primary">Primary</button>
+            <button class="btn btn--primary is-disabled">Disabled</button>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Secondary Button</div>
+          <div class="demo-interactive">
+            <button class="btn btn--secondary">Secondary</button>
+            <button class="btn btn--secondary is-disabled">Disabled</button>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Outline Button</div>
+          <div class="demo-interactive">
+            <button class="btn btn--outline">Outline</button>
+            <button class="btn btn--outline is-disabled">Disabled</button>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Ghost Button</div>
+          <div class="demo-interactive">
+            <button class="btn btn--ghost">Ghost</button>
+            <button class="btn btn--ghost is-disabled">Disabled</button>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Button Sizes</div>
+          <div class="demo-interactive">
+            <button class="btn btn--primary btn--sm">Small</button>
+            <button class="btn btn--primary">Default</button>
+            <button class="btn btn--primary btn--lg">Large</button>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Button Group</div>
+          <div class="btn-group">
+            <button class="btn">Day 1</button>
+            <button class="btn">Day 7</button>
+            <button class="btn is-active">Day 30</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-preview">
+        <span class="comment">&lt;!-- Button variants --&gt;</span><br>
+        <span class="tag">&lt;button</span> <span class="attr">class=</span><span class="value">"btn btn--primary"</span><span class="tag">&gt;</span>Primary<span class="tag">&lt;/button&gt;</span><br>
+        <span class="tag">&lt;button</span> <span class="attr">class=</span><span class="value">"btn btn--secondary"</span><span class="tag">&gt;</span>Secondary<span class="tag">&lt;/button&gt;</span><br>
+        <span class="tag">&lt;button</span> <span class="attr">class=</span><span class="value">"btn btn--outline"</span><span class="tag">&gt;</span>Outline<span class="tag">&lt;/button&gt;</span><br>
+        <span class="tag">&lt;button</span> <span class="attr">class=</span><span class="value">"btn btn--ghost"</span><span class="tag">&gt;</span>Ghost<span class="tag">&lt;/button&gt;</span>
+      </div>
+    </section>
+
+    <!-- 3. Form Elements -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">3. Form Elements</h2>
+      <p class="demo-section__desc">Input boundaries with semantic state feedback. Focus states guide attention.</p>
+
+      <div class="card">
+        <div class="card__header">
+          <h3 class="card__title">Form Elements</h3>
+        </div>
+        <div class="card__body">
+          <form style="max-width: 500px;">
+            <!-- Text input -->
+            <div class="form-group">
+              <label class="form-label required">Account ID</label>
+              <input type="text" class="form-control" placeholder="Enter account ID">
+              <small class="form-hint">Format: 50252079</small>
+            </div>
+
+            <!-- Select dropdown (single) -->
+            <div class="form-group">
+              <label class="form-label">Platform (Single)</label>
+              <select class="form-control">
+                <option>Select platform...</option>
+                <option>腾讯</option>
+                <option>抖音</option>
+                <option>小红书</option>
+              </select>
+            </div>
+
+            <!-- Select dropdown (multiple - custom component) -->
+            <div class="form-group">
+              <label class="form-label">Platform (Multiple)</label>
+              <div id="demoPlatformMultiSelect" class="multi-select-form"></div>
+              <small class="form-hint">点击展开下拉框，可多选平台</small>
+            </div>
+
+            <!-- Date input (standard) -->
+            <div class="form-group">
+              <label class="form-label">Date Range</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="date" class="form-control" value="2026-01-15">
+                <span class="text-tertiary">to</span>
+                <input type="date" class="form-control" value="2026-01-23">
+              </div>
+            </div>
+
+            <!-- Date range (with quick select buttons - horizontal layout) -->
+            <div class="form-group demo-showcase__item--full">
+              <label class="form-label">Date Range with Quick Select</label>
+              <!-- Date inputs and buttons as one integrated component - no wrapping -->
+              <div style="display: flex; gap: 12px; align-items: center; white-space: nowrap;">
+                <!-- Date inputs -->
+                <div style="display: inline-flex; gap: 8px; align-items: center;">
+                  <input type="date" id="demoStartDate" class="form-control" value="2026-01-08" style="height: 32px;">
+                  <span class="text-tertiary">→</span>
+                  <input type="date" id="demoEndDate" class="form-control" value="2026-01-23" style="height: 32px;">
+                </div>
+                <!-- Duration trigger buttons -->
+                <div class="btn-group" style="display: inline-flex;">
+                  <button class="btn" onclick="setDateRange('all')" style="height: 32px; white-space: nowrap;">全部</button>
+                  <button class="btn" onclick="setDateRange(7)" style="height: 32px; white-space: nowrap;">近7天</button>
+                  <button class="btn is-active" onclick="setDateRange(30)" style="height: 32px; white-space: nowrap;">近30天</button>
+                  <button class="btn" onclick="setDateRange(90)" style="height: 32px; white-space: nowrap;">近90天</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Disabled input -->
+            <div class="form-group">
+              <label class="form-label">Disabled Field</label>
+              <input type="text" class="form-control" disabled value="Cannot edit">
+            </div>
+
+            <!-- Error state -->
+            <div class="form-group">
+              <label class="form-label">Error State</label>
+              <input type="text" class="form-control is-error" value="Invalid value">
+              <small class="form-hint is-error">Account ID must be 8 digits</small>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="code-preview">
+        <span class="comment">&lt;!-- Form control --&gt;</span><br>
+        <span class="tag">&lt;div</span> <span class="attr">class=</span><span class="value">"form-group"</span><span class="tag">&gt;</span><br>
+        &nbsp;&nbsp;<span class="tag">&lt;label</span> <span class="attr">class=</span><span class="value">"form-label required"</span><span class="tag">&gt;</span>Label<span class="tag">&lt;/label&gt;</span><br>
+        &nbsp;&nbsp;<span class="tag">&lt;input</span> <span class="attr">type=</span><span class="value">"text"</span> <span class="attr">class=</span><span class="value">"form-control"</span> <span class="attr">placeholder=</span><span class="value">"..."</span><span class="tag">&gt;</span><br>
+        <span class="tag">&lt;/div&gt;</span>
+      </div>
+    </section>
+
+    <!-- 4. Dividers -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">4. Structural Dividers</h2>
+      <p class="demo-section__desc">Line weight carries meaning. Thin for separation, thick for emphasis.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Thin (1px)</div>
+          <hr class="divider">
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Thick (1.5px)</div>
+          <hr class="divider divider--thick">
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Dashed</div>
+          <hr class="divider divider--dashed">
+        </div>
+      </div>
+
+      <div class="card card--filter" style="margin-top: 20px;">
+        <div class="demo-showcase__label" style="margin-left: 16px;">With Text</div>
+        <div class="divider divider--with-text">
+          <span>OR</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Interactive States Demo -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">5. Interactive States</h2>
+      <p class="demo-section__desc">Hover over and interact with components to see state transitions.</p>
+
+      <div class="card">
+        <div class="card__body">
+          <div class="demo-interactive" style="margin-bottom: 16px;">
+            <button class="btn btn--primary">Hover Me</button>
+            <button class="btn btn--secondary">Hover Me</button>
+            <button class="btn btn--outline">Hover Me</button>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" class="form-control" placeholder="Focus me to see focus state">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Full Layout Example -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">6. Full Layout Example</h2>
+      <p class="demo-section__desc">Components working together in a realistic BI dashboard context.</p>
+
+      <div class="card">
+        <div class="card__header">
+          <h3 class="card__title">Data Filter</h3>
+          <div class="card__actions">
+            <button class="btn btn--secondary">Reset</button>
+            <button class="btn btn--primary">Query</button>
+          </div>
+        </div>
+        <div class="card__body">
+          <!-- Responsive layout: Platform & Date Range stay together, Agency wraps first if needed -->
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+
+            <!-- Platform selector (multiple) -->
+            <div class="form-group" style="margin-bottom: 0; flex: 0 0 auto; min-width: 200px;">
+              <label class="form-label">Platform</label>
+              <div id="fullDemoPlatformMultiSelect" class="multi-select-form"></div>
+            </div>
+
+            <!-- Date Range with Quick Select (integrated component - no internal wrap) -->
+            <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 480px;">
+              <label class="form-label">Date Range</label>
+              <!-- Date inputs and buttons as one integrated unit - no wrapping -->
+              <div style="display: flex; gap: 12px; align-items: center; white-space: nowrap;">
+                <!-- Date inputs -->
+                <div style="display: inline-flex; gap: 8px; align-items: center;">
+                  <input type="date" id="fullDemoStartDate" class="form-control" value="2026-01-08" style="height: 32px;">
+                  <span class="text-tertiary">→</span>
+                  <input type="date" id="fullDemoEndDate" class="form-control" value="2026-01-23" style="height: 32px;">
+                </div>
+                <!-- Duration trigger buttons -->
+                <div class="btn-group" style="display: inline-flex;">
+                  <button class="btn" onclick="setDateRange('all')" style="height: 32px; white-space: nowrap;">全部</button>
+                  <button class="btn" onclick="setFullDemoDateRange(7)" style="height: 32px; white-space: nowrap;">近7天</button>
+                  <button class="btn is-active" onclick="setFullDemoDateRange(30)" style="height: 32px; white-space: nowrap;">近30天</button>
+                  <button class="btn" onclick="setFullDemoDateRange(90)" style="height: 32px; white-space: nowrap;">近90天</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agency selector (multiple) -->
+            <div class="form-group" style="margin-bottom: 0; flex: 0 0 auto; min-width: 200px;">
+              <label class="form-label">Agency</label>
+              <div id="fullDemoAgencyMultiSelect" class="multi-select-form"></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div class="card card--metric">
+          <div class="demo-metric-value">¥1,234,567</div>
+          <div class="demo-metric-label">Total Cost</div>
+          <div class="demo-success" style="font-size: 12px; margin-top: 8px;">↑ 12.5% vs last period</div>
+        </div>
+
+        <div class="card card--metric">
+          <div class="demo-metric-value">123,456</div>
+          <div class="demo-metric-label">Impressions</div>
+          <div class="demo-success" style="font-size: 12px; margin-top: 8px;">↑ 8.3% vs last period</div>
+        </div>
+
+        <div class="card card--metric">
+          <div class="demo-metric-value">12,345</div>
+          <div class="demo-metric-label">Clicks</div>
+          <div class="demo-error" style="font-size: 12px; margin-top: 8px;">↓ 3.2% vs last period</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Data Tables -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">7. Data Tables</h2>
+      <p class="demo-section__desc">Structured data presentation with consistent spacing and visual hierarchy.</p>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="sortable">Date</th>
+              <th class="sortable">Platform</th>
+              <th class="sortable">Agency</th>
+              <th class="sortable" style="text-align: right;">Cost</th>
+              <th class="sortable" style="text-align: right;">Impressions</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2026-01-23</td>
+              <td>腾讯</td>
+              <td>量子</td>
+              <td style="text-align: right;">¥12,345.67</td>
+              <td style="text-align: right;">1,234,567</td>
+              <td><span class="tag tag--success">Active</span></td>
+            </tr>
+            <tr>
+              <td>2026-01-23</td>
+              <td>抖音</td>
+              <td>众联</td>
+              <td style="text-align: right;">¥8,901.23</td>
+              <td style="text-align: right;">987,654</td>
+              <td><span class="tag tag--success">Active</span></td>
+            </tr>
+            <tr>
+              <td>2026-01-23</td>
+              <td>小红书</td>
+              <td>风声</td>
+              <td style="text-align: right;">¥5,678.90</td>
+              <td style="text-align: right;">456,789</td>
+              <td><span class="tag tag--warning">Pending</span></td>
+            </tr>
+            <tr>
+              <td>2026-01-22</td>
+              <td>腾讯</td>
+              <td>优品</td>
+              <td style="text-align: right;">¥0.00</td>
+              <td style="text-align: right;">0</td>
+              <td><span class="tag tag--error">Inactive</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. Tags & Badges -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">8. Tags & Badges</h2>
+      <p class="demo-section__desc">Status indicators and notification badges with semantic color coding.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Tags</div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span class="tag">Default</span>
+            <span class="tag tag--primary">Primary</span>
+            <span class="tag tag--success">Success</span>
+            <span class="tag tag--warning">Warning</span>
+            <span class="tag tag--error">Error</span>
+            <span class="tag tag--info">Info</span>
+            <span class="tag" style="opacity: 0.6;">Disabled</span>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Badges</div>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <div style="position: relative; display: inline-block;">
+              <button class="btn btn--primary">Messages</button>
+              <span class="badge" style="position: absolute; top: -8px; right: -8px;">5</span>
+            </div>
+            <div style="position: relative; display: inline-block;">
+              <button class="btn btn--secondary">Notifications</button>
+              <span class="badge badge--dot" style="position: absolute; top: -4px; right: -4px;"></span>
+            </div>
+            <span class="badge">99+</span>
+            <span class="badge badge--primary">New</span>
+            <span class="badge badge--success">OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Modal Dialog -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">9. Modal Dialog</h2>
+      <p class="demo-section__desc">Overlay dialogs for focused user interactions.</p>
+
+      <button class="btn btn--primary"
+              onclick="document.getElementById('demoModal').classList.add('is-active')"
+              aria-haspopup="dialog"
+              aria-controls="demoModal">
+        Open Modal
+      </button>
+
+      <div class="modal-overlay"
+           id="demoModal"
+           role="dialog"
+           aria-modal="true"
+           aria-labelledby="modalTitle"
+           aria-describedby="modalDesc"
+           onclick="if(event.target === this) this.classList.remove('is-active')">
+        <div class="modal-container">
+          <div class="modal-header">
+            <h3 class="modal-title" id="modalTitle">Confirm Action</h3>
+            <button class="modal-close"
+                    onclick="document.getElementById('demoModal').classList.remove('is-active')"
+                    aria-label="关闭对话框">&times;</button>
+          </div>
+          <div class="modal-body" id="modalDesc">
+            <p style="margin: 0 0 16px 0;">Are you sure you want to proceed with this action? This operation cannot be undone.</p>
+            <div class="form-group">
+              <label class="form-label" for="modalReason">Reason</label>
+              <textarea id="modalReason"
+                        class="form-control"
+                        rows="3"
+                        placeholder="Optional: Provide a reason..."
+                        aria-describedby="modalReasonHint"></textarea>
+              <small class="form-hint" id="modalReasonHint">Optional: Provide a reason for your action</small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn--secondary" onclick="document.getElementById('demoModal').classList.remove('is-active')">Cancel</button>
+            <button class="btn btn--primary">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 10. Toast Notifications -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">10. Toast Notifications</h2>
+      <p class="demo-section__desc">Non-intrusive feedback messages for user actions.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn--success" onclick="showToast('success')">Success Toast</button>
+            <button class="btn btn--primary" onclick="showToast('info')">Info Toast</button>
+            <button class="btn btn--warning" onclick="showToast('warning')">Warning Toast</button>
+            <button class="btn btn--error" onclick="showToast('error')">Error Toast</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast-container" id="toastDemoContainer">
+        <!-- Toasts will be dynamically added here -->
+      </div>
+    </section>
+
+    <!-- 11. Loading States -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">11. Loading States</h2>
+      <p class="demo-section__desc">Visual feedback for async operations and content loading.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Spinners</div>
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <div class="spinner" style="width: 24px; height: 24px;"></div>
+            <div class="spinner" style="width: 32px; height: 32px;"></div>
+            <div class="spinner" style="width: 40px; height: 40px; border-width: 4px;"></div>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Skeleton Loading</div>
+          <div class="card" style="max-width: 400px;">
+            <div class="card__body">
+              <div class="skeleton" style="width: 60%; height: 24px; margin-bottom: 16px;"></div>
+              <div class="skeleton" style="width: 100%; height: 16px; margin-bottom: 8px;"></div>
+              <div class="skeleton" style="width: 100%; height: 16px; margin-bottom: 8px;"></div>
+              <div class="skeleton" style="width: 80%; height: 16px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12. Progress Indicators -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">12. Progress Indicators</h2>
+      <p class="demo-section__desc">Visualizing task completion and process flow.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Progress Bars</div>
+          <div style="max-width: 400px; display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+                <span>Uploading files...</span>
+                <span>75%</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar" style="width: 75%;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+                <span>Processing data...</span>
+                <span>45%</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar progress-bar--success" style="width: 45%;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+                <span>Warning: Low disk space</span>
+                <span>90%</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar progress-bar--warning" style="width: 90%;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+                <span>Error: Upload failed</span>
+                <span>30%</span>
+              </div>
+              <div class="progress">
+                <div class="progress-bar progress-bar--error" style="width: 30%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="demo-showcase__item">
+          <div class="demo-showcase__label">Steps</div>
+          <div style="max-width: 600px; padding: 20px 0;">
+            <div class="steps">
+              <div class="step is-completed">
+                <div class="step-circle">✓</div>
+                <div class="step-label">Account Info</div>
+              </div>
+              <div class="step-line step-line--success"></div>
+              <div class="step is-completed">
+                <div class="step-circle">✓</div>
+                <div class="step-label">Verification</div>
+              </div>
+              <div class="step-line"></div>
+              <div class="step is-active">
+                <div class="step-circle">3</div>
+                <div class="step-label">Confirmation</div>
+              </div>
+              <div class="step-line"></div>
+              <div class="step">
+                <div class="step-circle">4</div>
+                <div class="step-label">Complete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. Tooltips -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">13. Tooltips</h2>
+      <p class="demo-section__desc">Contextual help information on hover.</p>
+
+      <div class="demo-showcase">
+        <div class="demo-showcase__item">
+          <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap;">
+            <span class="tooltip" data-tooltip="This is a helpful tooltip text">
+              <button class="btn btn--outline">Hover me (Top)</button>
+            </span>
+
+            <span class="tooltip tooltip--right" data-tooltip="Tooltip appears on the right side">
+              <button class="btn btn--outline">Right tooltip</button>
+            </span>
+
+            <span class="tooltip tooltip--bottom" data-tooltip="Tooltip appears at the bottom">
+              <button class="btn btn--outline">Bottom tooltip</button>
+            </span>
+
+            <span class="tooltip tooltip--left" data-tooltip="Tooltip appears on the left">
+              <button class="btn btn--outline">Left tooltip</button>
+            </span>
+
+            <span class="tag tooltip" data-tooltip="Status: Active account">
+              Info with tooltip
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 14. Business Metrics Components -->
+    <section class="demo-section">
+      <h2 class="demo-section__title">14. Business Metrics Components</h2>
+      <p class="demo-section__desc">Professional metric cards for business dashboards with dynamic color coding and interactive effects.</p>
+
+      <!-- 14.1 Compact Cards (第一行：基础指标) -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card__header">
+          <h3 class="card__title">Compact Metric Cards</h3>
+          <div class="demo-showcase__label">First Row: Basic Metrics</div>
+        </div>
+        <div class="card__body">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <!-- Card 1: 新增笔记数 -->
+            <div style="
+              background: #6366F115;
+              border-left: 3px solid #6366F1;
+              padding: 14px 16px;
+              border-radius: 6px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px #6366F130'"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #6366F1; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                新增笔记数
+              </div>
+              <div style="font-size: 24px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                782
+              </div>
+              <div style="font-size: 11px; color: #8A8D99; margin-top: 2px;">
+                篇
+              </div>
+            </div>
+
+            <!-- Card 2: 投放笔记数 -->
+            <div style="
+              background: #8B5CF615;
+              border-left: 3px solid #8B5CF6;
+              padding: 14px 16px;
+              border-radius: 6px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px #8B5CF630'"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #8B5CF6; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                投放笔记数
+              </div>
+              <div style="font-size: 24px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                345
+              </div>
+              <div style="font-size: 11px; color: #8A8D99; margin-top: 2px;">
+                篇
+              </div>
+            </div>
+
+            <!-- Card 3: 投放金额 -->
+            <div style="
+              background: #F59E0B15;
+              border-left: 3px solid #F59E0B;
+              padding: 14px 16px;
+              border-radius: 6px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px #F59E0B30'"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #F59E0B; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                投放金额
+              </div>
+              <div style="font-size: 24px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                ¥128,450
+              </div>
+              <div style="font-size: 11px; color: #8A8D99; margin-top: 2px;">
+                元
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 14.2 Funnel Cards (第二行：业务转化漏斗) -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card__header">
+          <h3 class="card__title">Funnel Cards</h3>
+          <div class="demo-showcase__label">Second Row: Conversion Funnel</div>
+        </div>
+        <div class="card__body">
+          <div style="font-size: 12px; font-weight: 600; color: #5A5C66; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 3px; height: 14px; background: #1890FF; border-radius: 2px;"></span>
+            业务转化漏斗
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+            <!-- Funnel Step 1: 曝光量 -->
+            <div style="
+              background: #E8F4FF;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              position: relative;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px #1890FF40'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+              <div style="
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                width: 18px;
+                height: 18px;
+                background: #1890FF;
+                color: white;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">1</div>
+              <div style="font-size: 10px; color: #1890FF; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                曝光量
+              </div>
+              <div style="font-size: 20px; font-weight: 700; color: #171A23; line-height: 1.2; word-break: break-all;">
+                1,301,745
+              </div>
+            </div>
+
+            <!-- Funnel Step 2: 点击量 -->
+            <div style="
+              background: #FFF7E6;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              position: relative;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px #FA8C1640'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+              <div style="
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                width: 18px;
+                height: 18px;
+                background: #FA8C16;
+                color: white;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">2</div>
+              <div style="font-size: 10px; color: #FA8C16; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                点击量
+              </div>
+              <div style="font-size: 20px; font-weight: 700; color: #171A23; line-height: 1.2; word-break: break-all;">
+                112,456
+              </div>
+            </div>
+
+            <!-- Funnel Step 3: 私信进线 -->
+            <div style="
+              background: #FFF0F6;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              position: relative;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px #C41D7F40'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+              <div style="
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                width: 18px;
+                height: 18px;
+                background: #C41D7F;
+                color: white;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">3</div>
+              <div style="font-size: 10px; color: #C41D7F; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                私信进线
+              </div>
+              <div style="font-size: 20px; font-weight: 700; color: #171A23; line-height: 1.2; word-break: break-all;">
+                9,678
+              </div>
+            </div>
+
+            <!-- Funnel Step 4: 加企微 -->
+            <div style="
+              background: #F6FFED;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              position: relative;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px #52C41A40'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+              <div style="
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                width: 18px;
+                height: 18px;
+                background: #52C41A;
+                color: white;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">4</div>
+              <div style="font-size: 10px; color: #52C41A; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                加企微
+              </div>
+              <div style="font-size: 20px; font-weight: 700; color: #171A23; line-height: 1.2; word-break: break-all;">
+                834
+              </div>
+            </div>
+
+            <!-- Funnel Step 5: 开户数 -->
+            <div style="
+              background: #F9F0FF;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              position: relative;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px #722ED140'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+              <div style="
+                position: absolute;
+                top: 8px;
+                left: 8px;
+                width: 18px;
+                height: 18px;
+                background: #722ED1;
+                color: white;
+                border-radius: 50%;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              ">5</div>
+              <div style="font-size: 10px; color: #722ED1; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                开户数
+              </div>
+              <div style="font-size: 20px; font-weight: 700; color: #171A23; line-height: 1.2; word-break: break-all;">
+                153
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 14.3 Rate Cards (第三行：转化率指标) -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card__header">
+          <h3 class="card__title">Rate Cards with Dynamic Coloring</h3>
+          <div class="demo-showcase__label">Third Row: Conversion Rates</div>
+        </div>
+        <div class="card__body">
+          <div style="font-size: 12px; font-weight: 600; color: #5A5C66; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 3px; height: 14px; background: #52C41A; border-radius: 2px;"></span>
+            转化率指标
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <!-- Rate Card 1: 曝光点击率 (绿色 - 优秀) -->
+            <div style="
+              background: white;
+              border: 1px solid #E8E9EB;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.borderColor='#52C41A'; this.style.boxShadow='0 2px 8px #52C41A30'"
+               onmouseout="this.style.borderColor='#E8E9EB'; this.style.boxShadow='none'">
+              <div style="font-size: 10px; color: #8A8D99; margin-bottom: 4px;">
+                曝光 → 点击
+              </div>
+              <div style="font-size: 11px; color: #5A5C66; font-weight: 600; margin-bottom: 6px;">
+                曝光点击率
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #52C41A; line-height: 1.2;">
+                8.64<span style="font-size: 12px; font-weight: 500; margin-left: 2px;">%</span>
+              </div>
+            </div>
+
+            <!-- Rate Card 2: 点击进线率 (蓝色 - 良好) -->
+            <div style="
+              background: white;
+              border: 1px solid #E8E9EB;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.borderColor='#1890FF'; this.style.boxShadow='0 2px 8px #1890FF30'"
+               onmouseout="this.style.borderColor='#E8E9EB'; this.style.boxShadow='none'">
+              <div style="font-size: 10px; color: #8A8D99; margin-bottom: 4px;">
+                点击 → 私信
+              </div>
+              <div style="font-size: 11px; color: #5A5C66; font-weight: 600; margin-bottom: 6px;">
+                点击进线率
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #1890FF; line-height: 1.2;">
+                8.61<span style="font-size: 12px; font-weight: 500; margin-left: 2px;">%</span>
+              </div>
+            </div>
+
+            <!-- Rate Card 3: 进线加微率 (橙色 - 一般) -->
+            <div style="
+              background: white;
+              border: 1px solid #E8E9EB;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.borderColor='#FA8C16'; this.style.boxShadow='0 2px 8px #FA8C1630'"
+               onmouseout="this.style.borderColor='#E8E9EB'; this.style.boxShadow='none'">
+              <div style="font-size: 10px; color: #8A8D99; margin-bottom: 4px;">
+                私信 → 加微
+              </div>
+              <div style="font-size: 11px; color: #5A5C66; font-weight: 600; margin-bottom: 6px;">
+                进线加微率
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #FA8C16; line-height: 1.2;">
+                8.62<span style="font-size: 12px; font-weight: 500; margin-left: 2px;">%</span>
+              </div>
+            </div>
+
+            <!-- Rate Card 4: 线索开户率 (绿色 - 优秀) -->
+            <div style="
+              background: white;
+              border: 1px solid #E8E9EB;
+              border-radius: 6px;
+              padding: 12px;
+              text-align: center;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.borderColor='#52C41A'; this.style.boxShadow='0 2px 8px #52C41A30'"
+               onmouseout="this.style.borderColor='#E8E9EB'; this.style.boxShadow='none'">
+              <div style="font-size: 10px; color: #8A8D99; margin-bottom: 4px;">
+                加微 → 开户
+              </div>
+              <div style="font-size: 11px; color: #5A5C66; font-weight: 600; margin-bottom: 6px;">
+                线索开户率
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #52C41A; line-height: 1.2;">
+                18.35<span style="font-size: 12px; font-weight: 500; margin-left: 2px;">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 14.4 Cost Cards (第四行：成本效率指标) -->
+      <div class="card">
+        <div class="card__header">
+          <h3 class="card__title">Cost Efficiency Cards</h3>
+          <div class="demo-showcase__label">Fourth Row: Cost Metrics</div>
+        </div>
+        <div class="card__body">
+          <div style="font-size: 12px; font-weight: 600; color: #5A5C66; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 3px; height: 14px; background: #F59E0B; border-radius: 2px;"></span>
+            成本效率指标
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+            <!-- Cost Card 1: 千次曝光成本 (蓝色 - 100-500) -->
+            <div style="
+              background: #E8F4FF;
+              border-left: 3px solid #1890FF;
+              border-radius: 6px;
+              padding: 12px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 2px 8px #1890FF30'"
+               onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #1890FF; font-weight: 600; margin-bottom: 6px;">
+                千次曝光成本
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                130.18<span style="font-size: 12px; font-weight: 500; margin-left: 4px; color: #8A8D99;">元/千次</span>
+              </div>
+            </div>
+
+            <!-- Cost Card 2: 点击成本 (绿色 - <100) -->
+            <div style="
+              background: #F6FFED;
+              border-left: 3px solid #52C41A;
+              border-radius: 6px;
+              padding: 12px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 2px 8px #52C41A30'"
+               onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #52C41A; font-weight: 600; margin-bottom: 6px;">
+                点击成本
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                1.14<span style="font-size: 12px; font-weight: 500; margin-left: 4px; color: #8A8D99;">元/次</span>
+              </div>
+            </div>
+
+            <!-- Cost Card 3: 单企微成本 (橙色 - 500-1000) -->
+            <div style="
+              background: #FFF7E6;
+              border-left: 3px solid #FA8C16;
+              border-radius: 6px;
+              padding: 12px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 2px 8px #FA8C1630'"
+               onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #FA8C16; font-weight: 600; margin-bottom: 6px;">
+                单企微成本
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                13.29<span style="font-size: 12px; font-weight: 500; margin-left: 4px; color: #8A8D99;">元/人</span>
+              </div>
+            </div>
+
+            <!-- Cost Card 4: 单开户成本 (红色 - ≥1000) -->
+            <div style="
+              background: #FFF1F0;
+              border-left: 3px solid #F5222D;
+              border-radius: 6px;
+              padding: 12px;
+              transition: all 0.2s ease;
+              cursor: pointer;
+            " onmouseover="this.style.transform='translateX(4px)'; this.style.boxShadow='0 2px 8px #F5222D30'"
+               onmouseout="this.style.transform='translateX(0)'; this.style.boxShadow='none'">
+              <div style="font-size: 11px; color: #F5222D; font-weight: 600; margin-bottom: 6px;">
+                单开户成本
+              </div>
+              <div style="font-size: 22px; font-weight: 700; color: #171A23; line-height: 1.2;">
+                839.54<span style="font-size: 12px; font-weight: 500; margin-left: 4px; color: #8A8D99;">元/户</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Usage Documentation -->
+      <div class="code-preview" style="margin-top: 20px;">
+        <span class="comment">// JavaScript API Usage</span><br>
+        <span class="tag">&lt;script</span> <span class="attr">src=</span><span class="value">"js/components/BusinessMetrics.js"</span><span class="tag">&gt;&lt;/script&gt;</span><br><br>
+        <span class="comment">// Compact Card (First Row)</span><br>
+        BusinessMetrics.renderCompactCard('新增笔记数', '782', '篇', '#6366F1');<br><br>
+        <span class="comment">// Funnel Card (Second Row)</span><br>
+        BusinessMetrics.renderFunnelCard('曝光量', '1,301,745', '#E8F4FF', '#1890FF', 1);<br><br>
+        <span class="comment">// Rate Card (Third Row) - Auto color coding</span><br>
+        BusinessMetrics.renderRateCard('曝光点击率', 8.64, '%', '曝光 → 点击');<br><br>
+        <span class="comment">// Cost Card (Fourth Row) - Auto color coding</span><br>
+        BusinessMetrics.renderCostCard('千次曝光成本', 130.18, '元/千次');<br>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <div style="margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--color-border-light); text-align: center;">
+      <p class="text-tertiary" style="margin: 0; font-size: 13px;">
+        Structured Clarity Design System v1.0 · Precision through restraint
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // 深色模式切换函数
+    function toggleDarkMode() {
+      const body = document.body;
+      const themeIcon = document.getElementById('themeIcon');
+      const themeText = document.getElementById('themeText');
+
+      body.classList.toggle('dark-mode');
+      const isDark = body.classList.contains('dark-mode');
+
+      themeIcon.textContent = isDark ? '☀️' : '🌙';
+      themeText.textContent = isDark ? '浅色模式' : '深色模式';
+
+      // 持久化到 localStorage
+      localStorage.setItem('darkMode', isDark);
+    }
+
+    // 页面加载时恢复主题设置
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedDarkMode = localStorage.getItem('darkMode');
+      if (savedDarkMode === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('themeIcon').textContent = '☀️';
+        document.getElementById('themeText').textContent = '浅色模式';
+      }
+
+      // 初始化多选下拉框演示
+      const demoPlatformMultiSelect = new MultiSelectForm({
+        container: 'demoPlatformMultiSelect',
+        options: ['腾讯', '抖音', '小红书', '其他平台', '测试平台A', '测试平台B'],
+        placeholder: '请选择平台',
+        onChange: function(selectedValues) {
+          console.log('选中的平台:', selectedValues);
+        }
+      });
+
+      // 初始化 Full Layout Example 的多选下拉框
+      const fullDemoPlatformMultiSelect = new MultiSelectForm({
+        container: 'fullDemoPlatformMultiSelect',
+        options: ['腾讯', '抖音', '小红书'],
+        placeholder: '全部平台',
+        onChange: function(selectedValues) {
+          console.log('Full Layout - 选中的平台:', selectedValues);
+        }
+      });
+
+      const fullDemoAgencyMultiSelect = new MultiSelectForm({
+        container: 'fullDemoAgencyMultiSelect',
+        options: ['量子', '众联', '风声'],
+        placeholder: '全部代理商',
+        onChange: function(selectedValues) {
+          console.log('Full Layout - 选中的代理商:', selectedValues);
+        }
+      });
+
+      // 键盘导航支持 - ESC键关闭Modal
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          const modal = document.getElementById('demoModal');
+          if (modal && modal.classList.contains('is-active')) {
+            modal.classList.remove('is-active');
+            // 恢复焦点到触发按钮
+            document.querySelector('[aria-controls="demoModal"]').focus();
+          }
+        }
+      });
+
+      // Trap focus in modal（焦点陷阱）
+      const modal = document.getElementById('demoModal');
+      if (modal) {
+        modal.addEventListener('keydown', function(e) {
+          if (e.key === 'Tab') {
+            const focusableElements = modal.querySelectorAll(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            const firstFocusable = focusableElements[0];
+            const lastFocusable = focusableElements[focusableElements.length - 1];
+
+            if (e.shiftKey) {
+              // Shift+Tab
+              if (document.activeElement === firstFocusable) {
+                e.preventDefault();
+                lastFocusable.focus();
+              }
+            } else {
+              // Tab
+              if (document.activeElement === lastFocusable) {
+                e.preventDefault();
+                firstFocusable.focus();
+              }
+            }
+          }
+        });
+      }
+    });
+
+    // Date range quick select function (Form Elements section)
+    function setDateRange(days) {
+      const startDateInput = document.getElementById('demoStartDate');
+      const endDateInput = document.getElementById('demoEndDate');
+
+      if (days === 'all') {
+        // Demo 模式：使用近1年作为全部
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        
+        if (startDateInput && endDateInput) {
+          startDateInput.value = startDate.toISOString().split('T')[0];
+          endDateInput.value = endDate.toISOString().split('T')[0];
+        }
+      } else {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(endDate.getDate() - days);
+
+        if (startDateInput && endDateInput) {
+          startDateInput.value = startDate.toISOString().split('T')[0];
+          endDateInput.value = endDate.toISOString().split('T')[0];
+        }
+      }
+
+      // Update active state of buttons
+      const buttons = document.querySelectorAll('.btn-group .btn');
+      buttons.forEach(btn => btn.classList.remove('is-active'));
+      event.target.classList.add('is-active');
+    }
+
+    // Date range quick select function (Full Layout Example section)
+    function setFullDemoDateRange(days) {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - days);
+
+      const startDateInput = document.getElementById('fullDemoStartDate');
+      const endDateInput = document.getElementById('fullDemoEndDate');
+
+      if (startDateInput && endDateInput) {
+        startDateInput.value = startDate.toISOString().split('T')[0];
+        endDateInput.value = endDate.toISOString().split('T')[0];
+      }
+
+      // Update active state of buttons in the clicked button group only
+      const buttonGroup = event.target.closest('.btn-group');
+      if (buttonGroup) {
+        const buttons = buttonGroup.querySelectorAll('.btn');
+        buttons.forEach(btn => btn.classList.remove('is-active'));
+        event.target.classList.add('is-active');
+      }
+    }
+
+    // Interactive demo enhancements
+    document.addEventListener('DOMContentLoaded', function() {
+      // Add ripple effect to buttons
+      const buttons = document.querySelectorAll('.btn');
+      buttons.forEach(button => {
+        button.addEventListener('click', function(e) {
+          const ripple = document.createElement('span');
+          const rect = this.getBoundingClientRect();
+          const size = Math.max(rect.width, rect.height);
+          const x = e.clientX - rect.left - size / 2;
+          const y = e.clientY - rect.top - size / 2;
+
+          ripple.style.cssText = `
+            position: absolute;
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x}px;
+            top: ${y}px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: scale(0);
+            animation: ripple 0.6s ease-out;
+            pointer-events: none;
+          `;
+
+          this.style.position = 'relative';
+          this.style.overflow = 'hidden';
+          this.appendChild(ripple);
+
+          setTimeout(() => ripple.remove(), 600);
+        });
+      });
+
+      // Add loading state demo
+      const loadBtn = document.querySelector('.btn--primary');
+      let originalText;
+      loadBtn.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        if (!this.classList.contains('is-loading')) {
+          originalText = this.textContent;
+          this.classList.add('is-loading');
+          this.textContent = 'Loading...';
+          setTimeout(() => {
+            this.classList.remove('is-loading');
+            this.textContent = originalText;
+          }, 2000);
+        }
+      });
+    });
+
+    // Toast notification function
+    function showToast(type) {
+      const container = document.getElementById('toastDemoContainer');
+      const messages = {
+        success: { title: 'Success', message: 'Operation completed successfully!' },
+        info: { title: 'Information', message: 'Here is some useful information for you.' },
+        warning: { title: 'Warning', message: 'Please review this warning before proceeding.' },
+        error: { title: 'Error', message: 'An error occurred. Please try again.' }
+      };
+
+      const toast = document.createElement('div');
+      toast.className = `toast toast--${type}`;
+      toast.innerHTML = `
+        <div class="toast__icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ'}</div>
+        <div class="toast__content">
+          <div class="toast__title">${messages[type].title}</div>
+          <div class="toast__message">${messages[type].message}</div>
+        </div>
+        <button class="toast__close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+
+      container.appendChild(toast);
+
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateX(100%)';
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, 5000);
+    }
+  </script>
+
+  <style>
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+  </style>
+</body>
+</html>

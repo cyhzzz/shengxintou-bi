@@ -1,0 +1,604 @@
+/**
+ * 省心投 BI - 布局样式
+ * 定义页面整体布局：侧边栏、顶部栏、内容区
+ */
+
+/* ========================================
+   应用容器
+   ======================================== */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #F2F3F8;
+}
+
+/* ========================================
+   左侧导航栏
+   ======================================== */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 200px;
+    height: 100vh;
+    background-color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    z-index: 1000;
+}
+
+.sidebar-header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    background-color: #FFFFFF;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 200px;
+    z-index: 1001;
+    padding: 0 8px;
+    overflow: hidden;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0;
+}
+
+.logo-icon {
+    width: 90px;
+    height: 21px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.logo-text-icon {
+    width: 85px;
+    height: 21px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg) 0;
+    margin-top: 48px;  /* 为固定的header留出空间 */
+}
+
+.nav-list {
+    padding: 0;
+    margin: 0;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: #2B323F;
+    font-family: PingFangSC-Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 14px;
+    margin-bottom: 0;
+    position: relative;
+}
+
+/* 有子菜单的项使用flex布局换行 */
+.nav-item.has-submenu {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    height: auto;
+}
+
+.nav-item.has-submenu > .submenu-trigger {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: #2B323F;
+    font-family: PingFangSC-Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 14px;
+}
+
+/* 导航图标样式 */
+.nav-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+    opacity: 0.6;
+}
+
+/* 选中状态：图标变为蓝色 */
+.nav-item.active .nav-icon,
+.nav-item.has-submenu.active > .submenu-trigger .nav-icon,
+.submenu .nav-item.active .nav-icon {
+    opacity: 1;
+    filter: brightness(1.2) saturate(1.5);
+}
+
+.submenu-icon {
+    transition: transform var(--transition-normal);
+}
+
+.nav-item.expanded .submenu-icon {
+    transform: rotate(90deg);
+}
+
+.submenu-item-icon {
+    margin-right: var(--spacing-lg);
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-item:hover {
+    background-color: rgba(216, 216, 216, 0.3);
+}
+
+/* 移除有子菜单项的默认hover效果 */
+.nav-item.has-submenu:hover {
+    background-color: transparent;
+}
+
+.nav-item.has-submenu:hover > .submenu-trigger {
+    background-color: rgba(216, 216, 216, 0.3);
+}
+
+.nav-item.active {
+    background-color: #D8D8D8;
+    color: #165DFF;
+}
+
+/* 有子菜单项的active状态 */
+.nav-item.has-submenu.active > .submenu-trigger {
+    background-color: #D8D8D8;
+    color: #165DFF;
+}
+
+/* 二级菜单项样式 */
+.submenu .nav-item {
+    display: flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 16px 0 48px;
+    font-size: 14px;
+    width: 100%;
+    color: #2B323F;
+    font-family: PingFangSC-Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    line-height: 14px;
+}
+
+.submenu .nav-item .nav-icon {
+    margin-right: 12px;
+    opacity: 0.6;
+}
+
+.submenu .nav-item.active {
+    background-color: #D8D8D8;
+    color: #165DFF;
+}
+
+.submenu .nav-item.active .nav-icon {
+    opacity: 1;
+    filter: brightness(1.2) saturate(1.5);
+}
+
+/* 菜单分割线 */
+.nav-divider {
+    height: 1px;
+    background-color: #E5E6EB;
+    margin: 8px 16px;
+}
+
+.nav-item i {
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+}
+
+/* 二级菜单 */
+.submenu {
+    display: none;
+    transform-origin: top;
+    overflow: hidden;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    flex-basis: 100%;
+}
+
+.nav-item.has-submenu.expanded > .submenu {
+    display: block;
+}
+
+/* ========================================
+   主容器
+   ======================================== */
+.main-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-left: 200px;
+}
+
+/* ========================================
+   顶部栏
+   ======================================== */
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 200px;
+    right: 0;
+    height: 48px;
+    background-color: #FFFFFF;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-lg);
+    z-index: 999;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.breadcrumb-brand {
+    color: #b2b7c4;
+    font-family: PingFangSC, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 12px;
+}
+
+.breadcrumb-separator {
+    color: #b2b7c4;
+    font-family: PingFangSC, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 12px;
+}
+
+.breadcrumb-current {
+    color: #3e4862;
+    font-family: PingFangSC, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 12px;
+}
+
+.page-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing);
+}
+
+/* ========================================
+   内容区域
+   ======================================== */
+.content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: calc(48px + var(--spacing-lg)) var(--spacing-lg) var(--spacing-lg);
+    background-color: #FFFFFF;
+}
+
+/* ========================================
+   筛选器栏
+   ======================================== */
+.filter-bar {
+    width: 100%;
+    max-width: 1154px;
+    margin: 0 auto var(--spacing);
+    padding: 16px;
+    min-height: 64px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+}
+
+/* 通用卡片样式 */
+.card {
+    background-color: var(--bg-content);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing);
+    margin-bottom: var(--spacing);
+    width: 100%;
+    max-width: 1154px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* 代理商分析报表容器 */
+.agency-analysis-report {
+    width: 100%;
+    max-width: 1154px;
+    margin: 0 auto;
+}
+
+.agency-analysis-report .card {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-label {
+    min-width: 65px;
+    height: 16px;
+    font-family: PingFangSC-Medium, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    color: #2B323F;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+/* 日期按钮组 */
+.date-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.date-btn {
+    height: 32px;
+    padding: 0 12px;
+    border: 0.5px solid #CBD0DA;
+    border-radius: 4px;
+    background-color: #FFFFFF;
+    font-family: AlibabaPuHuiTi_2_55_Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: #4E5969;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.date-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.date-btn.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #FFFFFF;
+}
+
+/* 日期范围选择器 */
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 筛选器输入框 */
+.date-input,
+.filter-input {
+    width: 140px;
+    height: 32px;
+    padding: 0 12px;
+    border: 0.5px solid #CBD0DA;
+    border-radius: 4px;
+    font-family: AlibabaPuHuiTi_2_55_Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: #4E5969;
+    background-color: #FFFFFF;
+    transition: border-color var(--transition-fast);
+}
+
+.date-input:focus,
+.filter-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.date-separator {
+    color: #4E5969;
+    font-size: 14px;
+}
+
+/* 标签列表 */
+.tag-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 12px;
+    background-color: #F2F3F5;
+    border: 0.5px solid #CBD0DA;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #1D2129;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.tag:hover {
+    background-color: #E5E6EB;
+}
+
+.tag.active {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #FFFFFF;
+}
+
+/* 筛选操作按钮区 */
+.filter-actions {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.btn {
+    height: 32px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 2px;
+    font-family: AlibabaPuHuiTi_2_55_Regular, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background-color: #F2F3F5;
+    color: #1D2129;
+}
+
+.btn-primary:hover {
+    background-color: #E5E6EB;
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: #4E5969;
+}
+
+.btn-secondary:hover {
+    color: #1D2129;
+}
+
+/* ========================================
+   数据卡片区
+   ======================================== */
+.metrics-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing);
+    margin-bottom: var(--spacing);
+}
+
+.metrics-cards .metric-card {
+    margin: 0;
+}
+
+.metric-card {
+    background-color: var(--bg-content);
+    padding: var(--spacing);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--border-color);
+}
+
+.card-title {
+    font-size: var(--font-size);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.card-value {
+    font-size: var(--font-size-xxl);
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.card-trend {
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.card-trend.up {
+    color: var(--success-color);
+}
+
+.card-trend.down {
+    color: var(--error-color);
+}
+
+/* ========================================
+   图表区域
+   ======================================== */
+.chart-section {
+    /* card类已提供背景、圆角、阴影、内边距和下边距 */
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing);
+}
+
+.section-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chart-container {
+    width: 100%;
+    height: 400px;
+}

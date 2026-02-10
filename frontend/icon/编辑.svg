@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 铅笔 -->
+    <path d="M3,17 L5,13 L14,4 L16,6 L7,15 L3,17 Z" fill="#D2DAE8" opacity="0.5"/>
+    <path d="M5,13 L14,4 L16,6 L7,15 L5,13" fill="#A3ADC4" opacity="0.8"/>
+    <path d="M14,4 L16,6 L14.5,4.5 Z" fill="#55698F"/>
+    <path d="M3,17 L4.5,15 L5,15.5 Z" fill="#55698F"/>
+    <line x1="3" y1="17" x2="5" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round"/>
+  </g>
+</svg>

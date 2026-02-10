@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 文档 -->
+    <path d="M4,2 L12,2 L16,6 L16,18 L4,18 Z" fill="#D2DAE8" opacity="0.6"/>
+    <path d="M12,2 L12,6 L16,6" fill="#A3ADC4" opacity="0.8"/>
+    <!-- 向外箭头 -->
+    <path d="M10,8 L10,14" stroke="#55698F" stroke-width="2" stroke-linecap="round"/>
+    <path d="M7,11 L10,14 L13,11" stroke="#55698F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 向右箭头 -->
+    <path d="M13,12 L18,12" stroke="#55698F" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M16,10 L18,12 L16,14" stroke="#55698F" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

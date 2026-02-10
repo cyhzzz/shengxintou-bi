@@ -1,0 +1,14 @@
+{
+  "version": "0.9.0",
+  "release_date": "2026-02-05",
+  "changelog": [
+    "首个完整版本",
+    "制作exe启动器",
+    "内置便携PY环境",
+    "报表功能完成基础版本的多个报表",
+    "已知多个bug，持续修复中，请轻喷"
+  ],
+  "cloud_version_file": "version_cloud.json",
+  "update_url": "",
+  "support_contact": "产品经理 陈元昊"
+}
