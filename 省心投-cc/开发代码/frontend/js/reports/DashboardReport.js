@@ -1,8 +1,15 @@
 /**
- * 省心投 BI - 数据概览报表 (Structured Clarity v1.2 优化版)
+ * 省心投 BI - 数据概览报表 (Structured Clarity v2.1 业务层级优化)
  * 基于 PRD 文档规范实现
  * 使用 daily_metrics_unified 数据源
  * 支持深色模式
+ *
+ * 更新内容 (v2.1):
+ * - 新增业务层级分组展示：投入效果、业务成果、效率指标
+ * - 参考 Business Metrics Components 设计风格
+ * - 新增"服务存量客户资产"指标卡片
+ * - 客户资产和客户创收仅统计新开客户(is_opened_account=1)
+ * - 新增总展示数指标
  */
 
 class DashboardReport {
@@ -27,6 +34,12 @@ class DashboardReport {
         this.agencyMultiSelect = null;
         this.businessModelMultiSelect = null;
 
+        // Phase 1: 修复事件监听器泄漏
+        this.eventManager = new EventManager();
+
+        // 初始化元数据管理器
+        this.metadataManager = new MetadataManager();
+
         this.init();
     }
 
@@ -43,7 +56,7 @@ class DashboardReport {
         }
 
         // 加载元数据
-        await metadataManager.loadMetadata();
+        await this.metadataManager.loadMetadata();
 
         // 渲染筛选器
         this.renderFilters();
@@ -66,9 +79,7 @@ class DashboardReport {
      */
     initDataFreshnessIndicator() {
         try {
-            this.dataFreshnessIndicator = new DataFreshnessIndicator({
-                containerId: 'dataFreshnessContainer'
-            });
+            this.dataFreshnessIndicator = new DataFreshnessIndicator('dataFreshnessContainer');
             console.log('[Dashboard] 数据新鲜度指示器初始化成功');
         } catch (error) {
             console.error('[Dashboard] 数据新鲜度指示器初始化失败:', error);
@@ -180,8 +191,8 @@ class DashboardReport {
                                 <!-- 快速选择按钮 -->
                                 <div class="btn-group" style="display: inline-flex;">
                                     <button class="btn" data-days="all" style="height: 32px; white-space: nowrap;">全部</button>
-                                    <button class="btn is-active" data-days="7" style="height: 32px; white-space: nowrap;">近7天</button>
-                                    <button class="btn" data-days="30" style="height: 32px; white-space: nowrap;">近30天</button>
+                                    <button class="btn" data-days="7" style="height: 32px; white-space: nowrap;">近7天</button>
+                                    <button class="btn is-active" data-days="30" style="height: 32px; white-space: nowrap;">近30天</button>
                                     <button class="btn" data-days="90" style="height: 32px; white-space: nowrap;">近90天</button>
                                 </div>
                             </div>
@@ -203,7 +214,7 @@ class DashboardReport {
             }
 
             // 初始化平台多选下拉框
-            const platforms = metadataManager.getPlatforms();
+            const platforms = this.metadataManager.getPlatforms();
             console.log('[Dashboard] 初始化平台多选框，选项:', platforms);
             this.platformMultiSelect = new MultiSelectForm({
                 container: 'platformMultiSelect',
@@ -215,7 +226,7 @@ class DashboardReport {
             });
 
             // 初始化代理商多选下拉框
-            const agencies = metadataManager.getAgencies();
+            const agencies = this.metadataManager.getAgencies();
             console.log('[Dashboard] 初始化代理商多选框，选项:', agencies);
             this.agencyMultiSelect = new MultiSelectForm({
                 container: 'agencyMultiSelect',
@@ -227,7 +238,7 @@ class DashboardReport {
             });
 
             // 初始化业务模式多选下拉框
-            const businessModels = metadataManager.getBusinessModels();
+            const businessModels = this.metadataManager.getBusinessModels();
             console.log('[Dashboard] 初始化业务模式多选框，选项:', businessModels);
             this.businessModelMultiSelect = new MultiSelectForm({
                 container: 'businessModelMultiSelect',
@@ -241,18 +252,32 @@ class DashboardReport {
             console.log('[Dashboard] 多选组件初始化完成');
         }, 0);
 
-        // 设置默认日期（近7天，与HTML中的激活状态一致）
-        this.setDateRange(7);
+        // 设置默认日期（近30天，与HTML中的激活状态一致）
+        this.setDateRange(30);
+    }
+
+    /**
+     * 解绑事件（Phase 1: 修复事件监听器泄漏）
+     * 在 bindFilterEvents() 之前调用，防止重复绑定
+     */
+    unbindEvents() {
+        // 使用 EventManager 清理所有事件监听器
+        if (this.eventManager) {
+            this.eventManager.off();
+        }
     }
 
     /**
      * 绑定筛选器事件
      */
     bindFilterEvents() {
+        // Phase 1: 先解绑之前的事件，防止重复绑定
+        this.unbindEvents();
+
         // 日期快速选择按钮
         const dateButtons = document.querySelectorAll('.btn[data-days]');
         dateButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
+            this.eventManager.on(btn, 'click', () => {
                 const days = btn.dataset.days;
                 if (days === 'all') {
                     // 全部：不设置日期输入框，清空激活状态
@@ -282,44 +307,56 @@ class DashboardReport {
             allDateButtons.forEach(btn => btn.classList.remove('is-active'));
         };
 
-        startDateInput?.addEventListener('change', handleDateChange);
-        endDateInput?.addEventListener('change', handleDateChange);
+        if (startDateInput) {
+            this.eventManager.on(startDateInput, 'change', handleDateChange);
+        }
+        if (endDateInput) {
+            this.eventManager.on(endDateInput, 'change', handleDateChange);
+        }
 
         // 查询按钮
-        document.getElementById('queryBtn')?.addEventListener('click', async () => {
-            await this.loadData();
-            this.render();
-        });
+        const queryBtn = document.getElementById('queryBtn');
+        if (queryBtn) {
+            this.eventManager.on(queryBtn, 'click', async () => {
+                await this.loadData();
+                // Phase 2: 使用 updateData() 而不是 render()，避免全量重渲染
+                this.updateData();
+            });
+        }
 
         // 重置按钮
-        document.getElementById('resetBtn')?.addEventListener('click', async () => {
-            this.currentFilters = {
-                platforms: [],
-                agencies: [],
-                business_models: []
-            };
+        const resetBtn = document.getElementById('resetBtn');
+        if (resetBtn) {
+            this.eventManager.on(resetBtn, 'click', async () => {
+                this.currentFilters = {
+                    platforms: [],
+                    agencies: [],
+                    business_models: []
+                };
 
-            // 重置日期为默认（全部）
-            const dateButtons = document.querySelectorAll('.btn[data-days]');
-            dateButtons.forEach(btn => btn.classList.remove('is-active'));
-            dateButtons[0].classList.add('is-active'); // 激活"全部"按钮
+                // 重置日期为默认（全部）
+                const dateButtons = document.querySelectorAll('.btn[data-days]');
+                dateButtons.forEach(btn => btn.classList.remove('is-active'));
+                dateButtons[0].classList.add('is-active'); // 激活"全部"按钮
 
-            const startDateInput = document.getElementById('dashboardStartDate');
-            const endDateInput = document.getElementById('dashboardEndDate');
-            if (startDateInput && endDateInput) {
-                startDateInput.value = '';
-                endDateInput.value = '';
-            }
+                const startDateInput = document.getElementById('dashboardStartDate');
+                const endDateInput = document.getElementById('dashboardEndDate');
+                if (startDateInput && endDateInput) {
+                    startDateInput.value = '';
+                    endDateInput.value = '';
+                }
 
-            // 重置多选下拉框
-            this.platformMultiSelect?.clear();
-            this.agencyMultiSelect?.clear();
-            this.businessModelMultiSelect?.clear();
+                // 重置多选下拉框
+                this.platformMultiSelect?.clear();
+                this.agencyMultiSelect?.clear();
+                this.businessModelMultiSelect?.clear();
 
-            // 重新加载数据
-            await this.loadData();
-            this.render();
-        });
+                // 重新加载数据
+                await this.loadData();
+                // Phase 2: 使用 updateData() 而不是 render()，避免全量重渲染
+                this.updateData();
+            });
+        }
     }
 
     /**
@@ -380,13 +417,33 @@ class DashboardReport {
             business_models: businessModels  // 修复：使用正确的变量名
         };
 
-        // 参考厂商分析报表：只有当不是"全部"模式时才传日期
-        if (dateMode !== 'all') {
-            const startDate = document.getElementById('dashboardStartDate')?.value;
-            const endDate = document.getElementById('dashboardEndDate')?.value;
-            if (startDate && endDate) {
-                filters.date_range = [startDate, endDate];
-            }
+        // 修复：检查自定义日期输入值，如果有值就使用，不管快速按钮状态
+        const startDate = document.getElementById('dashboardStartDate')?.value;
+        const endDate = document.getElementById('dashboardEndDate')?.value;
+
+        // 检查快速按钮状态（用于日志记录）
+        const activeDateBtn = document.querySelector('.btn[data-days].is-active');
+        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : 'all';
+
+        if (startDate && endDate) {
+            // 有自定义日期：优先使用自定义日期范围
+            filters.date_range = [startDate, endDate];
+            console.log('[Dashboard] 使用自定义日期区间:', startDate, '至', endDate, '| 快速按钮状态:', dateMode);
+        } else if (dateMode !== 'all') {
+            // 快速按钮被选中（近7/30/90天）：计算日期范围
+            const days = parseInt(dateMode);
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - days);
+
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+
+            filters.date_range = [startDateStr, endDateStr];
+            console.log('[Dashboard] 使用快速日期按钮:', dateMode, '| 计算日期范围:', startDateStr, '至', endDateStr);
+        } else {
+            // 全部：不传递日期范围
+            console.log('[Dashboard] 使用全部数据（无日期筛选）');
         }
 
         console.log('[Dashboard] 获取筛选条件:', filters);
@@ -421,11 +478,14 @@ class DashboardReport {
             // 并行加载当前周期和上一周期的数据
             const prevDateRange = this.getPreviousDateRange();
 
-            // 构建请求列表
+            // 构建请求列表（添加客户资产、客户贡献、存量客户资产和总展示数指标）
+            const metricsList = ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'];
+            console.log('[Dashboard] 请求的metrics列表:', metricsList);
+
             const requests = [
                 API.queryData({
                     dimensions: [],
-                    metrics: ['cost', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users'],
+                    metrics: metricsList,
                     filters: filters,
                     granularity: 'summary'
                 })
@@ -436,7 +496,7 @@ class DashboardReport {
                 requests.push(
                     API.queryData({
                         dimensions: [],
-                        metrics: ['cost', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users'],
+                        metrics: ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
                         filters: {
                             date_range: [prevDateRange.start_date, prevDateRange.end_date],
                             ...(filters.platforms && { platforms: filters.platforms }),
@@ -448,19 +508,27 @@ class DashboardReport {
                 );
             }
 
-            const [currentResponse, previousResponse] = await Promise.all(requests);
+            // 🔧 性能优化: 并行加载趋势数据和核心数据 (Eliminating Waterfalls)
+            const [currentResponse, previousResponse] = await Promise.all([
+                Promise.all(requests),
+                this.loadTrendData()
+            ]);
 
-            if (!currentResponse.success) {
-                throw new Error(currentResponse.error || '加载数据失败');
+            console.log('[Dashboard] 当前周期响应:', currentResponse[0]);
+            console.log('[Dashboard] 上一周期响应:', previousResponse);
+
+            if (!currentResponse[0].success) {
+                throw new Error(currentResponse[0].error || '加载数据失败');
             }
 
             // 处理数据 (传递完整响应对象，而不是 .data)
-            this.currentData = this.processDashboardData(currentResponse, previousResponse);
+            this.currentData = this.processDashboardData(currentResponse[0], previousResponse);
 
-            // 同时加载趋势数据
-            await this.loadTrendData();
+            // 趋势数据已在并行加载中完成
 
             console.log('[Dashboard] 数据加载成功', this.currentData);
+            console.log('[Dashboard] 客户资产:', this.currentData.core_metrics?.customer_assets);
+            console.log('[Dashboard] 客户贡献:', this.currentData.core_metrics?.customer_contribution);
 
         } catch (error) {
             console.error('[Dashboard] 数据加载失败:', error);
@@ -477,15 +545,23 @@ class DashboardReport {
         const previous = previousData?.data?.[0] || {};
 
         const cost = parseFloat(current.metrics?.cost || 0);
+        const impressions = parseInt(current.metrics?.impressions || 0);
         const leads = parseInt(current.metrics?.lead_users || 0);
         const opened = parseInt(current.metrics?.opened_account_users || 0);
         const valid = parseInt(current.metrics?.valid_customer_users || 0);
         const clicks = parseInt(current.metrics?.click_users || 0);
+        const assets = parseFloat(current.metrics?.customer_assets || 0);
+        const contribution = parseFloat(current.metrics?.customer_contribution || 0);
+        const existingAssets = parseFloat(current.metrics?.existing_customers_assets || 0);
 
         const prevCost = parseFloat(previous.metrics?.cost || 0);
+        const prevImpressions = parseInt(previous.metrics?.impressions || 0);
         const prevLeads = parseInt(previous.metrics?.lead_users || 0);
         const prevOpened = parseInt(previous.metrics?.opened_account_users || 0);
         const prevValid = parseInt(previous.metrics?.valid_customer_users || 0);
+        const prevAssets = parseFloat(previous.metrics?.customer_assets || 0);
+        const prevContribution = parseFloat(previous.metrics?.customer_contribution || 0);
+        const prevExistingAssets = parseFloat(previous.metrics?.existing_customers_assets || 0);
 
         // 计算环比
         const calcWoW = (curr, prev, isCostMetric = false) => {
@@ -493,7 +569,8 @@ class DashboardReport {
             const percent = ((curr - prev) / prev) * 100;
             const trend = percent >= 0 ? 'up' : 'down';
             const color = isCostMetric ? (percent >= 0 ? 'red' : 'green') : (percent >= 0 ? 'green' : 'red');
-            return { value: Math.abs(percent), trend, color };
+            // 限制小数位数不超过2位
+            return { value: parseFloat(Math.abs(percent).toFixed(2)), trend, color };
         };
 
         const costPerLead = leads > 0 ? cost / leads : 0;
@@ -510,7 +587,11 @@ class DashboardReport {
                 investment: cost,
                 new_valid_accounts: valid,
                 total_leads: leads,
+                total_impressions: impressions,
                 total_clicks: clicks,
+                customer_assets: assets,
+                customer_contribution: contribution,
+                existing_customers_assets: existingAssets,
                 cost_per_valid_account: parseFloat(costPerValidAccount.toFixed(2)),
                 cost_per_lead: parseFloat(costPerLead.toFixed(2))
             },
@@ -519,7 +600,11 @@ class DashboardReport {
                 investment: calcWoW(cost, prevCost, true),
                 new_valid_accounts: calcWoW(valid, prevValid, false),
                 total_leads: calcWoW(leads, prevLeads, false),
+                total_impressions: calcWoW(impressions, prevImpressions, false),
                 total_clicks: calcWoW(clicks, 0, true),
+                customer_assets: calcWoW(assets, prevAssets, false),
+                customer_contribution: calcWoW(contribution, prevContribution, false),
+                existing_customers_assets: calcWoW(existingAssets, prevExistingAssets, false),
                 cost_per_valid_account: calcWoW(costPerValidAccount, prevCostPerValidAccount, true),
                 cost_per_lead: calcWoW(costPerLead, prevCostPerLead, true)
             }
@@ -584,11 +669,18 @@ class DashboardReport {
     }
 
     /**
-     * 渲染报表
+     * 渲染报表（Phase 2优化：只创建一次DOM结构）
      */
     render() {
         const container = document.getElementById('mainContent');
         if (!container) return;
+
+        // 检查是否已经渲染过DOM结构
+        if (container.querySelector('.dashboard-report')) {
+            // DOM结构已存在，只需要更新数据
+            this.updateData();
+            return;
+        }
 
         // 保留筛选器，移除旧内容
         const filterSection = container.querySelector('.card--filter');
@@ -610,11 +702,7 @@ class DashboardReport {
                         <h3 class="card__title">核心指标</h3>
                     </div>
                     <div class="card__body">
-                        <div class="metrics-cards" id="metricsCardsGrid" style="
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                            gap: var(--space-lg);
-                        ">
+                        <div class="metrics-cards" id="metricsCardsGrid">
                             ${this.renderMetricsCards()}
                         </div>
                     </div>
@@ -721,15 +809,68 @@ class DashboardReport {
 
         container.insertAdjacentHTML('beforeend', contentHTML);
 
-        // 渲染图表
-        setTimeout(() => {
-            this.renderChart();
+        // 渲染图表（异步加载 ECharts）
+        setTimeout(async () => {
+            await this.renderChart();
             this.bindTabEvents();
         }, 100);
     }
 
     /**
-     * 渲染核心指标卡片 (Structured Clarity v1.2 优化)
+     * 更新数据（Phase 2优化：局部更新，避免全量重渲染）
+     * 只更新数据部分，保留DOM结构
+     */
+    async updateData() {
+        if (!this.currentData) return;
+
+        // 更新指标卡片
+        const metricsContainer = document.getElementById('metricsCardsGrid');
+        if (metricsContainer) {
+            metricsContainer.innerHTML = this.renderMetricsCards();
+        }
+
+        // 更新指标摘要
+        this.updateMetricSummary();
+
+        // 更新图表（异步加载 ECharts）
+        if (this.chartInstance) {
+            this.chartInstance.dispose();
+        }
+        await this.renderChart();
+    }
+
+    /**
+     * 更新指标摘要（Phase 2新增）
+     */
+    updateMetricSummary() {
+        if (!this.currentData || !this.currentData.core_metrics) return;
+
+        const metrics = this.currentData.core_metrics;
+        const summaryContainer = document.querySelector('.metric-summary');
+        if (!summaryContainer) return;
+
+        // 更新单线索成本
+        const costPerLead = summaryContainer.querySelector('.summary-item:nth-child(1) .summary-value');
+        if (costPerLead) {
+            costPerLead.textContent = this.formatCurrency(metrics.cost_per_lead || 0);
+        }
+
+        // 更新单客户成本
+        const costPerCustomer = summaryContainer.querySelector('.summary-item:nth-child(2) .summary-value');
+        if (costPerCustomer) {
+            const value = metrics.investment / metrics.new_customers || 0;
+            costPerCustomer.textContent = this.formatCurrency(value);
+        }
+
+        // 更新单有效户成本
+        const costPerValidAccount = summaryContainer.querySelector('.summary-item:nth-child(3) .summary-value');
+        if (costPerValidAccount) {
+            costPerValidAccount.textContent = this.formatCurrency(metrics.cost_per_valid_account || 0);
+        }
+    }
+
+    /**
+     * 渲染核心指标卡片 (Business Metrics Components v2.0 - 业务层级优化)
      */
     renderMetricsCards() {
         if (!this.currentData || !this.currentData.core_metrics) {
@@ -739,97 +880,208 @@ class DashboardReport {
         const metrics = this.currentData.core_metrics;
         const wowChanges = this.currentData.wow_changes || {};
 
-        const metricsConfig = [
+        // 定义三个业务层级的指标组
+        const businessGroups = [
             {
-                title: '新开客户数',
-                key: 'new_customers',
-                unit: '户',
-                value: this.formatNumber(metrics.new_customers || 0),
-                wow: wowChanges.new_customers
+                name: '前端投放',
+                icon: '📊',
+                description: '广告投放与获取效果',
+                metrics: [
+                    {
+                        title: '阶段投入金额',
+                        key: 'investment',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.investment || 0),
+                        wow: wowChanges.investment,
+                        isPrimary: true,
+                        isCostMetric: true
+                    },
+                    {
+                        title: '总展示数',
+                        key: 'impressions',
+                        unit: '次',
+                        value: this.formatNumber(metrics.total_impressions || 0),
+                        wow: wowChanges.total_impressions
+                    },
+                    {
+                        title: '总点击数',
+                        key: 'total_clicks',
+                        unit: '次',
+                        value: this.formatNumber(metrics.total_clicks || 0),
+                        wow: wowChanges.total_clicks
+                    },
+                    {
+                        title: '总线索数',
+                        key: 'total_leads',
+                        unit: '个',
+                        value: this.formatNumber(metrics.total_leads || 0),
+                        wow: wowChanges.total_leads,
+                        isPrimary: true
+                    }
+                ]
             },
             {
-                title: '阶段投入金额',
-                key: 'investment',
-                unit: '元',
-                value: this.formatCurrency(metrics.investment || 0),
-                wow: wowChanges.investment,
-                isCostMetric: true
+                name: '后端转化',
+                icon: '💼',
+                description: '客户获取与价值创造',
+                metrics: [
+                    {
+                        title: '新开客户数',
+                        key: 'new_customers',
+                        unit: '户',
+                        value: this.formatNumber(metrics.new_customers || 0),
+                        wow: wowChanges.new_customers,
+                        isPrimary: true
+                    },
+                    {
+                        title: '新增有效户数',
+                        key: 'new_valid_accounts',
+                        unit: '户',
+                        value: this.formatNumber(metrics.new_valid_accounts || 0),
+                        wow: wowChanges.new_valid_accounts,
+                        isPrimary: true
+                    },
+                    {
+                        title: '客户资产',
+                        key: 'customer_assets',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.customer_assets || 0),
+                        wow: wowChanges.customer_assets,
+                        isHighlight: true
+                    },
+                    {
+                        title: '客户今年创收',
+                        key: 'customer_contribution',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.customer_contribution || 0),
+                        wow: wowChanges.customer_contribution,
+                        isHighlight: true
+                    },
+                    {
+                        title: '服务存量客户资产',
+                        key: 'existing_customers_assets',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.existing_customers_assets || 0),
+                        wow: wowChanges.existing_customers_assets,
+                        isHighlight: true
+                    }
+                ]
             },
             {
-                title: '新增有效户数',
-                key: 'new_valid_accounts',
-                unit: '户',
-                value: this.formatNumber(metrics.new_valid_accounts || 0),
-                wow: wowChanges.new_valid_accounts
-            },
-            {
-                title: '总线索数',
-                key: 'total_leads',
-                unit: '个',
-                value: this.formatNumber(metrics.total_leads || 0),
-                wow: wowChanges.total_leads
-            },
-            {
-                title: '总点击数',
-                key: 'total_clicks',
-                unit: '次',
-                value: this.formatNumber(metrics.total_clicks || 0),
-                wow: wowChanges.total_clicks
-            },
-            {
-                title: '单有效户成本',
-                key: 'cost_per_valid_account',
-                unit: '元',
-                value: this.formatCurrency(metrics.cost_per_valid_account || 0),
-                wow: wowChanges.cost_per_valid_account,
-                isCostMetric: true
-            },
-            {
-                title: '单线索成本',
-                key: 'cost_per_lead',
-                unit: '元',
-                value: this.formatCurrency(metrics.cost_per_lead || 0),
-                wow: wowChanges.cost_per_lead,
-                isCostMetric: true
+                name: '运营效率',
+                icon: '⚡',
+                description: '单位成本分析',
+                metrics: [
+                    {
+                        title: '单线索成本',
+                        key: 'cost_per_lead',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.cost_per_lead || 0),
+                        wow: wowChanges.cost_per_lead,
+                        isCostMetric: true
+                    },
+                    {
+                        title: '单开户成本',
+                        key: 'cost_per_account',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.investment / (metrics.new_customers || 1) || 0),
+                        wow: { value: 0, trend: 'neutral', color: 'gray' },
+                        isCostMetric: true
+                    },
+                    {
+                        title: '单有效户成本',
+                        key: 'cost_per_valid_account',
+                        unit: '元',
+                        value: this.formatCurrency(metrics.cost_per_valid_account || 0),
+                        wow: wowChanges.cost_per_valid_account,
+                        isCostMetric: true,
+                        isPrimary: true
+                    }
+                ]
             }
         ];
 
-        return metricsConfig.map(metric => {
-            const wow = metric.wow || { value: 0, trend: 'up', color: 'green' };
-            const trendIcon = wow.trend === 'up' ? '↑' : '↓';
-            const trendColorClass = wow.color === 'green' ? 'is-success' : 'is-error';
-            const trendSign = wow.value > 0 ? '+' : '';
+        // 渲染业务层级分组
+        return businessGroups.map(group => this.renderBusinessGroup(group)).join('');
+    }
 
-            return `
-                <div class="card card--metric">
-                    <div class="metric-label" style="
-                        font-size: var(--font-size-xs);
-                        color: var(--color-text-secondary);
-                        margin-bottom: var(--space-sm);
-                    ">
-                        ${metric.title}
-                    </div>
-                    <div class="metric-value" style="
-                        font-size: var(--font-size-2xl);
-                        font-weight: var(--font-weight-bold);
-                        color: var(--color-primary);
-                        margin-bottom: var(--space-sm);
-                    ">
-                        ${metric.value}
-                    </div>
-                    <div class="metric-wow" style="
-                        font-size: var(--font-size-xs);
-                        display: flex;
-                        align-items: center;
-                        gap: var(--space-xs);
-                    ">
-                        <span class="${trendColorClass}">${trendIcon}</span>
-                        <span class="${trendColorClass}">${trendSign}${wow.value.toFixed(2)}%</span>
-                        <span style="color: var(--color-text-tertiary);">较上期</span>
-                    </div>
+    /**
+     * 渲染单个业务层级组
+     */
+    renderBusinessGroup(group) {
+        const metricsCards = group.metrics.map(metric => this.renderMetricCard(metric)).join('');
+
+        return `
+            <div class="metrics-business-section">
+                <div class="metrics-section-header">
+                    <span style="font-size: 12px; font-weight: 500; color: #8A8D99; text-transform: uppercase; letter-spacing: 1px;">${group.name}</span>
                 </div>
-            `;
-        }).join('');
+                <div class="metrics-section-content">
+                    ${metricsCards}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染单个指标卡片 - 极简设计，无左侧色条
+     */
+    renderMetricCard(metric) {
+        const wow = metric.wow || { value: 0, trend: 'up', color: 'green' };
+        const trendIcon = wow.trend === 'up' ? '↑' : wow.trend === 'down' ? '↓' : '→';
+        const trendSign = wow.value > 0 ? '+' : '';
+
+        // 根据指标类型设置颜色
+        let valueColor, labelColor, trendColor;
+        if (metric.isHighlight) {
+            // 资产类指标 - 绿色
+            valueColor = '#277D4F';
+            labelColor = '#8A8D99';
+            trendColor = wow.color === 'green' ? '#277D4F' : wow.color === 'red' ? '#D5453D' : '#8A8D99';
+        } else if (metric.isCostMetric) {
+            // 成本指标 - 橙色
+            valueColor = '#C2661F';
+            labelColor = '#8A8D99';
+            trendColor = wow.color === 'green' ? '#277D4F' : wow.color === 'red' ? '#D5453D' : '#8A8D99';
+        } else if (metric.isPrimary) {
+            // 核心指标 - 蓝色
+            valueColor = '#0969DA';
+            labelColor = '#8A8D99';
+            trendColor = wow.color === 'green' ? '#277D4F' : wow.color === 'red' ? '#D5453D' : '#8A8D99';
+        } else {
+            // 普通指标 - 深灰色
+            valueColor = '#171A23';
+            labelColor = '#8A8D99';
+            trendColor = wow.color === 'green' ? '#277D4F' : wow.color === 'red' ? '#D5453D' : '#8A8D99';
+        }
+
+        return `
+            <div class="metric-card" style="
+                background: #FFFFFF;
+                border: 1px solid #E8EAED;
+                padding: 16px 20px;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                min-height: 88px;
+            " onmouseover="this.style.borderColor='#0969DA'; this.style.boxShadow='0 2px 8px rgba(9, 105, 218, 0.08)'"
+               onmouseout="this.style.borderColor='#E8EAED'; this.style.boxShadow='none'">
+                <div style="font-size: 12px; color: ${labelColor}; font-weight: 500;">
+                    ${metric.title}
+                </div>
+                <div style="font-size: 28px; font-weight: 600; color: ${valueColor}; line-height: 1; letter-spacing: -0.5px;">
+                    ${metric.value}
+                </div>
+                <div style="font-size: 11px; color: #8A8D99; display: flex; align-items: center; gap: 4px;">
+                    <span style="color: ${trendColor}; font-weight: 500;">${trendIcon}</span>
+                    <span>${trendSign}${wow.value}%</span>
+                    <span style="margin-left: 4px;">环比</span>
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -850,8 +1102,8 @@ class DashboardReport {
                 // 重新加载趋势数据
                 await this.loadTrendData();
 
-                // 重新渲染图表
-                this.renderChart();
+                // 重新渲染图表（异步加载 ECharts）
+                await this.renderChart();
             });
         });
 
@@ -869,8 +1121,8 @@ class DashboardReport {
                 // 重新加载趋势数据
                 await this.loadTrendData();
 
-                // 重新渲染图表
-                this.renderChart();
+                // 重新渲染图表（异步加载 ECharts）
+                await this.renderChart();
             });
         });
     }
@@ -878,7 +1130,7 @@ class DashboardReport {
     /**
      * 渲染图表
      */
-    renderChart() {
+    async renderChart() {
         const container = document.getElementById('trendChart');
         if (!container || !this.trendData || !this.trendData.trend_data) {
             return;
@@ -888,6 +1140,9 @@ class DashboardReport {
         if (this.chartInstance) {
             this.chartInstance.dispose();
         }
+
+        // 🔧 性能优化: 延迟加载 ECharts
+        const echarts = await window.loadECharts();
 
         const chartDom = container;
         this.chartInstance = echarts.init(chartDom);
@@ -1016,9 +1271,18 @@ class DashboardReport {
     }
 
     /**
-     * 销毁实例
+     * 销毁实例（Phase 1: 完善事件监听器清理）
      */
     destroy() {
+        // Phase 1: 解绑所有事件监听器
+        this.unbindEvents();
+
+        // 销毁事件管理器
+        if (this.eventManager) {
+            this.eventManager.destroy();
+            this.eventManager = null;
+        }
+
         // 销毁数据新鲜度指示器
         if (this.dataFreshnessIndicator) {
             this.dataFreshnessIndicator.destroy();
@@ -1035,6 +1299,11 @@ class DashboardReport {
             this.chartInstance.dispose();
             this.chartInstance = null;
         }
+
+        // 清理数据
+        this.currentData = null;
+        this.trendData = null;
+        this.currentFilters = null;
     }
 }
 

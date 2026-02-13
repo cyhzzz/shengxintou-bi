@@ -1,69 +1,63 @@
 /**
- * 数据新鲜度状态指示器组件
- *
- * 功能：
- * 1. 显示所有数据源的最新更新状态
- * 2. 按数据新鲜度分级显示（正常/警告/严重）
- * 3. 支持折叠/展开交互
- * 4. 提供快速跳转到数据导入页面的功能
- *
- * API 接口：GET /api/v1/data-freshness
- *
- * @version 1.0.0
- * @date 2026-02-04
+ * 数据新鲜度状态指示器组件 - v2.0
+ * 基于 Structured Clarity 设计系统
+ * 极简美学：无卡片包裹，标签式设计，状态徽章
  */
-
 class DataFreshnessIndicator {
     /**
      * 构造函数
+     * @param {string|HTMLElement} container - 容器元素ID或DOM元素
      * @param {Object} options - 配置选项
-     * @param {string} options.containerId - 容器ID
-     * @param {number} options.refreshInterval - 自动刷新间隔（毫秒），默认 5 分钟
-     * @param {Function} options.onUpdateClick - 点击"立即更新"按钮的回调
      */
-    constructor(options = {}) {
-        this.containerId = options.containerId || 'data-freshness-indicator';
-        this.refreshInterval = options.refreshInterval || 5 * 60 * 1000; // 5 分钟
-        this.onUpdateClick = options.onUpdateClick || null;
+    constructor(container, options = {}) {
+        this.container = typeof container === 'string'
+            ? document.getElementById(container)
+            : container;
 
-        // 内部状态
-        this.data = null;
         this.isExpanded = false;
-        this.refreshTimer = null;
-        this.isLoading = false;
+        this.data = null;
+        this.options = {
+            refreshInterval: 5 * 60 * 1000, // 5分钟自动刷新
+            autoRefresh: true,
+            onUpdateClick: null,
+            ...options
+        };
 
-        // 状态定义
+        // 状态配置
         this.statusConfig = {
-            normal: {
-                icon: '✅',
+            'normal': {
+                icon: '●',
+                color: 'var(--color-success)',
                 label: '正常',
-                className: 'status-normal',
-                color: '#52c41a'
+                badgeClass: 'freshness-badge--normal'
             },
-            warning: {
-                icon: '⚠️',
+            'warning': {
+                icon: '●',
+                color: 'var(--color-warning)',
                 label: '建议更新',
-                className: 'status-warning',
-                color: '#faad14'
+                badgeClass: 'freshness-badge--warning'
             },
-            critical: {
-                icon: '❌',
-                label: '急需更新',
-                className: 'status-critical',
-                color: '#f5222d'
+            'critical': {
+                icon: '●',
+                color: 'var(--color-error)',
+                label: '需立即更新',
+                badgeClass: 'freshness-badge--critical'
+            },
+            'no_data': {
+                icon: '○',
+                color: 'var(--color-text-tertiary)',
+                label: '无数据',
+                badgeClass: ''
+            },
+            'error': {
+                icon: '!',
+                color: 'var(--color-error)',
+                label: '查询失败',
+                badgeClass: ''
             }
         };
 
-        // 数据源显示名称映射
-        this.dataSourceNames = {
-            tencent_ads: '腾讯广告',
-            douyin_ads: '抖音广告',
-            xiaohongshu_ads: '小红书广告',
-            xhs_notes_daily: '小红书笔记投放',
-            xhs_notes_content_daily: '小红书笔记运营',
-            backend_conversions: '后端转化数据'
-        };
-
+        this.refreshTimer = null;
         this.init();
     }
 
@@ -72,12 +66,16 @@ class DataFreshnessIndicator {
      */
     async init() {
         try {
-            this.render();
             await this.loadData();
-            this.startAutoRefresh();
+            this.render();
+            this.bindEvents();
+
+            if (this.options.autoRefresh) {
+                this.startAutoRefresh();
+            }
         } catch (error) {
-            console.error('[DataFreshnessIndicator] 初始化失败:', error);
-            this.renderError('加载数据状态失败');
+            console.error('[DataFreshnessIndicator] init failed:', error);
+            this.renderError();
         }
     }
 
@@ -85,220 +83,226 @@ class DataFreshnessIndicator {
      * 加载数据
      */
     async loadData() {
-        if (this.isLoading) return;
+        const response = await API.get('/api/v1/data-freshness');
 
-        try {
-            this.isLoading = true;
-            this.showLoading();
+        if (!response.success) {
+            throw new Error(response.error || '加载数据失败');
+        }
 
-            const response = await API.get('/api/v1/data-freshness');
+        this.data = response.data;
 
-            if (response.success) {
-                this.data = response.data;
-                this.renderContent();
+        // 如果有紧急警告，自动展开
+        const hasCritical = Object.values(this.data).some(
+            source => source.status === 'critical'
+        );
 
-                // 如果有 critical 状态，自动展开
-                if (this.hasCriticalStatus()) {
-                    this.expand();
-                }
-            } else {
-                throw new Error(response.message || '加载数据失败');
-            }
-        } catch (error) {
-            console.error('[DataFreshnessIndicator] 加载数据失败:', error);
-            this.renderError('无法获取数据状态信息');
-        } finally {
-            this.isLoading = false;
+        if (hasCritical && !this.isExpanded) {
+            this.isExpanded = true;
         }
     }
 
     /**
-     * 渲染组件结构
+     * 渲染组件
      */
     render() {
-        const container = document.getElementById(this.containerId);
-        if (!container) {
-            console.error(`[DataFreshnessIndicator] 容器不存在: ${this.containerId}`);
-            return;
-        }
-
-        container.innerHTML = `
-            <div class="data-freshness-indicator" id="dataFreshnessWidget">
-                <!-- 加载状态 -->
-                <div class="freshness-loading">
-                    <span class="loading-spinner"></span>
-                    <span>正在检查数据状态...</span>
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * 显示加载状态
-     */
-    showLoading() {
-        const widget = document.getElementById('dataFreshnessWidget');
-        if (!widget) return;
-
-        widget.innerHTML = `
-            <div class="freshness-loading">
-                <span class="loading-spinner"></span>
-                <span>正在检查数据状态...</span>
-            </div>
-        `;
-    }
-
-    /**
-     * 渲染内容
-     */
-    renderContent() {
         if (!this.data) {
-            this.renderError('无数据');
+            this.renderLoading();
             return;
         }
 
-        const summary = this.buildSummary();
-        const detailList = this.buildDetailList();
+        // 检查是否有严重警告，添加特殊样式类
+        const hasCritical = Object.values(this.data).some(
+            source => source.status === 'critical'
+        );
 
-        const widget = document.getElementById('dataFreshnessWidget');
-        if (!widget) return;
-
-        widget.innerHTML = `
-            <!-- 摘要行 -->
-            <div class="freshness-summary" id="freshnessSummary">
-                ${summary}
-            </div>
-
-            <!-- 详情列表（默认折叠） -->
-            <div class="freshness-details" id="freshnessDetails" style="display: none;">
-                <div class="freshness-list">
-                    ${detailList}
-                </div>
-                <div class="freshness-actions">
-                    <button class="btn btn--primary btn--sm" id="btnUpdateData">
-                        📥 立即更新过期的数据
-                    </button>
-                    <button class="btn btn--secondary btn--sm" id="btnCloseDetails">
-                        ✕ 关闭
-                    </button>
-                </div>
+        this.container.innerHTML = `
+            <div class="data-freshness-indicator ${hasCritical ? 'freshness-indicator--critical' : ''}">
+                ${this.renderSummary()}
+                ${this.renderDetails()}
             </div>
         `;
-
-        this.bindEvents();
     }
 
     /**
-     * 构建摘要行
+     * 渲染摘要行
      */
-    buildSummary() {
-        const stats = this.calculateStats();
-        const statusIcon = this.getOverallStatusIcon(stats);
-        const toggleIcon = this.isExpanded ? '▲' : '▼';
+    renderSummary() {
+        const summary = this.calculateSummary();
+
+        // 判断是否有警告状态（黄色或红色）
+        const hasWarning = Object.values(this.data).some(
+            source => source.status === 'warning' || source.status === 'critical'
+        );
+
+        // 选择图标
+        const iconName = hasWarning ? '警告' : '成功';
+        const iconPath = `/icon/${iconName}.svg`;
 
         return `
-            <span class="freshness-icon">📊</span>
-            <span class="freshness-text">数据状态: ${stats.total} 个数据源</span>
-            ${stats.needsUpdate > 0 ? `
-                <span class="freshness-warning">(${stats.needsUpdate} 项建议更新)</span>
-            ` : ''}
-            <span class="freshness-status-icon">${statusIcon}</span>
-            <span class="freshness-toggle">${toggleIcon}</span>
+            <div class="freshness-summary ${this.isExpanded ? 'freshness-summary--expanded' : ''}">
+                <div class="freshness-summary__left">
+                    <div class="freshness-summary__icon">
+                        <img src="${iconPath}" class="freshness-summary__icon-img" alt="${iconName}">
+                    </div>
+                    <span class="freshness-summary__text">数据状态</span>
+                    <div class="freshness-summary__dots">
+                        ${this.renderDots(summary)}
+                    </div>
+                </div>
+            </div>
         `;
     }
 
     /**
-     * 构建详情列表
+     * 渲染状态点 - 显示所有数据源的状态
      */
-    buildDetailList() {
-        const items = Object.entries(this.data).map(([key, item]) => {
-            const statusInfo = this.statusConfig[item.status];
-            const dataSourceName = this.dataSourceNames[key] || key;
+    renderDots(summary) {
+        const dots = [];
+
+        // 为每个数据源生成一个状态点
+        Object.values(this.data).forEach(source => {
+            const statusClass = `freshness-dot--${source.status || 'no_data'}`;
+            dots.push(`<div class="freshness-dot ${statusClass}"></div>`);
+        });
+
+        return dots.join('');
+    }
+
+    /**
+     * 计算汇总统计
+     */
+    calculateSummary() {
+        const summary = {
+            total: 0,
+            normal: 0,
+            warning: 0,
+            critical: 0
+        };
+
+        Object.values(this.data).forEach(source => {
+            summary.total++;
+            if (source.status) {
+                summary[source.status]++;
+            }
+        });
+
+        return summary;
+    }
+
+    /**
+     * 渲染详情列表 - 按业务属性分组显示（紧凑横向布局）
+     */
+    renderDetails() {
+        if (!this.isExpanded) {
+            return '<div class="freshness-details" style="display: none;"></div>';
+        }
+
+        // 按分组和顺序排序数据
+        const sortedData = Object.values(this.data).sort((a, b) => a.order - b.order);
+
+        // 分组标签
+        const groupLabels = {
+            'account_ads': '账号数据',
+            'xhs_notes': '笔记数据',
+            'backend_conversions': '转化数据'
+        };
+
+        // 按分组渲染（单行紧凑横向布局）
+        const groupsHTML = ['account_ads', 'xhs_notes', 'backend_conversions'].map(groupKey => {
+            const groupItems = sortedData.filter(item => item.group === groupKey);
+
+            if (groupItems.length === 0) return '';
+
+            // 生成卡片布局（每个卡片占满空间）
+            const itemsHTML = groupItems.map(source => {
+                const config = this.statusConfig[source.status] || this.statusConfig['error'];
+                const dateText = source.latest_date
+                    ? this.formatDate(source.latest_date)
+                    : '无数据';
+
+                return `
+                    <div class="freshness-item freshness-item--compact">
+                        <span class="freshness-item__dot freshness-dot--${source.status}"></span>
+                        <span class="freshness-item__name">${source.name}</span>
+                        <span class="freshness-item__date">${dateText}</span>
+                    </div>
+                `;
+            }).join('');
 
             return `
-                <div class="freshness-item ${statusInfo.className}">
-                    <div class="item-status">${statusInfo.icon}</div>
-                    <div class="item-info">
-                        <div class="item-name">${dataSourceName}</div>
-                        <div class="item-date">
-                            ${item.latest_date ? `最后更新: ${item.latest_date}` : '暂无数据'}
-                        </div>
-                    </div>
-                    <div class="item-meta">
-                        <span class="item-days-ago">${item.days_ago !== null ? `${item.days_ago} 天前` : '-'}</span>
-                        <span class="item-status-label">${statusInfo.label}</span>
+                <div class="freshness-group">
+                    <div class="freshness-group__icon-spacer"></div>
+                    <span class="freshness-group__label">${groupLabels[groupKey]}</span>
+                    <div class="freshness-group__content">
+                        ${itemsHTML}
                     </div>
                 </div>
             `;
         }).join('');
 
-        return items;
-    }
-
-    /**
-     * 计算统计信息
-     */
-    calculateStats() {
-        const total = Object.keys(this.data).length;
-        const needsUpdate = Object.values(this.data).filter(
-            item => item.status === 'warning' || item.status === 'critical'
-        ).length;
-
-        return { total, needsUpdate };
-    }
-
-    /**
-     * 获取整体状态图标
-     */
-    getOverallStatusIcon(stats) {
-        if (stats.needsUpdate === 0) {
-            return '🟢';
-        }
-
-        // 检查是否有 critical 状态
-        const hasCritical = Object.values(this.data).some(
-            item => item.status === 'critical'
+        const hasWarning = Object.values(this.data).some(
+            source => source.status === 'warning' || source.status === 'critical'
         );
 
-        return hasCritical ? '🔴' : '🟡';
+        const actionsHTML = hasWarning ? `
+            <div class="freshness-actions">
+                <button class="btn btn--primary btn--sm freshness-update-btn">
+                    立即更新
+                </button>
+                <button class="btn btn--secondary btn--sm freshness-close-btn">
+                    收起
+                </button>
+            </div>
+        ` : `
+            <div class="freshness-actions">
+                <button class="btn btn--secondary btn--sm freshness-close-btn">
+                    收起
+                </button>
+            </div>
+        `;
+
+        return `
+            <div class="freshness-details">
+                <div class="freshness-list">
+                    ${groupsHTML}
+                </div>
+                ${actionsHTML}
+            </div>
+        `;
     }
 
     /**
-     * 检查是否有严重状态
+     * 格式化日期显示 - 显示"最新数据日期:MM-DD"
      */
-    hasCriticalStatus() {
-        return Object.values(this.data).some(item => item.status === 'critical');
+    formatDate(dateStr) {
+        if (!dateStr) return '--';
+
+        const date = new Date(dateStr);
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `最新数据日期:${month}-${day}`;
     }
 
     /**
      * 绑定事件
      */
     bindEvents() {
-        const summary = document.getElementById('freshnessSummary');
-        const btnUpdateData = document.getElementById('btnUpdateData');
-        const btnCloseDetails = document.getElementById('btnCloseDetails');
-
-        // 点击摘要行切换展开/折叠
+        // 摘要行点击事件
+        const summary = this.container.querySelector('.freshness-summary');
         if (summary) {
-            summary.addEventListener('click', () => {
-                this.toggle();
-            });
+            summary.addEventListener('click', () => this.toggle());
         }
 
-        // 点击"立即更新"按钮
-        if (btnUpdateData) {
-            btnUpdateData.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handleUpdateClick();
-            });
+        // 更新按钮
+        const updateBtn = this.container.querySelector('.freshness-update-btn');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', () => this.handleUpdateClick());
         }
 
-        // 点击"关闭"按钮
-        if (btnCloseDetails) {
-            btnCloseDetails.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.collapse();
-            });
+        // 关闭按钮
+        const closeBtn = this.container.querySelector('.freshness-close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.collapse());
         }
     }
 
@@ -306,45 +310,27 @@ class DataFreshnessIndicator {
      * 切换展开/折叠状态
      */
     toggle() {
-        if (this.isExpanded) {
-            this.collapse();
-        } else {
-            this.expand();
-        }
+        this.isExpanded = !this.isExpanded;
+        this.render();
+        this.bindEvents();
     }
 
     /**
      * 展开详情
      */
     expand() {
-        const details = document.getElementById('freshnessDetails');
-        const toggle = document.querySelector('.freshness-toggle');
-
-        if (details) {
-            details.style.display = 'block';
-        }
-        if (toggle) {
-            toggle.textContent = '▲';
-        }
-
         this.isExpanded = true;
+        this.render();
+        this.bindEvents();
     }
 
     /**
      * 折叠详情
      */
     collapse() {
-        const details = document.getElementById('freshnessDetails');
-        const toggle = document.querySelector('.freshness-toggle');
-
-        if (details) {
-            details.style.display = 'none';
-        }
-        if (toggle) {
-            toggle.textContent = '▼';
-        }
-
         this.isExpanded = false;
+        this.render();
+        this.bindEvents();
     }
 
     /**
@@ -352,13 +338,12 @@ class DataFreshnessIndicator {
      * 跳转到"系统配置-数据导入"页面
      */
     handleUpdateClick() {
-        if (this.onUpdateClick) {
-            this.onUpdateClick();
+        if (this.options.onUpdateClick) {
+            this.options.onUpdateClick();
         } else {
-            // 默认行为：展开"系统配置"菜单并跳转到"数据导入"
+            // 展开"系统配置"子菜单并跳转到"数据导入"
             const systemConfigItem = document.querySelector('.nav-item[data-report="system-config"]');
             if (systemConfigItem) {
-                // 展开系统配置子菜单
                 const submenu = systemConfigItem.querySelector('.submenu');
                 if (submenu && !systemConfigItem.classList.contains('expanded')) {
                     submenu.style.display = 'block';
@@ -369,7 +354,6 @@ class DataFreshnessIndicator {
                 setTimeout(() => {
                     const dataImportItem = document.querySelector('.submenu .nav-item[data-report="data-import"]');
                     if (dataImportItem) {
-                        // 模拟点击菜单项，触发完整的路由切换逻辑
                         dataImportItem.click();
                     } else {
                         console.error('[DataFreshnessIndicator] 未找到数据导入菜单项');
@@ -377,48 +361,45 @@ class DataFreshnessIndicator {
                 }, 150);
             } else {
                 console.error('[DataFreshnessIndicator] 未找到系统配置菜单项');
-                // 备用方案：直接使用 hash
                 window.location.hash = 'data-import';
             }
         }
     }
 
     /**
-     * 渲染错误状态
+     * 渲染加载状态
      */
-    renderError(message) {
-        const widget = document.getElementById('dataFreshnessWidget');
-        if (!widget) return;
-
-        widget.innerHTML = `
-            <div class="freshness-error">
-                <span class="error-icon">⚠️</span>
-                <span class="error-message">${message}</span>
-                <button class="btn btn--secondary btn--sm" id="btnRetry">
-                    🔄 重试
-                </button>
+    renderLoading() {
+        this.container.innerHTML = `
+            <div class="freshness-loading">
+                <span>加载数据状态...</span>
             </div>
         `;
-
-        const btnRetry = document.getElementById('btnRetry');
-        if (btnRetry) {
-            btnRetry.addEventListener('click', () => {
-                this.loadData();
-            });
-        }
     }
 
     /**
-     * 启动自动刷新
+     * 渲染错误状态
+     */
+    renderError(message) {
+        this.container.innerHTML = `
+            <div class="freshness-error">
+                <span>⚠️</span>
+                <span>数据状态加载失败${message ? ': ' + message : ''}</span>
+            </div>
+        `;
+    }
+
+    /**
+     * 开始自动刷新
      */
     startAutoRefresh() {
-        if (this.refreshTimer) {
-            clearInterval(this.refreshTimer);
-        }
+        this.stopAutoRefresh();
 
         this.refreshTimer = setInterval(() => {
-            this.loadData();
-        }, this.refreshInterval);
+            this.refresh().catch(error => {
+                console.error('[DataFreshnessIndicator] 自动刷新失败:', error);
+            });
+        }, this.options.refreshInterval);
     }
 
     /**
@@ -432,10 +413,16 @@ class DataFreshnessIndicator {
     }
 
     /**
-     * 手动刷新数据
+     * 刷新数据
      */
     async refresh() {
-        await this.loadData();
+        try {
+            await this.loadData();
+            this.render();
+            this.bindEvents();
+        } catch (error) {
+            console.error('[DataFreshnessIndicator] 刷新失败:', error);
+        }
     }
 
     /**
@@ -443,18 +430,10 @@ class DataFreshnessIndicator {
      */
     destroy() {
         this.stopAutoRefresh();
-
-        const container = document.getElementById(this.containerId);
-        if (container) {
-            container.innerHTML = '';
-        }
-
+        this.container.innerHTML = '';
         this.data = null;
-        this.isExpanded = false;
     }
 }
 
-// 导出给全局使用
-if (typeof window !== 'undefined') {
-    window.DataFreshnessIndicator = DataFreshnessIndicator;
-}
+// 导出
+window.DataFreshnessIndicator = DataFreshnessIndicator;
