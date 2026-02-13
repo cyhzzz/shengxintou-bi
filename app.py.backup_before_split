@@ -269,45 +269,16 @@ def health_check():
     })
 
 # 注册API路由
-from backend.routes import metadata, upload, config, aggregation, feishu_sync, webdav_backup, xhs_note_info, version
+from backend.routes import metadata, data, upload, config, aggregation, feishu_sync, webdav_backup, xhs_note_info, version
 
 # Import weekly_reports module
 from backend.routes import weekly_reports
-
-# 导入拆分后的数据模块
-from backend.routes.data import (
-    query,
-    dashboard,
-    trend,
-    agency_analysis,
-    xhs_notes,
-    cost_analysis,
-    external_analysis,
-    leads,
-    account_mapping,
-    abbreviation_mapping,
-    xhs_operation
-)
 
 # 注意：已移除模块缓存清除和reload逻辑，避免"module not in sys.modules"错误
 # 如需重新加载代码，请重启服务器
 
 app.register_blueprint(metadata.bp, url_prefix=API_PREFIX)
-
-# 注册所有拆分后的数据模块Blueprint
-app.register_blueprint(query.bp, url_prefix=API_PREFIX)
-app.register_blueprint(dashboard.bp, url_prefix=API_PREFIX)
-app.register_blueprint(trend.bp, url_prefix=API_PREFIX)
-app.register_blueprint(agency_analysis.bp, url_prefix=API_PREFIX)
-app.register_blueprint(xhs_notes.bp, url_prefix=API_PREFIX)
-app.register_blueprint(cost_analysis.bp, url_prefix=API_PREFIX)
-app.register_blueprint(external_analysis.bp, url_prefix=API_PREFIX)
-app.register_blueprint(leads.bp, url_prefix=API_PREFIX)
-app.register_blueprint(account_mapping.bp, url_prefix=API_PREFIX)
-app.register_blueprint(abbreviation_mapping.bp, url_prefix=API_PREFIX)
-app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
-
-# 其他Blueprint
+app.register_blueprint(data.bp, url_prefix=API_PREFIX)
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(config.bp)
 app.register_blueprint(aggregation.bp, url_prefix=API_PREFIX)
