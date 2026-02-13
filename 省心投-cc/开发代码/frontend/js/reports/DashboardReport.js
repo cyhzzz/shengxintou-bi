@@ -422,8 +422,8 @@ class DashboardReport {
         const endDate = document.getElementById('dashboardEndDate')?.value;
 
         // 检查快速按钮状态（用于日志记录）
-        const activeDateBtn = document.querySelector('.btn[data-days].is-active');
-        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : 'all';
+        const activeDateBtnForFilter = document.querySelector('.btn[data-days].is-active');
+        const dateMode = activeDateBtnForFilter ? activeDateBtnForFilter.dataset.days : 'all';
 
         if (startDate && endDate) {
             // 有自定义日期：优先使用自定义日期范围
