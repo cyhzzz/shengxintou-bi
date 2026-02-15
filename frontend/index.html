@@ -164,6 +164,19 @@
                             </li>
                         </ul>
                     </li>
+                    <!-- 新报表菜单 -->
+                    <li class="nav-item" data-report="cross-channel-comparison">
+                        <img src="icon/跨渠道对比.svg" class="nav-icon" alt="跨渠道对比">
+                        <span>跨渠道对比</span>
+                    </li>
+                    <li class="nav-item" data-report="material-effectiveness">
+                        <img src="icon/素材效果分析.svg" class="nav-icon" alt="素材效果分析">
+                        <span>素材效果分析</span>
+                    </li>
+                    <li class="nav-item" data-report="visual-conversion-funnel">
+                        <img src="icon/转化漏斗.svg" class="nav-icon" alt="可视化转化漏斗">
+                        <span>可视化转化漏斗</span>
+                    </li>
                 </ul>
             </nav>
         </aside>
@@ -310,7 +323,14 @@
     <script src="js/components/MultiSelectForm.js?v=1.0"></script>
     <script src="js/components/DataFreshnessIndicator.js?v=1.0"></script>
     <script src="js/components/HelpModal.js?v=1.0"></script>
-    <script src="js/utils/DynamicLoader.js?v=1.0"></script>
+    <!-- Phase 4 新增图表组件 -->
+    <script src="js/components/FunnelChart.js?v=1.0"></script>
+    <script src="js/components/RadarChart.js?v=1.0"></script>
+    <script src="js/components/ScatterChart.js?v=1.0"></script>
+    <script src="js/components/DataTable.js?v=1.0"></script>
+    <script src="js/utils/DataLoader.js?v=1.0"></script>
+    <script src="js/utils/APIManager.js?v=2.0"></script>
+    <script src="js/utils/DynamicLoader.js?v=2.0"></script>
 
     <!-- 小红书运营报表模块化版本 (v2.1) - 7个子模块 (协调器通过DynamicLoader动态加载) -->
     <script src="js/reports/modules_temp/XhsOverviewMetrics.js?v=2.1.1"></script>

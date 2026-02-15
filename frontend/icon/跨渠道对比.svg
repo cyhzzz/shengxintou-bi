@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="design-iconfont">
+  <circle cx="24" cy="24" r="22" fill="#1890ff" fill-opacity="0.1"/>
+  <path d="M24 6C17.373 6 12 17.373 12 24s5.373 12 12 12 12 5.373 12 12-12 5.373-12 12-12zm0 4c-4.418 0-8 3.582-8 8s3.582 0 8 8 8-8-3.582 0-8-8-8zm0 2c-3.314 0-6 2.686-6 6s2.686 0 6 6 6-6 2.686 0-6-6-6zm0 2c-2.209 0-4 1.791-4 4s1.791 0 4 4 4-4 1.791 0-4-4-4z" fill="#1890ff" fill-opacity="0.3"/>
+
+  <!-- 雷达图外圈 -->
+  <path d="M24 10a14 14 0 1 0 0-28 0 14 14 0 0 0 28 0" fill="none" stroke="#1890ff" stroke-width="1.5"/>
+  <path d="M24 10a10 10 0 1 0 0-20 0 10 10 0 0 0 20 0" fill="none" stroke="#1890ff" stroke-width="1.5"/>
+
+  <!-- 雷达轴线和点 -->
+  <g fill="none" stroke="#1890ff" stroke-width="2">
+    <!-- 水平轴 -->
+    <line x1="24" y1="24" x2="38" y2="24"/>
+    <line x1="24" y1="24" x2="38" y2="16"/>
+    <line x1="24" y1="24" x2="16" y2="32"/>
+    <line x1="24" y1="24" x2="38" y2="32"/>
+    <line x1="24" y1="24" x2="16" y2="16"/>
+
+    <!-- 数据点 -->
+    <circle cx="38" cy="24" r="2" fill="#1890ff"/>
+    <circle cx="34" cy="18" r="2" fill="#1890ff"/>
+    <circle cx="30" cy="16" r="2" fill="#1890ff"/>
+    <circle cx="32" cy="32" r="2" fill="#1890ff"/>
+    <circle cx="18" cy="30" r="2" fill="#1890ff"/>
+    <circle cx="16" cy="16" r="2" fill="#1890ff"/>
+  </g>
+</svg>
