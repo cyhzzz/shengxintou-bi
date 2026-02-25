@@ -417,33 +417,13 @@ class DashboardReport {
             business_models: businessModels  // 修复：使用正确的变量名
         };
 
-        // 修复：检查自定义日期输入值，如果有值就使用，不管快速按钮状态
-        const startDate = document.getElementById('dashboardStartDate')?.value;
-        const endDate = document.getElementById('dashboardEndDate')?.value;
-
-        // 检查快速按钮状态（用于日志记录）
-        const activeDateBtnForFilter = document.querySelector('.btn[data-days].is-active');
-        const dateMode = activeDateBtnForFilter ? activeDateBtnForFilter.dataset.days : 'all';
-
-        if (startDate && endDate) {
-            // 有自定义日期：优先使用自定义日期范围
-            filters.date_range = [startDate, endDate];
-            console.log('[Dashboard] 使用自定义日期区间:', startDate, '至', endDate, '| 快速按钮状态:', dateMode);
-        } else if (dateMode !== 'all') {
-            // 快速按钮被选中（近7/30/90天）：计算日期范围
-            const days = parseInt(dateMode);
-            const endDate = new Date();
-            const startDate = new Date();
-            startDate.setDate(endDate.getDate() - days);
-
-            const startDateStr = startDate.toISOString().split('T')[0];
-            const endDateStr = endDate.toISOString().split('T')[0];
-
-            filters.date_range = [startDateStr, endDateStr];
-            console.log('[Dashboard] 使用快速日期按钮:', dateMode, '| 计算日期范围:', startDateStr, '至', endDateStr);
-        } else {
-            // 全部：不传递日期范围
-            console.log('[Dashboard] 使用全部数据（无日期筛选）');
+        // 参考厂商分析报表：只有当不是"全部"模式时才传日期
+        if (dateMode !== 'all') {
+            const startDate = document.getElementById('dashboardStartDate')?.value;
+            const endDate = document.getElementById('dashboardEndDate')?.value;
+            if (startDate && endDate) {
+                filters.date_range = [startDate, endDate];
+            }
         }
 
         console.log('[Dashboard] 获取筛选条件:', filters);
