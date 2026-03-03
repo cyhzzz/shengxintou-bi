@@ -400,11 +400,12 @@ class DashboardReport {
 
     /**
      * 获取筛选条件（参考厂商分析报表的实现）
+     * 修复：自定义日期模式下正确获取日期范围
      */
     getFilters() {
         // 检查哪个日期按钮被激活
         const activeDateBtn = document.querySelector('.btn[data-days].is-active');
-        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : 'all';
+        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : null;
 
         // 从 MultiSelectForm 实例获取选中的值
         const platforms = this.platformMultiSelect?.getSelected() || [];
@@ -417,10 +418,22 @@ class DashboardReport {
             business_models: businessModels  // 修复：使用正确的变量名
         };
 
-        // 参考厂商分析报表：只有当不是"全部"模式时才传日期
-        if (dateMode !== 'all') {
-            const startDate = document.getElementById('dashboardStartDate')?.value;
-            const endDate = document.getElementById('dashboardEndDate')?.value;
+        // 获取日期输入框的值
+        const startDate = document.getElementById('dashboardStartDate')?.value;
+        const endDate = document.getElementById('dashboardEndDate')?.value;
+
+        // 判断是否需要日期筛选
+        if (dateMode === 'all') {
+            // "全部"模式：不传日期筛选
+            // filters.date_range 不设置
+        } else if (dateMode) {
+            // 快速选择模式（近7天/30天/90天）：使用输入框中的日期
+            if (startDate && endDate) {
+                filters.date_range = [startDate, endDate];
+            }
+        } else {
+            // 自定义模式（dateMode 为 null，表示没有快速按钮被激活）
+            // 检查日期输入框是否有值
             if (startDate && endDate) {
                 filters.date_range = [startDate, endDate];
             }
@@ -604,10 +617,10 @@ class DashboardReport {
                 'cost_per_valid_account': ['cost', 'valid_customer_users']
             };
 
-            // 添加粒度参数
-            params.granularity = this.currentGranularity;
+            // 获取当前粒度（直接从实例属性获取，而不是从params中）
+            const granularity = this.currentGranularity;
 
-            const response = await API.getTrend(params, metricMap[this.currentMetricType] || metricMap['cost_per_lead']);
+            const response = await API.getTrend(params, metricMap[this.currentMetricType] || metricMap['cost_per_lead'], granularity);
 
             if (!response.success) {
                 throw new Error(response.error || '加载趋势数据失败');
