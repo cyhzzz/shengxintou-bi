@@ -472,7 +472,7 @@ class DashboardReport {
             const prevDateRange = this.getPreviousDateRange();
 
             // 构建请求列表（添加客户资产、客户贡献、存量客户资产和总展示数指标）
-            const metricsList = ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'];
+            const metricsList = ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'clicks', 'customer_assets', 'customer_contribution', 'existing_customers_assets'];
             console.log('[Dashboard] 请求的metrics列表:', metricsList);
 
             const requests = [
@@ -489,7 +489,7 @@ class DashboardReport {
                 requests.push(
                     API.queryData({
                         dimensions: [],
-                        metrics: ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
+                        metrics: ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'clicks', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
                         filters: {
                             date_range: [prevDateRange.start_date, prevDateRange.end_date],
                             ...(filters.platforms && { platforms: filters.platforms }),
@@ -542,7 +542,7 @@ class DashboardReport {
         const leads = parseInt(current.metrics?.lead_users || 0);
         const opened = parseInt(current.metrics?.opened_account_users || 0);
         const valid = parseInt(current.metrics?.valid_customer_users || 0);
-        const clicks = parseInt(current.metrics?.click_users || 0);
+        const clicks = parseInt(current.metrics?.clicks || 0);
         const assets = parseFloat(current.metrics?.customer_assets || 0);
         const contribution = parseFloat(current.metrics?.customer_contribution || 0);
         const existingAssets = parseFloat(current.metrics?.existing_customers_assets || 0);
