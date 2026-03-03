@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>XX行金融市场外汇业务季度分析 - 2025年第一季度</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-size: 16px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 15px;
+        }
+
+        /* 移动端友好的导航 */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            padding: 10px 0;
+            border-top: 2px solid #C71521;
+        }
+
+        .mobile-nav-inner {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .mobile-nav-item {
+            text-align: center;
+            padding: 5px;
+            flex: 1;
+            color: #666;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-nav-item:active {
+            color: #C71521;
+            transform: scale(0.95);
+        }
+
+        .mobile-nav-item.active {
+            color: #C71521;
+            font-weight: bold;
+        }
+
+        /* 标题区域 */
+        .header {
+            background: linear-gradient(135deg, #C71521 0%, #8B0000 100%);
+            color: white;
+            padding: 40px 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(199, 21, 33, 0.3);
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shine 3s ease-in-out infinite;
+        }
+
+        @keyframes shine {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .header h1 {
+            font-size: clamp(24px, 5vw, 48px);
+            font-weight: bold;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+            line-height: 1.3;
+        }
+
+        .header h2 {
+            font-size: clamp(16px, 3vw, 24px);
+            font-weight: normal;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .meta {
+            margin-top: 15px;
+            font-size: 12px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 目录 */
+        .toc {
+            background: white;
+            padding: 20px 20px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+
+        .toc h2 {
+            color: #C71521;
+            font-size: clamp(18px, 4vw, 28px);
+            margin-bottom: 20px;
+            border-bottom: 3px solid #C71521;
+            padding-bottom: 10px;
+        }
+
+        .toc-items {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+        }
+
+        .toc-items li {
+            padding: 12px 15px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border-left: 4px solid;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .toc-items li:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .toc-items li:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+        }
+
+        .toc-items li:nth-child(1) { border-color: #C71521; background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%); }
+        .toc-items li:nth-child(2) { border-color: #2A5298; background: linear-gradient(135deg, #f0f5ff 0%, #dbeafe 100%); }
+        .toc-items li:nth-child(3) { border-color: #2E8B57; background: linear-gradient(135deg, #f0fff4 0%, #d1fae5 100%); }
+        .toc-items li:nth-child(4) { border-color: #FF8C00; background: linear-gradient(135deg, #fffaf0 0%, #fed7aa 100%); }
+        .toc-items li:nth-child(5) { border-color: #800080; background: linear-gradient(135deg, #fdf4ff 0%, #e9d5ff 100%); }
+        .toc-items li:nth-child(6) { border-color: #DAA520; background: linear-gradient(135deg, #fffbeb 0%, #fde68a 100%); }
+
+        /* 章节样式 */
+        .section {
+            background: white;
+            padding: 25px 20px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+            scroll-margin-top: 60px;
+        }
+
+        .section h2 {
+            color: #C71521;
+            font-size: clamp(20px, 4.5vw, 32px);
+            margin-bottom: 20px;
+            border-bottom: 3px solid #C71521;
+            padding-bottom: 12px;
+        }
+
+        .section h3 {
+            color: #2A5298;
+            font-size: clamp(16px, 3.5vw, 24px);
+            margin: 20px 0 12px 0;
+            padding-left: 12px;
+            border-left: 4px solid #2A5298;
+        }
+
+        /* 卡片布局 */
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .card {
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+        }
+
+        .card:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .card.red { background: linear-gradient(135deg, #fff5f5 0%, #ffe3e3 100%); border-color: #C71521; }
+        .card.blue { background: linear-gradient(135deg, #f0f5ff 0%, #dbeafe 100%); border-color: #2A5298; }
+        .card.green { background: linear-gradient(135deg, #f0fff4 0%, #d1fae5 100%); border-color: #2E8B57; }
+        .card.orange { background: linear-gradient(135deg, #fffaf0 0%, #fed7aa 100%); border-color: #FF8C00; }
+        .card.purple { background: linear-gradient(135deg, #fdf4ff 0%, #e9d5ff 100%); border-color: #800080; }
+        .card.gold { background: linear-gradient(135deg, #fffbeb 0%, #fde68a 100%); border-color: #DAA520; }
+
+        .card h4 {
+            font-size: clamp(14px, 3vw, 18px);
+            margin-bottom: 12px;
+            font-weight: bold;
+            line-height: 1.4;
+        }
+
+        .card.red h4 { color: #C71521; }
+        .card.blue h4 { color: #2A5298; }
+        .card.green h4 { color: #2E8B57; }
+        .card.orange h4 { color: #FF8C00; }
+        .card.purple h4 { color: #800080; }
+        .card.gold h4 { color: #DAA520; }
+
+        .card p {
+            margin: 6px 0;
+            font-size: clamp(12px, 2.5vw, 14px);
+            line-height: 1.7;
+        }
+
+        /* 数据展示 */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .data-item {
+            text-align: center;
+            padding: 15px 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .data-item .value {
+            font-size: clamp(24px, 6vw, 36px);
+            font-weight: bold;
+            margin-bottom: 5px;
+            line-height: 1.2;
+        }
+
+        .data-item .label {
+            font-size: clamp(10px, 2.5vw, 14px);
+            opacity: 0.9;
+        }
+
+        /* 列表样式 */
+        .feature-list {
+            list-style: none;
+            margin: 12px 0;
+        }
+
+        .feature-list li {
+            padding: 10px 0 10px 28px;
+            position: relative;
+            font-size: clamp(12px, 2.5vw, 15px);
+            line-height: 1.7;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #2E8B57;
+            font-weight: bold;
+            font-size: clamp(14px, 3vw, 18px);
+        }
+
+        .problem-list li::before {
+            content: "✗";
+            color: #C71521;
+        }
+
+        /* 表格样式 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: clamp(11px, 2.5vw, 14px);
+        }
+
+        .data-table thead {
+            background: linear-gradient(135deg, #C71521 0%, #8B0000 100%);
+            color: white;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .data-table th {
+            font-weight: bold;
+            font-size: clamp(12px, 2.8vw, 16px);
+        }
+
+        .data-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        /* 移动端表格横向滚动 */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* 关键词高亮 */
+        .highlight {
+            background: linear-gradient(120deg, #ffc107 0%, #ffeb3b 100%);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .positive {
+            color: #2E8B57;
+            font-weight: bold;
+        }
+
+        .negative {
+            color: #C71521;
+            font-weight: bold;
+        }
+
+        /* 页脚 */
+        .footer {
+            text-align: center;
+            padding: 25px 15px 70px 15px;
+            color: #666;
+            font-size: clamp(11px, 2.5vw, 14px);
+            background: white;
+            border-radius: 12px;
+            margin-top: 25px;
+        }
+
+        /* 图表容器 */
+        .chart-placeholder {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            padding: 30px 20px;
+            text-align: center;
+            margin: 20px 0;
+            border: 2px dashed #C71521;
+        }
+
+        .chart-placeholder h4 {
+            color: #C71521;
+            font-size: clamp(16px, 3.5vw, 20px);
+            margin-bottom: 10px;
+        }
+
+        .chart-placeholder p {
+            color: #666;
+            font-size: clamp(11px, 2.5vw, 14px);
+            line-height: 1.6;
+        }
+
+        /* 时间轴样式 */
+        .timeline {
+            position: relative;
+            padding: 15px 0;
+        }
+
+        .timeline::before {
+            content: "";
+            position: absolute;
+            left: 15px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, #C71521 0%, #2E8B57 100%);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 40px;
+            margin-bottom: 20px;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            left: 9px;
+            top: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #C71521;
+            border: 2px solid white;
+            box-shadow: 0 0 0 2px #C71521;
+        }
+
+        .timeline-item:nth-child(even)::before {
+            background: #2E8B57;
+            box-shadow: 0 0 0 2px #2E8B57;
+        }
+
+        .timeline-item .date {
+            font-size: clamp(11px, 2.5vw, 14px);
+            color: #999;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .timeline-item .content {
+            font-size: clamp(12px, 2.5vw, 15px);
+            line-height: 1.6;
+        }
+
+        /* 平板设备 */
+        @media (min-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            .header {
+                padding: 50px 30px;
+                border-radius: 15px;
+                margin-bottom: 30px;
+            }
+
+            .section {
+                padding: 35px 30px;
+                border-radius: 15px;
+                margin-bottom: 30px;
+            }
+
+            .card-container {
+                grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 20px;
+            }
+
+            .data-grid {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
+
+            .toc-items {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 12px;
+            }
+
+            .toc-items li {
+                padding: 15px 20px;
+                font-size: 14px;
+            }
+        }
+
+        /* 桌面设备 */
+        @media (min-width: 1024px) {
+            .container {
+                padding: 40px;
+            }
+
+            .header {
+                padding: 60px 40px;
+                border-radius: 20px;
+                margin-bottom: 40px;
+            }
+
+            .section {
+                padding: 40px;
+                border-radius: 15px;
+                margin-bottom: 40px;
+            }
+
+            .toc {
+                padding: 30px 40px;
+            }
+
+            .mobile-nav {
+                display: none;
+            }
+
+            .footer {
+                padding: 30px;
+                margin-bottom: 0;
+            }
+        }
+
+        /* 移动设备 */
+        @media (max-width: 767px) {
+            .mobile-nav {
+                display: block;
+            }
+
+            .data-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .card-container {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline::before {
+                left: 10px;
+            }
+
+            .timeline-item {
+                padding-left: 28px;
+            }
+
+            .timeline-item::before {
+                left: 6px;
+                width: 10px;
+                height: 10px;
+            }
+
+            .toc-items {
+                grid-template-columns: 1fr;
+            }
+
+            .toc-items li {
+                padding: 10px 15px;
+            }
+        }
+
+        /* 超小屏幕 */
+        @media (max-width: 360px) {
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .header h2 {
+                font-size: 14px;
+            }
+        }
+
+        /* 平滑滚动 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* 触屏优化 */
+        @media (hover: none) {
+            .card:hover {
+                transform: none;
+            }
+
+            .toc-items li:hover {
+                transform: none;
+            }
+        }
+
+        /* 深色模式支持 */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                color: #e0e0e0;
+            }
+
+            .section,
+            .toc,
+            .footer {
+                background: #1e293b;
+                color: #e0e0e0;
+            }
+
+            .card {
+                color: #333;
+            }
+
+            .data-table {
+                background: #1e293b;
+            }
+
+            .data-table th {
+                color: white;
+            }
+
+            .data-table td {
+                color: #e0e0e0;
+            }
+
+            .chart-placeholder {
+                background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 标题区域 -->
+        <div class="header" id="top">
+            <h1>XX行金融市场外汇业务季度分析</h1>
+            <h2>2025年第一季度 | 经营情况评估</h2>
+            <div class="meta">报告日期：2025年4月15日</div>
+        </div>
+
+        <!-- 目录 -->
+        <div class="toc" id="toc">
+            <h2>报告目录</h2>
+            <ul class="toc-items">
+                <li onclick="scrollToSection('section1')">一、历史业务情况回顾</li>
+                <li onclick="scrollToSection('section2')">二、2025年Q1经营情况分析</li>
+                <li onclick="scrollToSection('section3')">三、主要货币对操作回顾</li>
+                <li onclick="scrollToSection('section4')">四、期权与套利策略评估</li>
+                <li onclick="scrollToSection('section5')">五、风险管理情况</li>
+                <li onclick="scrollToSection('section6')">六、小结与改进建议</li>
+            </ul>
+        </div>
+
+        <!-- 一、历史业务情况回顾 -->
+        <div class="section" id="section1">
+            <h2>一、历史业务情况回顾</h2>
+
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="value">4.5亿</div>
+                    <div class="label">2025年Q1收入（亿元）</div>
+                </div>
+                <div class="data-item">
+                    <div class="value">+9.8%</div>
+                    <div class="label">同比增长率</div>
+                </div>
+                <div class="data-item">
+                    <div class="value">104.7%</div>
+                    <div class="label">预算完成率</div>
+                </div>
+                <div class="data-item">
+                    <div class="value">连续5年</div>
+                    <div class="label">收入持续增长</div>
+                </div>
+            </div>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>历史增长趋势</h4>
+                    <p>• 2020年收入2.8亿元，2024年突破4.0亿元</p>
+                    <p>• 2025年Q1达到4.5亿元，<span class="highlight">创历史同期新高</span></p>
+                    <p>• 同比增长9.8%，呈现稳健上升趋势</p>
+                </div>
+
+                <div class="card blue">
+                    <h4>预算完成情况</h4>
+                    <p>• 2021-2023年连续三年100%达成预算目标</p>
+                    <p>• 2025年Q1预算完成率<span class="positive">104.7%</span>，超额达成</p>
+                    <p>• 近五年表现非常稳健</p>
+                </div>
+            </div>
+
+            <div class="chart-placeholder">
+                <h4>历年收入对比图</h4>
+                <p>柱状图展示：2020-2025年Q1收入变化趋势</p>
+                <p style="margin-top: 10px; font-size: 12px;">2.8亿 → 3.2亿 → 3.5亿 → 3.8亿 → 4.1亿 → 4.5亿</p>
+            </div>
+        </div>
+
+        <!-- 二、2025年Q1经营情况分析 -->
+        <div class="section" id="section2">
+            <h2>二、2025年Q1经营情况分析</h2>
+
+            <div class="chart-placeholder" style="background: linear-gradient(135deg, #fffaf0 0%, #fed7aa 100%); border-color: #FF8C00;">
+                <h4 style="color: #FF8C00;">核心数据</h4>
+                <p style="font-size: clamp(14px, 3vw, 18px); font-weight: bold;">2025年Q1外汇业务收入4.5亿元，同比增长9.8%，预算完成率104.7%</p>
+            </div>
+
+            <h3>按交易策略收入分解</h3>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>即期交易：2.0亿元（44.4%）</h4>
+                    <p>• 主要盈利来源，市场活跃度高</p>
+                    <p>• 套保业务稳健发展</p>
+                </div>
+
+                <div class="card blue">
+                    <h4>远期/掉期：1.5亿元（33.3%）</h4>
+                    <p>• 套保业务稳健发展</p>
+                    <p>• 客户需求稳定</p>
+                </div>
+
+                <div class="card green">
+                    <h4>外汇期权：0.6亿元（13.3%）</h4>
+                    <p>• 期权策略效果良好</p>
+                    <p>• 风险对冲能力强</p>
+                </div>
+
+                <div class="card orange">
+                    <h4>跨货币套利：0.4亿元（8.9%）</h4>
+                    <p>• 套利策略表现显著</p>
+                    <p>• 收益贡献持续增加</p>
+                </div>
+            </div>
+
+            <div class="chart-placeholder">
+                <h4>收入构成环形图</h4>
+                <p>即期交易 44.4% | 远期/掉期 33.3% | 外汇期权 13.3% | 跨货币套利 8.9%</p>
+            </div>
+
+            <h3>市场表现对比分析</h3>
+
+            <div class="card-container">
+                <div class="card green">
+                    <h4>市场基准对比</h4>
+                    <ul class="feature-list">
+                        <li>美元指数（DXY）上涨2.8%</li>
+                        <li>人民币汇率指数（CFETS）下跌1.2%</li>
+                        <li>主要货币对波动率VIX平均14.5%</li>
+                    </ul>
+                </div>
+
+                <div class="card blue">
+                    <h4>本行收益率分析</h4>
+                    <p>• 本行收益率：<span class="positive">11.6%</span></p>
+                    <p>• 市场平均收益率：8.5%</p>
+                    <p>• 本行 vs 市场：<span class="positive">+3.1%</span></p>
+                    <p style="margin-top: 10px; font-weight: bold; color: #2E8B57;">✓ 显著跑赢市场基准！</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 三、主要货币对操作回顾 -->
+        <div class="section" id="section3">
+            <h2>三、主要货币对操作回顾</h2>
+
+            <h3>USD/CNY操作回顾 - 人民币贬值行情</h3>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="date">1月2日～2月10日</div>
+                    <div class="content">起始汇率：7.10，最高触及7.22，涨幅1.7%。驱动因素：美元走强、中美利差扩大。</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="date">1月5日-2月1日</div>
+                    <div class="content">逐步建仓加仓，最高持仓2.5亿美元。</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="date">2月8日-2月10日</div>
+                    <div class="content">快速减仓平仓，最终盈利900万美元。</div>
+                </div>
+            </div>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>关键问题</h4>
+                    <p class="negative">✗ 减仓过早，严重错失主要上涨红利</p>
+                </div>
+
+                <div class="card orange">
+                    <h4>收益对比分析</h4>
+                    <p><strong>模拟测算：</strong>若持续持有2.0亿美元，可获利2800万美元</p>
+                    <p><strong>实际收益：</strong>最终盈利900万美元</p>
+                    <p><strong>少获利：</strong>1900万美元，少获利比例<span class="negative">67.9%</span></p>
+                    <p style="margin-top: 10px;"><strong>评估结论：</strong>趋势识别准确，但持仓周期过短</p>
+                </div>
+            </div>
+
+            <h3>EUR/USD操作回顾 - 欧元贬值行情</h3>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="date">1月5日～3月10日</div>
+                    <div class="content">起始汇率：1.10，最低触及1.07，跌幅2.7%。驱动因素：欧央行鸽派、经济数据疲软。</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="date">1月8日-2月10日</div>
+                    <div class="content">逐步建仓加仓，最高持仓3.0亿欧元。</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="date">2月28日-3月10日</div>
+                    <div class="content">逐步减仓平仓，最终盈利2200万美元。</div>
+                </div>
+            </div>
+
+            <div class="card-container">
+                <div class="card purple">
+                    <h4>关键问题</h4>
+                    <p class="negative">✗ 减仓过早，严重错失盈利空间</p>
+                </div>
+
+                <div class="card gold">
+                    <h4>收益对比分析</h4>
+                    <p><strong>模拟测算：</strong>若持续持有2.5亿欧元，可获利7000万美元</p>
+                    <p><strong>实际收益：</strong>最终盈利2200万美元</p>
+                    <p><strong>少获利：</strong>4800万美元，少获利比例<span class="negative">68.6%</span></p>
+                    <p style="margin-top: 10px;"><strong>评估结论：</strong>成功捕捉下跌趋势，但减仓过早</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 四、期权与套利策略评估 -->
+        <div class="section" id="section4">
+            <h2>四、期权与套利策略评估</h2>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>USD/CNY波动率交易（2月～3月）</h4>
+                    <p><strong>市场环境：</strong></p>
+                    <ul class="feature-list">
+                        <li>隐含波动率：8.5% → 12.3%</li>
+                        <li>实际波动率：6.2% → 10.8%</li>
+                    </ul>
+                    <p><strong>期权策略：</strong></p>
+                    <ul class="feature-list">
+                        <li>买入看涨期权（权利金支出200万美元）</li>
+                        <li>卖出跨式期权（权利金收入350万美元）</li>
+                    </ul>
+                    <p><strong>到期盈亏：</strong></p>
+                    <p>USD/CNY到期汇率7.15，低于执行价，净盈利<span class="positive">150万元人民币</span></p>
+                    <p style="margin-top: 10px;"><strong>评估：</strong>准确判断汇率反弹，做空波动率策略获利</p>
+                </div>
+
+                <div class="card orange">
+                    <h4>USD/JPY与EUR/USD跨货币套利（1月～2月）</h4>
+                    <p><strong>市场机会：</strong></p>
+                    <ul class="feature-list">
+                        <li>USD/JPY：149.5 → 151.5（+1.3%）</li>
+                        <li>EUR/USD：1.10 → 1.08（-1.8%）</li>
+                    </ul>
+                    <p><strong>套利策略：</strong></p>
+                    <ul class="feature-list">
+                        <li>做多USD/JPY：盈利195万美元</li>
+                        <li>做空EUR/USD：盈利233万美元</li>
+                    </ul>
+                    <p><strong>合计收益：</strong></p>
+                    <p>• 总盈利：<span class="positive">428万美元</span></p>
+                    <p>• 折合人民币：<span class="positive">3082万元</span></p>
+                    <p style="margin-top: 10px;"><strong>评估：</strong>成功捕捉美元强势，套利策略效果显著</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 五、风险管理情况 -->
+        <div class="section" id="section5">
+            <h2>五、风险管理情况</h2>
+
+            <div class="card-container">
+                <div class="card blue">
+                    <h4>限额管理</h4>
+                    <p>• 敞口限额：6.0亿美元（季度内未调整）</p>
+                    <p>• 平均使用率：<span class="positive">90.0%</span></p>
+                    <p>• 高峰使用率：98.3%（3月下旬）</p>
+                    <p>• 汇率敞口结构：USD/CNY占45%，EUR/USD占30%，其他占25%</p>
+                </div>
+
+                <div class="card green">
+                    <h4>风险控制</h4>
+                    <ul class="feature-list">
+                        <li>超限次数：<span class="positive">0次</span> - 严格遵循限额</li>
+                        <li>累计损失：3240万元 - 在可控范围</li>
+                        <li>止损触发：3次，执行良好</li>
+                        <li>VaR（95%置信度）：日均200万美元</li>
+                    </ul>
+                    <p style="margin-top: 10px;"><strong>客户信用风险：</strong>企业客户零违约，授信使用率合理</p>
+                </div>
+            </div>
+
+            <div class="chart-placeholder">
+                <h4>汇率敞口结构环形图</h4>
+                <p>USD/CNY 45% | EUR/USD 30% | GBP/USD 15% | 其他 10%</p>
+            </div>
+        </div>
+
+        <!-- 六、小结与改进建议 -->
+        <div class="section" id="section6">
+            <h2>六、小结与改进建议</h2>
+
+            <h3>核心观点</h3>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>1. 经营业绩持续增长，超额达成目标</h4>
+                    <p>业务收入4.5亿元，同比增长9.8%，预算完成率104.7%，<span class="highlight">创历史同期新高</span></p>
+                </div>
+
+                <div class="card blue">
+                    <h4>2. 显著跑赢市场基准，主动管理能力突出</h4>
+                    <p>本行收益率11.6%，高于市场平均<span class="positive">3.1个百分点</span>，在汇率大幅波动情况下实现超额收益</p>
+                </div>
+
+                <div class="card green">
+                    <h4>3. 策略多元化布局，客户结构优化</h4>
+                    <p>即期44.4%，远期/掉期33.3%，期权13.3%，套利8.9%；企业客户62.2%</p>
+                </div>
+
+                <div class="card purple">
+                    <h4>4. 汇率波动加剧，风险控制严格</h4>
+                    <p>VIX平均14.5%，较去年同期上升；平均使用率90.0%，<span class="positive">零超限</span></p>
+                </div>
+
+                <div class="card orange">
+                    <h4>5. 趋势持仓能力不足，错失主要盈利空间</h4>
+                    <p>USD/CNY少获利<span class="negative">67.9%</span>，EUR/USD少获利<span class="negative">68.6%</span>，减仓过早问题严重</p>
+                </div>
+            </div>
+
+            <h3>业务亮点与存在问题</h3>
+
+            <div class="card-container">
+                <div class="card green">
+                    <h4>业务亮点</h4>
+                    <ul class="feature-list">
+                        <li>收入持续增长：连续五年保持增长，2025年Q1创历史同期新高</li>
+                        <li>超额达成目标：预算完成率104.7%，跑赢市场基准3.1%</li>
+                        <li>期权策略成功：做空波动率策略盈利1080万元</li>
+                        <li>跨货币套利出色：USD/JPY与EUR/USD套利盈利3082万元</li>
+                        <li>限额执行严格：全季度零超限，风险控制意识强</li>
+                        <li>客户信用良好：企业客户零违约，授信使用率合理</li>
+                    </ul>
+                </div>
+
+                <div class="card red">
+                    <h4>存在问题</h4>
+                    <ul class="feature-list problem-list">
+                        <li>趋势持仓能力严重不足：USD/CNY少获利67.9%，EUR/USD少获利68.6%</li>
+                        <li>止损决策有待优化：Q1触发3次止损，部分判断失误</li>
+                        <li>期权策略规模偏小：占比仅13.3%，未充分利用高波动环境</li>
+                        <li>汇率敞口结构有待优化：USD/CNY占比45%，集中度偏高</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>改进建议</h3>
+
+            <div class="card-container">
+                <div class="card red">
+                    <h4>1. 强化趋势持仓能力</h4>
+                    <p>建立趋势识别模型和持仓周期管理机制，适当延长持仓周期；设置分批止盈机制，在保护收益的同时保留继续盈利的空间</p>
+                </div>
+
+                <div class="card blue">
+                    <h4>2. 优化止损决策机制</h4>
+                    <p>研发止损触发模型，减少误判；建立止损复盘制度，对每次止损进行深入分析；设置止损缓冲区，避免小幅波动触发不必要的止损</p>
+                </div>
+
+                <div class="card green">
+                    <h4>3. 扩大期权策略规模</h4>
+                    <p>增加期权策略的资金配置，充分利用期权策略的盈利潜力；丰富期权策略类型，如波动率交易、套利策略等，提升策略多样性</p>
+                </div>
+
+                <div class="card purple">
+                    <h4>4. 优化汇率敞口结构</h4>
+                    <p>降低USD/CNY敞口占比，增加其他主要货币对的配置；建立汇率敞口动态调整机制，根据市场变化及时调整配置比例</p>
+                </div>
+
+                <div class="card orange">
+                    <h4>5. 完善汇率波动应对</h4>
+                    <p>建立汇率波动预警机制和应对预案，提前识别高波动风险；加强与央行、政策部门的沟通；提升对地缘政治、宏观经济事件的分析能力</p>
+                </div>
+            </div>
+
+            <h3>后续展望</h3>
+
+            <div class="card-container">
+                <div class="card blue">
+                    <h4>市场展望</h4>
+                    <ul class="feature-list">
+                        <li>关注美联储政策走向</li>
+                        <li>中美经贸关系变化</li>
+                        <li>欧洲央行政策调整</li>
+                        <li>地缘政治风险</li>
+                    </ul>
+                    <p><strong>市场预期：</strong>美元指数维持高位震荡，人民币汇率双向波动，EUR/USD继续承压</p>
+                </div>
+
+                <div class="card green">
+                    <h4>策略展望</h4>
+                    <ul class="feature-list">
+                        <li>坚持多元化策略布局</li>
+                        <li>优化各业务配置比例</li>
+                        <li>加强期权策略权重</li>
+                        <li>优化汇率敞口结构</li>
+                    </ul>
+                    <p><strong>优化方向：</strong>提升趋势持仓能力，减少误判止损，充分利用高波动环境</p>
+                </div>
+
+                <div class="card purple">
+                    <h4>风险展望</h4>
+                    <ul class="feature-list">
+                        <li>市场波动率持续上升</li>
+                        <li>汇率波动风险</li>
+                        <li>客户信用风险</li>
+                    </ul>
+                    <p><strong>风险控制措施：</strong>加强限额管理，优化止损机制，加强授信管理，确保风险可控前提下实现收益目标</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <div class="footer">
+            <p>© 2025 XX行金融市场部 | 仅供内部使用</p>
+            <p>报告生成日期：2025年4月15日</p>
+            <p style="margin-top: 10px; font-size: 11px; color: #999;">本报告支持深色模式显示</p>
+        </div>
+    </div>
+
+    <!-- 移动端导航 -->
+    <nav class="mobile-nav">
+        <div class="mobile-nav-inner">
+            <div class="mobile-nav-item" onclick="scrollToSection('top')">
+                <span style="font-size: 18px;">⬆</span>
+                <div>首页</div>
+            </div>
+            <div class="mobile-nav-item" onclick="scrollToSection('section1')">
+                <span style="font-size: 18px;">📊</span>
+                <div>回顾</div>
+            </div>
+            <div class="mobile-nav-item" onclick="scrollToSection('section2')">
+                <span style="font-size: 18px;">💰</span>
+                <div>经营</div>
+            </div>
+            <div class="mobile-nav-item" onclick="scrollToSection('section3')">
+                <span style="font-size: 18px;">📈</span>
+                <div>操作</div>
+            </div>
+            <div class="mobile-nav-item" onclick="scrollToSection('section6')">
+                <span style="font-size: 18px;">💡</span>
+                <div>建议</div>
+            </div>
+        </div>
+    </nav>
+
+    <script>
+        // 平滑滚动到指定章节
+        function scrollToSection(sectionId) {
+            const element = document.getElementById(sectionId);
+            if (element) {
+                const headerOffset = 60;
+                const elementPosition = element.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        // 监听滚动，更新导航状态
+        window.addEventListener('scroll', function() {
+            const sections = ['top', 'section1', 'section2', 'section3', 'section6'];
+            const navItems = document.querySelectorAll('.mobile-nav-item');
+
+            let currentSection = 'top';
+            sections.forEach(sectionId => {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    const rect = element.getBoundingClientRect();
+                    if (rect.top <= 150) {
+                        currentSection = sectionId;
+                    }
+                }
+            });
+
+            navItems.forEach((item, index) => {
+                item.classList.remove('active');
+                if (sections[index] === currentSection) {
+                    item.classList.add('active');
+                }
+            });
+        });
+
+        // 触摸优化：防止双击缩放
+        document.addEventListener('touchend', function(event) {
+            const now = Date.now();
+            if (now - (this.lastTouchEnd || 0) < 300) {
+                event.preventDefault();
+            }
+            this.lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>
