@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音渠道开户榜</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .poster-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 头部样式 */
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #e94560 100%);
+            padding: 30px 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before,
+        .header::after {
+            content: '🏆';
+            position: absolute;
+            font-size: 40px;
+            top: 20px;
+        }
+
+        .header::before {
+            left: 30px;
+        }
+
+        .header::after {
+            right: 30px;
+        }
+
+        .platform-title {
+            font-size: 42px;
+            font-weight: 800;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: 8px;
+            letter-spacing: 4px;
+        }
+
+        .sub-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #ffd700;
+            letter-spacing: 6px;
+        }
+
+        .date-range {
+            font-size: 16px;
+            color: #fff;
+            margin-top: 15px;
+            opacity: 0.9;
+        }
+
+        /* 内容区域 */
+        .content {
+            padding: 25px 20px;
+        }
+
+        /* 榜单区块 */
+        .ranking-section {
+            margin-bottom: 30px;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(233, 69, 96, 0.15);
+            border: 2px solid #ffe4e4;
+        }
+
+        .ranking-header {
+            background: linear-gradient(90deg, #1a1a2e 0%, #e94560 100%);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ranking-icon {
+            font-size: 24px;
+        }
+
+        .ranking-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 2px;
+        }
+
+        /* 表格样式 */
+        .ranking-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .ranking-table thead {
+            background: #f8f9fa;
+        }
+
+        .ranking-table th {
+            padding: 14px 8px;
+            font-weight: 600;
+            color: #e94560;
+            border-bottom: 2px solid #ffd700;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .ranking-table td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e8e9eb;
+            text-align: center;
+            color: #333;
+        }
+
+        .ranking-table tbody tr:nth-child(even) {
+            background: #fafbfc;
+        }
+
+        .ranking-table tbody tr:hover {
+            background: #fff5f5;
+        }
+
+        /* 排名样式 */
+        .rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .rank-1 {
+            background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(255, 183, 0, 0.4);
+        }
+
+        .rank-2 {
+            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(160, 160, 160, 0.4);
+        }
+
+        .rank-3 {
+            background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+        }
+
+        .rank-other {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        /* 员工姓名 */
+        .employee-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 数值样式 */
+        .number {
+            font-family: 'Arial', sans-serif;
+            font-weight: 600;
+        }
+
+        .highlight {
+            color: #e94560;
+            font-weight: 700;
+        }
+
+        /* 率值样式 */
+        .rate {
+            font-weight: 600;
+            color: #27ae60;
+        }
+
+        /* 合计行 */
+        .total-row {
+            background: linear-gradient(90deg, #fff5f5 0%, #ffe4e4 100%) !important;
+            font-weight: 700;
+        }
+
+        .total-row td {
+            color: #e94560;
+            border-top: 2px solid #e94560;
+        }
+
+        /* 底部说明 */
+        .footer-note {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border-left: 4px solid #e94560;
+        }
+
+        .footer-note-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #e94560;
+            margin-bottom: 10px;
+        }
+
+        .footer-note ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .footer-note li {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 6px;
+            padding-left: 16px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .footer-note li::before {
+            content: '•';
+            color: #e94560;
+            position: absolute;
+            left: 4px;
+            font-weight: bold;
+        }
+
+        /* 打印样式 */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .poster-container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="poster-container" id="posterContent">
+        <!-- 头部 -->
+        <div class="header">
+            <div class="platform-title">抖音渠道</div>
+            <div class="sub-title">开户榜</div>
+            <div class="date-range" id="dateRange">2026年2月24日 - 2026年3月2日</div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="content">
+            <!-- 开户总榜 -->
+            <div class="ranking-section">
+                <div class="ranking-header">
+                    <span class="ranking-icon">👑</span>
+                    <span class="ranking-title">小助手开户总榜</span>
+                </div>
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">排名</th>
+                            <th style="width: 100px;">员工姓名</th>
+                            <th style="width: 90px;">线索数</th>
+                            <th style="width: 70px;">开户数</th>
+                            <th style="width: 70px;">有效户</th>
+                            <th style="width: 100px;">引入资产</th>
+                            <th style="width: 80px;">开户率</th>
+                            <th style="width: 80px;">有效率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="totalRankingBody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 存量线索开户周榜 -->
+            <div class="ranking-section">
+                <div class="ranking-header">
+                    <span class="ranking-icon">📊</span>
+                    <span class="ranking-title">小助手存量线索开户周榜</span>
+                </div>
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">排名</th>
+                            <th style="width: 100px;">员工姓名</th>
+                            <th style="width: 90px;">线索数</th>
+                            <th style="width: 70px;">开户数</th>
+                            <th style="width: 70px;">有效户</th>
+                            <th style="width: 100px;">引入资产</th>
+                            <th style="width: 80px;">开户率</th>
+                            <th style="width: 80px;">有效率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="existingRankingBody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 新增线索开户周榜 -->
+            <div class="ranking-section">
+                <div class="ranking-header">
+                    <span class="ranking-icon">🆕</span>
+                    <span class="ranking-title">小助手新增线索开户周榜</span>
+                </div>
+                <table class="ranking-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">排名</th>
+                            <th style="width: 100px;">员工姓名</th>
+                            <th style="width: 90px;">线索数</th>
+                            <th style="width: 70px;">开户数</th>
+                            <th style="width: 70px;">有效户</th>
+                            <th style="width: 100px;">引入资产</th>
+                            <th style="width: 80px;">开户率</th>
+                            <th style="width: 80px;">有效率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="newRankingBody">
+                        <!-- 动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 底部说明 -->
+            <div class="footer-note">
+                <div class="footer-note-title">📋 数据说明</div>
+                <ul>
+                    <li>① 微信线索数指添加企业微信后留存线索量</li>
+                    <li>② 开户数据指开户营业部归属为10/30（即成都天府四街/二营业部）</li>
+                    <li>③ 开户率 = 开户数 / 微信线索数；有效率 = 有效户数 / 开户数</li>
+                    <li>④ 资产单位：万元</li>
+                    <li>⑤ 存量开户线索指添加企业微信时间在统计周期开始前</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 格式化数字
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '-';
+            return num.toLocaleString();
+        }
+
+        // 格式化资产（转换为万元）
+        function formatAssets(value) {
+            if (value === null || value === undefined) return '-';
+            const wan = value / 10000;
+            return wan.toFixed(2);
+        }
+
+        // 获取排名样式类
+        function getRankClass(rank) {
+            if (rank === 1) return 'rank-1';
+            if (rank === 2) return 'rank-2';
+            if (rank === 3) return 'rank-3';
+            return 'rank-other';
+        }
+
+        // 渲染表格行
+        function renderTableRow(item, index, isTotal = false) {
+            if (isTotal) {
+                return `
+                    <tr class="total-row">
+                        <td>总计</td>
+                        <td>-</td>
+                        <td class="number">${formatNumber(item.total_leads)}</td>
+                        <td class="number highlight">${formatNumber(item.opened_count)}</td>
+                        <td class="number">${formatNumber(item.valid_customer_count)}</td>
+                        <td class="number">${formatAssets(item.total_assets)}</td>
+                        <td class="rate">${(item.opening_rate || 0).toFixed(2)}%</td>
+                        <td class="rate">${(item.valid_customer_rate || 0).toFixed(2)}%</td>
+                    </tr>
+                `;
+            }
+
+            return `
+                <tr>
+                    <td><span class="rank ${getRankClass(index + 1)}">${index + 1}</span></td>
+                    <td class="employee-name">${item.employee_name}</td>
+                    <td class="number">${formatNumber(item.total_leads)}</td>
+                    <td class="number highlight">${formatNumber(item.opened_count)}</td>
+                    <td class="number">${formatNumber(item.valid_customer_count)}</td>
+                    <td class="number">${formatAssets(item.total_assets)}</td>
+                    <td class="rate">${(item.opening_rate || 0).toFixed(2)}%</td>
+                    <td class="rate">${(item.valid_customer_rate || 0).toFixed(2)}%</td>
+                </tr>
+            `;
+        }
+
+        // 渲染榜单
+        function renderRanking(data, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody || !data || data.length === 0) {
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #999;">暂无数据</td></tr>';
+                }
+                return;
+            }
+
+            let html = '';
+
+            // 渲染数据行
+            data.forEach((item, index) => {
+                html += renderTableRow(item, index);
+            });
+
+            // 计算合计
+            const total = {
+                total_leads: data.reduce((sum, item) => sum + (item.total_leads || 0), 0),
+                opened_count: data.reduce((sum, item) => sum + (item.opened_count || 0), 0),
+                valid_customer_count: data.reduce((sum, item) => sum + (item.valid_customer_count || 0), 0),
+                total_assets: data.reduce((sum, item) => sum + (item.total_assets || 0), 0),
+                opening_rate: 0,
+                valid_customer_rate: 0
+            };
+
+            // 计算合计率
+            if (total.total_leads > 0) {
+                total.opening_rate = (total.opened_count / total.total_leads * 100);
+            }
+            if (total.opened_count > 0) {
+                total.valid_customer_rate = (total.valid_customer_count / total.opened_count * 100);
+            }
+
+            html += renderTableRow(total, 0, true);
+            tbody.innerHTML = html;
+        }
+
+        // 设置日期范围
+        function setDateRange(startDate, endDate) {
+            const dateEl = document.getElementById('dateRange');
+            if (dateEl && startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                dateEl.textContent = `${start.getFullYear()}年${start.getMonth() + 1}月${start.getDate()}日 - ${end.getFullYear()}年${end.getMonth() + 1}月${end.getDate()}日`;
+            }
+        }
+
+        // 初始化
+        function init(data) {
+            if (data) {
+                setDateRange(data.start_date, data.end_date);
+                renderRanking(data.rankings?.total, 'totalRankingBody');
+                renderRanking(data.rankings?.existing, 'existingRankingBody');
+                renderRanking(data.rankings?.new, 'newRankingBody');
+            }
+        }
+
+        // 暴露初始化函数供外部调用
+        window.initPoster = init;
+    </script>
+</body>
+</html>

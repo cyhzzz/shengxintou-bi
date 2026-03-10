@@ -133,7 +133,7 @@ def get_aggregation_status():
         summary = db.session.query(
             sa.func.sum(DailyMetricsUnified.cost).label('total_cost'),
             sa.func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            sa.func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            sa.func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             sa.func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
             sa.func.sum(DailyMetricsUnified.opened_account_users).label('total_opened')
         ).first()
@@ -154,7 +154,7 @@ def get_aggregation_status():
                 'summary': {
                     'total_cost': float(summary.total_cost or 0),
                     'total_impressions': int(summary.total_impressions or 0),
-                    'total_click_users': int(summary.total_click_users or 0),
+                    'total_clicks': int(summary.total_clicks or 0),
                     'total_leads': int(summary.total_leads or 0),
                     'total_opened': int(summary.total_opened or 0)
                 }

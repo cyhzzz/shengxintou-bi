@@ -158,7 +158,7 @@ def get_conversion_funnel():
 
     7层漏斗定义:
     1. 曝光 (impressions) - 广告曝光量
-    2. 点击人数 (click_users) - 去重点击人数
+    2. 点击次数 (clicks) - 点击次数
     3. 线索人数 (lead_users) - 去重线索人数
     4. 开口人数 (customer_mouth_users) - 去重开口人数
     5. 有效线索 (valid_lead_users) - 去重有效线索人数
@@ -192,7 +192,7 @@ def get_conversion_funnel():
         query = db.session.query(
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
             func.sum(DailyMetricsUnified.customer_mouth_users).label('total_customer_mouth_users'),
             func.sum(DailyMetricsUnified.valid_lead_users).label('total_valid_lead_users'),
@@ -222,7 +222,7 @@ def get_conversion_funnel():
 
         # 提取数据
         impressions = int(result.total_impressions) if result.total_impressions else 0
-        click_users = int(result.total_click_users) if result.total_click_users else 0
+        clicks = int(result.total_clicks) if result.total_clicks else 0
         total_cost = float(result.total_cost) if result.total_cost else 0
         lead_users = int(result.total_lead_users) if result.total_lead_users else 0
         customer_mouth_users = int(result.total_customer_mouth_users) if result.total_customer_mouth_users else 0
@@ -241,15 +241,15 @@ def get_conversion_funnel():
             },
             {
                 'step': '客户点击',
-                'value': click_users,
-                'label': '点击人数',
-                'rate': (click_users / impressions * 100) if impressions > 0 else 0
+                'value': clicks,
+                'label': '点击次数',
+                'rate': (clicks / impressions * 100) if impressions > 0 else 0
             },
             {
                 'step': '客户线索',
                 'value': lead_users,
                 'label': '线索人数',
-                'rate': (lead_users / click_users * 100) if click_users > 0 else 0
+                'rate': (lead_users / clicks * 100) if clicks > 0 else 0
             },
             {
                 'step': '客户开口',

@@ -124,6 +124,10 @@ class DynamicLoader {
             'conversion-funnel': 'js/reports/ConversionFunnelReport.js',
             'external-data': 'js/reports/ExternalDataAnalysisReport.js',
 
+            // 员工转化报表
+            'employee-conversion-analysis': 'js/reports/EmployeeConversionAnalysis.js',
+            'employee-conversion-weekly': 'js/reports/EmployeeConversionWeekly.js',
+
             // 报告生成
             'report-generation': 'js/components/WeeklyReportGenerator.js'
         };
@@ -154,6 +158,8 @@ class DynamicLoader {
             'cost-analysis': 'CostAnalysisReport',
             'conversion-funnel': 'ConversionFunnelReport',
             'external-data': 'ExternalDataAnalysisReport',
+            'employee-conversion-analysis': 'EmployeeConversionAnalysis',
+            'employee-conversion-weekly': 'EmployeeConversionWeekly',
             'report-generation': 'WeeklyReportGenerator'
         };
 

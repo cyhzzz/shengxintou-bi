@@ -81,6 +81,27 @@ const REPORTS = {
         title: '转化漏斗',
         icon: 'icon-funnel'
     },
+    'employee-conversion': {
+        id: 'employee-conversion',
+        name: '员工转化报表',
+        title: '员工转化报表',
+        icon: 'icon-user',
+        hasSubmenu: true
+    },
+    'employee-conversion-analysis': {
+        id: 'employee-conversion-analysis',
+        name: '转化效果分析',
+        title: '转化效果分析',
+        icon: 'icon-chart',
+        parent: 'employee-conversion'
+    },
+    'employee-conversion-weekly': {
+        id: 'employee-conversion-weekly',
+        name: '转化周报生成',
+        title: '转化周报生成',
+        icon: 'icon-report',
+        parent: 'employee-conversion'
+    },
     'report-generation': {
         id: 'report-generation',
         name: '报告生成',

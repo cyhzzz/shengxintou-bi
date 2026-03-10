@@ -441,7 +441,7 @@ class DailyMetricsUnified(db.Model):
     # ===== 广告指标（从广告数据表聚合） =====
     cost = Column(Numeric(10, 2), default=0, comment='花费（元）')
     impressions = Column(Integer, default=0, comment='展示次数')
-    click_users = Column(Integer, default=0, comment='点击人数（去重）')
+    clicks = Column(Integer, default=0, comment='点击次数')
 
     # ===== 转化指标（从后端转化表聚合） =====
     lead_users = Column(Integer, default=0, comment='线索人数（去重）')
@@ -450,6 +450,13 @@ class DailyMetricsUnified(db.Model):
     valid_lead_users = Column(Integer, default=0, comment='有效线索人数（去重，is_valid_lead=True）')
     opened_account_users = Column(Integer, default=0, comment='开户人数（去重，is_opened_account=True）')
     valid_customer_users = Column(Integer, default=0, comment='有效户人数（去重，is_valid_customer=True）')
+
+    # ===== 资产指标（从后端转化表聚合） =====
+    opened_account_assets = Column(Numeric(15, 2), default=0, comment='新增客户资产（is_opened_account=True的assets总和）')
+    existing_customer_assets = Column(Numeric(15, 2), default=0, comment='服务存量客户资产（is_opened_account=False且assets>0的assets总和）')
+
+    # ===== 创收指标（从后端转化表聚合） =====
+    opened_account_contribution = Column(Numeric(15, 2), default=0, comment='新开客户创收（is_opened_account=True的customer_contribution总和）')
 
     # ===== 辅助字段（用于数据关联，不作为聚合维度） =====
     account_id = Column(String(50), comment='账号ID（辅助字段）')

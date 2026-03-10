@@ -487,4 +487,51 @@ def get_summary():
         }), 500
 
 
+@bp.route('/employees', methods=['GET'])
+def get_employees():
+    """
+    获取服务人员列表
+
+    从 backend_conversions 表中获取所有唯一的员工号和姓名
+
+    返回:
+    {
+        "success": true,
+        "data": [
+            {"employee_no": "E001", "employee_name": "张三"},
+            {"employee_no": "E002", "employee_name": "李四"}
+        ]
+    }
+    """
+    try:
+        employees = db.session.query(
+            BackendConversions.add_employee_no,
+            BackendConversions.add_employee_name
+        ).filter(
+            BackendConversions.add_employee_no.isnot(None),
+            BackendConversions.add_employee_no != ''
+        ).distinct().order_by(BackendConversions.add_employee_name).all()
+
+        result = [
+            {
+                'employee_no': e.add_employee_no,
+                'employee_name': e.add_employee_name or ''
+            }
+            for e in employees
+        ]
+
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 

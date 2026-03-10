@@ -29,7 +29,7 @@ class AgencyAnalysisReport {
         this.metrics = {
             cost: { name: '花费', unit: '元', precision: 2 },
             impressions: { name: '曝光', unit: '次', precision: 0 },
-            click_users: { name: '点击人数', unit: '人', precision: 0 },
+            clicks: { name: '点击次数', unit: '次', precision: 0 },
             lead_users: { name: '线索人数', unit: '人', precision: 0 },
             valid_customer_users: { name: '有效户人数', unit: '人', precision: 0 },
             opened_account_users: { name: '开户人数', unit: '人', precision: 0 }
@@ -503,7 +503,7 @@ class AgencyAnalysisReport {
                             <div class="btn-group" id="chartMetricSelector">
                                 <button class="btn is-active" data-metric="cost">花费</button>
                                 <button class="btn" data-metric="impressions">曝光</button>
-                                <button class="btn" data-metric="click_users">点击</button>
+                                <button class="btn" data-metric="clicks">点击</button>
                                 <button class="btn" data-metric="lead_users">线索</button>
                                 <button class="btn" data-metric="opened_account_users">开户</button>
                                 <button class="btn" data-metric="valid_customer_users">有效户</button>
@@ -540,6 +540,9 @@ class AgencyAnalysisReport {
                                         <th>点击</th>
                                         <th>线索</th>
                                         <th>开户</th>
+                                        <th>有效户</th>
+                                        <th>新增资产</th>
+                                        <th>服务存量资产</th>
                                         <th>CTR</th>
                                         <th>线索成本</th>
                                         <th>开户成本</th>
@@ -604,7 +607,7 @@ class AgencyAnalysisReport {
         this.currentData.summary.forEach(item => {
             totalCost += item.metrics.cost || 0;
             totalImpressions += item.metrics.impressions || 0;
-            totalClickUsers += item.metrics.click_users || 0;
+            totalClickUsers += item.metrics.clicks || 0;
             totalLeadUsers += item.metrics.lead_users || 0;
             totalOpenedAccountUsers += item.metrics.opened_account_users || 0;
             totalValidCustomerUsers += item.metrics.valid_customer_users || 0;
@@ -994,7 +997,7 @@ class AgencyAnalysisReport {
         if (data.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" class="empty-state">
+                    <td colspan="14" class="empty-state">
                         <div class="empty-state-icon">📊</div>
                         <div>暂无数据，请调整筛选条件</div>
                     </td>
@@ -1009,7 +1012,7 @@ class AgencyAnalysisReport {
 
         tbody.innerHTML = sortedData.map(record => {
             const m = record.metrics;
-            const ctr = m.impressions > 0 ? (m.click_users / m.impressions * 100) : 0;
+            const ctr = m.impressions > 0 ? (m.clicks / m.impressions * 100) : 0;
             // 使用后端返回的成本数据，如果没有则本地计算
             const leadCost = m.lead_cost !== undefined ? m.lead_cost : (m.lead_users > 0 ? (m.cost / m.lead_users) : 0);
             const accountCost = m.account_cost !== undefined ? m.account_cost : (m.opened_account_users > 0 ? (m.cost / m.opened_account_users) : 0);
@@ -1033,9 +1036,12 @@ class AgencyAnalysisReport {
                     <td><strong>${agencyDisplay}</strong></td>
                     <td class="number">${this.formatTableCellValue(m.cost, isSummaryRow, 2)}</td>
                     <td class="number">${this.formatTableCellValue(m.impressions, isSummaryRow, 0)}</td>
-                    <td class="number">${this.formatTableCellValue(m.click_users, isSummaryRow, 0)}</td>
+                    <td class="number">${this.formatTableCellValue(m.clicks, isSummaryRow, 0)}</td>
                     <td class="number">${this.formatTableCellValue(m.lead_users, isSummaryRow, 0)}</td>
                     <td class="number">${this.formatTableCellValue(m.opened_account_users, isSummaryRow, 0)}</td>
+                    <td class="number">${this.formatTableCellValue(m.valid_customer_users, isSummaryRow, 0)}</td>
+                    <td class="number">${this.formatTableCellValue(m.opened_account_assets, isSummaryRow, 2)}</td>
+                    <td class="number">${this.formatTableCellValue(m.existing_customer_assets, isSummaryRow, 2)}</td>
                     <td class="number">${ctr > 0 || isSummaryRow ? ctr.toFixed(2) + '%' : '<span style="color: #999;">-</span>'}</td>
                     <td class="number">${this.formatTableCellValue(leadCost, isSummaryRow, 2)}</td>
                     <td class="number">${this.formatTableCellValue(accountCost, isSummaryRow, 2)}</td>
@@ -1165,14 +1171,14 @@ class AgencyAnalysisReport {
         }
 
         // CSV表头
-        const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', 'CTR', '线索成本', '开户成本'];
+        const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', '有效户', '新增资产', '服务存量资产', 'CTR', '线索成本', '开户成本'];
 
         // 构建CSV内容
         const csvRows = [headers.join(',')];
 
         sortedData.forEach(record => {
             const m = record.metrics;
-            const ctr = m.impressions > 0 ? (m.click_users / m.impressions * 100).toFixed(2) : '0.00';
+            const ctr = m.impressions > 0 ? (m.clicks / m.impressions * 100).toFixed(2) : '0.00';
             const leadCost = m.lead_cost !== undefined ? m.lead_cost :
                            (m.lead_users > 0 ? (m.cost / m.lead_users).toFixed(2) : '0.00');
             const accountCost = m.account_cost !== undefined ? m.account_cost :
@@ -1195,9 +1201,12 @@ class AgencyAnalysisReport {
                 agency,
                 m.cost.toFixed(2),
                 m.impressions,
-                m.click_users,
+                m.clicks,
                 m.lead_users,
                 m.opened_account_users,
+                m.valid_customer_users || 0,
+                (m.opened_account_assets || 0).toFixed(2),
+                (m.existing_customer_assets || 0).toFixed(2),
                 ctr + '%',
                 leadCost,
                 accountCost

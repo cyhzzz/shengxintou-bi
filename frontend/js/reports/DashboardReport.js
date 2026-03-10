@@ -400,11 +400,12 @@ class DashboardReport {
 
     /**
      * 获取筛选条件（参考厂商分析报表的实现）
+     * 修复：自定义日期模式下正确获取日期范围
      */
     getFilters() {
         // 检查哪个日期按钮被激活
         const activeDateBtn = document.querySelector('.btn[data-days].is-active');
-        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : 'all';
+        const dateMode = activeDateBtn ? activeDateBtn.dataset.days : null;
 
         // 从 MultiSelectForm 实例获取选中的值
         const platforms = this.platformMultiSelect?.getSelected() || [];
@@ -417,10 +418,22 @@ class DashboardReport {
             business_models: businessModels  // 修复：使用正确的变量名
         };
 
-        // 参考厂商分析报表：只有当不是"全部"模式时才传日期
-        if (dateMode !== 'all') {
-            const startDate = document.getElementById('dashboardStartDate')?.value;
-            const endDate = document.getElementById('dashboardEndDate')?.value;
+        // 获取日期输入框的值
+        const startDate = document.getElementById('dashboardStartDate')?.value;
+        const endDate = document.getElementById('dashboardEndDate')?.value;
+
+        // 判断是否需要日期筛选
+        if (dateMode === 'all') {
+            // "全部"模式：不传日期筛选
+            // filters.date_range 不设置
+        } else if (dateMode) {
+            // 快速选择模式（近7天/30天/90天）：使用输入框中的日期
+            if (startDate && endDate) {
+                filters.date_range = [startDate, endDate];
+            }
+        } else {
+            // 自定义模式（dateMode 为 null，表示没有快速按钮被激活）
+            // 检查日期输入框是否有值
             if (startDate && endDate) {
                 filters.date_range = [startDate, endDate];
             }
@@ -446,6 +459,11 @@ class DashboardReport {
 
     /**
      * 加载数据
+     *
+     * 修复：改用 /dashboard/core-metrics 接口获取核心指标
+     * 原因：/query 接口的客户资产查询从 backend_conversions 原始表获取，
+     *      agency 字段是简称（如 "zl"），与筛选条件的全称（如 "众联"）不匹配
+     *      /dashboard/core-metrics 从 daily_metrics_unified 聚合表获取，agency 字段格式一致
      */
     async loadData() {
         try {
@@ -455,60 +473,45 @@ class DashboardReport {
             const filters = this.getFilters();
             console.log('[Dashboard] 使用筛选条件:', filters);
 
-            // 并行加载当前周期和上一周期的数据
-            const prevDateRange = this.getPreviousDateRange();
+            // 构建 /dashboard/core-metrics 接口参数
+            const coreMetricsParams = {
+                platforms: filters.platforms || [],
+                agencies: filters.agencies || [],
+                business_models: filters.business_models || []
+            };
 
-            // 构建请求列表（添加客户资产、客户贡献、存量客户资产和总展示数指标）
-            const metricsList = ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'];
-            console.log('[Dashboard] 请求的metrics列表:', metricsList);
-
-            const requests = [
-                API.queryData({
-                    dimensions: [],
-                    metrics: metricsList,
-                    filters: filters,
-                    granularity: 'summary'
-                })
-            ];
-
-            // 如果有上一周期日期，则添加上一周期数据请求
-            if (prevDateRange) {
-                requests.push(
-                    API.queryData({
-                        dimensions: [],
-                        metrics: ['cost', 'impressions', 'lead_users', 'opened_account_users', 'valid_customer_users', 'click_users', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
-                        filters: {
-                            date_range: [prevDateRange.start_date, prevDateRange.end_date],
-                            ...(filters.platforms && { platforms: filters.platforms }),
-                            ...(filters.agencies && { agencies: filters.agencies }),
-                            ...(filters.business_models && { business_models: filters.business_models })
-                        },
-                        granularity: 'summary'
-                    })
-                );
+            // 只有当有日期范围时才添加日期参数（"全部"模式不传日期，查询所有数据）
+            if (filters.date_range && filters.date_range[0] && filters.date_range[1]) {
+                coreMetricsParams.start_date = filters.date_range[0];
+                coreMetricsParams.end_date = filters.date_range[1];
+                console.log('[Dashboard] 使用指定日期范围:', filters.date_range[0], '至', filters.date_range[1]);
+            } else {
+                console.log('[Dashboard] "全部"模式：查询所有日期的数据');
             }
 
-            // 🔧 性能优化: 并行加载趋势数据和核心数据 (Eliminating Waterfalls)
-            const [currentResponse, previousResponse] = await Promise.all([
-                Promise.all(requests),
+            console.log('[Dashboard] 调用 /dashboard/core-metrics 接口，参数:', coreMetricsParams);
+
+            // 并行加载核心指标和趋势数据
+            const [coreMetricsResponse, trendResponse] = await Promise.all([
+                API.getDashboardCoreMetrics(coreMetricsParams),
                 this.loadTrendData()
             ]);
 
-            console.log('[Dashboard] 当前周期响应:', currentResponse[0]);
-            console.log('[Dashboard] 上一周期响应:', previousResponse);
+            console.log('[Dashboard] 核心指标响应:', coreMetricsResponse);
 
-            if (!currentResponse[0].success) {
-                throw new Error(currentResponse[0].error || '加载数据失败');
+            if (!coreMetricsResponse.success) {
+                throw new Error(coreMetricsResponse.error || '加载核心指标失败');
             }
 
-            // 处理数据 (传递完整响应对象，而不是 .data)
-            this.currentData = this.processDashboardData(currentResponse[0], previousResponse);
-
-            // 趋势数据已在并行加载中完成
+            // 直接使用后端返回的数据（后端已计算好环比）
+            this.currentData = {
+                core_metrics: coreMetricsResponse.data.core_metrics,
+                wow_changes: coreMetricsResponse.data.wow_changes
+            };
 
             console.log('[Dashboard] 数据加载成功', this.currentData);
             console.log('[Dashboard] 客户资产:', this.currentData.core_metrics?.customer_assets);
-            console.log('[Dashboard] 客户贡献:', this.currentData.core_metrics?.customer_contribution);
+            console.log('[Dashboard] 存量客户资产:', this.currentData.core_metrics?.existing_customers_assets);
 
         } catch (error) {
             console.error('[Dashboard] 数据加载失败:', error);
@@ -529,7 +532,7 @@ class DashboardReport {
         const leads = parseInt(current.metrics?.lead_users || 0);
         const opened = parseInt(current.metrics?.opened_account_users || 0);
         const valid = parseInt(current.metrics?.valid_customer_users || 0);
-        const clicks = parseInt(current.metrics?.click_users || 0);
+        const clicks = parseInt(current.metrics?.clicks || 0);
         const assets = parseFloat(current.metrics?.customer_assets || 0);
         const contribution = parseFloat(current.metrics?.customer_contribution || 0);
         const existingAssets = parseFloat(current.metrics?.existing_customers_assets || 0);
@@ -604,10 +607,10 @@ class DashboardReport {
                 'cost_per_valid_account': ['cost', 'valid_customer_users']
             };
 
-            // 添加粒度参数
-            params.granularity = this.currentGranularity;
+            // 获取当前粒度（直接从实例属性获取，而不是从params中）
+            const granularity = this.currentGranularity;
 
-            const response = await API.getTrend(params, metricMap[this.currentMetricType] || metricMap['cost_per_lead']);
+            const response = await API.getTrend(params, metricMap[this.currentMetricType] || metricMap['cost_per_lead'], granularity);
 
             if (!response.success) {
                 throw new Error(response.error || '加载趋势数据失败');

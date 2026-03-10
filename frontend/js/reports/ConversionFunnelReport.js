@@ -16,6 +16,11 @@ class ConversionFunnelReport {
         // 初始化元数据管理器
         this.metadataManager = new MetadataManager();
 
+        // 日期筛选模式: 7, 30, 90, 'all', 'custom'
+        this.dateMode = '7';
+        this.startDate = null;
+        this.endDate = null;
+
         this.init();
     }
 
@@ -66,16 +71,17 @@ class ConversionFunnelReport {
                         <div id="businessModelFilterContainer"></div>
 
                         <!-- 代理商筛选 -->
-                        <div class="filter-group">
-                            <label class="filter-label">代理商:</label>
-                            <div id="filterAgency" style="min-width: 200px;"></div>
-                        </div>
+                        <div id="filterAgency" style="min-width: 200px;"></div>
+
+                        <!-- 服务人员筛选 -->
+                        <div id="filterEmployee" style="min-width: 200px;"></div>
 
                         <!-- 日期范围 -->
                         <div class="filter-group">
                             <label class="filter-label">日期范围:</label>
-                            <div class="btn-group">
-                                <button class="btn is-active" data-days="7">近7天</button>
+                            <div class="btn-group" id="dateQuickButtons">
+                                <button class="btn is-active" data-days="all">全部</button>
+                                <button class="btn" data-days="7">近7天</button>
                                 <button class="btn" data-days="30">近30天</button>
                                 <button class="btn" data-days="90">近90天</button>
                             </div>
@@ -132,29 +138,68 @@ class ConversionFunnelReport {
             }
         });
 
+        // 初始化服务人员多选下拉框
+        this.loadEmployeeFilter();
+
         // 初始化日期
         this.initializeDateFilters();
+    }
+
+    /**
+     * 加载服务人员筛选器
+     */
+    async loadEmployeeFilter() {
+        try {
+            const response = await API.getEmployees();
+            console.log('员工API响应:', response);
+
+            // 确保数据存在
+            if (!response || !response.data || response.data.length === 0) {
+                console.warn('没有员工数据');
+                return;
+            }
+
+            // 处理空姓名情况：优先使用员工号，无则显示"未知"
+            // MultiSelectDropdown 需要 {value, label} 格式的对象数组
+            const employeeOptions = response.data.map(e => {
+                const empNo = e.employee_no || '未知';
+                const empName = e.employee_name?.trim() || empNo;
+                return {
+                    value: empNo,
+                    label: `${empName} (${empNo})`
+                };
+            });
+
+            console.log('员工选项:', employeeOptions);
+
+            this.employeeDropdown = new MultiSelectDropdown({
+                container: 'filterEmployee',
+                id: 'employeeFilter',
+                label: '服务人员',
+                placeholder: '选择服务人员',
+                options: employeeOptions,
+                onChange: (selected) => {
+                    console.log('已选择服务人员:', selected);
+                }
+            });
+        } catch (error) {
+            console.error('加载员工列表失败:', error);
+        }
     }
 
     /**
      * 初始化日期筛选器
      */
     initializeDateFilters() {
-        const dateButtons = document.querySelectorAll('.btn-group .btn');
+        const dateButtons = document.querySelectorAll('#dateQuickButtons .btn');
         const dateRangePicker = document.querySelector('.date-range-picker');
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
 
-        // 设置默认日期范围（近7天）
-        const end = new Date();
-        const start = new Date();
-        start.setDate(end.getDate() - 7);
-
-        this.startDate = start.toISOString().split('T')[0];
-        this.endDate = end.toISOString().split('T')[0];
-
-        if (startDateInput) startDateInput.value = this.startDate;
-        if (endDateInput) endDateInput.value = this.endDate;
+        // 默认选择"近7天"
+        this.dateMode = '7'; // 7, 30, 90, 'all', 'custom'
+        this.startDate = null;
+        this.endDate = null;
 
         // 快速日期按钮点击事件
         dateButtons.forEach(btn => {
@@ -164,19 +209,38 @@ class ConversionFunnelReport {
                 // 激活当前按钮
                 e.target.classList.add('is-active');
 
-                // 隐藏自定义日期选择器
-                if (dateRangePicker) {
-                    dateRangePicker.style.display = 'none';
+                const days = e.target.dataset.days;
+
+                if (days === 'all') {
+                    // 全部：不清除日期筛选
+                    this.dateMode = 'all';
+                    this.startDate = null;
+                    this.endDate = null;
+                    // 隐藏自定义日期选择器
+                    if (dateRangePicker) {
+                        dateRangePicker.style.display = 'none';
+                    }
+                } else {
+                    // 计算日期范围
+                    const daysNum = parseInt(days);
+                    this.dateMode = days;
+
+                    const end = new Date();
+                    const start = new Date();
+                    start.setDate(end.getDate() - daysNum);
+
+                    this.startDate = start.toISOString().split('T')[0];
+                    this.endDate = end.toISOString().split('T')[0];
+
+                    // 隐藏自定义日期选择器
+                    if (dateRangePicker) {
+                        dateRangePicker.style.display = 'none';
+                    }
+
+                    // 更新日期输入框的值
+                    if (startDateInput) startDateInput.value = this.startDate;
+                    if (endDateInput) endDateInput.value = this.endDate;
                 }
-
-                // 计算日期范围
-                const days = parseInt(e.target.dataset.days);
-                const end = new Date();
-                const start = new Date();
-                start.setDate(end.getDate() - days);
-
-                this.startDate = start.toISOString().split('T')[0];
-                this.endDate = end.toISOString().split('T')[0];
             });
         });
 
@@ -184,6 +248,7 @@ class ConversionFunnelReport {
         if (startDateInput && endDateInput) {
             startDateInput.addEventListener('change', (e) => {
                 this.startDate = e.target.value;
+                this.dateMode = 'custom';
                 // 移除快速按钮的激活状态
                 dateButtons.forEach(b => b.classList.remove('is-active'));
                 // 显示自定义日期选择器
@@ -194,6 +259,7 @@ class ConversionFunnelReport {
 
             endDateInput.addEventListener('change', (e) => {
                 this.endDate = e.target.value;
+                this.dateMode = 'custom';
                 // 移除快速按钮的激活状态
                 dateButtons.forEach(b => b.classList.remove('is-active'));
                 // 显示自定义日期选择器
@@ -268,11 +334,17 @@ class ConversionFunnelReport {
             this.agencyDropdown.clearAll();
         }
 
-        // 重置日期筛选
-        const dateButtons = document.querySelectorAll('.btn-group .btn');
-        dateButtons.forEach(btn => btn.classList.remove('is-active'));
-        dateButtons[0].classList.add('is-active'); // 默认选中"近7天"
+        // 重置服务人员筛选
+        if (this.employeeDropdown) {
+            this.employeeDropdown.clearAll();
+        }
 
+        // 重置日期筛选
+        const dateButtons = document.querySelectorAll('#dateQuickButtons .btn');
+        dateButtons.forEach(btn => btn.classList.remove('is-active'));
+        dateButtons[1].classList.add('is-active'); // 默认选中"近7天"
+
+        this.dateMode = '7';
         const end = new Date();
         const start = new Date();
         start.setDate(end.getDate() - 7);
@@ -283,6 +355,12 @@ class ConversionFunnelReport {
         const endDateInput = document.getElementById('endDate');
         if (startDateInput) startDateInput.value = this.startDate;
         if (endDateInput) endDateInput.value = this.endDate;
+
+        // 隐藏自定义日期选择器
+        const dateRangePicker = document.querySelector('.date-range-picker');
+        if (dateRangePicker) {
+            dateRangePicker.style.display = 'none';
+        }
 
         // 重新加载数据（空筛选条件）
         await this.loadData({});
@@ -298,11 +376,32 @@ class ConversionFunnelReport {
         const businessModels = this.businessModelFilter ? this.businessModelFilter.getSelectedValues() : [];
         const agencies = this.agencyDropdown ? this.agencyDropdown.getSelectedValues() : [];
 
+        // 从员工筛选值中提取员工号（格式：员工姓名 (员工号)）
+        const employeeSelected = this.employeeDropdown ? this.employeeDropdown.getSelectedValues() : [];
+        const employees = employeeSelected.map(empStr => {
+            const match = empStr.match(/\((.+)\)$/);
+            return match ? match[1] : empStr;
+        });
+
+        // 处理日期范围
+        let dateRange = null;
+        if (this.dateMode === 'all') {
+            // 全部：不传日期筛选条件
+            dateRange = null;
+        } else if (this.dateMode === 'custom' && this.startDate && this.endDate) {
+            // 自定义日期
+            dateRange = [this.startDate, this.endDate];
+        } else if (this.startDate && this.endDate) {
+            // 快速选择日期
+            dateRange = [this.startDate, this.endDate];
+        }
+
         return {
             platforms: platforms.length > 0 ? platforms : null,
             business_models: businessModels.length > 0 ? businessModels : null,
             agencies: agencies.length > 0 ? agencies : null,
-            date_range: [this.startDate, this.endDate]
+            employees: employees.length > 0 ? employees : null,
+            date_range: dateRange
         };
     }
 
@@ -311,8 +410,8 @@ class ConversionFunnelReport {
      */
     async loadData(filters = {}) {
         try {
-            // 如果没有筛选条件，设置默认日期范围
-            if (!filters.date_range) {
+            // 如果没有筛选条件，设置默认日期范围（近7天）
+            if (!filters.date_range && this.dateMode !== 'all') {
                 const end = new Date();
                 const start = new Date();
                 start.setDate(end.getDate() - 7);
@@ -345,13 +444,17 @@ class ConversionFunnelReport {
         if (!container) return;
 
         // 移除旧的报表内容（保留筛选器）
-        const oldContent = container.querySelectorAll(':scope > .card:not(.card--filter)');
-        oldContent.forEach(el => el.remove());
+        // 注意：报表内容被包裹在 grid 容器中，需要移除整个容器
+        const oldGridContainers = container.querySelectorAll(':scope > div[style*="grid"]');
+        oldGridContainers.forEach(el => el.remove());
+        // 同时移除可能存在的独立卡片（兼容旧版本）
+        const oldCards = container.querySelectorAll(':scope > .card:not(.card--filter)');
+        oldCards.forEach(el => el.remove());
 
         // 创建报表内容HTML（两列布局，全宽）
         container.insertAdjacentHTML('beforeend', `
             <!-- 报表内容区域（两列布局） -->
-            <div style="
+            <div class="funnel-report-content" style="
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 20px;
@@ -393,6 +496,7 @@ class ConversionFunnelReport {
 
     /**
      * 渲染转化率数据列表（7步）
+     * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
      */
     renderConversionRateList() {
         const container = document.getElementById('conversionRateList');
@@ -404,6 +508,11 @@ class ConversionFunnelReport {
         }
 
         const funnel = this.data.funnel;
+
+        // 🎨 品牌蓝色渐变配色
+        const brandColors = [
+            '#00ABEB', '#0099D6', '#0088C2', '#0077AD', '#006699', '#005585', '#00479D'
+        ];
 
         // 7层漏斗步骤名称
         const stepNames = [
@@ -421,6 +530,7 @@ class ConversionFunnelReport {
         funnel.forEach((step, index) => {
             const currentValue = step.value || 0;
             const currentRate = step.rate || 0;
+            const color = brandColors[index];
 
             // 计算到下一步的转化率
             let nextStepRate = null;
@@ -431,11 +541,6 @@ class ConversionFunnelReport {
                 nextStepName = stepNames[index + 1];
             }
 
-            // 转化率颜色
-            const rateColor = currentRate >= 50 ? 'var(--success-color)' :
-                            currentRate >= 20 ? 'var(--warning-color)' :
-                            'var(--error-color)';
-
             // 进度条宽度
             const barWidth = Math.min(currentRate, 100);
 
@@ -443,28 +548,28 @@ class ConversionFunnelReport {
                 <div class="conversion-step" style="
                     display: flex;
                     align-items: center;
-                    padding: 12px 0;
+                    padding: 14px 0;
                     border-bottom: 1px solid var(--border-color-light);
                 ">
-                    <div style="flex: 0 0 100px; font-size: 13px; color: var(--text-primary); font-weight: 500;">
+                    <div style="flex: 0 0 100px; font-size: 13px; color: ${color}; font-weight: 600;">
                         ${stepNames[index]}
                     </div>
-                    <div style="flex: 0 0 80px; text-align: right; font-size: 14px; color: ${rateColor}; font-weight: 600;">
+                    <div style="flex: 0 0 80px; text-align: right; font-size: 15px; color: ${color}; font-weight: 700;">
                         ${currentRate.toFixed(2)}%
                     </div>
                     <div style="flex: 1; margin: 0 12px;">
                         <div style="
                             width: 100%;
-                            height: 8px;
+                            height: 10px;
                             background: var(--bg-page);
-                            border-radius: 4px;
+                            border-radius: 5px;
                             overflow: hidden;
                         ">
                             <div style="
                                 width: ${barWidth}%;
                                 height: 100%;
-                                background: ${rateColor};
-                                border-radius: 4px;
+                                background: ${color};
+                                border-radius: 5px;
                                 transition: width 0.3s ease;
                             "></div>
                         </div>
@@ -496,6 +601,7 @@ class ConversionFunnelReport {
 
     /**
      * 渲染核心数据指标
+     * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
      */
     renderCoreMetrics() {
         const container = document.getElementById('coreMetrics');
@@ -508,27 +614,14 @@ class ConversionFunnelReport {
 
         const metrics = this.data.core_metrics;
 
+        // 🎨 品牌蓝色渐变配色
+        const brandColors = ['#00ABEB', '#0088C2', '#006699', '#00479D'];
+
         const metricCards = [
-            {
-                label: '投入金额',
-                value: '¥' + (metrics.cost || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                color: 'var(--primary-color)'
-            },
-            {
-                label: '新增线索',
-                value: (metrics.lead_users || 0).toLocaleString(),
-                color: 'var(--success-color)'
-            },
-            {
-                label: '新开客户数',
-                value: (metrics.opened_account_users || 0).toLocaleString(),
-                color: 'var(--warning-color)'
-            },
-            {
-                label: '新增有效户数',
-                value: (metrics.valid_customer_users || 0).toLocaleString(),
-                color: 'var(--error-color)'
-            }
+            { label: '投入金额', value: '¥' + (metrics.cost || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+            { label: '新增线索', value: (metrics.lead_users || 0).toLocaleString() },
+            { label: '新开客户数', value: (metrics.opened_account_users || 0).toLocaleString() },
+            { label: '新增有效户数', value: (metrics.valid_customer_users || 0).toLocaleString() }
         ];
 
         const html = `
@@ -537,15 +630,15 @@ class ConversionFunnelReport {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 12px;
             ">
-                ${metricCards.map(metric => `
+                ${metricCards.map((metric, index) => `
                     <div style="
-                        padding: 12px;
+                        padding: 14px;
                         background: var(--bg-hover);
                         border-radius: var(--border-radius);
-                        border-left: 3px solid ${metric.color};
+                        border-left: 3px solid ${brandColors[index]};
                     ">
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">${metric.label}</div>
-                        <div style="font-size: 18px; font-weight: 600; color: ${metric.color};">${metric.value}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">${metric.label}</div>
+                        <div style="font-size: 18px; font-weight: 600; color: ${brandColors[index]};">${metric.value}</div>
                     </div>
                 `).join('')}
             </div>
@@ -557,6 +650,7 @@ class ConversionFunnelReport {
     /**
      * 渲染漏斗图
      * 🔧 性能优化: 异步方法，支持延迟加载 ECharts
+     * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
      */
     async renderFunnelChart() {
         const chartDom = document.getElementById('funnelChart');
@@ -575,15 +669,15 @@ class ConversionFunnelReport {
         const myChart = echarts.init(chartDom);
         this.charts.funnel = myChart;
 
-        // 7层漏斗颜色配置
-        const colors = [
-            '#5470C6', // 广告曝光 - 深蓝
-            '#91CC75', // 客户点击 - 绿色
-            '#FAC858', // 客户线索 - 黄色
-            '#EE6666', // 客户开口 - 红色
-            '#73C0DE', // 有效线索 - 浅蓝
-            '#3BA272', // 成功开户 - 青绿
-            '#FC8452'  // 有效户 - 橙色
+        // 🎨 品牌蓝色渐变配色（从浅蓝到深蓝）
+        const brandColors = [
+            '#00ABEB', // 广告曝光 - 浅蓝（品牌标准色）
+            '#0099D6', // 客户点击
+            '#0088C2', // 客户线索
+            '#0077AD', // 客户开口
+            '#006699', // 有效线索
+            '#005585', // 成功开户
+            '#00479D'  // 有效户 - 深蓝（品牌标准色）
         ];
 
         const stepNames = [
@@ -596,66 +690,90 @@ class ConversionFunnelReport {
             '有效户'
         ];
 
+        // 计算最大值用于宽度比例（使用对数缩放处理大数据差异）
+        const logValues = funnelData.map(d => d.value > 0 ? Math.log10(d.value + 1) : 0);
+        const maxLogValue = Math.max(...logValues);
+        const chartWidth = chartDom.clientWidth || 400;
+        const chartHeight = chartDom.clientHeight || 400;
+        const barHeight = 45; // 每个矩形的高度
+        const gap = 8; // 矩形之间的间距
+        const borderRadius = 8; // 圆角半径
+        const minBarWidth = 60; // 最小宽度
+        const maxBarWidth = chartWidth - 40; // 最大宽度
+
         const option = {
             tooltip: {
                 trigger: 'item',
+                backgroundColor: 'rgba(0, 71, 157, 0.95)',
+                borderColor: '#00479D',
+                borderWidth: 1,
+                padding: [12, 16],
+                textStyle: {
+                    color: '#fff',
+                    fontSize: 13
+                },
                 formatter: (params) => {
                     const dataIndex = params.dataIndex;
                     const stage = funnelData[dataIndex];
                     const rate = stage.rate ? stage.rate.toFixed(2) : '0.00';
                     return `
-                        <strong>${params.name}</strong><br/>
-                        人数: ${params.value.toLocaleString()}<br/>
-                        转化率: ${rate}%
+                        <div style="font-weight: 600; margin-bottom: 4px;">${stage.step}</div>
+                        <div>人数: <span style="font-weight: 600;">${stage.value.toLocaleString()}</span></div>
+                        <div>转化率: <span style="font-weight: 600;">${rate}%</span></div>
                     `;
                 }
             },
-            series: [
-                {
-                    name: '转化漏斗',
-                    type: 'funnel',
-                    left: '10%',
-                    top: 10,
-                    bottom: 10,
-                    width: '80%',
-                    min: 0,
-                    max: 100,
-                    minSize: '0%',
-                    maxSize: '100%',
-                    sort: 'descending',
-                    gap: 0,
-                    label: {
-                        show: true,
-                        position: 'inside',
-                        formatter: (params) => {
-                            const dataIndex = params.dataIndex;
-                            const stage = funnelData[dataIndex];
-                            const rate = stage.rate ? stage.rate.toFixed(1) : '0.0';
-                            return `${params.name}\n${params.value.toLocaleString()}\n(${rate}%)`;
+            xAxis: { show: false, type: 'value', max: chartWidth },
+            yAxis: {
+                show: false,
+                type: 'category',
+                data: stepNames
+            },
+            series: [{
+                type: 'custom',
+                renderItem: (params, api) => {
+                    const dataIndex = params.dataIndex;
+                    const logValue = logValues[dataIndex];
+                    // 使用对数缩放计算宽度比例
+                    const widthRatio = maxLogValue > 0 ? logValue / maxLogValue : 0;
+                    const width = Math.max(minBarWidth + (maxBarWidth - minBarWidth) * widthRatio, minBarWidth);
+                    const y = dataIndex * (barHeight + gap) + 20;
+                    const x = (chartWidth - width) / 2;
+
+                    return {
+                        type: 'rect',
+                        shape: {
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: barHeight,
+                            r: [borderRadius, borderRadius, borderRadius, borderRadius]
                         },
-                        fontSize: 11,
-                        color: '#fff'
-                    },
-                    labelLine: {
-                        show: false
-                    },
-                    itemStyle: {
-                        borderColor: '#fff',
-                        borderWidth: 1
-                    },
-                    emphasis: {
-                        label: {
-                            fontSize: 13,
-                            fontWeight: 'bold'
+                        style: {
+                            fill: brandColors[dataIndex],
+                            stroke: 'transparent' // 无边框
+                        },
+                        // 添加文本
+                        textContent: {
+                            style: {
+                                text: `${stepNames[dataIndex]}\n${funnelData[dataIndex].value.toLocaleString()}\n(${(funnelData[dataIndex].rate || 0).toFixed(1)}%)`,
+                                fill: '#fff',
+                                fontSize: 12,
+                                fontWeight: 500,
+                                textAlign: 'center',
+                                textVerticalAlign: 'middle'
+                            }
+                        },
+                        textConfig: {
+                            position: 'inside'
                         }
-                    },
-                    data: funnelData.map((stage, index) => ({
-                        value: stage.value,
-                        name: stepNames[index],
-                        itemStyle: { color: colors[index] }
-                    }))
-                }
-            ]
+                    };
+                },
+                data: funnelData.map((stage, index) => ({
+                    value: stage.value,
+                    name: stepNames[index]
+                }))
+            }]
         };
 
         myChart.setOption(option);
@@ -663,6 +781,7 @@ class ConversionFunnelReport {
 
     /**
      * 渲染合并转化率
+     * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
      */
     renderCombinedRates() {
         const container = document.getElementById('combinedRates');
@@ -686,32 +805,32 @@ class ConversionFunnelReport {
         const openToValidRate = openedUsers > 0 ? (validUsers / openedUsers * 100) : 0;
         const overallRate = impressions > 0 ? (validUsers / impressions * 100) : 0;
 
+        // 🎨 品牌蓝色渐变配色
+        const brandColors = ['#00ABEB', '#0088C2', '#006699', '#00479D'];
+
         const html = `
             <div style="
                 padding: 16px;
                 background: var(--bg-hover);
                 border-radius: var(--border-radius);
             ">
-                <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--text-primary);">合并转化率</h4>
+                <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #00479D; font-weight: 600;">合并转化率</h4>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span style="color: var(--text-secondary);">曝光-线索率:</span>
-                        <span style="color: var(--primary-color); font-weight: 600;">${impressionToLeadRate.toFixed(2)}%</span>
+                        <span style="color: ${brandColors[0]}; font-weight: 600;">${impressionToLeadRate.toFixed(2)}%</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span style="color: var(--text-secondary);">线索-开户率:</span>
-                        <span style="color: var(--success-color); font-weight: 600;">${leadToOpenRate.toFixed(2)}%</span>
+                        <span style="color: ${brandColors[1]}; font-weight: 600;">${leadToOpenRate.toFixed(2)}%</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span style="color: var(--text-secondary);">开户-有效户率:</span>
-                        <span style="color: var(--warning-color); font-weight: 600;">${openToValidRate.toFixed(2)}%</span>
+                        <span style="color: ${brandColors[2]}; font-weight: 600;">${openToValidRate.toFixed(2)}%</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span style="color: var(--text-secondary);">全链路转化率:</span>
-                        <span style="color: var(--error-color); font-weight: 600;">
-                            ${overallRate.toFixed(2)}%
-                            <span style="color: var(--text-tertiary); font-size: 11px;">(曝光-有效户)</span>
-                        </span>
+                        <span style="color: ${brandColors[3]}; font-weight: 600;">${overallRate.toFixed(2)}%</span>
                     </div>
                 </div>
             </div>
@@ -774,6 +893,12 @@ class ConversionFunnelReport {
         if (this.agencyDropdown) {
             this.agencyDropdown.destroy();
             this.agencyDropdown = null;
+        }
+
+        // 清理服务人员下拉框
+        if (this.employeeDropdown) {
+            this.employeeDropdown.destroy();
+            this.employeeDropdown = null;
         }
 
         // 清理数据

@@ -10,8 +10,7 @@ from backend.models import (
     AccountAgencyMapping,
     AgencyAbbreviationMapping,
     DailyNotesMetricsUnified,
-    XhsNoteInfo,
-    BackendConversions
+    XhsNoteInfo
 )
 from backend.database import db
 from datetime import datetime, date, timedelta
@@ -113,23 +112,30 @@ def get_dashboard_core_metrics():
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
-        if not start_date or not end_date:
-            return jsonify({'success': False, 'error': '日期范围不能为空'}), 400
-
-        # 构建查询
+        # 日期可以为空，空表示查询所有数据（"全部"模式）
+        # 构建查询 - 从 daily_metrics_unified 获取所有指标（包括资产）
+        # 注意：字段名是 opened_account_assets，不是 customer_assets
+        # customer_contribution 不在此表中，需要单独查询
         query = db.session.query(
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_clicks'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid')
-        ).filter(
-            and_(
-                DailyMetricsUnified.date >= start_date,
-                DailyMetricsUnified.date <= end_date
-            )
+            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid'),
+            func.sum(DailyMetricsUnified.opened_account_assets).label('customer_assets'),
+            func.sum(DailyMetricsUnified.existing_customer_assets).label('existing_customer_assets'),
+            func.sum(DailyMetricsUnified.opened_account_contribution).label('customer_contribution')
         )
+
+        # 只有当日期范围存在时才添加日期筛选
+        if start_date and end_date:
+            query = query.filter(
+                and_(
+                    DailyMetricsUnified.date >= start_date,
+                    DailyMetricsUnified.date <= end_date
+                )
+            )
 
         # 应用筛选条件
         if platforms:
@@ -141,68 +147,16 @@ def get_dashboard_core_metrics():
 
         result = query.first()
 
-        # 提取数据
+        # 提取数据（从 daily_metrics_unified 聚合结果）
         total_cost = float(result.total_cost) if result.total_cost else 0
         total_impressions = int(result.total_impressions) if result.total_impressions else 0
         total_clicks = int(result.total_clicks) if result.total_clicks else 0
         total_leads = int(result.total_leads) if result.total_leads else 0
         total_opened = int(result.total_opened) if result.total_opened else 0
         total_valid = int(result.total_valid) if result.total_valid else 0
-
-        # ===== 查询客户资产数据（按 is_opened_account 分组） =====
-        # 构建用户唯一标识
-        user_identifier_expr = (
-            func.concat(
-                BackendConversions.platform_source, '|',
-                func.coalesce(BackendConversions.wechat_nickname, ''), '|',
-                func.coalesce(BackendConversions.capital_account, ''), '|',
-                func.coalesce(BackendConversions.platform_user_id, '')
-            )
-        )
-
-        # 新开客户资产（is_opened_account = True/1）
-        new_customers_assets_query = db.session.query(
-            func.sum(BackendConversions.assets).label('total_assets'),
-            func.count(func.distinct(user_identifier_expr)).label('unique_users'),
-            func.sum(BackendConversions.customer_contribution).label('total_contribution')
-        ).filter(
-            and_(
-                BackendConversions.lead_date >= start_date,
-                BackendConversions.lead_date <= end_date,
-                BackendConversions.is_opened_account == True
-            )
-        )
-
-        # 存量客户资产（is_opened_account = False 且有资产）
-        existing_customers_assets_query = db.session.query(
-            func.sum(BackendConversions.assets).label('total_assets'),
-            func.count(func.distinct(user_identifier_expr)).label('unique_users')
-        ).filter(
-            and_(
-                BackendConversions.lead_date >= start_date,
-                BackendConversions.lead_date <= end_date,
-                BackendConversions.is_opened_account == False,
-                BackendConversions.assets.isnot(None),
-                BackendConversions.assets > 0
-            )
-        )
-
-        # 应用筛选条件到资产查询
-        if platforms:
-            new_customers_assets_query = new_customers_assets_query.filter(
-                BackendConversions.platform_source.in_(platforms)
-            )
-            existing_customers_assets_query = existing_customers_assets_query.filter(
-                BackendConversions.platform_source.in_(platforms)
-            )
-
-        new_assets_result = new_customers_assets_query.first()
-        existing_assets_result = existing_customers_assets_query.first()
-
-        # 提取资产数据
-        customer_assets = float(new_assets_result.total_assets) if new_assets_result and new_assets_result.total_assets else 0
-        customer_contribution = float(new_assets_result.total_contribution) if new_assets_result and new_assets_result.total_contribution else 0
-        existing_customers_assets = float(existing_assets_result.total_assets) if existing_assets_result and existing_assets_result.total_assets else 0
+        customer_assets = float(result.customer_assets) if result.customer_assets else 0
+        existing_customer_assets = float(result.existing_customer_assets) if result.existing_customer_assets else 0
+        customer_contribution = float(result.customer_contribution) if result.customer_contribution else 0
 
         # 计算衍生指标
         cost_per_lead = (total_cost / total_leads) if total_leads > 0 else 0
@@ -218,123 +172,105 @@ def get_dashboard_core_metrics():
             'total_clicks': total_clicks,
             'customer_assets': customer_assets,
             'customer_contribution': customer_contribution,
-            'existing_customers_assets': existing_customers_assets,
+            'existing_customers_assets': existing_customer_assets,
             'cost_per_valid_account': round(cost_per_valid_account, 2),
             'cost_per_lead': round(cost_per_lead, 2)
         }
 
         # 计算环比数据（与上一周期对比）
-        days_diff = (datetime.strptime(end_date, '%Y-%m-%d').date() -
-                     datetime.strptime(start_date, '%Y-%m-%d').date()).days + 1
-        prev_start = (datetime.strptime(start_date, '%Y-%m-%d').date() -
-                      timedelta(days=days_diff)).strftime('%Y-%m-%d')
-        prev_end = (datetime.strptime(start_date, '%Y-%m-%d').date() -
-                    timedelta(days=1)).strftime('%Y-%m-%d')
+        # 只有当有日期范围时才计算环比，"全部"模式不计算环比
+        wow_changes = {}
+        if start_date and end_date:
+            days_diff = (datetime.strptime(end_date, '%Y-%m-%d').date() -
+                         datetime.strptime(start_date, '%Y-%m-%d').date()).days + 1
+            prev_start = (datetime.strptime(start_date, '%Y-%m-%d').date() -
+                          timedelta(days=days_diff)).strftime('%Y-%m-%d')
+            prev_end = (datetime.strptime(start_date, '%Y-%m-%d').date() -
+                        timedelta(days=1)).strftime('%Y-%m-%d')
 
-        # 查询上一周期数据
-        prev_query = db.session.query(
-            func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
-            func.sum(DailyMetricsUnified.opened_account_users).label('total_opened'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid')
-        ).filter(
-            and_(
-                DailyMetricsUnified.date >= prev_start,
-                DailyMetricsUnified.date <= prev_end
-            )
-        )
-
-        # 应用相同的筛选条件
-        if platforms:
-            prev_query = prev_query.filter(DailyMetricsUnified.platform.in_(platforms))
-        if agencies:
-            prev_query = prev_query.filter(DailyMetricsUnified.agency.in_(agencies))
-        if business_models:
-            prev_query = prev_query.filter(DailyMetricsUnified.business_model.in_(business_models))
-
-        prev_result = prev_query.first()
-
-        prev_cost = float(prev_result.total_cost) if prev_result.total_cost else 0
-        prev_impressions = int(prev_result.total_impressions) if prev_result.total_impressions else 0
-        prev_leads = int(prev_result.total_leads) if prev_result.total_leads else 0
-        prev_opened = int(prev_result.total_opened) if prev_result.total_opened else 0
-        prev_valid = int(prev_result.total_valid) if prev_result.total_valid else 0
-
-        # ===== 查询上一周期客户资产数据 =====
-        # 新开客户资产（is_opened_account = True）
-        prev_new_customers_assets_query = db.session.query(
-            func.sum(BackendConversions.assets).label('total_assets'),
-            func.sum(BackendConversions.customer_contribution).label('total_contribution')
-        ).filter(
-            and_(
-                BackendConversions.lead_date >= prev_start,
-                BackendConversions.lead_date <= prev_end,
-                BackendConversions.is_opened_account == True
-            )
-        )
-
-        # 存量客户资产（is_opened_account = False 且有资产）
-        prev_existing_customers_assets_query = db.session.query(
-            func.sum(BackendConversions.assets).label('total_assets')
-        ).filter(
-            and_(
-                BackendConversions.lead_date >= prev_start,
-                BackendConversions.lead_date <= prev_end,
-                BackendConversions.is_opened_account == False,
-                BackendConversions.assets.isnot(None),
-                BackendConversions.assets > 0
-            )
-        )
-
-        # 应用筛选条件到资产查询
-        if platforms:
-            prev_new_customers_assets_query = prev_new_customers_assets_query.filter(
-                BackendConversions.platform_source.in_(platforms)
-            )
-            prev_existing_customers_assets_query = prev_existing_customers_assets_query.filter(
-                BackendConversions.platform_source.in_(platforms)
+            # 查询上一周期数据（从 daily_metrics_unified 获取所有指标）
+            prev_query = db.session.query(
+                func.sum(DailyMetricsUnified.cost).label('total_cost'),
+                func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
+                func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
+                func.sum(DailyMetricsUnified.opened_account_users).label('total_opened'),
+                func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid'),
+                func.sum(DailyMetricsUnified.opened_account_assets).label('customer_assets'),
+                func.sum(DailyMetricsUnified.existing_customer_assets).label('existing_customer_assets'),
+                func.sum(DailyMetricsUnified.opened_account_contribution).label('customer_contribution')
+            ).filter(
+                and_(
+                    DailyMetricsUnified.date >= prev_start,
+                    DailyMetricsUnified.date <= prev_end
+                )
             )
 
-        prev_new_assets_result = prev_new_customers_assets_query.first()
-        prev_existing_assets_result = prev_existing_customers_assets_query.first()
+            # 应用相同的筛选条件
+            if platforms:
+                prev_query = prev_query.filter(DailyMetricsUnified.platform.in_(platforms))
+            if agencies:
+                prev_query = prev_query.filter(DailyMetricsUnified.agency.in_(agencies))
+            if business_models:
+                prev_query = prev_query.filter(DailyMetricsUnified.business_model.in_(business_models))
 
-        prev_customer_assets = float(prev_new_assets_result.total_assets) if prev_new_assets_result and prev_new_assets_result.total_assets else 0
-        prev_customer_contribution = float(prev_new_assets_result.total_contribution) if prev_new_assets_result and prev_new_assets_result.total_contribution else 0
-        prev_existing_customers_assets = float(prev_existing_assets_result.total_assets) if prev_existing_assets_result and prev_existing_assets_result.total_assets else 0
+            prev_result = prev_query.first()
 
-        # 计算环比
-        def calc_wow(current, previous, is_cost_metric=False):
-            if previous == 0:
-                return {'value': 0, 'trend': 'up', 'color': 'green'}
+            prev_cost = float(prev_result.total_cost) if prev_result.total_cost else 0
+            prev_impressions = int(prev_result.total_impressions) if prev_result.total_impressions else 0
+            prev_leads = int(prev_result.total_leads) if prev_result.total_leads else 0
+            prev_opened = int(prev_result.total_opened) if prev_result.total_opened else 0
+            prev_valid = int(prev_result.total_valid) if prev_result.total_valid else 0
+            prev_customer_assets = float(prev_result.customer_assets) if prev_result.customer_assets else 0
+            prev_existing_customer_assets = float(prev_result.existing_customer_assets) if prev_result.existing_customer_assets else 0
+            prev_customer_contribution = float(prev_result.customer_contribution) if prev_result.customer_contribution else 0
 
-            percent = ((current - previous) / previous) * 100
-            trend = 'up' if percent >= 0 else 'down'
+            # 计算环比
+            def calc_wow(current, previous, is_cost_metric=False):
+                if previous == 0:
+                    return {'value': 0, 'trend': 'up', 'color': 'green'}
 
-            if is_cost_metric:
-                color = 'red' if percent >= 0 else 'green'
-            else:
-                color = 'green' if percent >= 0 else 'red'
+                percent = ((current - previous) / previous) * 100
+                trend = 'up' if percent >= 0 else 'down'
 
-            return {'value': round(abs(percent), 2), 'trend': trend, 'color': color}
+                if is_cost_metric:
+                    color = 'red' if percent >= 0 else 'green'
+                else:
+                    color = 'green' if percent >= 0 else 'red'
 
-        wow_changes = {
-            'new_customers': calc_wow(total_opened, prev_opened, is_cost_metric=False),
-            'investment': calc_wow(total_cost, prev_cost, is_cost_metric=True),
-            'new_valid_accounts': calc_wow(total_valid, prev_valid, is_cost_metric=False),
-            'total_leads': calc_wow(total_leads, prev_leads, is_cost_metric=False),
-            'total_impressions': calc_wow(total_impressions, prev_impressions, is_cost_metric=False),
-            'total_clicks': calc_wow(total_clicks, 0, is_cost_metric=True),
-            'customer_assets': calc_wow(customer_assets, prev_customer_assets, is_cost_metric=False),
-            'customer_contribution': calc_wow(customer_contribution, prev_customer_contribution, is_cost_metric=False),
-            'existing_customers_assets': calc_wow(existing_customers_assets, prev_existing_customers_assets, is_cost_metric=False),
-            'cost_per_valid_account': calc_wow(cost_per_valid_account,
-                                                (prev_cost / prev_valid) if prev_valid > 0 else 0,
-                                                is_cost_metric=True),
-            'cost_per_lead': calc_wow(cost_per_lead,
-                                       (prev_cost / prev_leads) if prev_leads > 0 else 0,
-                                       is_cost_metric=True)
-        }
+                return {'value': round(abs(percent), 2), 'trend': trend, 'color': color}
+
+            wow_changes = {
+                'new_customers': calc_wow(total_opened, prev_opened, is_cost_metric=False),
+                'investment': calc_wow(total_cost, prev_cost, is_cost_metric=True),
+                'new_valid_accounts': calc_wow(total_valid, prev_valid, is_cost_metric=False),
+                'total_leads': calc_wow(total_leads, prev_leads, is_cost_metric=False),
+                'total_impressions': calc_wow(total_impressions, prev_impressions, is_cost_metric=False),
+                'total_clicks': calc_wow(total_clicks, 0, is_cost_metric=True),
+                'customer_assets': calc_wow(customer_assets, prev_customer_assets, is_cost_metric=False),
+                'customer_contribution': calc_wow(customer_contribution, prev_customer_contribution, is_cost_metric=False),
+                'existing_customers_assets': calc_wow(existing_customer_assets, prev_existing_customer_assets, is_cost_metric=False),
+                'cost_per_valid_account': calc_wow(cost_per_valid_account,
+                                                    (prev_cost / prev_valid) if prev_valid > 0 else 0,
+                                                    is_cost_metric=True),
+                'cost_per_lead': calc_wow(cost_per_lead,
+                                           (prev_cost / prev_leads) if prev_leads > 0 else 0,
+                                           is_cost_metric=True)
+            }
+        else:
+            # "全部"模式：不计算环比，返回默认值
+            wow_changes = {
+                'new_customers': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'investment': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'new_valid_accounts': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'total_leads': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'total_impressions': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'total_clicks': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'customer_assets': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'customer_contribution': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'existing_customers_assets': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'cost_per_valid_account': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'cost_per_lead': {'value': 0, 'trend': 'up', 'color': 'green'}
+            }
 
         return jsonify({
             'success': True,
