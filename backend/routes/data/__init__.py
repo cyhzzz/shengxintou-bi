@@ -18,6 +18,8 @@ from . import leads
 from . import account_mapping
 from . import abbreviation_mapping
 from . import xhs_operation
+from . import employee_conversion
+from . import weekly_report_poster
 
 # 汇总Blueprint（为了兼容性，创建一个主Blueprint）
 # 实际使用时需要分别注册各个Blueprint
@@ -33,4 +35,6 @@ __all__ = [
     'account_mapping',
     'abbreviation_mapping',
     'xhs_operation',
+    'employee_conversion',
+    'weekly_report_poster',
 ]

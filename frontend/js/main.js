@@ -244,6 +244,12 @@ class App {
                 case 'external-data':
                     await this.loadExternalDataAnalysis();
                     break;
+                case 'employee-conversion-analysis':
+                    await this.loadEmployeeConversionAnalysis();
+                    break;
+                case 'employee-conversion-weekly':
+                    await this.loadEmployeeConversionWeekly();
+                    break;
                 case 'report-generation':
                     await this.loadReportGeneration();
                     break;
@@ -684,6 +690,66 @@ class App {
         } catch (error) {
             console.error('周报生成器加载失败:', error);
             this.showError('加载周报生成器失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 加载员工转化效果分析
+     */
+    async loadEmployeeConversionAnalysis() {
+        try {
+            // 销毁旧报表实例
+            if (this.currentReportInstance && this.currentReportInstance.destroy) {
+                this.currentReportInstance.destroy();
+            }
+
+            // 清空主内容区域
+            const container = document.getElementById('mainContent');
+            if (container) {
+                container.innerHTML = '';
+            }
+
+            // 动态加载报表类
+            const ReportClass = await DynamicLoader.loadReport('employee-conversion-analysis');
+
+            // 创建新的员工转化分析组件
+            this.currentReportInstance = new ReportClass();
+
+            console.log('员工转化效果分析已加载');
+
+        } catch (error) {
+            console.error('员工转化效果分析加载失败:', error);
+            this.showError('加载员工转化效果分析失败: ' + error.message);
+        }
+    }
+
+    /**
+     * 加载员工转化周报生成
+     */
+    async loadEmployeeConversionWeekly() {
+        try {
+            // 销毁旧报表实例
+            if (this.currentReportInstance && this.currentReportInstance.destroy) {
+                this.currentReportInstance.destroy();
+            }
+
+            // 清空主内容区域
+            const container = document.getElementById('mainContent');
+            if (container) {
+                container.innerHTML = '';
+            }
+
+            // 动态加载报表类
+            const ReportClass = await DynamicLoader.loadReport('employee-conversion-weekly');
+
+            // 创建新的员工转化周报组件
+            this.currentReportInstance = new ReportClass();
+
+            console.log('员工转化周报生成已加载');
+
+        } catch (error) {
+            console.error('员工转化周报生成加载失败:', error);
+            this.showError('加载员工转化周报生成失败: ' + error.message);
         }
     }
 

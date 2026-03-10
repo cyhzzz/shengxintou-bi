@@ -177,10 +177,15 @@ class API {
      * 获取趋势数据
      * @param {Object} filters - 筛选条件
      * @param {Array} metrics - 指标列表
+     * @param {string} granularity - 粒度（daily/weekly/monthly）
      * @returns {Promise}
      */
-    static async getTrend(filters, metrics) {
-        return this.post('/trend', { filters, metrics });
+    static async getTrend(filters, metrics, granularity = 'daily') {
+        return this.post('/trend', {
+            filters,
+            metrics,
+            granularity
+        });
     }
 
     /**
@@ -190,6 +195,20 @@ class API {
      */
     static async getDashboardAccounts(filters = {}) {
         return this.post('/dashboard/accounts', { filters });
+    }
+
+    /**
+     * 获取数据概览核心指标
+     * @param {Object} params - 查询参数
+     * @param {Array} params.platforms - 平台列表
+     * @param {Array} params.agencies - 厂商列表
+     * @param {Array} params.business_models - 业务模式列表
+     * @param {string} params.start_date - 开始日期
+     * @param {string} params.end_date - 结束日期
+     * @returns {Promise}
+     */
+    static async getDashboardCoreMetrics(params) {
+        return this.post('/dashboard/core-metrics', params);
     }
 
     /**
@@ -392,6 +411,14 @@ class API {
      */
     static async batchUpdateConfigs(configs) {
         return this.put('/api/v1/config/batch', { configs });
+    }
+
+    /**
+     * 获取服务人员列表
+     * @returns {Promise}
+     */
+    static async getEmployees() {
+        return this.get('/employees');
     }
 }
 

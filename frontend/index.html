@@ -130,6 +130,24 @@
                         <span>转化漏斗</span>
                     </li>
 
+                    <!-- 员工转化报表 (一级菜单，包含二级菜单) -->
+                    <li class="nav-item has-submenu" data-report="employee-conversion">
+                        <div class="submenu-trigger">
+                            <img src="icon/员工转化报表.svg" class="nav-icon" alt="员工转化报表">
+                            <span>员工转化报表</span>
+                        </div>
+                        <ul class="submenu">
+                            <li class="nav-item" data-report="employee-conversion-analysis">
+                                <img src="icon/转化效果分析.svg" class="nav-icon" alt="转化效果分析">
+                                <span>转化效果分析</span>
+                            </li>
+                            <li class="nav-item" data-report="employee-conversion-weekly">
+                                <img src="icon/转化周报生成.svg" class="nav-icon" alt="转化周报生成">
+                                <span>转化周报生成</span>
+                            </li>
+                        </ul>
+                    </li>
+
                     <!-- 分割线 -->
                     <li class="nav-divider"></li>
 
@@ -245,6 +263,7 @@
                             <li><strong>小红书报表</strong> - 笔记列表、运营分析</li>
                             <li><strong>线索明细</strong> - 所有客户线索到转化的数据明细</li>
                             <li><strong>转化漏斗</strong> - 从转化率角度针对性查看和分析</li>
+                            <li><strong>员工转化报表</strong> - 服务人员转化效果分析与周报生成</li>
                         </ul>
                     </section>
 
@@ -311,16 +330,6 @@
     <script src="js/components/DataFreshnessIndicator.js?v=1.0"></script>
     <script src="js/components/HelpModal.js?v=1.0"></script>
     <script src="js/utils/DynamicLoader.js?v=1.0"></script>
-
-    <!-- 小红书运营报表模块化版本 (v2.1) - 7个子模块 (协调器通过DynamicLoader动态加载) -->
-    <script src="js/reports/modules_temp/XhsOverviewMetrics.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsEmployeeConversion.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsCreatorContentTable.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsCreatorConversionTable.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsTopNotesRanking.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsCreatorAnnualRanking.js?v=2.1.1"></script>
-    <script src="js/reports/modules_temp/XhsAgencyRanking.js?v=2.1.1"></script>
-    <!-- 注意：协调器通过DynamicLoader动态加载，不在这里静态加载，避免重复声明 -->
 
     <script src="js/main.js?v=1.3"></script>
 </body>

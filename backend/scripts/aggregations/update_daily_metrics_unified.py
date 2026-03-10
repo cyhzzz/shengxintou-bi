@@ -221,7 +221,7 @@ def update_daily_metrics(start_date=None, end_date=None):
             func.coalesce(AccountAgencyMapping.business_model, '').label('business_model'),
             func.sum(RawAdDataTencent.cost).label('cost'),
             func.sum(RawAdDataTencent.impressions).label('impressions'),
-            func.sum(RawAdDataTencent.click_users).label('click_users')
+            func.sum(RawAdDataTencent.clicks).label('clicks')
         ).outerjoin(
             AccountAgencyMapping,
             and_(
@@ -254,7 +254,7 @@ def update_daily_metrics(start_date=None, end_date=None):
             func.coalesce(AccountAgencyMapping.business_model, '').label('business_model'),
             func.sum(RawAdDataDouyin.cost).label('cost'),
             func.sum(RawAdDataDouyin.impressions).label('impressions'),
-            func.sum(RawAdDataDouyin.clicks).label('click_users')
+            func.sum(RawAdDataDouyin.clicks).label('clicks')
         ).outerjoin(
             AccountAgencyMapping,
             and_(
@@ -295,7 +295,7 @@ def update_daily_metrics(start_date=None, end_date=None):
             func.coalesce(AccountAgencyMapping.business_model, '').label('business_model'),
             func.sum(RawAdDataXiaohongshu.cost).label('cost'),
             func.sum(RawAdDataXiaohongshu.impressions).label('impressions'),
-            func.sum(RawAdDataXiaohongshu.clicks).label('click_users')
+            func.sum(RawAdDataXiaohongshu.clicks).label('clicks')
         ).outerjoin(
             AccountAgencyMapping,
             and_(
@@ -370,42 +370,51 @@ def update_daily_metrics(start_date=None, end_date=None):
 
 
 def _save_ad_metric(ad_data, platform):
-    """保存广告数据到聚合表
+    """保存广告数据到聚合表（使用 UPSERT）
 
-    注意：不使用 account_id 维度，只按 date + platform + agency + business_model 聚合
-    这样可以确保广告数据和转化数据能够正确合并
+    使用 INSERT OR REPLACE 确保数据一致性，避免重复记录
     """
     # 应用业务模式映射规则
     agency = ad_data.agency or ''
     business_model = apply_business_model_mapping(agency, ad_data.business_model or '', platform)
 
-    # 查找或创建记录（不包含 account_id）
-    metric = DailyMetricsUnified.query.filter_by(
-        date=ad_data.date,
-        platform=platform,
-        agency=agency,
-        business_model=business_model
-    ).first()
-
-    if not metric:
-        metric = DailyMetricsUnified(
-            date=ad_data.date,
-            platform=platform,
-            account_id='',  # 不再细分到账号
-            account_name='',
-            agency=agency,
-            business_model=business_model
-        )
-
-    # 更新广告指标
-    metric.cost = float(ad_data.cost or 0)
-    metric.impressions = int(ad_data.impressions or 0)
-
-    # 更新点击人数（从广告数据获取）
-    if hasattr(ad_data, 'click_users'):
-        metric.click_users = int(ad_data.click_users or 0)
-
-    db.session.add(metric)
+    # 使用原生 SQL 的 INSERT OR REPLACE 实现 UPSERT
+    db.session.execute(text('''
+        INSERT OR REPLACE INTO daily_metrics_unified
+        (date, platform, agency, business_model, cost, impressions, clicks,
+         lead_users, potential_customers, customer_mouth_users, valid_lead_users,
+         opened_account_users, valid_customer_users, opened_account_assets, existing_customer_assets, opened_account_contribution,
+         account_id, account_name, updated_at)
+        VALUES
+        (:date, :platform, :agency, :business_model, :cost, :impressions, :clicks,
+         COALESCE((SELECT lead_users FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT potential_customers FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT customer_mouth_users FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT valid_lead_users FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT opened_account_users FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT valid_customer_users FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT opened_account_assets FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT existing_customer_assets FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT opened_account_contribution FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         '', '', datetime('now'))
+    '''), {
+        'date': ad_data.date,
+        'platform': platform,
+        'agency': agency,
+        'business_model': business_model,
+        'cost': float(ad_data.cost or 0),
+        'impressions': int(ad_data.impressions or 0),
+        'clicks': int(ad_data.clicks or 0) if hasattr(ad_data, 'clicks') else 0
+    })
 
 
 def _calculate_conversion_aggregation(start_date, end_date):
@@ -476,18 +485,37 @@ def _calculate_conversion_aggregation(start_date, end_date):
                 (BackendConversions.is_valid_customer == True, BackendConversions.id),
                 else_=None
             )
-        ).label('valid_customer_users')
-    ).outerjoin(
-        RawAdDataTencent,
-        and_(
-            RawAdDataTencent.account_id == BackendConversions.ad_account,
-            RawAdDataTencent.date == BackendConversions.lead_date
-        )
+        ).label('valid_customer_users'),
+        # 资产指标
+        func.sum(
+            case(
+                (BackendConversions.is_opened_account == True, BackendConversions.assets),
+                else_=0
+            )
+        ).label('opened_account_assets'),
+        func.sum(
+            case(
+                (and_(
+                    BackendConversions.is_opened_account == False,
+                    BackendConversions.assets > 0
+                ), BackendConversions.assets),
+                else_=0
+            )
+        ).label('existing_customer_assets'),
+        # 创收指标
+        func.sum(
+            case(
+                (BackendConversions.is_opened_account == True, BackendConversions.customer_contribution),
+                else_=0
+            )
+        ).label('opened_account_contribution')
+    # 腾讯转化数据：直接通过 ad_account 关联 account_agency_mapping
+    # 不再通过 raw_ad_data_tencent 作为中间表，避免日期不匹配导致数据丢失
     ).outerjoin(
         AccountAgencyMapping,
         and_(
             AccountAgencyMapping.platform == '腾讯',
-            AccountAgencyMapping.account_id == RawAdDataTencent.account_id
+            AccountAgencyMapping.account_id == BackendConversions.ad_account
         )
     ).filter(
         and_(
@@ -508,12 +536,28 @@ def _calculate_conversion_aggregation(start_date, end_date):
 
     # 代理商映射CASE表达式（抖音、小红书、yj、高德）
     # 抖音：使用简称映射
-    # 小红书：优先从 JOIN 获取，如果为空则使用简称映射（备用）
+    # 小红书：优先从 JOIN 获取，如果为空则使用简称映射（备用），最后规范化"直投"名称
     # yj（云极）：独立平台，代理商为空
     # 高德：独立平台，代理商为空
+
+    # 小红书代理商规范化逻辑：
+    # 1. 优先从映射表获取（通过 ad_account JOIN account_name）
+    # 2. 如果映射表没有，检查原始 agency 字段：
+    #    - 如果包含"直投"字样，统一命名为"申万宏源直投"
+    #    - 否则使用简称映射结果
+    xiaohongshu_agency = func.coalesce(
+        AccountAgencyMapping.agency,
+        case(
+            # 如果原始 agency 包含"直投"，规范化为"申万宏源直投"
+            (BackendConversions.agency.like('%直投%'), '申万宏源直投'),
+            # 否则使用简称映射结果
+            else_=agency_name_mapping
+        )
+    )
+
     agency_mapping = case(
         (BackendConversions.platform_source == '抖音', agency_name_mapping),
-        (BackendConversions.platform_source == '小红书', func.coalesce(AccountAgencyMapping.agency, agency_name_mapping)),
+        (BackendConversions.platform_source == '小红书', xiaohongshu_agency),
         (BackendConversions.platform_source == 'yj', ''),
         (BackendConversions.platform_source == '高德', ''),
         else_=''
@@ -556,7 +600,30 @@ def _calculate_conversion_aggregation(start_date, end_date):
                 (BackendConversions.is_valid_customer == True, BackendConversions.id),
                 else_=None
             )
-        ).label('valid_customer_users')
+        ).label('valid_customer_users'),
+        # 资产指标
+        func.sum(
+            case(
+                (BackendConversions.is_opened_account == True, BackendConversions.assets),
+                else_=0
+            )
+        ).label('opened_account_assets'),
+        func.sum(
+            case(
+                (and_(
+                    BackendConversions.is_opened_account == False,
+                    BackendConversions.assets > 0
+                ), BackendConversions.assets),
+                else_=0
+            )
+        ).label('existing_customer_assets'),
+        # 创收指标
+        func.sum(
+            case(
+                (BackendConversions.is_opened_account == True, BackendConversions.customer_contribution),
+                else_=0
+            )
+        ).label('opened_account_contribution')
     ).outerjoin(
         AccountAgencyMapping,
         and_(
@@ -577,7 +644,7 @@ def _calculate_conversion_aggregation(start_date, end_date):
         )
     ).filter(
         and_(
-            BackendConversions.platform_source.in_(['抖音', '小红书', 'yj', '高德']),
+            BackendConversions.platform_source.in_(['抖音', '小红书', 'yj', '高德', 'nj']),
             BackendConversions.lead_date >= start_date,
             BackendConversions.lead_date <= end_date
         )
@@ -606,19 +673,23 @@ def _calculate_conversion_aggregation(start_date, end_date):
             'customer_mouth_users': int(row.customer_mouth_users) if row.customer_mouth_users else 0,
             'valid_lead_users': int(row.valid_lead_users) if row.valid_lead_users else 0,
             'opened_account_users': int(row.opened_account_users) if row.opened_account_users else 0,
-            'valid_customer_users': int(row.valid_customer_users) if row.valid_customer_users else 0
+            'valid_customer_users': int(row.valid_customer_users) if row.valid_customer_users else 0,
+            'opened_account_assets': float(row.opened_account_assets) if row.opened_account_assets else 0,
+            'existing_customer_assets': float(row.existing_customer_assets) if row.existing_customer_assets else 0,
+            'opened_account_contribution': float(row.opened_account_contribution) if row.opened_account_contribution else 0
         })
 
     # 处理抖音、小红书、yj、高德数据
     print(f"      处理其他平台转化数据: {len(other_conversions)} 条")
     platform_sample_count = {}
     for row in other_conversions:
-        # 平台映射：yj→云极，高德→高德（作为独立平台）
+        # 平台映射：yj→云极，高德→高德（作为独立平台），nj作为独立平台
         platform_mapping = {
             '抖音': '抖音',
             '小红书': '小红书',
             'yj': '云极',
-            '高德': '高德'
+            '高德': '高德',
+            'nj': 'nj'
         }
         platform = platform_mapping.get(row.platform, row.platform)
 
@@ -635,7 +706,10 @@ def _calculate_conversion_aggregation(start_date, end_date):
             'customer_mouth_users': int(row.customer_mouth_users) if row.customer_mouth_users else 0,
             'valid_lead_users': int(row.valid_lead_users) if row.valid_lead_users else 0,
             'opened_account_users': int(row.opened_account_users) if row.opened_account_users else 0,
-            'valid_customer_users': int(row.valid_customer_users) if row.valid_customer_users else 0
+            'valid_customer_users': int(row.valid_customer_users) if row.valid_customer_users else 0,
+            'opened_account_assets': float(row.opened_account_assets) if row.opened_account_assets else 0,
+            'existing_customer_assets': float(row.existing_customer_assets) if row.existing_customer_assets else 0,
+            'opened_account_contribution': float(row.opened_account_contribution) if row.opened_account_contribution else 0
         })
 
     print(f"      其他平台源数据分布: {platform_sample_count}")
@@ -646,43 +720,51 @@ def _calculate_conversion_aggregation(start_date, end_date):
 
 
 def _save_conversion_metric(conv_data):
-    """保存转化数据到聚合表"""
-    # 应用业务模式映射规则
+    """保存转化数据到聚合表（使用 UPSERT）
+
+    使用 INSERT OR REPLACE 确保数据一致性，避免重复记录
+
+    注意：business_model 已在 SQL 查询中正确计算，不需要再次处理
+    """
+    # 直接使用 SQL 查询返回的值，不再调用 apply_business_model_mapping
     agency = conv_data['agency']
     platform = conv_data['platform']
-    business_model = apply_business_model_mapping(agency, conv_data['business_model'], platform)
+    business_model = conv_data['business_model']  # 直接使用，不再调用 apply_business_model_mapping
 
-    # 查找或创建记录（可能已由广告数据创建）
-    metric = DailyMetricsUnified.query.filter_by(
-        date=conv_data['date'],
-        platform=conv_data['platform'],
-        agency=agency,
-        business_model=business_model
-    ).first()
-
-    if not metric:
-        # 如果没有找到，创建新记录（纯转化数据，无广告数据）
-        metric = DailyMetricsUnified(
-            date=conv_data['date'],
-            platform=conv_data['platform'],
-            agency=agency,
-            business_model=business_model,
-            account_id='',
-            account_name='',
-            cost=0,
-            impressions=0,
-            click_users=0  # 无广告数据时，点击人数为0
-        )
-
-    # 更新转化指标
-    metric.lead_users = conv_data['lead_users']
-    metric.potential_customers = conv_data['potential_customers']
-    metric.customer_mouth_users = conv_data['customer_mouth_users']
-    metric.valid_lead_users = conv_data['valid_lead_users']
-    metric.opened_account_users = conv_data['opened_account_users']
-    metric.valid_customer_users = conv_data['valid_customer_users']
-
-    db.session.add(metric)
+    # 使用原生 SQL 的 INSERT OR REPLACE 实现 UPSERT
+    # 保留已有的广告指标，只更新转化指标
+    db.session.execute(text('''
+        INSERT OR REPLACE INTO daily_metrics_unified
+        (date, platform, agency, business_model, cost, impressions, clicks,
+         lead_users, potential_customers, customer_mouth_users, valid_lead_users,
+         opened_account_users, valid_customer_users, opened_account_assets, existing_customer_assets, opened_account_contribution,
+         account_id, account_name, updated_at)
+        VALUES
+        (:date, :platform, :agency, :business_model,
+         COALESCE((SELECT cost FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT impressions FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         COALESCE((SELECT clicks FROM daily_metrics_unified
+                   WHERE date=:date AND platform=:platform AND agency=:agency AND business_model=:business_model), 0),
+         :lead_users, :potential_customers, :customer_mouth_users, :valid_lead_users,
+         :opened_account_users, :valid_customer_users, :opened_account_assets, :existing_customer_assets, :opened_account_contribution,
+         '', '', datetime('now'))
+    '''), {
+        'date': conv_data['date'],
+        'platform': conv_data['platform'],
+        'agency': agency,
+        'business_model': business_model,
+        'lead_users': conv_data['lead_users'],
+        'potential_customers': conv_data['potential_customers'],
+        'customer_mouth_users': conv_data['customer_mouth_users'],
+        'valid_lead_users': conv_data['valid_lead_users'],
+        'opened_account_users': conv_data['opened_account_users'],
+        'valid_customer_users': conv_data['valid_customer_users'],
+        'opened_account_assets': conv_data.get('opened_account_assets', 0),
+        'existing_customer_assets': conv_data.get('existing_customer_assets', 0),
+        'opened_account_contribution': conv_data.get('opened_account_contribution', 0)
+    })
 
 
 def _calculate_click_users(start_date, end_date):
@@ -717,24 +799,19 @@ def _calculate_click_users(start_date, end_date):
         else_=''
     )
 
-    # ===== 1. 腾讯转化数据：通过 ad_account JOIN raw_ad_data_tencent =====
-    print("      处理腾讯点击人数（通过 ad_account → raw_ad_data_tencent → account_agency_mapping）...")
+    # ===== 1. 腾讯点击人数：直接通过 ad_account 关联 account_agency_mapping =====
+    # 不再通过 raw_ad_data_tencent 作为中间表，避免日期不匹配导致数据丢失
+    print("      处理腾讯点击人数（通过 ad_account → account_agency_mapping）...")
     tencent_clicks = db.session.query(
         BackendConversions.lead_date.label('date'),
         AccountAgencyMapping.agency.label('agency'),
         AccountAgencyMapping.business_model.label('business_model'),
         func.count(func.distinct(user_identifier)).label('click_users')
     ).outerjoin(
-        RawAdDataTencent,
-        and_(
-            RawAdDataTencent.account_id == BackendConversions.ad_account,
-            RawAdDataTencent.date == BackendConversions.lead_date
-        )
-    ).outerjoin(
         AccountAgencyMapping,
         and_(
             AccountAgencyMapping.platform == '腾讯',
-            AccountAgencyMapping.account_id == RawAdDataTencent.account_id
+            AccountAgencyMapping.account_id == BackendConversions.ad_account
         )
     ).filter(
         and_(
@@ -756,10 +833,23 @@ def _calculate_click_users(start_date, end_date):
     # 从 AgencyAbbreviationMapping 表动态构建简称映射（用于抖音）
     agency_name_mapping = build_abbreviation_mapping_case()
 
-    # 代理商映射：抖音使用简称映射，小红书优先从 JOIN 获取，yj 和高德作为独立平台
+    # 代理商映射：抖音使用简称映射，小红书优先从 JOIN 获取，最后规范化"直投"名称
+    # 小红书代理商规范化逻辑：
+    # 1. 优先从映射表获取（通过 ad_account JOIN account_name）
+    # 2. 如果映射表没有，检查原始 agency 字段：
+    #    - 如果包含"直投"字样，统一命名为"申万宏源直投"
+    #    - 否则使用简称映射结果
+    xiaohongshu_agency = func.coalesce(
+        AccountAgencyMapping.agency,
+        case(
+            (BackendConversions.agency.like('%直投%'), '申万宏源直投'),
+            else_=agency_name_mapping
+        )
+    )
+
     agency_mapping = case(
         (BackendConversions.platform_source == '抖音', agency_name_mapping),
-        (BackendConversions.platform_source == '小红书', func.coalesce(AccountAgencyMapping.agency, agency_name_mapping)),
+        (BackendConversions.platform_source == '小红书', xiaohongshu_agency),
         (BackendConversions.platform_source == 'yj', ''),
         (BackendConversions.platform_source == '高德', ''),
         else_=''
@@ -782,7 +872,7 @@ def _calculate_click_users(start_date, end_date):
         and_(
             BackendConversions.lead_date >= start_date,
             BackendConversions.lead_date <= end_date,
-            BackendConversions.platform_source.in_(['抖音', '小红书', 'yj', '高德'])
+            BackendConversions.platform_source.in_(['抖音', '小红书', 'yj', '高德', 'nj'])
         )
     ).group_by(
         BackendConversions.lead_date,
@@ -806,18 +896,19 @@ def _calculate_click_users(start_date, end_date):
         ).first()
 
         if metric:
-            metric.click_users = int(row.click_users) if row.click_users else 0
+            metric.clicks = int(row.click_users) if row.click_users else 0
             db.session.add(metric)
             updated_count += 1
 
     # 处理抖音、小红书、yj、高德数据
     for row in other_clicks:
-        # 平台映射：yj→云极，高德→高德（作为独立平台）
+        # 平台映射：yj→云极，高德→高德（作为独立平台），nj作为独立平台
         platform_mapping = {
             '抖音': '抖音',
             '小红书': '小红书',
             'yj': '云极',
-            '高德': '高德'
+            '高德': '高德',
+            'nj': 'nj'
         }
         platform = platform_mapping.get(row.platform, row.platform)
 
@@ -829,7 +920,7 @@ def _calculate_click_users(start_date, end_date):
         ).first()
 
         if metric:
-            metric.click_users = int(row.click_users) if row.click_users else 0
+            metric.clicks = int(row.click_users) if row.click_users else 0
             db.session.add(metric)
             updated_count += 1
 

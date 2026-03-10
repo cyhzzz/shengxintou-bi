@@ -1,83 +1,44 @@
 {
-  "version": "0.9.1",
-  "release_date": "2026-02-13",
+  "version": "0.9.3",
+  "release_date": "2026-03-04",
   "changelog": [
-    "🔧 后端架构重构：data.py拆分为18个模块文件",
-    "   - 原data.py（3996行）→ backend/routes/data/（18个文件，4179行）",
-    "   - 代码行数+5%，模块化程度大幅提升",
-    "   - 26个API接口100%保留功能",
-    "   - 单文件行数从3996行降至584行（平均），最大584行",
-    "✅ 所有API接口路径、参数、响应格式保持不变",
-    "✅ 支持独立模块注册Blueprint方案（代码已准备）",
-    "✅ 添加完整的拆分报告和使用指南文档",
-    "🐛 修复已知问题并优化性能"
+    "✨ 数据概览新增客户今年创收指标",
+    "🔧 修复创收卡片显示为0的问题",
+    "🔧 修复全部模式查询和环比计算"
   ],
   "major_changes": [
     {
-      "type": "refactor",
-      "description": "后端数据接口模块化重构",
+      "type": "feature",
+      "description": "客户今年创收功能",
       "details": {
-        "before": "backend/routes/data.py (3996行)",
-        "after": "backend/routes/data/ (18个模块文件)",
-        "modules": [
-          "query.py - 通用查询接口（490行）",
-          "dashboard.py - 仪表盘数据接口（465行）",
-          "trend.py - 趋势数据接口（162行）",
-          "agency_analysis.py - 代理商分析接口（268行）",
-          "xhs_notes.py - 小红书笔记分析（414行）",
-          "cost_analysis.py - 成本分析接口（309行）",
-          "external_analysis.py - 外部数据分析（357行）",
-          "leads.py - 线索详情接口（341行）",
-          "account_mapping.py - 账号映射管理（316行）",
-          "abbreviation_mapping.py - 简称映射管理（240行）",
-          "xhs_operation.py - 小红书运营分析（197行）",
-          "xhs_operation_helpers.py - 运营分析辅助函数（584行）",
-          "__init__.py - 模块初始化（36行）"
-        ],
-        "benefits": [
-          "✅ 单文件易读易维护（平均321行/文件）",
-          "✅ 按功能模块分组，职责清晰",
-          "✅ 支持独立模块开发和测试",
-          "✅ 减少代码冲突（多人协作友好）",
-          "✅ AI辅助开发更精准（小文件上下文更聚焦）"
-        ]
+        "new_field": "opened_account_contribution - 新开客户创收金额",
+        "data_source": "backend_conversions 表的 customer_contribution 字段（仅统计 is_opened_account=True 的记录）",
+        "api_change": "dashboard core-metrics API 新增 customer_contribution 字段"
       }
     },
     {
-      "type": "compatibility",
-      "description": "100%向后兼容保证",
+      "type": "bugfix",
+      "description": "修复创收卡片显示为0的问题",
       "details": {
-        "api_routes": "26个API接口路径保持不变",
-        "request_format": "所有请求参数格式保持不变",
-        "response_format": "所有响应格式保持不变",
-        "database_logic": "所有数据库查询逻辑保持不变",
-        "error_handling": "所有错误处理逻辑保持不变"
+        "before": "customer_contribution 硬编码为0",
+        "after": "从 daily_metrics_unified.opened_account_contribution 查询真实数据"
       }
     }
   ],
   "upgrade_notes": [
-    "⚠️ 重要：本次重构完全向后兼容，无需修改前端代码",
-    "📋 拆分报告：backend/routes/data/SPLIT_REPORT.md",
-    "📋 使用指南：backend/routes/data/USAGE_GUIDE.md",
-    "🔧 下一步支持：可在app.py中统一注册Blueprint（可选）"
+    "✅ 后端 API 已自动返回创收数据，无需额外配置",
+    "✅ 数据库字段已存在，无需迁移",
+    "📋 创收数据来源：backend_conversions 表的 customer_contribution 字段"
   ],
   "cloud_version_file": "version_cloud.json",
   "update_url": "",
   "support_contact": "产品经理 陈元昊",
   "technical_details": {
-    "refactor_type": "backend_modularization",
-    "original_file": "backend/routes/data.py",
-    "new_structure": "backend/routes/data/",
-    "code_metrics": {
-      "original_lines": 3996,
-      "new_total_lines": 4179,
-      "code_increase_percent": 5,
-      "files_count": 18,
-      "max_file_lines": 584,
-      "avg_file_lines": 232,
-      "routes_preserved": 26
-    },
-    "completion_time": "2026-02-11 16:35",
-    "refactor_duration_minutes": 15
+    "backend_changes": [
+      "backend/routes/data/dashboard.py - 新增 opened_account_contribution 查询"
+    ],
+    "frontend_changes": [],
+    "database_status": "字段已存在于 daily_metrics_unified 表",
+    "completion_time": "2026-03-04"
   }
 }

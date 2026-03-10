@@ -385,7 +385,7 @@ def get_agency_data(date_range):
 
         agency_data[agency]['total_cost'] += float(metric.cost or 0)
         agency_data[agency]['total_impressions'] += metric.impressions or 0
-        agency_data[agency]['total_clicks'] += metric.click_users or 0
+        agency_data[agency]['total_clicks'] += metric.clicks or 0
         agency_data[agency]['lead_users'] += metric.lead_users or 0
         agency_data[agency]['potential_customers'] += metric.potential_customers or 0
         agency_data[agency]['customer_mouth_users'] += metric.customer_mouth_users or 0

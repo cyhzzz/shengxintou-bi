@@ -214,14 +214,82 @@ def query_data():
                 logger.info(f'[query_data] 应用平台筛选: {filters["platforms"]}')
 
             # 应用代理商筛选条件
+            # 注意：前端传递的是代理商全称（如"量子"），数据库存储的是简称（如"lz"）
+            # 需要进行转换
             if 'agencies' in filters and filters['agencies']:
-                new_customers_query = new_customers_query.filter(
-                    BackendConversions.agency.in_(filters['agencies'])
-                )
-                existing_customers_query = existing_customers_query.filter(
-                    BackendConversions.agency.in_(filters['agencies'])
-                )
-                logger.info(f'[query_data] 应用代理商筛选: {filters["agencies"]}')
+                # 获取代理商简称映射（全称 -> 简称）
+                abbreviation_mappings = db.session.query(AgencyAbbreviationMapping).filter(
+                    AgencyAbbreviationMapping.is_active == True,
+                    AgencyAbbreviationMapping.mapping_type == 'agency'
+                ).all()
+
+                # 创建全称 -> 简称的反向映射
+                full_name_to_abbreviation = {}
+                for mapping in abbreviation_mappings:
+                    display_name = mapping.display_name or mapping.full_name
+                    if display_name:
+                        full_name_to_abbreviation[display_name] = mapping.abbreviation
+                    if mapping.full_name and mapping.full_name != display_name:
+                        full_name_to_abbreviation[mapping.full_name] = mapping.abbreviation
+
+                # 转换代理商全称为简称（用于查询数据库）
+                agency_abbreviations = []
+                for agency in filters['agencies']:
+                    if agency == '申万宏源直投':
+                        # 特殊处理：申万宏源直投
+                        agency_abbreviations.append(agency)
+                    elif agency in full_name_to_abbreviation:
+                        # 转换为简称
+                        agency_abbreviations.append(full_name_to_abbreviation[agency])
+                    else:
+                        # 没有找到映射，保持原样
+                        agency_abbreviations.append(agency)
+
+                logger.info(f'[query_data] 代理商全称转换: {filters["agencies"]} -> {agency_abbreviations}')
+
+                # 处理"申万宏源直投"（空值）的筛选
+                if '申万宏源直投' in agency_abbreviations:
+                    # 如果包含"申万宏源直投"，需要特殊处理空值
+                    other_agencies = [a for a in agency_abbreviations if a != '申万宏源直投']
+                    if other_agencies:
+                        # 有其他代理商，使用OR条件：(agency IN (other_agencies) OR agency IS NULL)
+                        new_customers_query = new_customers_query.filter(
+                            or_(
+                                BackendConversions.agency.in_(other_agencies),
+                                BackendConversions.agency == '',
+                                BackendConversions.agency.is_(None)
+                            )
+                        )
+                        existing_customers_query = existing_customers_query.filter(
+                            or_(
+                                BackendConversions.agency.in_(other_agencies),
+                                BackendConversions.agency == '',
+                                BackendConversions.agency.is_(None)
+                            )
+                        )
+                    else:
+                        # 只选择了"申万宏源直投"，查询空值
+                        new_customers_query = new_customers_query.filter(
+                            or_(
+                                BackendConversions.agency == '',
+                                BackendConversions.agency.is_(None)
+                            )
+                        )
+                        existing_customers_query = existing_customers_query.filter(
+                            or_(
+                                BackendConversions.agency == '',
+                                BackendConversions.agency.is_(None)
+                            )
+                        )
+                else:
+                    # 正常代理商筛选（使用简称）
+                    new_customers_query = new_customers_query.filter(
+                        BackendConversions.agency.in_(agency_abbreviations)
+                    )
+                    existing_customers_query = existing_customers_query.filter(
+                        BackendConversions.agency.in_(agency_abbreviations)
+                    )
+                logger.info(f'[query_data] 应用代理商筛选: {agency_abbreviations}')
 
             logger.info(f'[query_data] 筛选条件应用完成')
 
@@ -570,6 +638,7 @@ def get_trend():
     支持日级、周级、月级聚合
     """
     from backend.database import db
+    import json
 
     data = request.get_json()
     filters = data.get('filters', {})
@@ -577,75 +646,88 @@ def get_trend():
     granularity = data.get('granularity', 'daily')  # daily, weekly, monthly
 
     try:
-        # 根据请求的指标添加聚合列
-        select_columns = []
-        group_by_columns = []
+        # 构建原生SQL查询以避免SQLAlchemy的函数转换问题
+        sql_parts = ["SELECT "]
 
-        # 根据粒度选择分组列
+        # 根据粒度构建周期字段
         if granularity == 'daily':
-            # 日级：按日期分组
-            select_columns.append(DailyMetricsUnified.date.label('period'))
-            group_by_columns.append(DailyMetricsUnified.date)
+            sql_parts.append("date as period, ")
         elif granularity == 'weekly':
-            # 周级：按ISO周分组 (年份+周数)
-            select_columns.append(
-                (func.strftime('%Y', DailyMetricsUnified.date).op('||')('-W')).op('||')(func.strftime('%W', DailyMetricsUnified.date)).label('period')
-            )
-            group_by_columns.append(
-                (func.strftime('%Y', DailyMetricsUnified.date).op('||')('-W')).op('||')(func.strftime('%W', DailyMetricsUnified.date))
-            )
+            # 使用SQLite原生字符串拼接避免concat函数
+            sql_parts.append("strftime('%Y', date) || '-W' || strftime('%W', date) as period, ")
         elif granularity == 'monthly':
-            # 月级：按年月分组
-            select_columns.append(
-                func.strftime('%Y-%m', DailyMetricsUnified.date).label('period')
-            )
-            group_by_columns.append(
-                func.strftime('%Y-%m', DailyMetricsUnified.date)
-            )
+            sql_parts.append("strftime('%Y-%m', date) as period, ")
 
-        # 添加指标聚合列
+        # 构建指标聚合部分
+        metric_selects = []
         for metric in metrics:
             if metric == 'cost':
-                select_columns.append(func.sum(DailyMetricsUnified.cost).label('cost'))
+                metric_selects.append("SUM(cost) as cost")
             elif metric == 'impressions':
-                select_columns.append(func.sum(DailyMetricsUnified.impressions).label('impressions'))
-            elif metric == 'clicks' or metric == 'click_users':
-                select_columns.append(func.sum(DailyMetricsUnified.click_users).label('click_users'))
+                metric_selects.append("SUM(impressions) as impressions")
+            elif metric == 'clicks':
+                metric_selects.append("SUM(clicks) as clicks")
             elif metric == 'leads' or metric == 'lead_users':
-                select_columns.append(func.sum(DailyMetricsUnified.lead_users).label('lead_users'))
+                metric_selects.append("SUM(lead_users) as lead_users")
             elif metric == 'new_accounts' or metric == 'opened_account_users':
-                select_columns.append(func.sum(DailyMetricsUnified.opened_account_users).label('opened_account_users'))
+                metric_selects.append("SUM(opened_account_users) as opened_account_users")
             elif metric == 'valid_customer_users':
-                select_columns.append(func.sum(DailyMetricsUnified.valid_customer_users).label('valid_customer_users'))
+                metric_selects.append("SUM(valid_customer_users) as valid_customer_users")
 
-        query = db.session.query(*select_columns)
+        sql_parts.append(", ".join(metric_selects))
+        sql_parts.append(" FROM daily_metrics_unified ")
 
-        # 应用筛选条件
+        # 构建WHERE条件
+        where_conditions = []
+        params = []
+
         if 'date_range' in filters and filters['date_range']:
-            query = query.filter(
-                and_(
-                    DailyMetricsUnified.date >= filters['date_range'][0],
-                    DailyMetricsUnified.date <= filters['date_range'][1]
-                )
-            )
+            where_conditions.append("date >= ? AND date <= ?")
+            params.extend(filters['date_range'])
 
         if 'platforms' in filters and filters['platforms']:
-            query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
+            platforms_placeholders = ','.join(['?' for _ in filters['platforms']])
+            where_conditions.append(f"platform IN ({platforms_placeholders})")
+            params.extend(filters['platforms'])
 
         if 'agencies' in filters and filters['agencies']:
-            query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
+            agencies_placeholders = ','.join(['?' for _ in filters['agencies']])
+            where_conditions.append(f"agency IN ({agencies_placeholders})")
+            params.extend(filters['agencies'])
 
         if 'business_models' in filters and filters['business_models']:
-            query = query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
+            models_placeholders = ','.join(['?' for _ in filters['business_models']])
+            where_conditions.append(f"business_model IN ({models_placeholders})")
+            params.extend(filters['business_models'])
 
-        # 按粒度分组
-        for group_col in group_by_columns:
-            query = query.group_by(group_col)
+        if where_conditions:
+            sql_parts.append("WHERE " + " AND ".join(where_conditions) + " ")
 
-        # 排序
-        query = query.order_by(group_by_columns[0])
+        # 构建GROUP BY子句
+        if granularity == 'daily':
+            sql_parts.append("GROUP BY date ")
+        elif granularity == 'weekly':
+            sql_parts.append("GROUP BY strftime('%Y', date), strftime('%W', date) ")
+        elif granularity == 'monthly':
+            sql_parts.append("GROUP BY strftime('%Y-%m', date) ")
 
-        results = query.all()
+        # 构建ORDER BY子句
+        if granularity == 'daily':
+            sql_parts.append("ORDER BY date")
+        elif granularity == 'weekly':
+            sql_parts.append("ORDER BY strftime('%Y', date), CAST(strftime('%W', date) AS INTEGER)")
+        elif granularity == 'monthly':
+            sql_parts.append("ORDER BY strftime('%Y-%m', date)")
+
+        # 执行查询
+        from sqlalchemy import text
+        full_sql = "".join(sql_parts)
+        print(f"DEBUG: Executing raw SQL with granularity={granularity}")
+        print(f"DEBUG: SQL: {full_sql}")
+        print(f"DEBUG: Params: {params}")
+
+        result = db.session.execute(text(full_sql), params)
+        rows = result.fetchall()
 
         # 转换结果
         output = {
@@ -654,32 +736,30 @@ def get_trend():
         }
 
         # 提取周期标签
-        for row in results:
-            output['dates'].append(str(row.period))
+        for row in rows:
+            output['dates'].append(str(row[0]))  # 第一列是period
 
-        # 构建series
-        for metric in metrics:
+        # 构建series数据
+        for i, metric in enumerate(metrics):
             series_data = []
-            metric_name = metric
 
-            for row in results:
-                if metric == 'cost' and hasattr(row, 'cost'):
-                    series_data.append(float(row.cost) if row.cost else 0)
-                elif metric == 'impressions' and hasattr(row, 'impressions'):
-                    series_data.append(int(row.impressions) if row.impressions else 0)
-                elif (metric == 'clicks' or metric == 'click_users') and hasattr(row, 'click_users'):
-                    series_data.append(int(row.click_users) if row.click_users else 0)
-                elif (metric == 'leads' or metric == 'lead_users') and hasattr(row, 'lead_users'):
-                    series_data.append(int(row.lead_users) if row.lead_users else 0)
-                elif (metric == 'new_accounts' or metric == 'opened_account_users') and hasattr(row, 'opened_account_users'):
-                    series_data.append(int(row.opened_account_users) if row.opened_account_users else 0)
-                elif metric == 'valid_customer_users' and hasattr(row, 'valid_customer_users'):
-                    series_data.append(int(row.valid_customer_users) if row.valid_customer_users else 0)
+            # 根据指标确定在结果中的列位置（第0列是period，从第1列开始是指标）
+            metric_col_index = i + 1
+
+            for row in rows:
+                if metric_col_index < len(row):
+                    val = row[metric_col_index]
+                    if metric == 'cost':
+                        series_data.append(float(val) if val is not None else 0)
+                    elif metric in ['impressions', 'clicks', 'lead_users', 'opened_account_users', 'valid_customer_users']:
+                        series_data.append(int(val) if val is not None else 0)
+                    else:
+                        series_data.append(float(val) if val is not None else 0)
                 else:
                     series_data.append(0)
 
             output['series'].append({
-                'name': metric_name,
+                'name': metric,
                 'data': series_data
             })
 
@@ -689,9 +769,12 @@ def get_trend():
         })
 
     except Exception as e:
+        import traceback
+        print(f"ERROR in get_trend: {str(e)}")
+        print(f"ERROR traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
-            'error': f'查询失败: {str(e)}'
+            'error': f'查询失败: {str(e)}, 详细信息: {traceback.format_exc()}'
         }), 500
 
 
@@ -714,7 +797,7 @@ def get_agency_analysis():
             DailyMetricsUnified.agency,
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
             func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users'),
@@ -756,7 +839,7 @@ def get_agency_analysis():
         grand_total = {  # 全部合计
             'cost': 0,
             'impressions': 0,
-            'click_users': 0,
+            'clicks': 0,
             'lead_users': 0,
             'opened_account_users': 0,
             'valid_customer_users': 0,
@@ -768,7 +851,7 @@ def get_agency_analysis():
         for row in summary_results:
             cost = float(row.total_cost) if row.total_cost else 0
             impressions = int(row.total_impressions) if row.total_impressions else 0
-            click_users = int(row.total_click_users) if row.total_click_users else 0
+            clicks = int(row.total_clicks) if row.total_clicks else 0
             lead_users = int(row.total_lead_users) if row.total_lead_users else 0
             opened_account_users = int(row.total_opened_account_users) if row.total_opened_account_users else 0
             valid_customer_users = int(row.total_valid_customer_users) if row.total_valid_customer_users else 0
@@ -787,7 +870,7 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': cost,
                     'impressions': impressions,
-                    'click_users': click_users,
+                    'clicks': clicks,
                     'lead_users': lead_users,
                     'opened_account_users': opened_account_users,
                     'valid_customer_users': valid_customer_users,
@@ -806,7 +889,7 @@ def get_agency_analysis():
                 platform_subtotals[platform] = {
                     'cost': 0,
                     'impressions': 0,
-                    'click_users': 0,
+                    'clicks': 0,
                     'lead_users': 0,
                     'opened_account_users': 0,
                     'valid_customer_users': 0,
@@ -816,7 +899,7 @@ def get_agency_analysis():
                 }
             platform_subtotals[platform]['cost'] += cost
             platform_subtotals[platform]['impressions'] += impressions
-            platform_subtotals[platform]['click_users'] += click_users
+            platform_subtotals[platform]['clicks'] += clicks
             platform_subtotals[platform]['lead_users'] += lead_users
             platform_subtotals[platform]['opened_account_users'] += opened_account_users
             platform_subtotals[platform]['valid_customer_users'] += valid_customer_users
@@ -827,7 +910,7 @@ def get_agency_analysis():
             # 累加全部合计
             grand_total['cost'] += cost
             grand_total['impressions'] += impressions
-            grand_total['click_users'] += click_users
+            grand_total['clicks'] += clicks
             grand_total['lead_users'] += lead_users
             grand_total['opened_account_users'] += opened_account_users
             grand_total['valid_customer_users'] += valid_customer_users
@@ -849,7 +932,7 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': metrics['cost'],
                     'impressions': metrics['impressions'],
-                    'click_users': metrics['click_users'],
+                    'clicks': metrics['clicks'],
                     'lead_users': metrics['lead_users'],
                     'opened_account_users': metrics['opened_account_users'],
                     'valid_customer_users': metrics['valid_customer_users'],
@@ -873,7 +956,7 @@ def get_agency_analysis():
             'metrics': {
                 'cost': grand_total['cost'],
                 'impressions': grand_total['impressions'],
-                'click_users': grand_total['click_users'],
+                'clicks': grand_total['clicks'],
                 'lead_users': grand_total['lead_users'],
                 'opened_account_users': grand_total['opened_account_users'],
                 'valid_customer_users': grand_total['valid_customer_users'],
@@ -896,7 +979,7 @@ def get_agency_analysis():
             DailyMetricsUnified.agency,
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
             func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
@@ -942,7 +1025,7 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': float(row.total_cost) if row.total_cost else 0,
                     'impressions': int(row.total_impressions) if row.total_impressions else 0,
-                    'click_users': int(row.total_click_users) if row.total_click_users else 0,
+                    'clicks': int(row.total_clicks) if row.total_clicks else 0,
                     'lead_users': int(row.total_lead_users) if row.total_lead_users else 0,
                     'opened_account_users': int(row.total_opened_account_users) if row.total_opened_account_users else 0,
                     'valid_customer_users': int(row.total_valid_customer_users) if row.total_valid_customer_users else 0
@@ -1493,11 +1576,11 @@ def get_cost_analysis():
 def get_conversion_funnel():
     """
     转化漏斗监测 (7层漏斗)
-    使用 daily_metrics_unified 表数据
+    使用 daily_metrics_unified 表数据和 backend_conversions 表数据
 
     7层漏斗定义:
     1. 曝光 (impressions) - 广告曝光量
-    2. 点击人数 (click_users) - 去重点击人数
+    2. 点击次数 (clicks) - 点击次数
     3. 线索人数 (lead_users) - 去重线索人数
     4. 开口人数 (customer_mouth_users) - 去重开口人数
     5. 有效线索 (valid_lead_users) - 去重有效线索人数
@@ -1510,7 +1593,8 @@ def get_conversion_funnel():
         "platforms": ["腾讯", "抖音", "小红书"],
         "date_range": ["2025-01-01", "2025-01-15"],
         "agencies": ["量子", "众联"],
-        "business_models": ["直播", "信息流"]
+        "business_models": ["直播", "信息流"],
+        "employees": ["E001", "E002"]  // 新增：员工号列表
       }
     }
     """
@@ -1527,21 +1611,19 @@ def get_conversion_funnel():
             start_date = filters['date_range'][0]
             end_date = filters['date_range'][1]
 
-        # ===== 1. 从 daily_metrics_unified 聚合数据 =====
-        query = db.session.query(
+        # 检查是否有员工筛选
+        has_employee_filter = 'employees' in filters and filters['employees']
+
+        # ===== 1. 从 daily_metrics_unified 获取广告指标 =====
+        ad_query = db.session.query(
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
-            func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
-            func.sum(DailyMetricsUnified.customer_mouth_users).label('total_customer_mouth_users'),
-            func.sum(DailyMetricsUnified.valid_lead_users).label('total_valid_lead_users'),
-            func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks')
         )
 
         # 应用筛选条件
         if start_date and end_date:
-            query = query.filter(
+            ad_query = ad_query.filter(
                 and_(
                     DailyMetricsUnified.date >= start_date,
                     DailyMetricsUnified.date <= end_date
@@ -1549,25 +1631,90 @@ def get_conversion_funnel():
             )
 
         if 'platforms' in filters and filters['platforms']:
-            query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
+            ad_query = ad_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
 
         if 'agencies' in filters and filters['agencies']:
-            query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
+            ad_query = ad_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
 
         if 'business_models' in filters and filters['business_models']:
-            query = query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
+            ad_query = ad_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
 
-        result = query.first()
+        ad_result = ad_query.first()
 
-        # 提取数据
-        impressions = int(result.total_impressions) if result.total_impressions else 0
-        click_users = int(result.total_click_users) if result.total_click_users else 0
-        total_cost = float(result.total_cost) if result.total_cost else 0
-        lead_users = int(result.total_lead_users) if result.total_lead_users else 0
-        customer_mouth_users = int(result.total_customer_mouth_users) if result.total_customer_mouth_users else 0
-        valid_lead_users = int(result.total_valid_lead_users) if result.total_valid_lead_users else 0
-        opened_account_users = int(result.total_opened_account_users) if result.total_opened_account_users else 0
-        valid_customer_users = int(result.total_valid_customer_users) if result.total_valid_customer_users else 0
+        # 提取广告数据
+        impressions = int(ad_result.total_impressions) if ad_result.total_impressions else 0
+        clicks = int(ad_result.total_clicks) if ad_result.total_clicks else 0
+        total_cost = float(ad_result.total_cost) if ad_result.total_cost else 0
+
+        # ===== 2. 获取转化指标 =====
+        if has_employee_filter:
+            # 有员工筛选时，从 backend_conversions 表直接查询
+            conv_query = db.session.query(
+                func.count(func.distinct(BackendConversions.id)).label('total_leads'),
+                func.sum(case((BackendConversions.is_customer_mouth == True, 1), else_=0)).label('total_mouth'),
+                func.sum(case((BackendConversions.is_valid_lead == True, 1), else_=0)).label('total_valid_leads'),
+                func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('total_opened'),
+                func.sum(case((BackendConversions.is_valid_customer == True, 1), else_=0)).label('total_valid')
+            ).filter(
+                BackendConversions.add_employee_no.in_(filters['employees'])
+            )
+
+            # 应用日期筛选
+            if start_date and end_date:
+                conv_query = conv_query.filter(
+                    and_(
+                        BackendConversions.lead_date >= start_date,
+                        BackendConversions.lead_date <= end_date
+                    )
+                )
+
+            # 应用平台筛选
+            if 'platforms' in filters and filters['platforms']:
+                conv_query = conv_query.filter(BackendConversions.platform_source.in_(filters['platforms']))
+
+            conv_result = conv_query.first()
+
+            lead_users = int(conv_result.total_leads) if conv_result.total_leads else 0
+            customer_mouth_users = int(conv_result.total_mouth) if conv_result.total_mouth else 0
+            valid_lead_users = int(conv_result.total_valid_leads) if conv_result.total_valid_leads else 0
+            opened_account_users = int(conv_result.total_opened) if conv_result.total_opened else 0
+            valid_customer_users = int(conv_result.total_valid) if conv_result.total_valid else 0
+
+        else:
+            # 无员工筛选时，从聚合表查询
+            conv_query = db.session.query(
+                func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
+                func.sum(DailyMetricsUnified.customer_mouth_users).label('total_customer_mouth_users'),
+                func.sum(DailyMetricsUnified.valid_lead_users).label('total_valid_lead_users'),
+                func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
+                func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
+            )
+
+            # 应用筛选条件
+            if start_date and end_date:
+                conv_query = conv_query.filter(
+                    and_(
+                        DailyMetricsUnified.date >= start_date,
+                        DailyMetricsUnified.date <= end_date
+                    )
+                )
+
+            if 'platforms' in filters and filters['platforms']:
+                conv_query = conv_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
+
+            if 'agencies' in filters and filters['agencies']:
+                conv_query = conv_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
+
+            if 'business_models' in filters and filters['business_models']:
+                conv_query = conv_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
+
+            conv_result = conv_query.first()
+
+            lead_users = int(conv_result.total_lead_users) if conv_result.total_lead_users else 0
+            customer_mouth_users = int(conv_result.total_customer_mouth_users) if conv_result.total_customer_mouth_users else 0
+            valid_lead_users = int(conv_result.total_valid_lead_users) if conv_result.total_valid_lead_users else 0
+            opened_account_users = int(conv_result.total_opened_account_users) if conv_result.total_opened_account_users else 0
+            valid_customer_users = int(conv_result.total_valid_customer_users) if conv_result.total_valid_customer_users else 0
 
         # ===== 2. 构建7层漏斗 =====
         # 计算每一层相对于上一层的转化率
@@ -1580,15 +1727,15 @@ def get_conversion_funnel():
             },
             {
                 'step': '客户点击',
-                'value': click_users,
-                'label': '点击人数',
-                'rate': (click_users / impressions * 100) if impressions > 0 else 0
+                'value': clicks,
+                'label': '点击次数',
+                'rate': (clicks / impressions * 100) if impressions > 0 else 0
             },
             {
                 'step': '客户线索',
                 'value': lead_users,
                 'label': '线索人数',
-                'rate': (lead_users / click_users * 100) if click_users > 0 else 0
+                'rate': (lead_users / clicks * 100) if clicks > 0 else 0
             },
             {
                 'step': '客户开口',
@@ -3061,7 +3208,7 @@ def get_xhs_notes_operation_analysis():
             # 聚合指标
             agency_data[agency]['total_cost'] += float(metric.cost or 0)
             agency_data[agency]['total_impressions'] += metric.impressions or 0
-            agency_data[agency]['total_clicks'] += metric.click_users or 0
+            agency_data[agency]['total_clicks'] += metric.clicks or 0
             agency_data[agency]['lead_users'] += metric.lead_users or 0  # 企微数
             agency_data[agency]['potential_customers'] += metric.potential_customers or 0  # 潜客数
             agency_data[agency]['customer_mouth_users'] += metric.customer_mouth_users or 0  # 客户开口数
@@ -3670,7 +3817,7 @@ def get_dashboard_core_metrics():
         query = db.session.query(
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_clicks'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened'),
             func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid'),
@@ -4126,6 +4273,53 @@ def get_dashboard_trend_data():
                 'trend_data': trend_data,
                 'summary': summary
             }
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
+@bp.route('/employees', methods=['GET'])
+def get_employees():
+    """
+    获取服务人员列表
+
+    从 backend_conversions 表中获取所有唯一的员工号和姓名
+
+    返回:
+    {
+        "success": true,
+        "data": [
+            {"employee_no": "E001", "employee_name": "张三"},
+            {"employee_no": "E002", "employee_name": "李四"}
+        ]
+    }
+    """
+    try:
+        employees = db.session.query(
+            BackendConversions.add_employee_no,
+            BackendConversions.add_employee_name
+        ).filter(
+            BackendConversions.add_employee_no.isnot(None),
+            BackendConversions.add_employee_no != ''
+        ).distinct().order_by(BackendConversions.add_employee_name).all()
+
+        result = [
+            {
+                'employee_no': e.add_employee_no,
+                'employee_name': e.add_employee_name or ''
+            }
+            for e in employees
+        ]
+
+        return jsonify({
+            'success': True,
+            'data': result
         })
 
     except Exception as e:

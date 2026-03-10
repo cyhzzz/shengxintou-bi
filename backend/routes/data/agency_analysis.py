@@ -38,10 +38,12 @@ def get_agency_analysis():
             DailyMetricsUnified.agency,
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
+            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users'),
+            func.sum(DailyMetricsUnified.opened_account_assets).label('total_opened_account_assets'),
+            func.sum(DailyMetricsUnified.existing_customer_assets).label('total_existing_customer_assets')
         )
 
         # 应用筛选条件
@@ -77,19 +79,23 @@ def get_agency_analysis():
         grand_total = {  # 全部合计
             'cost': 0,
             'impressions': 0,
-            'click_users': 0,
+            'clicks': 0,
             'lead_users': 0,
             'opened_account_users': 0,
-            'valid_customer_users': 0
+            'valid_customer_users': 0,
+            'opened_account_assets': 0,
+            'existing_customer_assets': 0
         }
 
         for row in summary_results:
             cost = float(row.total_cost) if row.total_cost else 0
             impressions = int(row.total_impressions) if row.total_impressions else 0
-            click_users = int(row.total_click_users) if row.total_click_users else 0
+            clicks = int(row.total_clicks) if row.total_clicks else 0
             lead_users = int(row.total_lead_users) if row.total_lead_users else 0
             opened_account_users = int(row.total_opened_account_users) if row.total_opened_account_users else 0
             valid_customer_users = int(row.total_valid_customer_users) if row.total_valid_customer_users else 0
+            opened_account_assets = float(row.total_opened_account_assets) if row.total_opened_account_assets else 0
+            existing_customer_assets = float(row.total_existing_customer_assets) if row.total_existing_customer_assets else 0
 
             # 计算成本指标
             lead_cost = cost / lead_users if lead_users > 0 else 0
@@ -102,10 +108,12 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': cost,
                     'impressions': impressions,
-                    'click_users': click_users,
+                    'clicks': clicks,
                     'lead_users': lead_users,
                     'opened_account_users': opened_account_users,
                     'valid_customer_users': valid_customer_users,
+                    'opened_account_assets': opened_account_assets,
+                    'existing_customer_assets': existing_customer_assets,
                     'lead_cost': round(lead_cost, 2),
                     'account_cost': round(account_cost, 2)
                 }
@@ -118,25 +126,31 @@ def get_agency_analysis():
                 platform_subtotals[platform] = {
                     'cost': 0,
                     'impressions': 0,
-                    'click_users': 0,
+                    'clicks': 0,
                     'lead_users': 0,
                     'opened_account_users': 0,
-                    'valid_customer_users': 0
+                    'valid_customer_users': 0,
+                    'opened_account_assets': 0,
+                    'existing_customer_assets': 0
                 }
             platform_subtotals[platform]['cost'] += cost
             platform_subtotals[platform]['impressions'] += impressions
-            platform_subtotals[platform]['click_users'] += click_users
+            platform_subtotals[platform]['clicks'] += clicks
             platform_subtotals[platform]['lead_users'] += lead_users
             platform_subtotals[platform]['opened_account_users'] += opened_account_users
             platform_subtotals[platform]['valid_customer_users'] += valid_customer_users
+            platform_subtotals[platform]['opened_account_assets'] += opened_account_assets
+            platform_subtotals[platform]['existing_customer_assets'] += existing_customer_assets
 
             # 累加全部合计
             grand_total['cost'] += cost
             grand_total['impressions'] += impressions
-            grand_total['click_users'] += click_users
+            grand_total['clicks'] += clicks
             grand_total['lead_users'] += lead_users
             grand_total['opened_account_users'] += opened_account_users
             grand_total['valid_customer_users'] += valid_customer_users
+            grand_total['opened_account_assets'] += opened_account_assets
+            grand_total['existing_customer_assets'] += existing_customer_assets
 
         # 生成平台小计行
         platform_subtotal_rows = []
@@ -152,10 +166,12 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': metrics['cost'],
                     'impressions': metrics['impressions'],
-                    'click_users': metrics['click_users'],
+                    'clicks': metrics['clicks'],
                     'lead_users': metrics['lead_users'],
                     'opened_account_users': metrics['opened_account_users'],
                     'valid_customer_users': metrics['valid_customer_users'],
+                    'opened_account_assets': metrics['opened_account_assets'],
+                    'existing_customer_assets': metrics['existing_customer_assets'],
                     'lead_cost': round(lead_cost, 2),
                     'account_cost': round(account_cost, 2)
                 }
@@ -173,10 +189,12 @@ def get_agency_analysis():
             'metrics': {
                 'cost': grand_total['cost'],
                 'impressions': grand_total['impressions'],
-                'click_users': grand_total['click_users'],
+                'clicks': grand_total['clicks'],
                 'lead_users': grand_total['lead_users'],
                 'opened_account_users': grand_total['opened_account_users'],
                 'valid_customer_users': grand_total['valid_customer_users'],
+                'opened_account_assets': grand_total['opened_account_assets'],
+                'existing_customer_assets': grand_total['existing_customer_assets'],
                 'lead_cost': round(total_lead_cost, 2),
                 'account_cost': round(total_account_cost, 2)
             }
@@ -193,7 +211,7 @@ def get_agency_analysis():
             DailyMetricsUnified.agency,
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
             func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
@@ -239,7 +257,7 @@ def get_agency_analysis():
                 'metrics': {
                     'cost': float(row.total_cost) if row.total_cost else 0,
                     'impressions': int(row.total_impressions) if row.total_impressions else 0,
-                    'click_users': int(row.total_click_users) if row.total_click_users else 0,
+                    'clicks': int(row.total_clicks) if row.total_clicks else 0,
                     'lead_users': int(row.total_lead_users) if row.total_lead_users else 0,
                     'opened_account_users': int(row.total_opened_account_users) if row.total_opened_account_users else 0,
                     'valid_customer_users': int(row.total_valid_customer_users) if row.total_valid_customer_users else 0

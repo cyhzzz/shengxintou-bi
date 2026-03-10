@@ -138,10 +138,9 @@ def configure_sqlite_optimization():
             """设置SQLite PRAGMA参数以提升性能"""
             cursor = dbapi_conn.cursor()
 
-            # 启用WAL模式（Write-Ahead Logging）
-            # 优点：读写并发，不再阻塞
-            # 性能提升：查询速度提升2-3倍
-            cursor.execute("PRAGMA journal_mode=WAL")
+            # 更改为传统模式，避免WAL模式导致的数据库损坏问题
+            # WAL模式虽然提高了并发性能，但在某些情况下可能导致数据库损坏
+            cursor.execute("PRAGMA journal_mode=DELETE")
 
             # 设置缓存大小（-100000表示约100MB）
             # 默认是2000页（约8MB），增大缓存可显著提升查询性能
@@ -160,7 +159,7 @@ def configure_sqlite_optimization():
 
             cursor.close()
 
-        logger.info("SQLite性能优化配置已启用: WAL模式 + 100MB缓存 + NORMAL同步")
+        logger.info("SQLite性能优化配置已启用: 传统模式 + 100MB缓存 + NORMAL同步")
     except Exception as e:
         logger.warning(f"SQLite性能优化配置失败: {e}")
 
@@ -286,7 +285,9 @@ from backend.routes.data import (
     leads,
     account_mapping,
     abbreviation_mapping,
-    xhs_operation
+    xhs_operation,
+    employee_conversion,
+    weekly_report_poster
 )
 
 # 注意：已移除模块缓存清除和reload逻辑，避免"module not in sys.modules"错误
@@ -306,6 +307,8 @@ app.register_blueprint(leads.bp, url_prefix=API_PREFIX)
 app.register_blueprint(account_mapping.bp, url_prefix=API_PREFIX)
 app.register_blueprint(abbreviation_mapping.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
+app.register_blueprint(employee_conversion.bp, url_prefix=API_PREFIX)
+app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
 
 # 其他Blueprint
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)

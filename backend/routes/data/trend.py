@@ -4,7 +4,7 @@
 """
 
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_, Integer, case, literal
+from sqlalchemy import func, and_, or_, Integer, case
 from backend.models import (
     DailyMetricsUnified,
     AccountAgencyMapping,
@@ -43,21 +43,11 @@ def get_trend():
             select_columns.append(DailyMetricsUnified.date.label('period'))
             group_by_columns.append(DailyMetricsUnified.date)
         elif granularity == 'weekly':
-            # 周级：按ISO周分组 (年份+周数)
-            select_columns.append(
-                func.concat(
-                    func.strftime('%Y', DailyMetricsUnified.date),
-                    literal('-W'),
-                    func.strftime('%W', DailyMetricsUnified.date)
-                ).label('period')
-            )
-            group_by_columns.append(
-                func.concat(
-                    func.strftime('%Y', DailyMetricsUnified.date),
-                    literal('-W'),
-                    func.strftime('%W', DailyMetricsUnified.date)
-                )
-            )
+            # 周级：按ISO周分组 (年份+周数)，使用SQLite兼容的字符串拼接
+            # 使用op方法确保生成SQLite的||操作符而非concat函数
+            week_expr = func.strftime('%Y', DailyMetricsUnified.date).op('||')('-W').op('||')(func.strftime('%W', DailyMetricsUnified.date))
+            select_columns.append(week_expr.label('period'))
+            group_by_columns.append(week_expr)
         elif granularity == 'monthly':
             # 月级：按年月分组
             select_columns.append(
@@ -73,8 +63,8 @@ def get_trend():
                 select_columns.append(func.sum(DailyMetricsUnified.cost).label('cost'))
             elif metric == 'impressions':
                 select_columns.append(func.sum(DailyMetricsUnified.impressions).label('impressions'))
-            elif metric == 'clicks' or metric == 'click_users':
-                select_columns.append(func.sum(DailyMetricsUnified.click_users).label('click_users'))
+            elif metric == 'clicks':
+                select_columns.append(func.sum(DailyMetricsUnified.clicks).label('clicks'))
             elif metric == 'leads' or metric == 'lead_users':
                 select_columns.append(func.sum(DailyMetricsUnified.lead_users).label('lead_users'))
             elif metric == 'new_accounts' or metric == 'opened_account_users':
@@ -124,15 +114,14 @@ def get_trend():
         # 构建series
         for metric in metrics:
             series_data = []
-            metric_name = metric
 
             for row in results:
                 if metric == 'cost' and hasattr(row, 'cost'):
                     series_data.append(float(row.cost) if row.cost else 0)
                 elif metric == 'impressions' and hasattr(row, 'impressions'):
                     series_data.append(int(row.impressions) if row.impressions else 0)
-                elif (metric == 'clicks' or metric == 'click_users') and hasattr(row, 'click_users'):
-                    series_data.append(int(row.click_users) if row.click_users else 0)
+                elif metric == 'clicks' and hasattr(row, 'clicks'):
+                    series_data.append(int(row.clicks) if row.clicks else 0)
                 elif (metric == 'leads' or metric == 'lead_users') and hasattr(row, 'lead_users'):
                     series_data.append(int(row.lead_users) if row.lead_users else 0)
                 elif (metric == 'new_accounts' or metric == 'opened_account_users') and hasattr(row, 'opened_account_users'):
@@ -143,7 +132,7 @@ def get_trend():
                     series_data.append(0)
 
             output['series'].append({
-                'name': metric_name,
+                'name': metric,
                 'data': series_data
             })
 
