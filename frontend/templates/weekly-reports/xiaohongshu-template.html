@@ -4,7 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小红书渠道开户榜</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #ff4757;
+            --primary-light: #ff6b7a;
+            --primary-dark: #e84118;
+            --accent: #ff7f50;
+            --accent-glow: rgba(255, 127, 80, 0.4);
+            --bg-warm: #fff5f5;
+            --bg-card: #ffffff;
+            --text-dark: #2d3436;
+            --text-muted: #636e72;
+            --gold: linear-gradient(135deg, #f9ca24 0%, #f0932b 100%);
+            --silver: linear-gradient(135deg, #dfe6e9 0%, #b2bec3 100%);
+            --bronze: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,100 +30,184 @@
         }
 
         body {
-            font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 50%, #d64545 100%);
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #ff4757 0%, #ff6b7a 50%, #ff7f50 100%);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 背景装饰 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 127, 80, 0.15) 0%, transparent 40%);
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, 1%) rotate(1deg); }
+            66% { transform: translate(-1%, 2%) rotate(-1deg); }
         }
 
         .poster-container {
             max-width: 800px;
             margin: 0 auto;
-            background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
-            border-radius: 20px;
+            background: var(--bg-card);
+            border-radius: 24px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.25),
+                0 10px 30px rgba(255, 71, 87, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            position: relative;
+            z-index: 1;
         }
 
         /* 头部样式 */
         .header {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-            padding: 30px 20px;
+            background: linear-gradient(135deg, #ff4757 0%, #ff6b7a 60%, #ff7f50 100%);
+            padding: 40px 30px;
             text-align: center;
             position: relative;
-        }
-
-        .header::before,
-        .header::after {
-            content: '🏆';
-            position: absolute;
-            font-size: 40px;
-            top: 20px;
+            overflow: hidden;
         }
 
         .header::before {
-            left: 30px;
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
         }
 
-        .header::after {
-            right: 30px;
+        /* 波浪装饰 */
+        .wave-decoration {
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z' fill='%23ffffff' fill-opacity='0.3'/%3E%3C/svg%3E");
+            background-size: cover;
         }
 
         .platform-title {
-            font-size: 42px;
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+            font-size: 48px;
             font-weight: 800;
             color: #ffffff;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            text-shadow:
+                0 2px 4px rgba(0, 0, 0, 0.1),
+                0 4px 12px rgba(0, 0, 0, 0.15);
             margin-bottom: 8px;
-            letter-spacing: 4px;
+            letter-spacing: 2px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .platform-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
         }
 
         .sub-title {
-            font-size: 28px;
-            font-weight: 600;
-            color: #ffe4e4;
-            letter-spacing: 6px;
+            font-size: 26px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: 8px;
+            margin-top: 16px;
+            text-transform: uppercase;
         }
 
         .date-range {
-            font-size: 16px;
-            color: #fff;
-            margin-top: 15px;
-            opacity: 0.9;
+            font-size: 15px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 20px;
+            padding: 8px 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            display: inline-block;
+            backdrop-filter: blur(4px);
         }
 
         /* 内容区域 */
         .content {
-            padding: 25px 20px;
+            padding: 30px 24px;
+            background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%);
         }
 
         /* 榜单区块 */
         .ranking-section {
-            margin-bottom: 30px;
-            background: #ffffff;
-            border-radius: 16px;
+            margin-bottom: 28px;
+            background: var(--bg-card);
+            border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(238, 90, 90, 0.15);
-            border: 2px solid #ffe4e4;
+            box-shadow:
+                0 4px 20px rgba(255, 71, 87, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 71, 87, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .ranking-section:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 30px rgba(255, 71, 87, 0.12),
+                0 2px 6px rgba(0, 0, 0, 0.08);
         }
 
         .ranking-header {
-            background: linear-gradient(90deg, #ff6b6b 0%, #ff8e8e 100%);
-            padding: 15px 20px;
+            background: linear-gradient(90deg, #ff4757 0%, #ff6b7a 100%);
+            padding: 16px 24px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            position: relative;
+        }
+
+        .ranking-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
         }
 
         .ranking-icon {
-            font-size: 24px;
+            font-size: 26px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }
 
         .ranking-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: #ffffff;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
 
         /* 表格样式 */
@@ -116,31 +218,33 @@
         }
 
         .ranking-table thead {
-            background: #fff5f5;
+            background: linear-gradient(180deg, #fff5f5 0%, #fff0f0 100%);
         }
 
         .ranking-table th {
-            padding: 14px 8px;
+            padding: 16px 8px;
             font-weight: 600;
-            color: #d64545;
-            border-bottom: 2px solid #ffcccc;
+            color: var(--primary);
+            border-bottom: 2px solid rgba(255, 71, 87, 0.15);
             text-align: center;
             font-size: 13px;
+            letter-spacing: 0.5px;
         }
 
         .ranking-table td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #ffe4e4;
+            padding: 14px 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
             text-align: center;
-            color: #333;
+            color: var(--text-dark);
+            transition: background 0.2s ease;
         }
 
         .ranking-table tbody tr:nth-child(even) {
-            background: #fffafa;
+            background: rgba(255, 245, 245, 0.5);
         }
 
         .ranking-table tbody tr:hover {
-            background: #fff0f0;
+            background: rgba(255, 71, 87, 0.05);
         }
 
         /* 排名样式 */
@@ -148,84 +252,102 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            font-weight: 700;
+            font-weight: 800;
             font-size: 15px;
+            font-family: 'Outfit', sans-serif;
+            transition: transform 0.2s ease;
+        }
+
+        .rank:hover {
+            transform: scale(1.1);
         }
 
         .rank-1 {
-            background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
+            background: var(--gold);
             color: #fff;
-            box-shadow: 0 2px 8px rgba(255, 183, 0, 0.4);
+            box-shadow:
+                0 4px 12px rgba(249, 202, 36, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-2 {
-            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+            background: var(--silver);
             color: #fff;
-            box-shadow: 0 2px 8px rgba(160, 160, 160, 0.4);
+            box-shadow:
+                0 4px 12px rgba(178, 190, 195, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
         }
 
         .rank-3 {
-            background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+            background: var(--bronze);
             color: #fff;
-            box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+            box-shadow:
+                0 4px 12px rgba(214, 48, 49, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-other {
-            background: #f0f0f0;
-            color: #666;
+            background: linear-gradient(135deg, #f5f6fa 0%, #dfe4ea 100%);
+            color: var(--text-muted);
         }
 
         /* 员工姓名 */
         .employee-name {
             font-weight: 600;
-            color: #333;
+            color: var(--text-dark);
         }
 
         /* 数值样式 */
         .number {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
             font-weight: 600;
+            font-variant-numeric: tabular-nums;
         }
 
         .highlight {
-            color: #ee5a5a;
+            color: var(--primary);
             font-weight: 700;
         }
 
         /* 率值样式 */
         .rate {
             font-weight: 600;
-            color: #27ae60;
+            color: #00b894;
         }
 
         /* 合计行 */
         .total-row {
-            background: linear-gradient(90deg, #fff0f0 0%, #ffe4e4 100%) !important;
+            background: linear-gradient(90deg, #fff5f5 0%, #ffe8e8 100%) !important;
             font-weight: 700;
         }
 
         .total-row td {
-            color: #d64545;
-            border-top: 2px solid #ff6b6b;
+            color: var(--primary);
+            border-top: 2px solid var(--primary);
+            font-weight: 700;
         }
 
         /* 底部说明 */
         .footer-note {
-            background: #fff5f5;
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 20px;
-            border-left: 4px solid #ff6b6b;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+            padding: 24px;
+            border-radius: 16px;
+            margin-top: 24px;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 2px 12px rgba(255, 71, 87, 0.06);
         }
 
         .footer-note-title {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
-            color: #d64545;
-            margin-bottom: 10px;
+            color: var(--primary);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .footer-note ul {
@@ -234,28 +356,74 @@
         }
 
         .footer-note li {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 6px;
-            padding-left: 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-left: 20px;
             position: relative;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .footer-note li::before {
-            content: '•';
-            color: #ff6b6b;
+            content: '';
             position: absolute;
             left: 4px;
-            font-weight: bold;
+            top: 8px;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
         }
 
-        /* 装饰元素 */
-        .decoration {
+        /* 悬浮导出工具栏 */
+        .floating-export-toolbar {
             position: fixed;
-            opacity: 0.1;
-            font-size: 100px;
-            z-index: -1;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            padding: 10px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.15),
+                0 2px 10px rgba(255, 71, 87, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 71, 87, 0.1);
+        }
+
+        .floating-export-toolbar button {
+            background: linear-gradient(135deg, #ff4757 0%, #ff6b7a 100%);
+            border: none;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+        }
+
+        .floating-export-toolbar button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4);
+        }
+
+        .floating-export-toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .floating-export-toolbar button.loading {
+            opacity: 0.7;
+            cursor: wait;
+            transform: none;
         }
 
         /* 打印样式 */
@@ -269,16 +437,31 @@
                 box-shadow: none;
                 max-width: 100%;
             }
+
+            .floating-export-toolbar {
+                display: none !important;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- 悬浮导出工具栏 -->
+    <div class="floating-export-toolbar">
+        <button onclick="exportAsImage()" id="exportImageBtn">
+            📷 导出图片
+        </button>
+        <button onclick="exportAsPDF()" id="exportPDFBtn">
+            📄 导出PDF
+        </button>
+    </div>
+
     <div class="poster-container" id="posterContent">
         <!-- 头部 -->
         <div class="header">
             <div class="platform-title">小红书渠道</div>
             <div class="sub-title">开户榜</div>
             <div class="date-range" id="dateRange">2026年2月24日 - 2026年3月2日</div>
+            <div class="wave-decoration"></div>
         </div>
 
         <!-- 内容区域 -->
@@ -496,6 +679,125 @@
 
         // 暴露初始化函数供外部调用
         window.initPoster = init;
+
+        // ========== 导出功能 ==========
+
+        // 获取日期字符串
+        function getDateString() {
+            const dateEl = document.getElementById('dateRange');
+            if (dateEl) {
+                return dateEl.textContent.replace(/[年月]/g, '-').replace(/[日\s]/g, '').replace(/-/g, '');
+            }
+            return new Date().toISOString().split('T')[0];
+        }
+
+        // 动态加载 html2canvas
+        async function loadHtml2Canvas() {
+            if (typeof html2canvas !== 'undefined') return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // 动态加载 jspdf
+        async function loadJsPDF() {
+            if (window.jspdf) return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // 导出为图片
+        async function exportAsImage() {
+            const btn = document.getElementById('exportImageBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const link = document.createElement('a');
+                link.download = `小红书渠道开户榜_${getDateString()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+            } catch (error) {
+                console.error('导出图片失败:', error);
+                alert('导出图片失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // 导出为 PDF
+        async function exportAsPDF() {
+            const btn = document.getElementById('exportPDFBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+                await loadJsPDF();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const { jsPDF } = window.jspdf;
+
+                // 计算尺寸（基于 A4 纸张）
+                const imgWidth = 210;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/png');
+
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+                pdf.save(`小红书渠道开户榜_${getDateString()}.pdf`);
+
+            } catch (error) {
+                console.error('导出PDF失败:', error);
+                alert('导出PDF失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
     </script>
 </body>
 </html>

@@ -24,6 +24,108 @@ def get_trend():
     """
     获取趋势数据
     支持日级、周级、月级聚合
+    ---
+    tags:
+      - Trend
+    description: |
+      获取趋势数据，支持日级、周级、月级聚合。
+
+      **支持的粒度**：
+      - daily: 按日期分组，返回格式 YYYY-MM-DD
+      - weekly: 按ISO周分组，返回格式 YYYY-WWW (如 2025-W01)
+      - monthly: 按年月分组，返回格式 YYYY-MM
+
+      **支持的指标**：
+      - cost: 花费
+      - impressions: 曝光量
+      - clicks: 点击量
+      - leads / lead_users: 线索人数
+      - new_accounts / opened_account_users: 开户人数
+      - valid_customer_users: 有效户人数
+
+      **返回格式**：
+      - dates: 周期标签数组
+      - series: 指标数据数组，每个指标一个对象
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["腾讯", "抖音", "小红书"]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["直播", "信息流", "搜索"]
+                  description: 业务模式筛选
+            metrics:
+              type: array
+              items:
+                type: string
+                enum: ["cost", "impressions", "clicks", "leads", "lead_users", "new_accounts", "opened_account_users", "valid_customer_users"]
+              description: 要查询的指标列表
+              default: ["cost", "leads"]
+              example: ["cost", "impressions", "clicks", "leads"]
+            granularity:
+              type: string
+              enum: ["daily", "weekly", "monthly"]
+              description: 聚合粒度
+              default: "daily"
+              example: "daily"
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              properties:
+                dates:
+                  type: array
+                  items:
+                    type: string
+                  example: ["2025-01-01", "2025-01-02", "2025-01-03"]
+                series:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "cost"
+                      data:
+                        type: array
+                        items:
+                          type: number
+                        example: [1000.00, 1200.00, 1500.00]
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 

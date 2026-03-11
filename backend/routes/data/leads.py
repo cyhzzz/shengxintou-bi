@@ -24,14 +24,106 @@ def get_leads_detail():
     """
     获取线索明细数据
     返回backend_conversions表的线索数据，支持分页和多维度筛选
+    ---
+    tags:
+      - Leads
+    description: |
+      获取线索明细数据，返回backend_conversions表的完整线索数据。
 
-    筛选参数:
-    - page: 页码
-    - page_size: 每页数量
-    - start_date: 开始日期 (YYYY-MM-DD)，可选，不传则查询全部
-    - end_date: 结束日期 (YYYY-MM-DD)，可选，不传则查询全部
-    - platforms: 平台列表（逗号分隔），可选
-    - agencies: 代理商列表（逗号分隔），可选
+      **支持筛选**：
+      - page: 页码（默认1）
+      - page_size: 每页数量（默认50）
+      - start_date: 开始日期（可选）
+      - end_date: 结束日期（可选）
+      - platforms: 平台列表（逗号分隔）
+      - agencies: 代理商列表（逗号分隔）
+
+      **返回字段**（40个字段）：
+      - 基本信息: wechat_nickname, capital_account, opening_branch, customer_gender
+      - 平台信息: platform_source, traffic_type, customer_source
+      - 布尔字段: is_customer_mouth, is_valid_lead, is_opened_account等
+      - 时间字段: lead_date, first_contact_time, last_contact_time等
+      - 数值字段: interaction_count, assets, customer_contribution
+      - 人员信息: add_employee_no, add_employee_name
+      - 广告信息: ad_account, agency, ad_id, creative_id
+      - 笔记信息: note_id, note_title
+      - 用户信息: platform_user_id, platform_user_nickname
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: 页码
+      - name: page_size
+        in: query
+        type: integer
+        default: 50
+        description: 每页数量
+      - name: start_date
+        in: query
+        type: string
+        format: date
+        description: 开始日期 (YYYY-MM-DD)
+        example: "2025-01-01"
+      - name: end_date
+        in: query
+        type: string
+        format: date
+        description: 结束日期 (YYYY-MM-DD)
+        example: "2025-01-31"
+      - name: platforms
+        in: query
+        type: string
+        description: 平台列表（逗号分隔）
+        example: "腾讯,抖音"
+      - name: agencies
+        in: query
+        type: string
+        description: 代理商列表（逗号分隔，使用全称）
+        example: "量子,众联"
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  wechat_nickname:
+                    type: string
+                  capital_account:
+                    type: string
+                  platform_source:
+                    type: string
+                  agency:
+                    type: string
+                    description: 代理商全称（已从简称转换）
+                  lead_date:
+                    type: string
+                    format: date
+                  is_opened_account:
+                    type: boolean
+                  assets:
+                    type: number
+                  customer_contribution:
+                    type: number
+            total:
+              type: integer
+              description: 总记录数
+            page:
+              type: integer
+            page_size:
+              type: integer
+            total_pages:
+              type: integer
+      500:
+        description: 服务器错误
     """
     from backend.database import db
     from backend.models import BackendConversions
@@ -240,6 +332,59 @@ def get_leads_detail_filter_options():
     """
     获取线索明细筛选器选项
     返回平台和代理商的简称与全称映射关系
+    ---
+    tags:
+      - Leads
+    description: |
+      获取线索明细报表筛选器的所有选项数据，包括：
+      - platforms: 平台选项列表（value + label）
+      - agencies: 代理商选项列表（value + label），包含特殊选项"申万宏源直投"
+
+      **平台选项示例**：
+      - {"value": "腾讯", "label": "腾讯"}
+      - {"value": "抖音", "label": "抖音"}
+      - {"value": "小红书", "label": "小红书"}
+
+      **代理商选项示例**：
+      - {"value": "lz", "label": "量子"}
+      - {"value": "zl", "label": "众联"}
+      - {"value": "申万宏源直投", "label": "申万宏源直投"}
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              properties:
+                platforms:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: "腾讯"
+                      label:
+                        type: string
+                        example: "腾讯"
+                agencies:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      value:
+                        type: string
+                        example: "lz"
+                      label:
+                        type: string
+                        example: "量子"
+      500:
+        description: 服务器错误
     """
     from backend.database import db
     from backend.models import BackendConversions, AgencyAbbreviationMapping

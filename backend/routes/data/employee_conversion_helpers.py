@@ -18,6 +18,44 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_qualified_employees(min_leads=30):
+    """
+    获取符合条件的员工列表（全量线索数 >= min_leads）
+
+    用途：过滤掉全量线索数过少的员工，避免样本量不足导致转化率失真
+
+    Args:
+        min_leads: 最小线索数阈值，默认为30
+
+    Returns:
+        list: 符合条件的员工姓名列表
+    """
+    try:
+        # 计算每个员工在全量表中的总线索数
+        query = db.session.query(
+            BackendConversions.add_employee_name,
+            func.count(BackendConversions.id).label('total_leads')
+        ).filter(
+            and_(
+                BackendConversions.add_employee_name.isnot(None),
+                BackendConversions.add_employee_name != ''
+            )
+        ).group_by(BackendConversions.add_employee_name)
+
+        results = query.all()
+
+        # 筛选线索数 >= min_leads 的员工
+        qualified = [row.add_employee_name for row in results
+                     if row.total_leads >= min_leads]
+
+        logger.info(f"[Filter] 符合条件的员工: {len(qualified)}/{len(results)} (阈值={min_leads})")
+        return qualified
+
+    except Exception as e:
+        logger.error(f"获取符合条件的员工列表失败: {e}")
+        return []
+
+
 def get_platform_filter(platform):
     """
     获取平台筛选条件
@@ -69,6 +107,14 @@ def get_employee_conversion_ranking(platforms, start_date, end_date, lead_type='
             )
         )
 
+        # 【新增】获取符合条件的员工列表（全量线索数 >= 5）
+        qualified_employees = get_qualified_employees(min_leads=5)
+
+        # 【新增】员工预过滤：只查询符合条件的员工
+        query = query.filter(
+            BackendConversions.add_employee_name.in_(qualified_employees)
+        )
+
         # 平台筛选（支持多选）
         platform_filters = []
         for platform in platforms:
@@ -91,9 +137,12 @@ def get_employee_conversion_ranking(platforms, start_date, end_date, lead_type='
                 )
             )
 
-        # 服务人员筛选
+        # 服务人员筛选（用户指定的员工，也必须是符合条件的员工）
         if employees and len(employees) > 0:
-            query = query.filter(BackendConversions.add_employee_name.in_(employees))
+            # 取交集：用户指定的员工 ∩ 符合条件的员工
+            valid_employees = [emp for emp in employees if emp in qualified_employees]
+            if valid_employees:
+                query = query.filter(BackendConversions.add_employee_name.in_(valid_employees))
 
         # 分组
         query = query.group_by(BackendConversions.add_employee_name, BackendConversions.platform_source)
@@ -272,11 +321,13 @@ def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
     - 开户数 = is_opened_account = 1 的行数
     - 转化率 = 开户数 / 加微数 × 100%
 
+    ⚠️ 已优化：自动过滤全量线索数 < 5 的员工
+
     Args:
         platforms: 平台列表
         start_date: 开始日期
         end_date: 结束日期
-        employees: 服务人员列表（可选，为空则返回TOP5）
+        employees: 服务人员列表（可选，为空则返回所有符合条件的员工）
 
     Returns:
         dict: 员工转化率走势数据，格式与小红书报表一致
@@ -287,10 +338,16 @@ def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
         }
     """
     try:
-        # 如果没有指定员工，获取所有员工
+        # 【新增】获取符合条件的员工列表（全量线索数 >= 5）
+        qualified_employees = get_qualified_employees(min_leads=5)
+
+        # 如果没有指定员工，获取所有符合条件的员工
         if not employees or len(employees) == 0:
             ranking = get_employee_conversion_ranking(platforms, start_date, end_date, 'all', None)
-            employees = [item['employee_name'] for item in ranking]  # 返回所有员工，不再限制为TOP5
+            employees = [item['employee_name'] for item in ranking]
+
+        # 【新增】取交集：确保只处理符合条件的员工
+        employees = [emp for emp in employees if emp in qualified_employees]
 
         if not employees:
             return {'weeks': [], 'employees': [], 'series': []}
@@ -444,23 +501,14 @@ def get_employee_list():
     """
     获取服务人员列表（用于下拉筛选）
 
+    ⚠️ 已优化：只返回全量线索数 >= 5 的员工
+
     Returns:
         list: 服务人员姓名列表（按拼音排序）
     """
     try:
-        results = db.session.query(
-            BackendConversions.add_employee_name
-        ).filter(
-            and_(
-                BackendConversions.add_employee_name.isnot(None),
-                BackendConversions.add_employee_name != ''
-            )
-        ).distinct().all()
-
-        # 过滤空值并排序
-        employees = sorted([row[0] for row in results if row[0] and row[0].strip()])
-        return employees
-
+        qualified = get_qualified_employees(min_leads=5)
+        return sorted(qualified)
     except Exception as e:
         logger.error(f"获取服务人员列表失败: {e}")
         return []

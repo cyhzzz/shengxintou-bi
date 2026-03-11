@@ -18,6 +18,226 @@ from datetime import datetime, date, timedelta
 # 创建Blueprint
 bp = Blueprint('dashboard', __name__)
 
+
+# ============================================================================
+# Swagger 文档定义
+# ============================================================================
+
+# Dashboard Core Metrics API 文档
+DASHBOARD_CORE_METRICS_DOC = """
+获取数据概览核心指标
+---
+tags:
+  - Dashboard
+description: |
+  获取数据概览页面的核心指标数据，包括：
+  - 投入效果：总花费、总曝光、总点击
+  - 业务成果：总线索、新开客户、新有效户
+  - 客户资产：新客户资产、存量客户资产
+  - 效率指标：线索成本、有效户成本
+
+  支持环比数据计算（需提供日期范围）。
+parameters:
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date
+          description: 开始日期 (YYYY-MM-DD)
+          example: "2025-01-01"
+        end_date:
+          type: string
+          format: date
+          description: 结束日期 (YYYY-MM-DD)
+          example: "2025-01-31"
+        platforms:
+          type: array
+          items:
+            type: string
+            enum: ["腾讯", "抖音", "小红书"]
+          description: 平台筛选
+          example: ["腾讯", "抖音"]
+        agencies:
+          type: array
+          items:
+            type: string
+          description: 代理商筛选
+        business_models:
+          type: array
+          items:
+            type: string
+            enum: ["直播", "信息流", "搜索"]
+          description: 业务模式筛选
+responses:
+  200:
+    description: 成功响应
+    schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            core_metrics:
+              type: object
+              properties:
+                new_customers:
+                  type: integer
+                  description: 新开客户数
+                investment:
+                  type: number
+                  description: 总投入（元）
+                new_valid_accounts:
+                  type: integer
+                  description: 新有效户数
+                total_leads:
+                  type: integer
+                  description: 总线索数
+                total_impressions:
+                  type: integer
+                  description: 总曝光数
+                total_clicks:
+                  type: integer
+                  description: 总点击数
+                customer_assets:
+                  type: number
+                  description: 新客户资产
+                customer_contribution:
+                  type: number
+                  description: 客户贡献
+                existing_customers_assets:
+                  type: number
+                  description: 存量客户资产
+                cost_per_valid_account:
+                  type: number
+                  description: 有效户成本
+                cost_per_lead:
+                  type: number
+                  description: 线索成本
+            wow_changes:
+              type: object
+              description: 环比变化数据
+              properties:
+                investment:
+                  type: object
+                  properties:
+                    value:
+                      type: number
+                    trend:
+                      type: string
+                      enum: ["up", "down"]
+                    color:
+                      type: string
+                      enum: ["green", "red"]
+  400:
+    description: 请求参数错误
+    schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+  500:
+    description: 服务器错误
+"""
+
+DASHBOARD_TREND_DATA_DOC = """
+获取趋势数据
+---
+tags:
+  - Dashboard
+description: |
+  获取指定指标的趋势数据，用于绘制趋势图。
+
+  支持的指标类型：
+  - cost_per_lead: 线索成本趋势
+  - cost_per_customer: 开户成本趋势
+  - cost_per_valid_account: 有效户成本趋势
+parameters:
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      required:
+        - start_date
+        - end_date
+      properties:
+        start_date:
+          type: string
+          format: date
+          description: 开始日期 (YYYY-MM-DD)
+          example: "2025-01-01"
+        end_date:
+          type: string
+          format: date
+          description: 结束日期 (YYYY-MM-DD)
+          example: "2025-01-31"
+        platforms:
+          type: array
+          items:
+            type: string
+          description: 平台筛选
+        agencies:
+          type: array
+          items:
+            type: string
+          description: 代理商筛选
+        business_models:
+          type: array
+          items:
+            type: string
+          description: 业务模式筛选
+        metric_type:
+          type: string
+          enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account"]
+          default: "cost_per_lead"
+          description: 指标类型
+responses:
+  200:
+    description: 成功响应
+    schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            trend_data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  value:
+                    type: number
+            summary:
+              type: object
+              properties:
+                cost_per_lead:
+                  type: number
+                cost_per_customer:
+                  type: number
+                cost_per_valid_account:
+                  type: number
+  400:
+    description: 请求参数错误
+  500:
+    description: 服务器错误
+"""
+
 @bp.route('/dashboard/accounts', methods=['POST'])
 def get_dashboard_accounts():
     """
@@ -100,6 +320,61 @@ def get_dashboard_accounts():
 def get_dashboard_core_metrics():
     """
     获取数据概览核心指标
+    ---
+    tags:
+      - Dashboard
+    description: 获取数据概览页面的核心指标数据，包括投入效果、业务成果、客户资产、效率指标等
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            start_date:
+              type: string
+              format: date
+              description: 开始日期
+              example: "2025-01-01"
+            end_date:
+              type: string
+              format: date
+              description: 结束日期
+              example: "2025-01-31"
+            platforms:
+              type: array
+              items:
+                type: string
+              description: 平台筛选
+            agencies:
+              type: array
+              items:
+                type: string
+              description: 代理商筛选
+            business_models:
+              type: array
+              items:
+                type: string
+              description: 业务模式筛选
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            data:
+              type: object
+              properties:
+                core_metrics:
+                  $ref: '#/definitions/CoreMetrics'
+                wow_changes:
+                  type: object
+      400:
+        description: 请求参数错误
+      500:
+        description: 服务器错误
     """
     try:
         data = request.get_json()
@@ -294,6 +569,84 @@ def get_dashboard_core_metrics():
 def get_dashboard_trend_data():
     """
     获取趋势数据
+    ---
+    tags:
+      - Dashboard
+    description: 获取指定指标的趋势数据，支持线索成本、开户成本、有效户成本等指标
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - start_date
+            - end_date
+          properties:
+            start_date:
+              type: string
+              format: date
+              description: 开始日期
+              example: "2025-01-01"
+            end_date:
+              type: string
+              format: date
+              description: 结束日期
+              example: "2025-01-31"
+            platforms:
+              type: array
+              items:
+                type: string
+              description: 平台筛选
+            agencies:
+              type: array
+              items:
+                type: string
+              description: 代理商筛选
+            business_models:
+              type: array
+              items:
+                type: string
+              description: 业务模式筛选
+            metric_type:
+              type: string
+              enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account"]
+              default: "cost_per_lead"
+              description: 指标类型
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            data:
+              type: object
+              properties:
+                trend_data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      value:
+                        type: number
+                summary:
+                  type: object
+                  properties:
+                    cost_per_lead:
+                      type: number
+                    cost_per_customer:
+                      type: number
+                    cost_per_valid_account:
+                      type: number
+      400:
+        description: 请求参数错误
+      500:
+        description: 服务器错误
     """
     try:
         data = request.get_json()

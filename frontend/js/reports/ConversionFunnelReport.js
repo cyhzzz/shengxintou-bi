@@ -495,42 +495,36 @@ class ConversionFunnelReport {
     }
 
     /**
-     * 渲染转化率数据列表（7步）
+     * 渲染转化率数据列表（动态渲染）
      * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
+     * 根据后端返回的漏斗数据动态渲染，支持5层或7层漏斗
      */
     renderConversionRateList() {
         const container = document.getElementById('conversionRateList');
         if (!container) return;
 
-        if (!this.data || !this.data.funnel || this.data.funnel.length < 7) {
+        if (!this.data || !this.data.funnel || this.data.funnel.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px 20px;">暂无数据</p>';
             return;
         }
 
         const funnel = this.data.funnel;
+        const isEmployeeMode = this.data.is_employee_mode;
 
-        // 🎨 品牌蓝色渐变配色
-        const brandColors = [
-            '#00ABEB', '#0099D6', '#0088C2', '#0077AD', '#006699', '#005585', '#00479D'
-        ];
+        // 🎨 品牌蓝色渐变配色（根据漏斗层数动态选择）
+        const brandColors = isEmployeeMode
+            ? ['#0088C2', '#0077AD', '#006699', '#005585', '#00479D']  // 5层配色
+            : ['#00ABEB', '#0099D6', '#0088C2', '#0077AD', '#006699', '#005585', '#00479D'];  // 7层配色
 
-        // 7层漏斗步骤名称
-        const stepNames = [
-            '广告曝光',
-            '客户点击',
-            '客户线索',
-            '客户开口',
-            '有效线索',
-            '成功开户',
-            '有效户'
-        ];
+        // 从后端数据动态获取步骤名称
+        const stepNames = funnel.map(stage => stage.step);
 
         let html = '<div class="conversion-steps">';
 
         funnel.forEach((step, index) => {
             const currentValue = step.value || 0;
             const currentRate = step.rate || 0;
-            const color = brandColors[index];
+            const color = brandColors[index] || brandColors[brandColors.length - 1];
 
             // 计算到下一步的转化率
             let nextStepRate = null;
@@ -602,6 +596,7 @@ class ConversionFunnelReport {
     /**
      * 渲染核心数据指标
      * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
+     * 支持动态渲染5层或7层漏斗的核心指标
      */
     renderCoreMetrics() {
         const container = document.getElementById('coreMetrics');
@@ -613,21 +608,36 @@ class ConversionFunnelReport {
         }
 
         const metrics = this.data.core_metrics;
+        const isEmployeeMode = this.data.is_employee_mode;
 
         // 🎨 品牌蓝色渐变配色
         const brandColors = ['#00ABEB', '#0088C2', '#006699', '#00479D'];
 
-        const metricCards = [
-            { label: '投入金额', value: '¥' + (metrics.cost || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
-            { label: '新增线索', value: (metrics.lead_users || 0).toLocaleString() },
-            { label: '新开客户数', value: (metrics.opened_account_users || 0).toLocaleString() },
-            { label: '新增有效户数', value: (metrics.valid_customer_users || 0).toLocaleString() }
-        ];
+        // 根据模式显示不同的核心指标
+        let metricCards;
+        if (isEmployeeMode) {
+            // 服务人员模式：不显示投入金额
+            metricCards = [
+                { label: '新增线索', value: (metrics.lead_users || 0).toLocaleString() },
+                { label: '新开客户数', value: (metrics.opened_account_users || 0).toLocaleString() },
+                { label: '新增有效户数', value: (metrics.valid_customer_users || 0).toLocaleString() }
+            ];
+        } else {
+            // 广告投放模式：显示投入金额
+            metricCards = [
+                { label: '投入金额', value: '¥' + (metrics.cost || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+                { label: '新增线索', value: (metrics.lead_users || 0).toLocaleString() },
+                { label: '新开客户数', value: (metrics.opened_account_users || 0).toLocaleString() },
+                { label: '新增有效户数', value: (metrics.valid_customer_users || 0).toLocaleString() }
+            ];
+        }
+
+        const gridColumns = isEmployeeMode ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
 
         const html = `
             <div style="
                 display: grid;
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: ${gridColumns};
                 gap: 12px;
             ">
                 ${metricCards.map((metric, index) => `
@@ -651,6 +661,7 @@ class ConversionFunnelReport {
      * 渲染漏斗图
      * 🔧 性能优化: 异步方法，支持延迟加载 ECharts
      * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
+     * 支持动态渲染5层或7层漏斗
      */
     async renderFunnelChart() {
         const chartDom = document.getElementById('funnelChart');
@@ -662,6 +673,7 @@ class ConversionFunnelReport {
         }
 
         const funnelData = this.data.funnel;
+        const isEmployeeMode = this.data.is_employee_mode;
 
         // 🔧 性能优化: 延迟加载 ECharts
         const echarts = await window.loadECharts();
@@ -669,26 +681,13 @@ class ConversionFunnelReport {
         const myChart = echarts.init(chartDom);
         this.charts.funnel = myChart;
 
-        // 🎨 品牌蓝色渐变配色（从浅蓝到深蓝）
-        const brandColors = [
-            '#00ABEB', // 广告曝光 - 浅蓝（品牌标准色）
-            '#0099D6', // 客户点击
-            '#0088C2', // 客户线索
-            '#0077AD', // 客户开口
-            '#006699', // 有效线索
-            '#005585', // 成功开户
-            '#00479D'  // 有效户 - 深蓝（品牌标准色）
-        ];
+        // 🎨 品牌蓝色渐变配色（根据漏斗层数动态选择）
+        const brandColors = isEmployeeMode
+            ? ['#0088C2', '#0077AD', '#006699', '#005585', '#00479D']  // 5层配色
+            : ['#00ABEB', '#0099D6', '#0088C2', '#0077AD', '#006699', '#005585', '#00479D'];  // 7层配色
 
-        const stepNames = [
-            '广告曝光',
-            '客户点击',
-            '客户线索',
-            '客户开口',
-            '有效线索',
-            '成功开户',
-            '有效户'
-        ];
+        // 从后端数据动态获取步骤名称
+        const stepNames = funnelData.map(stage => stage.step);
 
         // 计算最大值用于宽度比例（使用对数缩放处理大数据差异）
         const logValues = funnelData.map(d => d.value > 0 ? Math.log10(d.value + 1) : 0);
@@ -750,7 +749,7 @@ class ConversionFunnelReport {
                             r: [borderRadius, borderRadius, borderRadius, borderRadius]
                         },
                         style: {
-                            fill: brandColors[dataIndex],
+                            fill: brandColors[dataIndex] || brandColors[brandColors.length - 1],
                             stroke: 'transparent' // 无边框
                         },
                         // 添加文本
@@ -782,33 +781,24 @@ class ConversionFunnelReport {
     /**
      * 渲染合并转化率
      * 🎨 品牌VI配色: 浅蓝(#00ABEB) → 深蓝(#00479D) 渐变
+     * 支持动态渲染5层或7层漏斗
      */
     renderCombinedRates() {
         const container = document.getElementById('combinedRates');
         if (!container) return;
 
-        if (!this.data || !this.data.funnel || this.data.funnel.length < 7) {
+        if (!this.data || !this.data.funnel || this.data.funnel.length === 0) {
             container.innerHTML = '';
             return;
         }
 
         const funnel = this.data.funnel;
-
-        // 计算合并转化率
-        const impressions = funnel[0].value || 0;
-        const leadUsers = funnel[2].value || 0; // 客户线索
-        const openedUsers = funnel[5].value || 0; // 成功开户
-        const validUsers = funnel[6].value || 0; // 有效户
-
-        const impressionToLeadRate = impressions > 0 ? (leadUsers / impressions * 100) : 0;
-        const leadToOpenRate = leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0;
-        const openToValidRate = openedUsers > 0 ? (validUsers / openedUsers * 100) : 0;
-        const overallRate = impressions > 0 ? (validUsers / impressions * 100) : 0;
+        const isEmployeeMode = this.data.is_employee_mode;
 
         // 🎨 品牌蓝色渐变配色
         const brandColors = ['#00ABEB', '#0088C2', '#006699', '#00479D'];
 
-        const html = `
+        let html = `
             <div style="
                 padding: 16px;
                 background: var(--bg-hover);
@@ -816,22 +806,65 @@ class ConversionFunnelReport {
             ">
                 <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #00479D; font-weight: 600;">合并转化率</h4>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 13px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: var(--text-secondary);">曝光-线索率:</span>
-                        <span style="color: ${brandColors[0]}; font-weight: 600;">${impressionToLeadRate.toFixed(2)}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: var(--text-secondary);">线索-开户率:</span>
-                        <span style="color: ${brandColors[1]}; font-weight: 600;">${leadToOpenRate.toFixed(2)}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: var(--text-secondary);">开户-有效户率:</span>
-                        <span style="color: ${brandColors[2]}; font-weight: 600;">${openToValidRate.toFixed(2)}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span style="color: var(--text-secondary);">全链路转化率:</span>
-                        <span style="color: ${brandColors[3]}; font-weight: 600;">${overallRate.toFixed(2)}%</span>
-                    </div>
+        `;
+
+        if (isEmployeeMode) {
+            // ===== 服务人员模式（5层漏斗）=====
+            const leadUsers = funnel[0].value || 0;       // 客户线索
+            const openedUsers = funnel[3].value || 0;    // 成功开户
+            const validUsers = funnel[4].value || 0;     // 有效户
+
+            const leadToOpenRate = leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0;
+            const openToValidRate = openedUsers > 0 ? (validUsers / openedUsers * 100) : 0;
+            const overallRate = leadUsers > 0 ? (validUsers / leadUsers * 100) : 0;
+
+            html += `
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">线索-开户率:</span>
+                    <span style="color: ${brandColors[1]}; font-weight: 600;">${leadToOpenRate.toFixed(2)}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">开户-有效户率:</span>
+                    <span style="color: ${brandColors[2]}; font-weight: 600;">${openToValidRate.toFixed(2)}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; grid-column: span 2;">
+                    <span style="color: var(--text-secondary);">全链路转化率:</span>
+                    <span style="color: ${brandColors[3]}; font-weight: 600;">${overallRate.toFixed(2)}%</span>
+                </div>
+            `;
+        } else {
+            // ===== 广告投放模式（7层漏斗）=====
+            const impressions = funnel[0].value || 0;    // 广告曝光
+            const leadUsers = funnel[2].value || 0;     // 客户线索
+            const openedUsers = funnel[5].value || 0;   // 成功开户
+            const validUsers = funnel[6].value || 0;    // 有效户
+
+            const impressionToLeadRate = impressions > 0 ? (leadUsers / impressions * 100) : 0;
+            const leadToOpenRate = leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0;
+            const openToValidRate = openedUsers > 0 ? (validUsers / openedUsers * 100) : 0;
+            const overallRate = impressions > 0 ? (validUsers / impressions * 100) : 0;
+
+            html += `
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">曝光-线索率:</span>
+                    <span style="color: ${brandColors[0]}; font-weight: 600;">${impressionToLeadRate.toFixed(2)}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">线索-开户率:</span>
+                    <span style="color: ${brandColors[1]}; font-weight: 600;">${leadToOpenRate.toFixed(2)}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">开户-有效户率:</span>
+                    <span style="color: ${brandColors[2]}; font-weight: 600;">${openToValidRate.toFixed(2)}%</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">全链路转化率:</span>
+                    <span style="color: ${brandColors[3]}; font-weight: 600;">${overallRate.toFixed(2)}%</span>
+                </div>
+            `;
+        }
+
+        html += `
                 </div>
             </div>
         `;

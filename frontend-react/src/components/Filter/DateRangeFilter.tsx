@@ -3,7 +3,7 @@
  * 支持快速选择和自定义日期范围
  */
 import React, { useState } from 'react';
-import { DatePicker, Space, Button, Dropdown } from 'antd';
+import { DatePicker, Space, Button } from 'antd';
 import { CalendarOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { useFilterStore } from '@/stores';
@@ -54,24 +54,6 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     }
   };
 
-  // 自定义日期下拉菜单
-  const customDateMenu = {
-    items: [
-      {
-        key: 'custom',
-        label: (
-          <div className={styles.customDatePanel}>
-            <RangePicker
-              value={[dayjs(dateRange.startDate), dayjs(dateRange.endDate)]}
-              onChange={handleDateChange}
-              allowClear={false}
-            />
-          </div>
-        ),
-      },
-    ],
-  };
-
   return (
     <div className={styles.dateRangeFilter}>
       {showQuickSelect && (
@@ -79,7 +61,6 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
           {quickOptions.map((option) => (
             <Button
               key={option.days}
-              size="small"
               type={activeQuick === option.days ? 'primary' : 'default'}
               onClick={() => handleQuickSelect(option.days)}
             >
@@ -89,11 +70,13 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
         </Space>
       )}
 
-      <Dropdown menu={customDateMenu} trigger={['click']} placement="bottomRight">
-        <Button size="small" icon={<CalendarOutlined />}>
-          {dateRange.startDate} ~ {dateRange.endDate}
-        </Button>
-      </Dropdown>
+      <RangePicker
+        value={[dayjs(dateRange.startDate), dayjs(dateRange.endDate)]}
+        onChange={handleDateChange}
+        allowClear={false}
+        style={{ width: 280 }}
+        suffixIcon={<CalendarOutlined />}
+      />
     </div>
   );
 };

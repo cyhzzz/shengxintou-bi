@@ -38,6 +38,12 @@ interface FilterState {
   toggleBusinessModel: (model: string) => void;
   clearBusinessModels: () => void;
 
+  // 服务人员筛选 (多选)
+  selectedEmployees: string[];
+  setEmployees: (employees: string[]) => void;
+  toggleEmployee: (employee: string) => void;
+  clearEmployees: () => void;
+
   // 重置所有筛选条件
   resetAll: () => void;
 }
@@ -105,6 +111,20 @@ export const useFilterStore = create<FilterState>()(
         }),
       clearBusinessModels: () => set({ selectedBusinessModels: [] }),
 
+      // 服务人员筛选
+      selectedEmployees: [],
+      setEmployees: (employees) => set({ selectedEmployees: employees }),
+      toggleEmployee: (employee) =>
+        set((state) => {
+          const isSelected = state.selectedEmployees.includes(employee);
+          return {
+            selectedEmployees: isSelected
+              ? state.selectedEmployees.filter((e) => e !== employee)
+              : [...state.selectedEmployees, employee],
+          };
+        }),
+      clearEmployees: () => set({ selectedEmployees: [] }),
+
       // 重置所有
       resetAll: () =>
         set({
@@ -112,6 +132,7 @@ export const useFilterStore = create<FilterState>()(
           selectedPlatforms: [],
           selectedAgencies: [],
           selectedBusinessModels: [],
+          selectedEmployees: [],
         }),
     }),
     {
@@ -121,6 +142,7 @@ export const useFilterStore = create<FilterState>()(
         selectedPlatforms: state.selectedPlatforms,
         selectedAgencies: state.selectedAgencies,
         selectedBusinessModels: state.selectedBusinessModels,
+        selectedEmployees: state.selectedEmployees,
       }),
     }
   )

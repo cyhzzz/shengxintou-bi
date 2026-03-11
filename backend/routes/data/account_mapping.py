@@ -23,6 +23,58 @@ bp = Blueprint('account_mapping', __name__)
 def get_account_mapping():
     """
     获取账号代理商映射数据
+    ---
+    tags:
+      - Account Mapping
+    summary: 获取所有账号代理商映射
+    description: 获取系统中所有账号与代理商、业务模式的映射关系，按平台和代理商排序
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                    description: 平台名称
+                    enum: [腾讯, 抖音, 小红书]
+                    example: "腾讯"
+                  account_id:
+                    type: string
+                    description: 投放账号ID（腾讯/抖音账号ID，小红书代理商子账户ID）
+                    example: "50252079"
+                  account_name:
+                    type: string
+                    description: 账号名称
+                    example: "测试账号"
+                  main_account_id:
+                    type: string
+                    description: 主账号ID（小红书广告主账户ID）
+                    example: "66b0686c000000001d020d1f"
+                  sub_account_name:
+                    type: string
+                    description: 子账户名称（小红书）
+                  agency:
+                    type: string
+                    description: 代理商名称
+                    example: "量子"
+                  business_model:
+                    type: string
+                    description: 业务模式
+                    enum: [直播, 信息流, 搜索]
+                    example: "信息流"
+            total:
+              type: integer
+              description: 映射记录总数
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -63,7 +115,50 @@ def get_account_mapping():
 @bp.route('/account-agency-mapping', methods=['GET'])
 def get_account_agency_mapping():
     """
-    获取账号代理商映射数据（别名路由，与前端API调用保持一致）
+    获取账号代理商映射数据（别名路由）
+    ---
+    tags:
+      - Account Mapping
+    summary: 获取账号代理商映射（别名）
+    description: 与 /account-mapping 功能相同，提供兼容性路由
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                    description: 平台名称
+                    example: "腾讯"
+                  account_id:
+                    type: string
+                    description: 投放账号ID
+                    example: "50252079"
+                  account_name:
+                    type: string
+                    description: 账号名称
+                    example: "测试账号"
+                  agency:
+                    type: string
+                    description: 代理商名称
+                    example: "量子"
+                  business_model:
+                    type: string
+                    description: 业务模式
+                    example: "信息流"
+            total:
+              type: integer
+              description: 映射记录总数
+      500:
+        description: 服务器错误
     """
     return get_account_mapping()
 
@@ -72,16 +167,91 @@ def get_account_agency_mapping():
 @bp.route('/account-mapping', methods=['POST'])
 def create_account_mapping():
     """
-    创建新的账号代理商映射（v2.2 - 支持小红书字段）
-    请求体: {
-        "platform": "腾讯/抖音/小红书",
-        "account_id": "123456",  // 腾讯/抖音必填，小红书可选（直投时为null）
-        "account_name": "测试账号",
-        "main_account_id": "66b0686c000000001d020d1f",  // 小红书必填
-        "sub_account_name": "代理商子账户名称",  // 小红书可选
-        "agency": "众联",
-        "business_model": "信息流"
-    }
+    创建新的账号代理商映射
+    ---
+    tags:
+      - Account Mapping
+    summary: 创建账号映射
+    description: |
+      创建新的账号代理商映射关系。
+      - 腾讯/抖音：account_id 必填
+      - 小红书：main_account_id 必填，account_id 可选（直投时为空）
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - platform
+            - agency
+          properties:
+            platform:
+              type: string
+              description: 平台名称
+              enum: [腾讯, 抖音, 小红书]
+              example: "腾讯"
+            account_id:
+              type: string
+              description: 投放账号ID（腾讯/抖音必填，小红书可选）
+              example: "50252079"
+            account_name:
+              type: string
+              description: 账号名称
+              example: "测试账号"
+            main_account_id:
+              type: string
+              description: 主账号ID（小红书必填）
+              example: "66b0686c000000001d020d1f"
+            sub_account_name:
+              type: string
+              description: 子账户名称（小红书可选）
+              example: "代理商子账户"
+            agency:
+              type: string
+              description: 代理商名称
+              example: "量子"
+            business_model:
+              type: string
+              description: 业务模式
+              enum: [直播, 信息流, 搜索]
+              example: "信息流"
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 创建成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "创建成功"
+            data:
+              type: object
+              properties:
+                platform:
+                  type: string
+                  example: "腾讯"
+                account_id:
+                  type: string
+                  example: "50252079"
+                account_name:
+                  type: string
+                  example: "测试账号"
+                agency:
+                  type: string
+                  example: "量子"
+                business_model:
+                  type: string
+                  example: "信息流"
+      400:
+        description: 请求参数错误或映射已存在
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -166,14 +336,98 @@ def create_account_mapping():
 @bp.route('/account-mapping/<string:platform>/<string:account_id>', methods=['PUT'])
 def update_account_mapping(platform, account_id):
     """
-    更新账号代理商映射（v2.2 - 支持小红书字段）
-    请求体: {
-        "account_name": "新账号名称",
-        "agency": "新代理商",
-        "business_model": "直播",
-        "main_account_id": "66b0686c000000001d020d1f",  // 小红书字段
-        "sub_account_name": "代理商子账户名称"  // 小红书字段
-    }
+    更新账号代理商映射
+    ---
+    tags:
+      - Account Mapping
+    summary: 更新账号映射
+    description: |
+      更新指定平台和账号ID的映射关系。
+      支持更新账号名称、代理商、业务模式等字段。
+      小红书直投账号（account_id为空）需通过main_account_id查找。
+    parameters:
+      - name: platform
+        in: path
+        type: string
+        required: true
+        description: 平台名称
+        enum: [腾讯, 抖音, 小红书]
+      - name: account_id
+        in: path
+        type: string
+        required: true
+        description: 投放账号ID（小红书直投可传null或空值）
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            account_name:
+              type: string
+              description: 新账号名称
+              example: "新账号名称"
+            agency:
+              type: string
+              description: 新代理商
+              example: "新代理商"
+            business_model:
+              type: string
+              description: 新业务模式
+              enum: [直播, 信息流, 搜索]
+              example: "直播"
+            main_account_id:
+              type: string
+              description: 主账号ID（用于小红书直投账号查找）
+              example: "66b0686c000000001d020d1f"
+            sub_account_name:
+              type: string
+              description: 子账户名称
+              example: "新子账户名称"
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 更新成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "更新成功"
+            data:
+              type: object
+              properties:
+                platform:
+                  type: string
+                  example: "腾讯"
+                account_id:
+                  type: string
+                  example: "50252079"
+                account_name:
+                  type: string
+                  example: "新账号名称"
+                main_account_id:
+                  type: string
+                  example: null
+                sub_account_name:
+                  type: string
+                  example: null
+                agency:
+                  type: string
+                  example: "新代理商"
+                business_model:
+                  type: string
+                  example: "直播"
+      400:
+        description: 请求参数错误
+      404:
+        description: 映射不存在
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -246,6 +500,41 @@ def update_account_mapping(platform, account_id):
 def delete_account_mapping(platform, account_id):
     """
     删除账号代理商映射
+    ---
+    tags:
+      - Account Mapping
+    summary: 删除账号映射
+    description: 删除指定平台和账号ID的映射关系
+    parameters:
+      - name: platform
+        in: path
+        type: string
+        required: true
+        description: 平台名称
+        enum: [腾讯, 抖音, 小红书]
+      - name: account_id
+        in: path
+        type: string
+        required: true
+        description: 投放账号ID
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 删除成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "删除成功"
+      404:
+        description: 映射不存在
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -280,7 +569,44 @@ def delete_account_mapping(platform, account_id):
 @bp.route('/account-mapping/<string:platform>/main/<string:main_account_id>', methods=['DELETE'])
 def delete_account_mapping_by_main(platform, main_account_id):
     """
-    通过主账号ID删除账号代理商映射（用于小红书直投账号）
+    通过主账号ID删除账号代理商映射
+    ---
+    tags:
+      - Account Mapping
+    summary: 通过主账号ID删除映射
+    description: |
+      通过主账号ID删除账号代理商映射，主要用于小红书直投账号（account_id为空）。
+      小红书直投账号没有子账户ID，只能通过主账号ID（广告主账户ID）来定位和删除。
+    parameters:
+      - name: platform
+        in: path
+        type: string
+        required: true
+        description: 平台名称
+        enum: [腾讯, 抖音, 小红书]
+      - name: main_account_id
+        in: path
+        type: string
+        required: true
+        description: 主账号ID（广告主账户ID）
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 删除成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "删除成功"
+      404:
+        description: 映射不存在
+      500:
+        description: 服务器错误
     """
     from backend.database import db
     from sqlalchemy import or_

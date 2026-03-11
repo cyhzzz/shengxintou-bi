@@ -1,71 +1,84 @@
 import { useState } from 'react';
 import { Layout, Menu } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Icon, ICONS, HelpModal } from '@/components';
+import {
+  DashboardOutlined,
+  FunnelPlotOutlined,
+  UnorderedListOutlined,
+  BarChartOutlined,
+  BookOutlined,
+  FileTextOutlined,
+  LineChartOutlined,
+  TeamOutlined,
+  UserSwitchOutlined,
+  FileAddOutlined,
+  SettingOutlined,
+  UploadOutlined,
+  UserOutlined,
+  TagOutlined,
+  SyncOutlined,
+  FilePdfOutlined,
+} from '@ant-design/icons';
+import { HelpModal } from '@/components';
 import type { MenuProps } from 'antd';
 import styles from './MainLayout.module.scss';
 
 const { Sider, Header, Content } = Layout;
 
-// Custom icon component for menu items
-const MenuIcon = ({ name }: { name: string }) => (
-  <Icon name={name} style={{ width: 18, height: 18 }} />
-);
-
 const menuItems: MenuProps['items'] = [
   {
     key: '/dashboard',
-    icon: <MenuIcon name={ICONS.数据概览} />,
+    icon: <DashboardOutlined />,
     label: '数据概览',
   },
   {
     key: '/conversion-funnel',
-    icon: <MenuIcon name={ICONS.转化漏斗} />,
+    icon: <FunnelPlotOutlined />,
     label: '转化漏斗',
   },
   {
     key: '/leads-detail',
-    icon: <MenuIcon name={ICONS.线索明细} />,
+    icon: <UnorderedListOutlined />,
     label: '线索明细',
   },
   {
     key: '/agency-analysis',
-    icon: <MenuIcon name={ICONS.厂商分析} />,
+    icon: <BarChartOutlined />,
     label: '厂商分析',
   },
   {
     key: 'xhs-notes',
-    icon: <MenuIcon name={ICONS.小红书报表} />,
+    icon: <BookOutlined />,
     label: '小红书',
     children: [
-      { key: '/xhs-notes/list', label: '笔记列表', icon: <MenuIcon name={ICONS.笔记列表} /> },
-      { key: '/xhs-notes/operation', label: '运营分析', icon: <MenuIcon name={ICONS.运营分析} /> },
+      { key: '/xhs-notes/list', label: '笔记列表', icon: <FileTextOutlined /> },
+      { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
     ],
   },
   {
     key: 'employee-conversion',
-    icon: <MenuIcon name={ICONS.员工转化报表} />,
+    icon: <TeamOutlined />,
     label: '员工转化',
     children: [
-      { key: '/employee-conversion/analysis', label: '转化分析', icon: <MenuIcon name={ICONS.转化效果分析} /> },
-      { key: '/employee-conversion/weekly', label: '转化周报', icon: <MenuIcon name={ICONS.转化周报生成} /> },
+      { key: '/employee-conversion/analysis', label: '转化分析', icon: <UserSwitchOutlined /> },
+      { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
     ],
   },
   { type: 'divider' },
   {
     key: 'system',
-    icon: <MenuIcon name={ICONS.系统配置} />,
+    icon: <SettingOutlined />,
     label: '系统配置',
     children: [
-      { key: '/system/data-import', icon: <MenuIcon name={ICONS.数据导入} />, label: '数据导入' },
-      { key: '/system/account-management', icon: <MenuIcon name={ICONS.账号管理} />, label: '账号管理' },
-      { key: '/system/abbreviation-management', icon: <MenuIcon name={ICONS.简称管理} />, label: '简称管理' },
-      { key: '/system/database-backup', icon: <MenuIcon name={ICONS.数据同步} />, label: '数据同步' },
+      { key: '/system/data-import', icon: <UploadOutlined />, label: '数据导入' },
+      { key: '/system/account-management', icon: <UserOutlined />, label: '账号管理' },
+      { key: '/system/abbreviation-management', icon: <TagOutlined />, label: '简称管理' },
+      { key: '/system/database-backup', icon: <SyncOutlined />, label: '数据同步' },
     ],
   },
   {
     key: '/report-generation',
-    icon: <MenuIcon name={ICONS.报告生成} />,
+    icon: <FilePdfOutlined />,
     label: '报告生成',
   },
 ];

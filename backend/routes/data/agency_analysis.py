@@ -23,7 +23,114 @@ bp = Blueprint('agency_analysis', __name__)
 def get_agency_analysis():
     """
     代理商投放分析
-    返回平台×业务模式×代理商的多维度数据
+    获取平台×业务模式×代理商的多维度投放数据分析
+    ---
+    tags:
+      - Agency Analysis
+    description: |
+      获取平台×业务模式×代理商的多维度投放数据分析。
+
+      **返回数据包括**：
+      - summary: 汇总数据（平台×业务模式×代理商明细 + 平台小计 + 全部合计）
+      - trend: 日级趋势数据
+
+      **计算指标**：
+      - lead_cost: 单线索成本 = 花费 / 线索人数
+      - account_cost: 单开户成本 = 花费 / 开户人数
+
+      **支持筛选**：
+      - date_range: 日期范围
+      - platforms: 平台筛选
+      - agencies: 代理商筛选
+      - business_models: 业务模式筛选
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["腾讯", "抖音", "小红书"]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                  example: ["量子", "众联"]
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["直播", "信息流", "搜索"]
+                  description: 业务模式筛选
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            summary:
+              type: array
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                  business_model:
+                    type: string
+                  agency:
+                    type: string
+                  is_subtotal:
+                    type: boolean
+                  is_total:
+                    type: boolean
+                  metrics:
+                    type: object
+                    properties:
+                      cost:
+                        type: number
+                      impressions:
+                        type: integer
+                      clicks:
+                        type: integer
+                      lead_users:
+                        type: integer
+                      opened_account_users:
+                        type: integer
+                      valid_customer_users:
+                        type: integer
+                      lead_cost:
+                        type: number
+                      account_cost:
+                        type: number
+            trend:
+              type: object
+              properties:
+                dates:
+                  type: array
+                  items:
+                    type: string
+                series:
+                  type: array
+                  items:
+                    type: object
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 

@@ -2,8 +2,21 @@
   padding: 0;
 }
 
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 16px 0 8px 0;
+  padding-left: 8px;
+  border-left: 3px solid #1890ff;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
 .metricsRow {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .metricCard {
@@ -18,6 +31,11 @@
       font-weight: 600;
     }
   }
+}
+
+.wowChange {
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .chartsRow {

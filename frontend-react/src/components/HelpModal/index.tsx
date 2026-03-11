@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import { dataService } from '@/services';
 import styles from './index.module.scss';
 
@@ -45,7 +46,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
         className={`${styles.helpBtn} ${className || ''}`}
         type="text"
         onClick={() => setVisible(true)}
-        icon={<img src="/icons/帮助.svg" alt="帮助" style={{ width: 20, height: 20 }} />}
+        icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />}
       />
       <Modal
         title="关于省心投平台"

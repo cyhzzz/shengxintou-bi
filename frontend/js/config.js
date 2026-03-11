@@ -40,8 +40,8 @@ const REPORTS = {
     },
     'xhs-notes': {
         id: 'xhs-notes',
-        name: '小红书报表',
-        title: '小红书报表',
+        name: '小红书',
+        title: '小红书',
         icon: 'icon-document',
         hasSubmenu: true
     },
@@ -83,22 +83,22 @@ const REPORTS = {
     },
     'employee-conversion': {
         id: 'employee-conversion',
-        name: '员工转化报表',
-        title: '员工转化报表',
+        name: '员工转化',
+        title: '员工转化',
         icon: 'icon-user',
         hasSubmenu: true
     },
     'employee-conversion-analysis': {
         id: 'employee-conversion-analysis',
-        name: '转化效果分析',
-        title: '转化效果分析',
+        name: '转化分析',
+        title: '转化分析',
         icon: 'icon-chart',
         parent: 'employee-conversion'
     },
     'employee-conversion-weekly': {
         id: 'employee-conversion-weekly',
-        name: '转化周报生成',
-        title: '转化周报生成',
+        name: '转化周报',
+        title: '转化周报',
         icon: 'icon-report',
         parent: 'employee-conversion'
     },

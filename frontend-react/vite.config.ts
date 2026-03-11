@@ -19,4 +19,46 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Output directory
+    outDir: 'dist',
+    // Static assets directory
+    assetsDir: 'assets',
+    // Generate source maps for debugging
+    sourcemap: false,
+    // Minify output
+    minify: 'esbuild',
+    // Target modern browsers
+    target: 'esnext',
+    // Chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Rollup options
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for better caching
+        manualChunks: {
+          // React core
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Ant Design
+          'antd-vendor': ['antd', '@ant-design/icons', '@ant-design/charts'],
+          // State management
+          'state-vendor': ['zustand'],
+          // Utilities
+          'utils-vendor': ['dayjs'],
+        },
+        // Asset file naming
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+      },
+    },
+    // CSS code splitting
+    cssCodeSplit: true,
+    // Enable CSS minification
+    cssMinify: true,
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'antd', 'zustand', 'dayjs'],
+  },
 })
