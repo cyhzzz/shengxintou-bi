@@ -9,6 +9,33 @@
   z-index: 10;
 }
 
+// Sidebar header with logo - matching original frontend
+.sidebarHeader {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logoIcon {
+  height: 23px;
+  width: auto;
+}
+
+.logoTextIcon {
+  height: 20px;
+  width: auto;
+}
+
+// Legacy logo class (for backwards compatibility)
 .logo {
   height: 48px;
   display: flex;
@@ -52,6 +79,26 @@
 
 .current {
   color: #333;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.helpBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
 }
 
 .content {

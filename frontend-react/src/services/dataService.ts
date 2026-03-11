@@ -70,4 +70,14 @@ export const dataService = {
   getEmployeeConversionAnalysis: async (filters?: FilterParams): Promise<ApiResponse<unknown>> => {
     return http.post('/employee-conversion-analysis', { filters });
   },
+
+  // 获取版本信息
+  getVersion: async (): Promise<ApiResponse<{
+    version: string;
+    release_date: string;
+    changelog?: string[];
+    support_contact?: string;
+  }>> => {
+    return http.get('/version/local');
+  },
 };

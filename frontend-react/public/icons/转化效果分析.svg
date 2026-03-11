@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 分析面板背景 -->
+    <rect x="3" y="3" width="14" height="14" rx="2" fill="#D2DAE8" opacity="0.5"/>
+
+    <!-- 坐标轴 -->
+    <line x1="5" y1="15" x2="15" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+    <line x1="5" y1="5" x2="5" y2="15" stroke="#55698F" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- 转化漏斗条形图 -->
+    <rect x="6" y="6" width="8" height="2" rx="0.5" fill="#A3ADC4"/>
+    <rect x="7" y="9" width="6" height="2" rx="0.5" fill="#55698F" opacity="0.7"/>
+    <rect x="8" y="12" width="4" height="2" rx="0.5" fill="#55698F"/>
+
+    <!-- 分析标记 - 放大镜效果 -->
+    <circle cx="14" cy="6" r="2" fill="#D2DAE8" opacity="0.8"/>
+    <circle cx="14" cy="6" r="1" stroke="#55698F" stroke-width="0.8" fill="none"/>
+    <line x1="14.7" y1="6.7" x2="16" y2="8" stroke="#55698F" stroke-width="0.8" stroke-linecap="round"/>
+
+    <!-- 转化率指示箭头 -->
+    <path d="M15,13 L15,10 L14,11 L15,10 L16,11" stroke="#55698F" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>
