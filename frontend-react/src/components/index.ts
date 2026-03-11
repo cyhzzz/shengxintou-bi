@@ -3,6 +3,12 @@
  * 集中导出所有可复用组件
  */
 
+// 图标组件
+export * from './Icon';
+
+// 帮助模态框
+export { HelpModal } from './HelpModal';
+
 // 筛选器组件
 export * from './Filter';
 
