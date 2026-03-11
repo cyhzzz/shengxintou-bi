@@ -1,0 +1,25 @@
+.dashboardPage {
+  padding: 0;
+}
+
+.metricsRow {
+  margin-bottom: 16px;
+}
+
+.metricCard {
+  :global {
+    .ant-statistic-title {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .ant-statistic-content {
+      font-size: 24px;
+      font-weight: 600;
+    }
+  }
+}
+
+.chartsRow {
+  margin-top: 16px;
+}

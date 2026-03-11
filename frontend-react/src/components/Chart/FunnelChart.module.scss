@@ -1,0 +1,23 @@
+.funnelChart {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0;
+}
+
+.funnelStage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stageLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.conversionRate {
+  font-size: 12px;
+}

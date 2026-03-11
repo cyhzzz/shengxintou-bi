@@ -1,0 +1,36 @@
+.chartCard {
+  :global {
+    .ant-card-head {
+      min-height: 48px;
+      padding: 0 16px;
+    }
+
+    .ant-card-head-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .ant-card-body {
+      padding: 16px;
+    }
+  }
+}
+
+.chartContainer {
+  width: 100%;
+  position: relative;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
