@@ -24,6 +24,172 @@ def get_external_data_analysis():
     """
     外部数据分析
     提供高级分析和对比洞察
+    ---
+    tags:
+      - External Analysis
+    description: |
+      获取高级分析和对比洞察数据，包括：
+      - platform_comparison: 平台对比分析
+      - agency_ranking: 代理商排名（按综合评分排序）
+      - business_model_analysis: 业务模式分析
+      - roi_analysis: ROI分析（投资回报率）
+      - trend_insights: 趋势洞察和建议
+      - performance_matrix: 平台×代理商性能矩阵
+
+      **计算指标**：
+      - ctr: 点击率 = 点击量 / 曝光量 * 100
+      - lead_rate: 线索率 = 线索量 / 点击量 * 100
+      - account_rate: 开户率 = 开户量 / 线索量 * 100
+      - cost_per_lead: 单线索成本 = 花费 / 线索量
+      - cost_per_account: 单开户成本 = 花费 / 开户量
+      - roi: 投资回报率 = (开户量 * 10000 - 花费) / 花费 * 100
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["腾讯", "抖音", "小红书"]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                  example: ["量子", "众联"]
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["直播", "信息流", "搜索"]
+                  description: 业务模式筛选
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            platform_comparison:
+              type: array
+              description: 平台对比分析
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                  metrics:
+                    type: object
+                    properties:
+                      cost:
+                        type: number
+                      impressions:
+                        type: integer
+                      clicks:
+                        type: integer
+                      leads:
+                        type: integer
+                      new_accounts:
+                        type: integer
+                      ctr:
+                        type: number
+                      lead_rate:
+                        type: number
+                      account_rate:
+                        type: number
+                      cost_per_lead:
+                        type: number
+                      cost_per_account:
+                        type: number
+            agency_ranking:
+              type: array
+              description: 代理商排名（按score降序）
+              items:
+                type: object
+                properties:
+                  agency:
+                    type: string
+                  metrics:
+                    type: object
+                  score:
+                    type: number
+                    description: 综合评分
+            business_model_analysis:
+              type: array
+              description: 业务模式分析
+              items:
+                type: object
+                properties:
+                  business_model:
+                    type: string
+                  metrics:
+                    type: object
+            roi_analysis:
+              type: object
+              description: ROI分析
+              properties:
+                total_investment:
+                  type: number
+                total_returns:
+                  type: number
+                roi:
+                  type: number
+                break_even_accounts:
+                  type: number
+                current_accounts:
+                  type: integer
+                profit_loss:
+                  type: number
+                metrics:
+                  type: object
+            trend_insights:
+              type: object
+              description: 趋势洞察
+              properties:
+                dates:
+                  type: array
+                  items:
+                    type: string
+                cost_trend:
+                  type: number
+                ctr_trend:
+                  type: number
+                insights:
+                  type: array
+                  items:
+                    type: string
+                recommendations:
+                  type: array
+                  items:
+                    type: string
+            performance_matrix:
+              type: array
+              description: 平台×代理商性能矩阵
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                  agency:
+                    type: string
+                  metrics:
+                    type: object
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 

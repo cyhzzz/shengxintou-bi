@@ -22,11 +22,84 @@ bp = Blueprint('abbreviation_mapping', __name__)
 @bp.route('/abbreviation-mapping', methods=['GET'])
 def get_abbreviation_mapping():
     """
-    获取所有代理商简称映射
-    
-    查询参数:
-    - mapping_type: 映射类型 (agency/platform)
-    - is_active: 是否启用 (true/false)
+    获取所有简称映射
+    ---
+    tags:
+      - Abbreviation Mapping
+    summary: 获取简称映射列表
+    description: 获取系统中所有的简称映射数据，支持按类型和状态筛选
+    parameters:
+      - name: mapping_type
+        in: query
+        type: string
+        required: false
+        description: 映射类型筛选
+        enum: [agency, platform]
+      - name: is_active
+        in: query
+        type: boolean
+        required: false
+        description: 是否启用筛选
+        example: true
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    description: 映射ID
+                    example: 1
+                  abbreviation:
+                    type: string
+                    description: 简称
+                    example: "lz"
+                  full_name:
+                    type: string
+                    description: 全称
+                    example: "量子"
+                  mapping_type:
+                    type: string
+                    description: 映射类型
+                    enum: [agency, platform]
+                    example: "agency"
+                  platform:
+                    type: string
+                    description: 适用平台（null表示通用）
+                    example: null
+                  display_name:
+                    type: string
+                    description: 显示名称
+                    example: "量子"
+                  description:
+                    type: string
+                    description: 说明备注
+                    example: "代理商简称"
+                  is_active:
+                    type: boolean
+                    description: 是否启用
+                    example: true
+                  created_at:
+                    type: string
+                    format: date-time
+                    description: 创建时间
+                  updated_at:
+                    type: string
+                    format: date-time
+                    description: 更新时间
+      500:
+        description: 服务器错误
     """
     try:
         query = AgencyAbbreviationMapping.query
@@ -80,18 +153,76 @@ def get_abbreviation_mapping():
 @bp.route('/abbreviation-mapping', methods=['POST'])
 def create_abbreviation_mapping():
     """
-    创建新的代理商简称映射
-    
-    请求体:
-    {
-        "abbreviation": "lz",
-        "full_name": "量子",
-        "mapping_type": "agency",
-        "platform": null,
-        "display_name": "量子",
-        "description": "代理商简称",
-        "is_active": true
-    }
+    创建新的简称映射
+    ---
+    tags:
+      - Abbreviation Mapping
+    summary: 创建简称映射
+    description: 创建新的简称到全称的映射关系，用于代理商简称和平台简称的转换
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - abbreviation
+            - full_name
+            - mapping_type
+          properties:
+            abbreviation:
+              type: string
+              description: 简称
+              example: "lz"
+            full_name:
+              type: string
+              description: 全称
+              example: "量子"
+            mapping_type:
+              type: string
+              description: 映射类型
+              enum: [agency, platform]
+              example: "agency"
+            platform:
+              type: string
+              description: 适用平台（null表示通用）
+              example: null
+            display_name:
+              type: string
+              description: 显示名称
+              example: "量子"
+            description:
+              type: string
+              description: 说明备注
+              example: "代理商简称"
+            is_active:
+              type: boolean
+              description: 是否启用
+              example: true
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 创建成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "创建成功"
+            data:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+      400:
+        description: 请求参数错误或简称已存在
+      500:
+        description: 服务器错误
     """
     try:
         data = request.get_json()

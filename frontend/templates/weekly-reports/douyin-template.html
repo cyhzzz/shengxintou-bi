@@ -4,7 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>抖音渠道开户榜</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Orbitron:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #0a0a0f;
+            --primary-light: #1a1a2e;
+            --accent-cyan: #00f5ff;
+            --accent-magenta: #ff00ff;
+            --accent-pink: #ff2d75;
+            --accent-purple: #9d4edd;
+            --neon-glow: rgba(0, 245, 255, 0.6);
+            --pink-glow: rgba(255, 45, 117, 0.5);
+            --success: #00ff88;
+            --text-dark: #1a1a2e;
+            --text-medium: #4a4a6a;
+            --text-light: #8888aa;
+            --bg-card: #ffffff;
+            --bg-subtle: #f8f8fc;
+
+            --gold: linear-gradient(135deg, #ffd700 0%, #ffaa00 50%, #ff8800 100%);
+            --silver: linear-gradient(135deg, #e0e0e0 0%, #a0a0a0 50%, #707070 100%);
+            --bronze: linear-gradient(135deg, #ff7b00 0%, #ff5500 50%, #cc3300 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,103 +36,240 @@
         }
 
         body {
-            font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated neon grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Neon glow orbs */
+        .neon-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        .neon-orb-1 {
+            top: 5%;
+            left: 10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--accent-cyan), transparent 70%);
+            opacity: 0.15;
+        }
+
+        .neon-orb-2 {
+            top: 50%;
+            right: 5%;
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle, var(--accent-pink), transparent 70%);
+            opacity: 0.12;
+            animation-delay: -3s;
+        }
+
+        .neon-orb-3 {
+            bottom: 10%;
+            left: 20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, var(--accent-purple), transparent 70%);
+            opacity: 0.1;
+            animation-delay: -5s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.15; }
+            50% { transform: scale(1.2); opacity: 0.25; }
         }
 
         .poster-container {
             max-width: 800px;
             margin: 0 auto;
-            background: linear-gradient(180deg, #fafbfc 0%, #ffffff 100%);
-            border-radius: 20px;
+            background: var(--bg-card);
+            border-radius: 24px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.5),
+                0 0 60px var(--neon-glow),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 1;
         }
 
-        /* 头部样式 */
+        /* Header with neon effect */
         .header {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #e94560 100%);
-            padding: 30px 20px;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 40%, #2d1f3d 70%, #3d1f4d 100%);
+            padding: 45px 30px;
             text-align: center;
             position: relative;
+            overflow: hidden;
         }
 
-        .header::before,
-        .header::after {
-            content: '🏆';
-            position: absolute;
-            font-size: 40px;
-            top: 20px;
-        }
-
+        /* Diagonal neon stripes */
         .header::before {
-            left: 30px;
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            right: -100%;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 20px,
+                rgba(0, 245, 255, 0.03) 20px,
+                rgba(0, 245, 255, 0.03) 21px
+            );
+            animation: stripes 30s linear infinite;
         }
 
+        @keyframes stripes {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(60px); }
+        }
+
+        /* Bottom neon line */
         .header::after {
-            right: 30px;
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink), var(--accent-purple), var(--accent-cyan));
+            background-size: 300% 100%;
+            animation: gradient-flow 5s linear infinite;
+            box-shadow: 0 0 30px var(--neon-glow), 0 0 60px var(--pink-glow);
+        }
+
+        @keyframes gradient-flow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 300% 50%; }
         }
 
         .platform-title {
-            font-size: 42px;
+            font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+            font-size: 52px;
             font-weight: 800;
             color: #ffffff;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-            margin-bottom: 8px;
-            letter-spacing: 4px;
+            text-shadow:
+                0 0 10px var(--neon-glow),
+                0 0 20px var(--neon-glow),
+                0 0 40px var(--accent-cyan);
+            margin-bottom: 10px;
+            letter-spacing: 8px;
+            position: relative;
+            display: inline-block;
         }
 
         .sub-title {
-            font-size: 28px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
             font-weight: 600;
-            color: #ffd700;
-            letter-spacing: 6px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 16px;
+            text-transform: uppercase;
+            filter: drop-shadow(0 0 20px var(--neon-glow));
         }
 
         .date-range {
             font-size: 16px;
-            color: #fff;
-            margin-top: 15px;
-            opacity: 0.9;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 18px;
+            padding: 10px 28px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 30px;
+            display: inline-block;
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.1);
         }
 
-        /* 内容区域 */
+        /* Content area */
         .content {
-            padding: 25px 20px;
+            padding: 30px 24px;
+            background: linear-gradient(180deg, #fafbff 0%, #ffffff 100%);
         }
 
-        /* 榜单区块 */
+        /* Ranking sections with neon borders */
         .ranking-section {
-            margin-bottom: 30px;
-            background: #ffffff;
+            margin-bottom: 28px;
+            background: var(--bg-card);
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(233, 69, 96, 0.15);
-            border: 2px solid #ffe4e4;
+            box-shadow:
+                0 4px 20px rgba(10, 10, 15, 0.08),
+                0 0 0 1px rgba(0, 245, 255, 0.1);
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .ranking-section:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 30px rgba(10, 10, 15, 0.12),
+                0 0 0 1px rgba(0, 245, 255, 0.3),
+                0 0 30px rgba(0, 245, 255, 0.1);
         }
 
         .ranking-header {
-            background: linear-gradient(90deg, #1a1a2e 0%, #e94560 100%);
-            padding: 15px 20px;
+            background: linear-gradient(90deg, #0a0a0f 0%, #1a1a2e 50%, #2d1f3d 100%);
+            padding: 16px 20px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            position: relative;
+        }
+
+        .ranking-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink), transparent);
         }
 
         .ranking-icon {
             font-size: 24px;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.3));
         }
 
         .ranking-title {
-            font-size: 20px;
-            font-weight: 700;
+            font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
+            font-size: 17px;
+            font-weight: 600;
             color: #ffffff;
             letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--neon-glow);
         }
 
-        /* 表格样式 */
+        /* Table styling */
         .ranking-table {
             width: 100%;
             border-collapse: collapse;
@@ -116,116 +277,169 @@
         }
 
         .ranking-table thead {
-            background: #f8f9fa;
+            background: linear-gradient(180deg, #f0f0ff 0%, #e8e8f8 100%);
         }
 
         .ranking-table th {
             padding: 14px 8px;
+            font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
             font-weight: 600;
-            color: #e94560;
-            border-bottom: 2px solid #ffd700;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            border-bottom: 2px solid transparent;
+            border-image: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink)) 1;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .ranking-table td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #e8e9eb;
+            padding: 14px 8px;
+            border-bottom: 1px solid rgba(0, 245, 255, 0.1);
             text-align: center;
-            color: #333;
+            color: var(--text-dark);
+            transition: background 0.2s ease;
         }
 
         .ranking-table tbody tr:nth-child(even) {
-            background: #fafbfc;
+            background: rgba(0, 245, 255, 0.02);
         }
 
         .ranking-table tbody tr:hover {
-            background: #fff5f5;
+            background: linear-gradient(90deg, rgba(0, 245, 255, 0.05), rgba(255, 45, 117, 0.05));
         }
 
-        /* 排名样式 */
+        /* Neon rank badges */
         .rank {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            font-family: 'Orbitron', sans-serif;
             font-weight: 700;
-            font-size: 15px;
+            font-size: 16px;
+            position: relative;
         }
 
         .rank-1 {
-            background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(255, 183, 0, 0.4);
+            background: var(--gold);
+            color: #ffffff;
+            box-shadow:
+                0 0 20px rgba(255, 170, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .rank-1::before {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.6), transparent);
+            z-index: -1;
+            filter: blur(8px);
         }
 
         .rank-2 {
-            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(160, 160, 160, 0.4);
+            background: var(--silver);
+            color: #ffffff;
+            box-shadow:
+                0 0 15px rgba(160, 160, 160, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-3 {
-            background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+            background: var(--bronze);
+            color: #ffffff;
+            box-shadow:
+                0 0 15px rgba(255, 85, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-other {
-            background: #f0f0f0;
-            color: #666;
+            background: linear-gradient(135deg, #e8e8f0 0%, #d0d0d8 100%);
+            color: var(--text-medium);
         }
 
-        /* 员工姓名 */
+        /* Employee name styling */
         .employee-name {
             font-weight: 600;
-            color: #333;
+            color: var(--text-dark);
         }
 
-        /* 数值样式 */
+        /* Number styling with monospace */
         .number {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Orbitron', monospace;
             font-weight: 600;
+            font-variant-numeric: tabular-nums;
         }
 
         .highlight {
-            color: #e94560;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             font-weight: 700;
         }
 
-        /* 率值样式 */
         .rate {
             font-weight: 600;
-            color: #27ae60;
+            color: var(--success);
+            text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
         }
 
-        /* 合计行 */
+        /* Total row with neon accent */
         .total-row {
-            background: linear-gradient(90deg, #fff5f5 0%, #ffe4e4 100%) !important;
+            background: linear-gradient(90deg, rgba(0, 245, 255, 0.08) 0%, rgba(255, 45, 117, 0.08) 100%) !important;
             font-weight: 700;
         }
 
         .total-row td {
-            color: #e94560;
-            border-top: 2px solid #e94560;
+            border-top: 2px solid transparent;
+            border-image: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink)) 1;
+            font-family: 'Orbitron', sans-serif;
         }
 
-        /* 底部说明 */
+        .total-row td:first-child {
+            color: var(--text-dark);
+        }
+
+        /* Footer note with neon styling */
         .footer-note {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 20px;
-            border-left: 4px solid #e94560;
+            background: linear-gradient(135deg, #f5f5ff 0%, #f0f0f8 100%);
+            padding: 24px;
+            border-radius: 16px;
+            margin-top: 24px;
+            border-left: 4px solid transparent;
+            border-image: linear-gradient(180deg, var(--accent-cyan), var(--accent-pink)) 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .footer-note::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
         }
 
         .footer-note-title {
+            font-family: 'Orbitron', 'Noto Sans SC', sans-serif;
             font-size: 14px;
             font-weight: 700;
-            color: #e94560;
-            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
         }
 
         .footer-note ul {
@@ -235,22 +449,85 @@
 
         .footer-note li {
             font-size: 12px;
-            color: #666;
-            margin-bottom: 6px;
-            padding-left: 16px;
+            color: var(--text-medium);
+            margin-bottom: 8px;
+            padding-left: 20px;
             position: relative;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .footer-note li::before {
-            content: '•';
-            color: #e94560;
+            content: '';
             position: absolute;
             left: 4px;
-            font-weight: bold;
+            top: 8px;
+            width: 8px;
+            height: 8px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-pink));
+            border-radius: 2px;
         }
 
-        /* 打印样式 */
+        /* Floating export toolbar - neon style */
+        .floating-export-toolbar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 15, 0.9);
+            border-radius: 16px;
+            padding: 10px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            backdrop-filter: blur(20px);
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(0, 245, 255, 0.2),
+                inset 0 0 0 1px rgba(0, 245, 255, 0.2);
+        }
+
+        .floating-export-toolbar button {
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.2) 0%, rgba(255, 45, 117, 0.2) 100%);
+            border: 1px solid rgba(0, 245, 255, 0.3);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: 'Noto Sans SC', sans-serif;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 10px var(--neon-glow);
+        }
+
+        .floating-export-toolbar button:hover {
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.3) 0%, rgba(255, 45, 117, 0.3) 100%);
+            box-shadow: 0 0 20px var(--neon-glow);
+            transform: translateY(-2px);
+        }
+
+        .floating-export-toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .floating-export-toolbar button.loading {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .floating-export-toolbar button:nth-child(2) {
+            background: linear-gradient(135deg, rgba(255, 45, 117, 0.2) 0%, rgba(157, 78, 221, 0.2) 100%);
+            border-color: rgba(255, 45, 117, 0.3);
+        }
+
+        .floating-export-toolbar button:nth-child(2):hover {
+            box-shadow: 0 0 20px var(--pink-glow);
+        }
+
+        /* Print styles */
         @media print {
             body {
                 background: white;
@@ -261,21 +538,50 @@
                 box-shadow: none;
                 max-width: 100%;
             }
+
+            .floating-export-toolbar,
+            .neon-orb {
+                display: none !important;
+            }
+
+            body::before {
+                display: none;
+            }
+
+            .header::before,
+            .header::after {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Floating neon orbs -->
+    <div class="neon-orb neon-orb-1"></div>
+    <div class="neon-orb neon-orb-2"></div>
+    <div class="neon-orb neon-orb-3"></div>
+
+    <!-- Floating export toolbar -->
+    <div class="floating-export-toolbar">
+        <button onclick="exportAsImage()" id="exportImageBtn">
+            📷 导出图片
+        </button>
+        <button onclick="exportAsPDF()" id="exportPDFBtn">
+            📄 导出PDF
+        </button>
+    </div>
+
     <div class="poster-container" id="posterContent">
-        <!-- 头部 -->
+        <!-- Header -->
         <div class="header">
             <div class="platform-title">抖音渠道</div>
             <div class="sub-title">开户榜</div>
             <div class="date-range" id="dateRange">2026年2月24日 - 2026年3月2日</div>
         </div>
 
-        <!-- 内容区域 -->
+        <!-- Content -->
         <div class="content">
-            <!-- 开户总榜 -->
+            <!-- Total Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">👑</span>
@@ -295,12 +601,12 @@
                         </tr>
                     </thead>
                     <tbody id="totalRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 存量线索开户周榜 -->
+            <!-- Existing Leads Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">📊</span>
@@ -320,12 +626,12 @@
                         </tr>
                     </thead>
                     <tbody id="existingRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 新增线索开户周榜 -->
+            <!-- New Leads Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">🆕</span>
@@ -345,12 +651,12 @@
                         </tr>
                     </thead>
                     <tbody id="newRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 底部说明 -->
+            <!-- Footer Note -->
             <div class="footer-note">
                 <div class="footer-note-title">📋 数据说明</div>
                 <ul>
@@ -365,20 +671,20 @@
     </div>
 
     <script>
-        // 格式化数字
+        // Format number with thousand separator
         function formatNumber(num) {
             if (num === null || num === undefined) return '-';
             return num.toLocaleString();
         }
 
-        // 格式化资产（转换为万元）
+        // Format assets to wan yuan
         function formatAssets(value) {
             if (value === null || value === undefined) return '-';
             const wan = value / 10000;
             return wan.toFixed(2);
         }
 
-        // 获取排名样式类
+        // Get rank badge class
         function getRankClass(rank) {
             if (rank === 1) return 'rank-1';
             if (rank === 2) return 'rank-2';
@@ -386,7 +692,7 @@
             return 'rank-other';
         }
 
-        // 渲染表格行
+        // Render table row
         function renderTableRow(item, index, isTotal = false) {
             if (isTotal) {
                 return `
@@ -417,24 +723,24 @@
             `;
         }
 
-        // 渲染榜单
+        // Render ranking table
         function renderRanking(data, tbodyId) {
             const tbody = document.getElementById(tbodyId);
             if (!tbody || !data || data.length === 0) {
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #999;">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #8888aa;">暂无数据</td></tr>';
                 }
                 return;
             }
 
             let html = '';
 
-            // 渲染数据行
+            // Render data rows
             data.forEach((item, index) => {
                 html += renderTableRow(item, index);
             });
 
-            // 计算合计
+            // Calculate totals
             const total = {
                 total_leads: data.reduce((sum, item) => sum + (item.total_leads || 0), 0),
                 opened_count: data.reduce((sum, item) => sum + (item.opened_count || 0), 0),
@@ -444,7 +750,7 @@
                 valid_customer_rate: 0
             };
 
-            // 计算合计率
+            // Calculate rates
             if (total.total_leads > 0) {
                 total.opening_rate = (total.opened_count / total.total_leads * 100);
             }
@@ -456,7 +762,7 @@
             tbody.innerHTML = html;
         }
 
-        // 设置日期范围
+        // Set date range
         function setDateRange(startDate, endDate) {
             const dateEl = document.getElementById('dateRange');
             if (dateEl && startDate && endDate) {
@@ -466,7 +772,7 @@
             }
         }
 
-        // 初始化
+        // Initialize poster
         function init(data) {
             if (data) {
                 setDateRange(data.start_date, data.end_date);
@@ -476,8 +782,121 @@
             }
         }
 
-        // 暴露初始化函数供外部调用
+        // Expose init function
         window.initPoster = init;
+
+        // ========== Export Functions ==========
+
+        function getDateString() {
+            const dateEl = document.getElementById('dateRange');
+            if (dateEl) {
+                return dateEl.textContent.replace(/[年月]/g, '-').replace(/[日\s]/g, '').replace(/-/g, '');
+            }
+            return new Date().toISOString().split('T')[0];
+        }
+
+        async function loadHtml2Canvas() {
+            if (typeof html2canvas !== 'undefined') return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadJsPDF() {
+            if (window.jspdf) return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function exportAsImage() {
+            const btn = document.getElementById('exportImageBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const link = document.createElement('a');
+                link.download = `抖音渠道开户榜_${getDateString()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+            } catch (error) {
+                console.error('导出图片失败:', error);
+                alert('导出图片失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function exportAsPDF() {
+            const btn = document.getElementById('exportPDFBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+                await loadJsPDF();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const { jsPDF } = window.jspdf;
+
+                const imgWidth = 210;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/png');
+
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+                pdf.save(`抖音渠道开户榜_${getDateString()}.pdf`);
+
+            } catch (error) {
+                console.error('导出PDF失败:', error);
+                alert('导出PDF失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
     </script>
 </body>
 </html>

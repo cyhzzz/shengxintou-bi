@@ -4,7 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>腾讯渠道开户榜</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #0a2463;
+            --primary-light: #1e5bb5;
+            --primary-lighter: #3a9bdc;
+            --primary-glow: rgba(30, 91, 181, 0.4);
+            --accent: #00d4ff;
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --success: #10b981;
+            --text-dark: #0f172a;
+            --text-medium: #475569;
+            --text-light: #94a3b8;
+            --bg-card: #ffffff;
+            --bg-subtle: #f1f5f9;
+            --border: #e2e8f0;
+
+            --gold: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+            --silver: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 50%, #64748b 100%);
+            --bronze: linear-gradient(135deg, #fb923c 0%, #ea580c 50%, #c2410c 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,103 +35,235 @@
         }
 
         body {
-            font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #1e5bb5 0%, #2d7dd2 50%, #3a9bdc 100%);
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a2463 0%, #1e3a5f 30%, #1e5bb5 60%, #2d7dd2 100%);
             min-height: 100vh;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Tech geometric background pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Floating geometric shapes */
+        .geo-shape {
+            position: fixed;
+            opacity: 0.1;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .geo-shape-1 {
+            top: 10%;
+            left: 5%;
+            width: 120px;
+            height: 120px;
+            background: var(--accent);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        }
+
+        .geo-shape-2 {
+            top: 60%;
+            right: 8%;
+            width: 80px;
+            height: 80px;
+            border: 3px solid var(--accent);
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            animation-delay: -5s;
+        }
+
+        .geo-shape-3 {
+            bottom: 15%;
+            left: 10%;
+            width: 60px;
+            height: 60px;
+            background: var(--primary-lighter);
+            transform: rotate(45deg);
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-20px) rotate(5deg); }
+            50% { transform: translateY(-10px) rotate(-3deg); }
+            75% { transform: translateY(-25px) rotate(3deg); }
         }
 
         .poster-container {
             max-width: 800px;
             margin: 0 auto;
-            background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
-            border-radius: 20px;
+            background: var(--bg-card);
+            border-radius: 24px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow:
+                0 25px 80px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            position: relative;
+            z-index: 1;
         }
 
-        /* 头部样式 */
+        /* Header with tech gradient */
         .header {
-            background: linear-gradient(135deg, #1e5bb5 0%, #2d7dd2 100%);
-            padding: 30px 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, var(--primary-lighter) 100%);
+            padding: 40px 30px;
             text-align: center;
             position: relative;
+            overflow: hidden;
         }
 
-        .header::before,
-        .header::after {
-            content: '🏆';
-            position: absolute;
-            font-size: 40px;
-            top: 20px;
-        }
-
+        /* Circuit line decoration */
         .header::before {
-            left: 30px;
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(90deg, transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%),
+                linear-gradient(transparent 24%, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.05) 26%, transparent 27%, transparent 74%, rgba(255,255,255,0.05) 75%, rgba(255,255,255,0.05) 76%, transparent 77%);
+            background-size: 50px 50px;
         }
 
+        /* Glowing accent line */
         .header::after {
-            right: 30px;
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent-glow);
         }
 
         .platform-title {
-            font-size: 42px;
-            font-weight: 800;
+            font-family: 'Space Grotesk', 'Noto Sans SC', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
             color: #ffffff;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
             margin-bottom: 8px;
-            letter-spacing: 4px;
+            letter-spacing: 6px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .platform-title::before,
+        .platform-title::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40px;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .platform-title::before {
+            left: -50px;
+        }
+
+        .platform-title::after {
+            right: -50px;
         }
 
         .sub-title {
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 28px;
             font-weight: 600;
-            color: #cce5ff;
-            letter-spacing: 6px;
+            color: var(--accent);
+            letter-spacing: 12px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px var(--accent-glow);
         }
 
         .date-range {
             font-size: 16px;
-            color: #fff;
-            margin-top: 15px;
-            opacity: 0.9;
+            color: rgba(255, 255, 255, 0.9);
+            margin-top: 16px;
+            padding: 8px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: inline-block;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
         }
 
-        /* 内容区域 */
+        /* Content area */
         .content {
-            padding: 25px 20px;
+            padding: 30px 24px;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
         }
 
-        /* 榜单区块 */
+        /* Ranking sections with tech styling */
         .ranking-section {
-            margin-bottom: 30px;
-            background: #ffffff;
+            margin-bottom: 28px;
+            background: var(--bg-card);
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(30, 91, 181, 0.15);
-            border: 2px solid #cce5ff;
+            box-shadow:
+                0 4px 20px rgba(10, 36, 99, 0.08),
+                0 0 0 1px var(--border);
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .ranking-section:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 30px rgba(10, 36, 99, 0.12),
+                0 0 0 1px var(--primary-lighter);
         }
 
         .ranking-header {
-            background: linear-gradient(90deg, #1e5bb5 0%, #3a9bdc 100%);
-            padding: 15px 20px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 16px 20px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            position: relative;
+        }
+
+        .ranking-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), transparent);
         }
 
         .ranking-icon {
             font-size: 24px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
         }
 
         .ranking-title {
-            font-size: 20px;
-            font-weight: 700;
+            font-family: 'Space Grotesk', 'Noto Sans SC', sans-serif;
+            font-size: 18px;
+            font-weight: 600;
             color: #ffffff;
             letter-spacing: 2px;
         }
 
-        /* 表格样式 */
+        /* Table styling */
         .ranking-table {
             width: 100%;
             border-collapse: collapse;
@@ -116,116 +271,152 @@
         }
 
         .ranking-table thead {
-            background: #f0f7ff;
+            background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
         }
 
         .ranking-table th {
             padding: 14px 8px;
+            font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
-            color: #1e5bb5;
-            border-bottom: 2px solid #cce5ff;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary-lighter);
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .ranking-table td {
-            padding: 12px 8px;
-            border-bottom: 1px solid #e6f2ff;
+            padding: 14px 8px;
+            border-bottom: 1px solid var(--border);
             text-align: center;
-            color: #333;
+            color: var(--text-dark);
+            transition: background 0.2s ease;
         }
 
         .ranking-table tbody tr:nth-child(even) {
-            background: #f8fbff;
+            background: var(--bg-subtle);
         }
 
         .ranking-table tbody tr:hover {
-            background: #e6f2ff;
+            background: linear-gradient(90deg, rgba(30, 91, 181, 0.05), rgba(58, 155, 220, 0.08));
         }
 
-        /* 排名样式 */
+        /* Rank badges with enhanced gradients */
         .rank {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            font-family: 'Space Grotesk', sans-serif;
             font-weight: 700;
-            font-size: 15px;
+            font-size: 16px;
+            position: relative;
         }
 
         .rank-1 {
-            background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(255, 183, 0, 0.4);
+            background: var(--gold);
+            color: #ffffff;
+            box-shadow:
+                0 4px 12px rgba(251, 191, 36, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .rank-1::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.4), transparent);
+            z-index: -1;
         }
 
         .rank-2 {
-            background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(160, 160, 160, 0.4);
+            background: var(--silver);
+            color: #ffffff;
+            box-shadow:
+                0 4px 12px rgba(148, 163, 184, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-3 {
-            background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+            background: var(--bronze);
+            color: #ffffff;
+            box-shadow:
+                0 4px 12px rgba(234, 88, 12, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
         .rank-other {
-            background: #f0f0f0;
-            color: #666;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            color: var(--text-medium);
         }
 
-        /* 员工姓名 */
+        /* Employee name styling */
         .employee-name {
             font-weight: 600;
-            color: #333;
+            color: var(--text-dark);
         }
 
-        /* 数值样式 */
+        /* Number styling */
         .number {
-            font-family: 'Arial', sans-serif;
+            font-family: 'Space Grotesk', monospace;
             font-weight: 600;
+            font-variant-numeric: tabular-nums;
         }
 
         .highlight {
-            color: #1e5bb5;
+            color: var(--primary-light);
             font-weight: 700;
         }
 
-        /* 率值样式 */
         .rate {
             font-weight: 600;
-            color: #27ae60;
+            color: var(--success);
         }
 
-        /* 合计行 */
+        /* Total row with accent */
         .total-row {
-            background: linear-gradient(90deg, #e6f2ff 0%, #cce5ff 100%) !important;
+            background: linear-gradient(90deg, #dbeafe 0%, #e0f2fe 100%) !important;
             font-weight: 700;
         }
 
         .total-row td {
-            color: #1e5bb5;
-            border-top: 2px solid #1e5bb5;
+            color: var(--primary);
+            border-top: 2px solid var(--primary-lighter);
+            font-family: 'Space Grotesk', sans-serif;
         }
 
-        /* 底部说明 */
+        /* Footer note with tech styling */
         .footer-note {
-            background: #f0f7ff;
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 20px;
-            border-left: 4px solid #1e5bb5;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            padding: 24px;
+            border-radius: 16px;
+            margin-top: 24px;
+            border-left: 4px solid var(--primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .footer-note::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary-lighter), transparent);
         }
 
         .footer-note-title {
+            font-family: 'Space Grotesk', 'Noto Sans SC', sans-serif;
             font-size: 14px;
             font-weight: 700;
-            color: #1e5bb5;
-            margin-bottom: 10px;
+            color: var(--primary);
+            margin-bottom: 12px;
+            letter-spacing: 1px;
         }
 
         .footer-note ul {
@@ -235,22 +426,79 @@
 
         .footer-note li {
             font-size: 12px;
-            color: #666;
-            margin-bottom: 6px;
-            padding-left: 16px;
+            color: var(--text-medium);
+            margin-bottom: 8px;
+            padding-left: 20px;
             position: relative;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .footer-note li::before {
-            content: '•';
-            color: #1e5bb5;
+            content: '';
             position: absolute;
             left: 4px;
-            font-weight: bold;
+            top: 8px;
+            width: 6px;
+            height: 6px;
+            background: var(--primary-lighter);
+            border-radius: 2px;
+            transform: rotate(45deg);
         }
 
-        /* 打印样式 */
+        /* Floating export toolbar */
+        .floating-export-toolbar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 8px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            backdrop-filter: blur(20px);
+            box-shadow:
+                0 8px 32px rgba(10, 36, 99, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.5);
+        }
+
+        .floating-export-toolbar button {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border: none;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: 'Noto Sans SC', sans-serif;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px var(--primary-glow);
+        }
+
+        .floating-export-toolbar button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px var(--primary-glow);
+        }
+
+        .floating-export-toolbar button:active {
+            transform: translateY(0);
+        }
+
+        .floating-export-toolbar button.loading {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .floating-export-toolbar button:nth-child(2) {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-lighter) 100%);
+        }
+
+        /* Print styles */
         @media print {
             body {
                 background: white;
@@ -261,21 +509,45 @@
                 box-shadow: none;
                 max-width: 100%;
             }
+
+            .floating-export-toolbar,
+            .geo-shape {
+                display: none !important;
+            }
+
+            body::before {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Floating geometric decorations -->
+    <div class="geo-shape geo-shape-1"></div>
+    <div class="geo-shape geo-shape-2"></div>
+    <div class="geo-shape geo-shape-3"></div>
+
+    <!-- Floating export toolbar -->
+    <div class="floating-export-toolbar">
+        <button onclick="exportAsImage()" id="exportImageBtn">
+            📷 导出图片
+        </button>
+        <button onclick="exportAsPDF()" id="exportPDFBtn">
+            📄 导出PDF
+        </button>
+    </div>
+
     <div class="poster-container" id="posterContent">
-        <!-- 头部 -->
+        <!-- Header -->
         <div class="header">
             <div class="platform-title">腾讯渠道</div>
             <div class="sub-title">开户榜</div>
             <div class="date-range" id="dateRange">2026年2月24日 - 2026年3月2日</div>
         </div>
 
-        <!-- 内容区域 -->
+        <!-- Content -->
         <div class="content">
-            <!-- 开户总榜 -->
+            <!-- Total Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">👑</span>
@@ -295,12 +567,12 @@
                         </tr>
                     </thead>
                     <tbody id="totalRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 存量线索开户周榜 -->
+            <!-- Existing Leads Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">📊</span>
@@ -320,12 +592,12 @@
                         </tr>
                     </thead>
                     <tbody id="existingRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 新增线索开户周榜 -->
+            <!-- New Leads Ranking -->
             <div class="ranking-section">
                 <div class="ranking-header">
                     <span class="ranking-icon">🆕</span>
@@ -345,12 +617,12 @@
                         </tr>
                     </thead>
                     <tbody id="newRankingBody">
-                        <!-- 动态生成 -->
+                        <!-- Dynamic content -->
                     </tbody>
                 </table>
             </div>
 
-            <!-- 底部说明 -->
+            <!-- Footer Note -->
             <div class="footer-note">
                 <div class="footer-note-title">📋 数据说明</div>
                 <ul>
@@ -365,20 +637,20 @@
     </div>
 
     <script>
-        // 格式化数字
+        // Format number with thousand separator
         function formatNumber(num) {
             if (num === null || num === undefined) return '-';
             return num.toLocaleString();
         }
 
-        // 格式化资产（转换为万元）
+        // Format assets to wan yuan
         function formatAssets(value) {
             if (value === null || value === undefined) return '-';
             const wan = value / 10000;
             return wan.toFixed(2);
         }
 
-        // 获取排名样式类
+        // Get rank badge class
         function getRankClass(rank) {
             if (rank === 1) return 'rank-1';
             if (rank === 2) return 'rank-2';
@@ -386,7 +658,7 @@
             return 'rank-other';
         }
 
-        // 渲染表格行
+        // Render table row
         function renderTableRow(item, index, isTotal = false) {
             if (isTotal) {
                 return `
@@ -417,24 +689,24 @@
             `;
         }
 
-        // 渲染榜单
+        // Render ranking table
         function renderRanking(data, tbodyId) {
             const tbody = document.getElementById(tbodyId);
             if (!tbody || !data || data.length === 0) {
                 if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #999;">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding: 30px; color: #94a3b8;">暂无数据</td></tr>';
                 }
                 return;
             }
 
             let html = '';
 
-            // 渲染数据行
+            // Render data rows
             data.forEach((item, index) => {
                 html += renderTableRow(item, index);
             });
 
-            // 计算合计
+            // Calculate totals
             const total = {
                 total_leads: data.reduce((sum, item) => sum + (item.total_leads || 0), 0),
                 opened_count: data.reduce((sum, item) => sum + (item.opened_count || 0), 0),
@@ -444,7 +716,7 @@
                 valid_customer_rate: 0
             };
 
-            // 计算合计率
+            // Calculate rates
             if (total.total_leads > 0) {
                 total.opening_rate = (total.opened_count / total.total_leads * 100);
             }
@@ -456,7 +728,7 @@
             tbody.innerHTML = html;
         }
 
-        // 设置日期范围
+        // Set date range
         function setDateRange(startDate, endDate) {
             const dateEl = document.getElementById('dateRange');
             if (dateEl && startDate && endDate) {
@@ -466,7 +738,7 @@
             }
         }
 
-        // 初始化
+        // Initialize poster
         function init(data) {
             if (data) {
                 setDateRange(data.start_date, data.end_date);
@@ -476,8 +748,121 @@
             }
         }
 
-        // 暴露初始化函数供外部调用
+        // Expose init function
         window.initPoster = init;
+
+        // ========== Export Functions ==========
+
+        function getDateString() {
+            const dateEl = document.getElementById('dateRange');
+            if (dateEl) {
+                return dateEl.textContent.replace(/[年月]/g, '-').replace(/[日\s]/g, '').replace(/-/g, '');
+            }
+            return new Date().toISOString().split('T')[0];
+        }
+
+        async function loadHtml2Canvas() {
+            if (typeof html2canvas !== 'undefined') return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function loadJsPDF() {
+            if (window.jspdf) return;
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function exportAsImage() {
+            const btn = document.getElementById('exportImageBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const link = document.createElement('a');
+                link.download = `腾讯渠道开户榜_${getDateString()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+            } catch (error) {
+                console.error('导出图片失败:', error);
+                alert('导出图片失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function exportAsPDF() {
+            const btn = document.getElementById('exportPDFBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.classList.add('loading');
+                btn.innerHTML = '⏳ 导出中...';
+
+                await loadHtml2Canvas();
+                await loadJsPDF();
+
+                const element = document.getElementById('posterContent');
+                if (!element) {
+                    alert('海报内容未找到');
+                    return;
+                }
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: null
+                });
+
+                const { jsPDF } = window.jspdf;
+
+                const imgWidth = 210;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/png');
+
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+                pdf.save(`腾讯渠道开户榜_${getDateString()}.pdf`);
+
+            } catch (error) {
+                console.error('导出PDF失败:', error);
+                alert('导出PDF失败，请重试');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = originalText;
+            }
+        }
     </script>
 </body>
 </html>

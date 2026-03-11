@@ -1575,10 +1575,10 @@ def get_cost_analysis():
 @bp.route('/conversion-funnel', methods=['POST'])
 def get_conversion_funnel():
     """
-    转化漏斗监测 (7层漏斗)
-    使用 daily_metrics_unified 表数据和 backend_conversions 表数据
+    转化漏斗监测
+    支持两种模式：
 
-    7层漏斗定义:
+    模式1: 广告投放漏斗（7层）- 无员工筛选时
     1. 曝光 (impressions) - 广告曝光量
     2. 点击次数 (clicks) - 点击次数
     3. 线索人数 (lead_users) - 去重线索人数
@@ -1587,6 +1587,13 @@ def get_conversion_funnel():
     6. 开户人数 (opened_account_users) - 去重开户人数
     7. 有效户人数 (valid_customer_users) - 去重有效户人数
 
+    模式2: 服务人员漏斗（5层）- 有员工筛选时
+    1. 线索人数 (lead_users) - 该员工服务的线索人数
+    2. 开口人数 (customer_mouth_users) - 去重开口人数
+    3. 有效线索 (valid_lead_users) - 去重有效线索人数
+    4. 开户人数 (opened_account_users) - 去重开户人数
+    5. 有效户人数 (valid_customer_users) - 去重有效户人数
+
     请求参数:
     {
       "filters": {
@@ -1594,7 +1601,7 @@ def get_conversion_funnel():
         "date_range": ["2025-01-01", "2025-01-15"],
         "agencies": ["量子", "众联"],
         "business_models": ["直播", "信息流"],
-        "employees": ["E001", "E002"]  // 新增：员工号列表
+        "employees": ["E001", "E002"]  // 员工号列表
       }
     }
     """
@@ -1614,41 +1621,11 @@ def get_conversion_funnel():
         # 检查是否有员工筛选
         has_employee_filter = 'employees' in filters and filters['employees']
 
-        # ===== 1. 从 daily_metrics_unified 获取广告指标 =====
-        ad_query = db.session.query(
-            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.clicks).label('total_clicks')
-        )
-
-        # 应用筛选条件
-        if start_date and end_date:
-            ad_query = ad_query.filter(
-                and_(
-                    DailyMetricsUnified.date >= start_date,
-                    DailyMetricsUnified.date <= end_date
-                )
-            )
-
-        if 'platforms' in filters and filters['platforms']:
-            ad_query = ad_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-        if 'agencies' in filters and filters['agencies']:
-            ad_query = ad_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-        if 'business_models' in filters and filters['business_models']:
-            ad_query = ad_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-        ad_result = ad_query.first()
-
-        # 提取广告数据
-        impressions = int(ad_result.total_impressions) if ad_result.total_impressions else 0
-        clicks = int(ad_result.total_clicks) if ad_result.total_clicks else 0
-        total_cost = float(ad_result.total_cost) if ad_result.total_cost else 0
-
-        # ===== 2. 获取转化指标 =====
+        # ===== 根据模式选择不同的数据查询逻辑 =====
         if has_employee_filter:
-            # 有员工筛选时，从 backend_conversions 表直接查询
+            # ===== 模式2: 服务人员漏斗（5层）=====
+            # 从 backend_conversions 表直接查询，不需要广告数据
+
             conv_query = db.session.query(
                 func.count(func.distinct(BackendConversions.id)).label('total_leads'),
                 func.sum(case((BackendConversions.is_customer_mouth == True, 1), else_=0)).label('total_mouth'),
@@ -1680,8 +1657,86 @@ def get_conversion_funnel():
             opened_account_users = int(conv_result.total_opened) if conv_result.total_opened else 0
             valid_customer_users = int(conv_result.total_valid) if conv_result.total_valid else 0
 
+            # 构建5层漏斗（从客户线索开始）
+            funnel_stages = [
+                {
+                    'step': '客户线索',
+                    'value': lead_users,
+                    'label': '线索人数',
+                    'rate': 100.0  # 第一层是100%
+                },
+                {
+                    'step': '客户开口',
+                    'value': customer_mouth_users,
+                    'label': '开口人数',
+                    'rate': (customer_mouth_users / lead_users * 100) if lead_users > 0 else 0
+                },
+                {
+                    'step': '有效线索',
+                    'value': valid_lead_users,
+                    'label': '有效线索',
+                    'rate': (valid_lead_users / customer_mouth_users * 100) if customer_mouth_users > 0 else 0
+                },
+                {
+                    'step': '成功开户',
+                    'value': opened_account_users,
+                    'label': '开户人数',
+                    'rate': (opened_account_users / valid_lead_users * 100) if valid_lead_users > 0 else 0
+                },
+                {
+                    'step': '有效户',
+                    'value': valid_customer_users,
+                    'label': '有效户人数',
+                    'rate': (valid_customer_users / opened_account_users * 100) if opened_account_users > 0 else 0
+                }
+            ]
+
+            # 计算总转化率（有效户 / 线索）
+            overall_conversion_rate = (valid_customer_users / lead_users * 100) if lead_users > 0 else 0
+
+            # 核心指标数据（服务人员模式没有广告花费）
+            core_metrics = {
+                'cost': 0,  # 服务人员模式下无广告花费
+                'lead_users': lead_users,
+                'opened_account_users': opened_account_users,
+                'valid_customer_users': valid_customer_users
+            }
+
         else:
-            # 无员工筛选时，从聚合表查询
+            # ===== 模式1: 广告投放漏斗（7层）=====
+            # 从 daily_metrics_unified 获取广告指标
+            ad_query = db.session.query(
+                func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
+                func.sum(DailyMetricsUnified.cost).label('total_cost'),
+                func.sum(DailyMetricsUnified.clicks).label('total_clicks')
+            )
+
+            # 应用筛选条件
+            if start_date and end_date:
+                ad_query = ad_query.filter(
+                    and_(
+                        DailyMetricsUnified.date >= start_date,
+                        DailyMetricsUnified.date <= end_date
+                    )
+                )
+
+            if 'platforms' in filters and filters['platforms']:
+                ad_query = ad_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
+
+            if 'agencies' in filters and filters['agencies']:
+                ad_query = ad_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
+
+            if 'business_models' in filters and filters['business_models']:
+                ad_query = ad_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
+
+            ad_result = ad_query.first()
+
+            # 提取广告数据
+            impressions = int(ad_result.total_impressions) if ad_result.total_impressions else 0
+            clicks = int(ad_result.total_clicks) if ad_result.total_clicks else 0
+            total_cost = float(ad_result.total_cost) if ad_result.total_cost else 0
+
+            # 从聚合表查询转化指标
             conv_query = db.session.query(
                 func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
                 func.sum(DailyMetricsUnified.customer_mouth_users).label('total_customer_mouth_users'),
@@ -1716,70 +1771,70 @@ def get_conversion_funnel():
             opened_account_users = int(conv_result.total_opened_account_users) if conv_result.total_opened_account_users else 0
             valid_customer_users = int(conv_result.total_valid_customer_users) if conv_result.total_valid_customer_users else 0
 
-        # ===== 2. 构建7层漏斗 =====
-        # 计算每一层相对于上一层的转化率
-        funnel_stages = [
-            {
-                'step': '广告曝光',
-                'value': impressions,
-                'label': '曝光量',
-                'rate': 100.0  # 第一层是100%
-            },
-            {
-                'step': '客户点击',
-                'value': clicks,
-                'label': '点击次数',
-                'rate': (clicks / impressions * 100) if impressions > 0 else 0
-            },
-            {
-                'step': '客户线索',
-                'value': lead_users,
-                'label': '线索人数',
-                'rate': (lead_users / clicks * 100) if clicks > 0 else 0
-            },
-            {
-                'step': '客户开口',
-                'value': customer_mouth_users,
-                'label': '开口人数',
-                'rate': (customer_mouth_users / lead_users * 100) if lead_users > 0 else 0
-            },
-            {
-                'step': '有效线索',
-                'value': valid_lead_users,
-                'label': '有效线索',
-                'rate': (valid_lead_users / customer_mouth_users * 100) if customer_mouth_users > 0 else 0
-            },
-            {
-                'step': '成功开户',
-                'value': opened_account_users,
-                'label': '开户人数',
-                'rate': (opened_account_users / valid_lead_users * 100) if valid_lead_users > 0 else 0
-            },
-            {
-                'step': '有效户',
-                'value': valid_customer_users,
-                'label': '有效户人数',
-                'rate': (valid_customer_users / opened_account_users * 100) if opened_account_users > 0 else 0
+            # 构建7层漏斗
+            funnel_stages = [
+                {
+                    'step': '广告曝光',
+                    'value': impressions,
+                    'label': '曝光量',
+                    'rate': 100.0  # 第一层是100%
+                },
+                {
+                    'step': '客户点击',
+                    'value': clicks,
+                    'label': '点击次数',
+                    'rate': (clicks / impressions * 100) if impressions > 0 else 0
+                },
+                {
+                    'step': '客户线索',
+                    'value': lead_users,
+                    'label': '线索人数',
+                    'rate': (lead_users / clicks * 100) if clicks > 0 else 0
+                },
+                {
+                    'step': '客户开口',
+                    'value': customer_mouth_users,
+                    'label': '开口人数',
+                    'rate': (customer_mouth_users / lead_users * 100) if lead_users > 0 else 0
+                },
+                {
+                    'step': '有效线索',
+                    'value': valid_lead_users,
+                    'label': '有效线索',
+                    'rate': (valid_lead_users / customer_mouth_users * 100) if customer_mouth_users > 0 else 0
+                },
+                {
+                    'step': '成功开户',
+                    'value': opened_account_users,
+                    'label': '开户人数',
+                    'rate': (opened_account_users / valid_lead_users * 100) if valid_lead_users > 0 else 0
+                },
+                {
+                    'step': '有效户',
+                    'value': valid_customer_users,
+                    'label': '有效户人数',
+                    'rate': (valid_customer_users / opened_account_users * 100) if opened_account_users > 0 else 0
+                }
+            ]
+
+            # 计算总转化率（有效户 / 曝光）
+            overall_conversion_rate = (valid_customer_users / impressions * 100) if impressions > 0 else 0
+
+            # 核心指标数据
+            core_metrics = {
+                'cost': round(total_cost, 2),
+                'lead_users': lead_users,
+                'opened_account_users': opened_account_users,
+                'valid_customer_users': valid_customer_users
             }
-        ]
 
-        # 计算总转化率（有效户 / 曝光）
-        overall_conversion_rate = (valid_customer_users / impressions * 100) if impressions > 0 else 0
-
-        # ===== 3. 核心指标数据 =====
-        core_metrics = {
-            'cost': round(total_cost, 2),
-            'lead_users': lead_users,
-            'opened_account_users': opened_account_users,
-            'valid_customer_users': valid_customer_users
-        }
-
-        # ===== 4. 返回结果 =====
+        # ===== 返回结果 =====
         return jsonify({
             'success': True,
             'data': {
                 'funnel': funnel_stages,
-                'core_metrics': core_metrics
+                'core_metrics': core_metrics,
+                'is_employee_mode': has_employee_filter  # 标识当前模式
             }
         })
 

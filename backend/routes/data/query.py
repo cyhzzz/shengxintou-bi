@@ -24,21 +24,109 @@ def query_data():
     """
     通用数据查询接口
     支持多维度聚合查询
-
-    请求体:
-    {
-        "dimensions": ["date", "platform", "agency", "business_model"],
-        "metrics": ["cost", "impressions", "clicks", "leads", "new_accounts"],
-        "filters": {
-            "date_range": ["2025-01-01", "2025-01-31"],
-            "platforms": ["腾讯", "抖音"],
-            "agencies": ["量子", "众联"],
-            "business_models": ["直播", "信息流"]
-        },
-        "granularity": "daily",  # daily/summary
-        "order_by": {"date": "asc"},
-        "limit": 1000
-    }
+    ---
+    tags:
+      - Query
+    summary: 通用数据查询
+    description: 支持按日期、平台、代理商、业务模式等多维度聚合查询广告投放数据
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            dimensions:
+              type: array
+              items:
+                type: string
+                enum: [date, platform, agency, business_model]
+              description: 聚合维度
+              example: ["date", "platform", "agency"]
+            metrics:
+              type: array
+              items:
+                type: string
+                enum: [cost, impressions, clicks, leads, new_accounts, customer_assets, customer_contribution]
+              description: 查询指标
+              example: ["cost", "impressions", "clicks", "leads"]
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: [腾讯, 抖音, 小红书]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                    enum: [直播, 信息流, 搜索]
+                  description: 业务模式筛选
+            granularity:
+              type: string
+              enum: [daily, summary]
+              default: daily
+              description: 查询粒度，daily为日级明细，summary为汇总
+            limit:
+              type: integer
+              default: 1000
+              description: 返回记录数限制
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  platform:
+                    type: string
+                  agency:
+                    type: string
+                  business_model:
+                    type: string
+                  metrics:
+                    type: object
+                    properties:
+                      cost:
+                        type: number
+                      impressions:
+                        type: integer
+                      clicks:
+                        type: integer
+                      leads:
+                        type: integer
+            total:
+              type: integer
+              description: 返回记录总数
+      400:
+        description: 请求参数错误
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -417,6 +505,84 @@ def get_summary():
     """
     获取汇总数据
     按平台、代理商、业务模式汇总
+    ---
+    tags:
+      - Query
+    summary: 汇总数据查询
+    description: 按平台、代理商、业务模式维度汇总广告投放数据
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: [腾讯, 抖音, 小红书]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  platform:
+                    type: string
+                    description: 平台名称
+                  agency:
+                    type: string
+                    description: 代理商名称
+                  business_model:
+                    type: string
+                    description: 业务模式
+                  metrics:
+                    type: object
+                    properties:
+                      cost:
+                        type: number
+                        description: 总花费
+                      impressions:
+                        type: integer
+                        description: 总曝光量
+                      clicks:
+                        type: integer
+                        description: 总点击量
+                      leads:
+                        type: integer
+                        description: 总线索数
+                      new_accounts:
+                        type: integer
+                        description: 总开户数
+            total:
+              type: integer
+              description: 返回记录数
+      400:
+        description: 请求参数错误
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
@@ -493,15 +659,46 @@ def get_employees():
     获取服务人员列表
 
     从 backend_conversions 表中获取所有唯一的员工号和姓名
-
-    返回:
-    {
-        "success": true,
-        "data": [
-            {"employee_no": "E001", "employee_name": "张三"},
-            {"employee_no": "E002", "employee_name": "李四"}
-        ]
-    }
+    ---
+    tags:
+      - Query
+    summary: 获取服务人员列表
+    description: 从后端转化数据表中获取所有唯一的服务人员（员工号和姓名），用于员工转化报表的筛选
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 查询成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  employee_no:
+                    type: string
+                    description: 员工号
+                    example: "E001"
+                  employee_name:
+                    type: string
+                    description: 员工姓名
+                    example: "张三"
+      500:
+        description: 服务器错误
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: false
+            error:
+              type: string
+              description: 错误信息
     """
     try:
         employees = db.session.query(

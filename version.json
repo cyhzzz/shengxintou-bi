@@ -1,44 +1,82 @@
 {
-  "version": "0.9.3",
-  "release_date": "2026-03-04",
+  "version": "0.9.4",
+  "release_date": "2026-03-10",
   "changelog": [
-    "✨ 数据概览新增客户今年创收指标",
-    "🔧 修复创收卡片显示为0的问题",
-    "🔧 修复全部模式查询和环比计算"
+    "✨ 新增员工转化报表，支持多维度转化分析",
+    "✨ 转化漏斗新增服务人员维度，支持按服务人员分析转化情况",
+    "✨ 平台厂商聚合表新增用户贡献字段",
+    "🔧 修复员工转化报表部分前端样式问题",
+    "🔧 优化转化漏斗页面样式"
   ],
   "major_changes": [
     {
       "type": "feature",
-      "description": "客户今年创收功能",
+      "description": "员工转化报表",
       "details": {
-        "new_field": "opened_account_contribution - 新开客户创收金额",
-        "data_source": "backend_conversions 表的 customer_contribution 字段（仅统计 is_opened_account=True 的记录）",
-        "api_change": "dashboard core-metrics API 新增 customer_contribution 字段"
+        "function": "新增员工转化报表，支持按服务人员维度分析转化漏斗",
+        "metrics": "线索数、开口数、有效线索数、开户数、有效户数等转化指标",
+        "dimensions": "支持按日期、服务人员、平台等多维度筛选分析"
+      }
+    },
+    {
+      "type": "feature",
+      "description": "转化漏斗服务人员维度",
+      "details": {
+        "new_dimension": "服务人员（添加员工姓名）维度",
+        "benefit": "支持按服务人员分析客户转化情况，便于绩效考核"
+      }
+    },
+    {
+      "type": "feature",
+      "description": "平台厂商聚合表新增字段",
+      "details": {
+        "new_field": "用户贡献（customer_contribution）字段",
+        "data_source": "backend_conversions 表的 customer_contribution 字段"
+      }
+    },
+    {
+      "type": "refactor",
+      "description": "字段重命名",
+      "details": {
+        "change": "click_users 重命名为 clicks",
+        "reason": "字段命名统一，保持一致性"
       }
     },
     {
       "type": "bugfix",
-      "description": "修复创收卡片显示为0的问题",
+      "description": "样式修复",
       "details": {
-        "before": "customer_contribution 硬编码为0",
-        "after": "从 daily_metrics_unified.opened_account_contribution 查询真实数据"
+        "fixes": [
+          "员工转化报表部分前端样式问题",
+          "转化漏斗页面样式优化"
+        ]
       }
     }
   ],
   "upgrade_notes": [
-    "✅ 后端 API 已自动返回创收数据，无需额外配置",
-    "✅ 数据库字段已存在，无需迁移",
-    "📋 创收数据来源：backend_conversions 表的 customer_contribution 字段"
+    "✅ 新增员工转化报表，在菜单中可直接访问",
+    "✅ 转化漏斗新增服务人员筛选维度",
+    "✅ 数据库字段已更新，click_users 已重命名为 clicks",
+    "📋 用户贡献字段已添加到平台厂商聚合表"
   ],
   "cloud_version_file": "version_cloud.json",
   "update_url": "",
   "support_contact": "产品经理 陈元昊",
   "technical_details": {
     "backend_changes": [
-      "backend/routes/data/dashboard.py - 新增 opened_account_contribution 查询"
+      "backend/routes/data/ - 新增员工转化报表 API",
+      "backend/routes/data/employee_conversion_helpers.py - 员工转化数据处理",
+      "backend/scripts/aggregations/update_daily_metrics_unified.py - 新增用户贡献字段"
     ],
-    "frontend_changes": [],
-    "database_status": "字段已存在于 daily_metrics_unified 表",
-    "completion_time": "2026-03-04"
+    "frontend_changes": [
+      "frontend/js/reports/EmployeeConversionAnalysis.js - 员工转化报表",
+      "frontend/js/reports/EmployeeConversionWeekly.js - 员工转化周报表",
+      "frontend/js/reports/ConversionFunnelReport.js - 转化漏斗新增服务人员维度"
+    ],
+    "database_changes": [
+      "daily_metrics_unified.opened_account_contribution - 新增用户贡献字段",
+      "字段重命名: click_users -> clicks"
+    ],
+    "completion_time": "2026-03-10"
   }
 }

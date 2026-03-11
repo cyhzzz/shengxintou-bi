@@ -111,6 +111,99 @@ class EmployeeConversionWeekly {
                     </div>
                 </div>
                 <div class="card__body">
+                    <!-- 海报导出内部卡片 -->
+                    <div class="poster-export-inline" id="posterExportInline" style="
+                        background: var(--bg-hover, #f5f7fa);
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                        display: none;
+                    ">
+                        <div style="display: flex; gap: 12px;">
+                            <!-- 小红书 -->
+                            <div class="poster-btn" style="
+                                flex: 1;
+                                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+                                border-radius: 10px;
+                                padding: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                cursor: pointer;
+                                transition: transform 0.2s, box-shadow 0.2s;
+                            " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(255, 107, 107, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                                <span style="font-size: 36px;">📕</span>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">小红书</div>
+                                    <button class="btn btn--sm export-poster-btn" data-platform="xiaohongshu" style="
+                                        background: #fff;
+                                        color: #ff6b6b;
+                                        border: none;
+                                        font-weight: 600;
+                                        padding: 6px 14px;
+                                        border-radius: 4px;
+                                        width: 100%;
+                                    ">导出海报</button>
+                                </div>
+                            </div>
+
+                            <!-- 腾讯 -->
+                            <div class="poster-btn" style="
+                                flex: 1;
+                                background: linear-gradient(135deg, #1e5bb5 0%, #2d7dd2 100%);
+                                border-radius: 10px;
+                                padding: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                cursor: pointer;
+                                transition: transform 0.2s, box-shadow 0.2s;
+                            " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(30, 91, 181, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                                <span style="font-size: 36px;">💬</span>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">腾讯</div>
+                                    <button class="btn btn--sm export-poster-btn" data-platform="tencent" style="
+                                        background: #fff;
+                                        color: #1e5bb5;
+                                        border: none;
+                                        font-weight: 600;
+                                        padding: 6px 14px;
+                                        border-radius: 4px;
+                                        width: 100%;
+                                    ">导出海报</button>
+                                </div>
+                            </div>
+
+                            <!-- 抖音 -->
+                            <div class="poster-btn" style="
+                                flex: 1;
+                                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                                border-radius: 10px;
+                                padding: 14px;
+                                display: flex;
+                                align-items: center;
+                                gap: 12px;
+                                cursor: pointer;
+                                transition: transform 0.2s, box-shadow 0.2s;
+                            " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(0, 0, 0, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                                <span style="font-size: 36px;">🎵</span>
+                                <div style="flex: 1;">
+                                    <div style="font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 6px;">抖音</div>
+                                    <button class="btn btn--sm export-poster-btn" data-platform="douyin" style="
+                                        background: #fff;
+                                        color: #1a1a2e;
+                                        border: none;
+                                        font-weight: 600;
+                                        padding: 6px 14px;
+                                        border-radius: 4px;
+                                        width: 100%;
+                                    ">导出海报</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 周报正文 -->
                     <div id="reportContent" style="
                         background: var(--bg-hover, #f5f7fa);
                         border-radius: 8px;
@@ -123,86 +216,6 @@ class EmployeeConversionWeekly {
 <span style="color: #999; font-size: 14px;">
 点击"生成周报"按钮，将自动生成本周转化战报...
 </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 海报导出卡片 -->
-            <div class="card card--full-width" id="posterExportCard" style="display: none;">
-                <div class="card__header">
-                    <h3 class="card__title">导出海报</h3>
-                    <div class="card__actions">
-                        <span class="stat-label">选择平台导出精美海报</span>
-                    </div>
-                </div>
-                <div class="card__body">
-                    <div class="poster-export-grid" style="
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                        gap: 20px;
-                    ">
-                        <!-- 小红书海报 -->
-                        <div class="poster-export-item" style="
-                            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-                            border-radius: 12px;
-                            padding: 24px;
-                            color: white;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: transform 0.2s, box-shadow 0.2s;
-                        " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(255, 107, 107, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                            <div style="font-size: 48px; margin-bottom: 12px;">📕</div>
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">小红书渠道</div>
-                            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">开户榜海报</div>
-                            <button class="btn btn--sm export-poster-btn" data-platform="xiaohongshu" style="
-                                background: white;
-                                color: #ff6b6b;
-                                border: none;
-                                font-weight: 600;
-                            ">导出海报</button>
-                        </div>
-
-                        <!-- 腾讯海报 -->
-                        <div class="poster-export-item" style="
-                            background: linear-gradient(135deg, #1e5bb5 0%, #2d7dd2 100%);
-                            border-radius: 12px;
-                            padding: 24px;
-                            color: white;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: transform 0.2s, box-shadow 0.2s;
-                        " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(30, 91, 181, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                            <div style="font-size: 48px; margin-bottom: 12px;">💬</div>
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">腾讯渠道</div>
-                            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">开户榜海报</div>
-                            <button class="btn btn--sm export-poster-btn" data-platform="tencent" style="
-                                background: white;
-                                color: #1e5bb5;
-                                border: none;
-                                font-weight: 600;
-                            ">导出海报</button>
-                        </div>
-
-                        <!-- 抖音海报 -->
-                        <div class="poster-export-item" style="
-                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-                            border-radius: 12px;
-                            padding: 24px;
-                            color: white;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: transform 0.2s, box-shadow 0.2s;
-                        " onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 24px rgba(0, 0, 0, 0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                            <div style="font-size: 48px; margin-bottom: 12px;">🎵</div>
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">抖音渠道</div>
-                            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">开户榜海报</div>
-                            <button class="btn btn--sm export-poster-btn" data-platform="douyin" style="
-                                background: white;
-                                color: #1a1a2e;
-                                border: none;
-                                font-weight: 600;
-                            ">导出海报</button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -237,14 +250,7 @@ class EmployeeConversionWeekly {
             excelBtn.addEventListener('click', () => this.exportExcel());
         }
 
-        // 海报导出按钮
-        const posterBtns = document.querySelectorAll('.export-poster-btn');
-        posterBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const platform = e.target.dataset.platform;
-                this.exportPoster(platform);
-            });
-        });
+        // 海报导出按钮在 generateReport 成功后通过 bindPosterEvents() 绑定，避免重复绑定
     }
 
     /**
@@ -326,10 +332,10 @@ class EmployeeConversionWeekly {
                 document.getElementById('exportWordBtn').disabled = false;
                 document.getElementById('exportExcelBtn').disabled = false;
 
-                // 显示海报导出卡片
-                const posterCard = document.getElementById('posterExportCard');
-                if (posterCard) {
-                    posterCard.style.display = 'block';
+                // 显示海报导出内部卡片
+                const posterInline = document.getElementById('posterExportInline');
+                if (posterInline) {
+                    posterInline.style.display = 'block';
                 }
 
                 // 绑定海报导出按钮事件
@@ -573,13 +579,23 @@ class EmployeeConversionWeekly {
      * 绑定海报导出按钮事件
      */
     bindPosterEvents() {
-        const posterBtns = document.querySelectorAll('.export-poster-btn');
-        posterBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const platform = e.target.dataset.platform;
+        // 使用事件委托，避免重复绑定
+        const posterContainer = document.getElementById('posterExportInline');
+        if (!posterContainer) return;
+
+        // 如果已经绑定过，跳过
+        if (posterContainer.dataset.bound === 'true') return;
+
+        posterContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.export-poster-btn');
+            if (btn) {
+                const platform = btn.dataset.platform;
                 this.exportPoster(platform);
-            });
+            }
         });
+
+        // 标记已绑定
+        posterContainer.dataset.bound = 'true';
     }
 
     /**

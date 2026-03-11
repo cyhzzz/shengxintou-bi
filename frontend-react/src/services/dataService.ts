@@ -3,7 +3,7 @@
  * 提供数据查询相关接口
  */
 import { http } from './http';
-import type { ApiResponse, SummaryData, TrendData, AgencyAnalysisData, ConversionFunnelData, LeadsDetailData } from '@/types';
+import type { ApiResponse, SummaryData, TrendData, AgencyAnalysisData, ConversionFunnelData, LeadsDetailData, DashboardCoreMetricsData, DashboardTrendData } from '@/types';
 
 // 筛选条件接口
 export interface FilterParams {
@@ -35,6 +35,29 @@ export const dataService = {
     granularity?: 'daily' | 'weekly' | 'monthly'
   ): Promise<ApiResponse<TrendData>> => {
     return http.post('/trend', { filters, metrics, granularity });
+  },
+
+  // 获取数据概览核心指标（与原始前端一致）
+  getDashboardCoreMetrics: async (params?: {
+    platforms?: string[];
+    agencies?: string[];
+    business_models?: string[];
+    start_date?: string;
+    end_date?: string;
+  }): Promise<ApiResponse<DashboardCoreMetricsData>> => {
+    return http.post('/dashboard/core-metrics', params || {});
+  },
+
+  // 获取数据概览趋势数据（与原始前端一致）
+  getDashboardTrendData: async (params: {
+    start_date: string;
+    end_date: string;
+    platforms?: string[];
+    agencies?: string[];
+    business_models?: string[];
+    metric_type?: 'cost_per_lead' | 'cost_per_customer' | 'cost_per_valid_account';
+  }): Promise<ApiResponse<DashboardTrendData>> => {
+    return http.post('/dashboard/trend-data', params);
   },
 
   // 获取代理商分析数据

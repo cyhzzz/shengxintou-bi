@@ -23,7 +23,87 @@ bp = Blueprint('xhs_notes', __name__)
 def get_xhs_notes_analysis():
     """
     小红书笔记分析
-    返回笔记互动数据和趋势
+    ---
+    tags:
+      - XHS Notes
+    description: |
+      获取小红书笔记互动数据和趋势分析。
+
+      返回数据包括：
+      - 笔记列表（分页）
+      - 互动指标：曝光、点击、点赞、评论、收藏、分享
+      - 成本指标：花费、点击成本、CPM
+      - 汇总数据：总花费、总曝光、总互动等
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+            page:
+              type: integer
+              default: 1
+              description: 页码
+            page_size:
+              type: integer
+              default: 50
+              description: 每页数量
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            notes:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  note_id:
+                    type: string
+                  metrics:
+                    type: object
+                    properties:
+                      cost:
+                        type: number
+                      impressions:
+                        type: integer
+                      clicks:
+                        type: integer
+            summary:
+              type: object
+              properties:
+                total_cost:
+                  type: number
+                total_impressions:
+                  type: integer
+                total_notes:
+                  type: integer
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+                total:
+                  type: integer
+      500:
+        description: 服务器错误
     """
     from backend.database import db
     from backend.models import XhsNotesDaily
@@ -137,19 +217,148 @@ def get_xhs_notes_analysis():
 @bp.route('/xhs-notes-list', methods=['POST'])
 def get_xhs_notes_list():
     """
-    小红书笔记列表 (使用聚合表 DailyNotesMetricsUnified)
-    返回分页的笔记数据，支持筛选
+    小红书笔记列表
+    ---
+    tags:
+      - XHS Notes
+    description: |
+      获取小红书笔记列表数据（使用聚合表 DailyNotesMetricsUnified）。
 
-    聚合逻辑：
-    - 按 note_id 分组，将多日期数据聚合为笔记级数据
-    - 数值字段求和：cost, impressions, clicks, interactions, lead_users等
-    - 维度字段取最大值：note_title, creator_name, producer, ad_strategy等
+      **聚合逻辑**：
+      - 按 note_id 分组，将多日期数据聚合为笔记级数据
+      - 数值字段求和：cost, impressions, clicks, interactions, lead_users等
+      - 维度字段取最大值：note_title, creator_name, producer, ad_strategy等
 
-    更新说明:
-    - 使用 daily_notes_metrics_unified 聚合表
-    - 支持笔记级数据（每个笔记一条记录，多日期聚合）
-    - 支持转化数据（加粉量、开户量等）
-    - 支持总量/投放量/自然量拆分
+      **支持筛选**：
+      - date_range: 数据时间范围
+      - publish_date_range: 笔记发布时间范围
+      - creator/creators: 生产者筛选
+      - ad_strategies: 广告策略筛选
+      - content_types: 内容类型筛选（图文/视频）
+      - account: 发布账号筛选
+      - is_ad: 投放类型筛选（投放/自然）
+
+      **转化数据**：
+      - lead_users: 加微量
+      - customer_mouth_users: 开口量
+      - valid_lead_users: 有效线索量
+      - opened_account_users: 开户量
+      - valid_customer_users: 有效户量
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 数据时间范围
+                  example: ["2025-01-01", "2025-01-31"]
+                publish_date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 笔记发布时间范围
+                creator:
+                  type: string
+                  description: 生产者筛选（单选）
+                creators:
+                  type: array
+                  items:
+                    type: string
+                  description: 生产者筛选（多选）
+                ad_strategies:
+                  type: array
+                  items:
+                    type: string
+                  description: 广告策略筛选
+                content_types:
+                  type: array
+                  items:
+                    type: string
+                  description: 内容类型筛选（图文笔记/视频笔记）
+                account:
+                  type: string
+                  description: 发布账号筛选
+                is_ad:
+                  type: string
+                  enum: ["all", "true", "false"]
+                  description: 投放类型筛选
+            page:
+              type: integer
+              default: 1
+            page_size:
+              type: integer
+              default: 50
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+            notes:
+              type: array
+              items:
+                type: object
+                properties:
+                  note_id:
+                    type: string
+                  note_name:
+                    type: string
+                  note_type:
+                    type: string
+                  producer:
+                    type: string
+                  ad_strategy:
+                    type: string
+                  exposure:
+                    type: integer
+                  interactions:
+                    type: integer
+                  ad_spend:
+                    type: number
+                  lead_users:
+                    type: integer
+                  opened_account_users:
+                    type: integer
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+                total:
+                  type: integer
+                total_pages:
+                  type: integer
+            filters:
+              type: object
+              properties:
+                creators:
+                  type: array
+                  items:
+                    type: string
+                note_types:
+                  type: array
+                  items:
+                    type: string
+                content_types:
+                  type: array
+                  items:
+                    type: string
+      500:
+        description: 服务器错误
     """
     from backend.database import db
     from sqlalchemy import func

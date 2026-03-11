@@ -1,0 +1,50 @@
+.conversionFunnelPage {
+  padding: 0;
+}
+
+.detailCard {
+  height: 100%;
+}
+
+.funnelTable {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.funnelRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.stageName {
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.stageCount {
+  color: #1890ff;
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 100px;
+  text-align: right;
+}
+
+.stageRate {
+  color: #52c41a;
+  min-width: 80px;
+  text-align: right;
+}
+
+.stageConversion {
+  color: #666;
+  font-size: 12px;
+}
+
+.tableRow {
+  margin-top: 16px;
+}

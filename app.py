@@ -92,6 +92,11 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # CORS配置
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+# ============================================================================
+# Swagger/OpenAPI 文档配置
+# 注意：Swagger 初始化必须在所有 Blueprint 注册之后
+# ============================================================================
+
 # 统一CORS处理
 @app.after_request
 def after_request(response):
@@ -319,6 +324,19 @@ app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(xhs_note_info.bp, url_prefix=API_PREFIX + '/xhs-note-info')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
+
+# ============================================================================
+# Swagger/OpenAPI 文档初始化
+# 必须在所有 Blueprint 注册之后初始化，才能发现所有 API 端点
+# ============================================================================
+try:
+    from backend.swagger_config import init_swagger
+    swagger = init_swagger(app)
+    logger.info("✓ Swagger API 文档已启用: http://127.0.0.1:5000/apidocs")
+except ImportError as e:
+    logger.warning(f"Swagger 未安装，跳过 API 文档初始化: {e}")
+except Exception as e:
+    logger.warning(f"Swagger 初始化失败: {e}")
 
 # Debug: Log all registered routes
 logger.info("已注册的路由:")
