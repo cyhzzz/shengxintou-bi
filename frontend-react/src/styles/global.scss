@@ -1,0 +1,255 @@
+// ========================================
+// 省心投 BI - 全局样式
+// ========================================
+
+@import './variables.scss';
+
+// ===== CSS Reset =====
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: $font-family;
+  font-size: $font-size-base;
+  line-height: 1.5;
+  color: $text-primary;
+  background-color: $bg-page;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+}
+
+// ===== 滚动条样式 =====
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $bg-page;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $border-color-dark;
+  border-radius: 4px;
+
+  &:hover {
+    background: $text-tertiary;
+  }
+}
+
+// ===== 链接样式 =====
+a {
+  color: $primary-color;
+  text-decoration: none;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $primary-hover;
+  }
+}
+
+// ===== 通用类 =====
+
+// 文字省略
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 多行文字省略
+.text-ellipsis-multi {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+// Flex 布局
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+// 间距工具类
+@for $i from 1 through 10 {
+  .mt-#{$i} {
+    margin-top: #{$i * 4}px;
+  }
+  .mb-#{$i} {
+    margin-bottom: #{$i * 4}px;
+  }
+  .ml-#{$i} {
+    margin-left: #{$i * 4}px;
+  }
+  .mr-#{$i} {
+    margin-right: #{$i * 4}px;
+  }
+  .pt-#{$i} {
+    padding-top: #{$i * 4}px;
+  }
+  .pb-#{$i} {
+    padding-bottom: #{$i * 4}px;
+  }
+  .pl-#{$i} {
+    padding-left: #{$i * 4}px;
+  }
+  .pr-#{$i} {
+    padding-right: #{$i * 4}px;
+  }
+}
+
+// ===== 页面布局 =====
+.app-layout {
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: $sidebar-width;
+  background-color: $bg-sidebar;
+  border-right: 1px solid $border-color;
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.main-container {
+  margin-left: $sidebar-width;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: $sidebar-width;
+  right: 0;
+  height: $topbar-height;
+  background-color: $bg-content;
+  border-bottom: 1px solid $border-color;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 $spacing-lg;
+  z-index: 999;
+}
+
+.content-area {
+  margin-top: $topbar-height;
+  padding: $spacing-lg;
+  flex: 1;
+  background-color: $bg-page;
+}
+
+// ===== 卡片样式 =====
+.card {
+  background-color: $bg-content;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-card;
+  padding: $spacing-lg;
+
+  & + & {
+    margin-top: $spacing-lg;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $spacing;
+  padding-bottom: $spacing;
+  border-bottom: 1px solid $border-color-light;
+}
+
+.card-title {
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: $text-primary;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+// ===== 筛选器样式 =====
+.filter-bar {
+  background-color: $bg-content;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-card;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-lg;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: $text-secondary;
+  font-size: $font-size-sm;
+  white-space: nowrap;
+}
+
+.filter-actions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-left: auto;
+}
+
+// ===== 响应式 =====
+@media (max-width: $breakpoint-md) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform $transition-normal;
+  }
+
+  .sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .main-container {
+    margin-left: 0;
+  }
+
+  .topbar {
+    left: 0;
+  }
+}
