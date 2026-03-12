@@ -30,6 +30,7 @@ const VaadinLoader = {
   COMPONENT_JS: {
     button: '@vaadin/button/vaadin-button.js',
     textField: '@vaadin/text-field/vaadin-text-field.js',
+    textArea: '@vaadin/text-field/vaadin-text-area.js',
     select: '@vaadin/select/vaadin-select.js',
     item: '@vaadin/item/vaadin-item.js',
     datePicker: '@vaadin/date-picker/vaadin-date-picker.js',
