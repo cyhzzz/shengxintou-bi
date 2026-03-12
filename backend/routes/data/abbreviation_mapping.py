@@ -284,13 +284,58 @@ def create_abbreviation_mapping():
 @bp.route('/abbreviation-mapping/<int:id>', methods=['PUT'])
 def update_abbreviation_mapping(id):
     """
-    更新代理商简称映射
-    
-    请求体:
-    {
-        "full_name": "量子",
-        "is_active": true
-    }
+    更新简称映射
+    ---
+    tags:
+      - Abbreviation Mapping
+    summary: 更新简称映射
+    description: 更新指定ID的简称映射信息，可更新全称、显示名称、描述和启用状态
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: 映射记录ID
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            full_name:
+              type: string
+              description: 新全称
+              example: "量子"
+            display_name:
+              type: string
+              description: 新显示名称
+              example: "量子"
+            description:
+              type: string
+              description: 新说明备注
+              example: "更新后的代理商简称"
+            is_active:
+              type: boolean
+              description: 是否启用
+              example: true
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 更新成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "更新成功"
+      404:
+        description: 记录不存在
+      500:
+        description: 服务器错误
     """
     try:
         data = request.get_json()
@@ -336,7 +381,38 @@ def update_abbreviation_mapping(id):
 
 @bp.route('/abbreviation-mapping/<int:id>', methods=['DELETE'])
 def delete_abbreviation_mapping(id):
-    """删除代理商简称映射"""
+    """
+    删除简称映射
+    ---
+    tags:
+      - Abbreviation Mapping
+    summary: 删除简称映射
+    description: 删除指定ID的简称映射记录
+    parameters:
+      - name: id
+        in: path
+        type: integer
+        required: true
+        description: 映射记录ID
+    produces:
+      - application/json
+    responses:
+      200:
+        description: 删除成功
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "删除成功"
+      404:
+        description: 记录不存在
+      500:
+        description: 服务器错误
+    """
     try:
         mapping = AgencyAbbreviationMapping.query.get(id)
         if not mapping:

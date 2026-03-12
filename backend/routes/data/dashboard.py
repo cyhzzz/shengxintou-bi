@@ -241,20 +241,65 @@ responses:
 @bp.route('/dashboard/accounts', methods=['POST'])
 def get_dashboard_accounts():
     """
-    获取数据概览报表的账号列表
-    请求体: {
-        "filters": {
-            "platforms": ["腾讯", "抖音"],
-            "agencies": ["量子", "众联"]
-        }
-    }
-    返回: {
-        "success": true,
-        "data": {
-            "ad_accounts": [...],  # 投放账号
-            "content_accounts": [...]  # 内容账号（如果需要区分）
-        }
-    }
+    获取数据概览账号列表
+    ---
+    tags:
+      - Dashboard
+    description: 获取数据概览报表的账号列表，支持按平台和代理商筛选
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: ["腾讯", "抖音", "小红书"]
+                  description: 平台筛选
+                  example: ["腾讯", "抖音"]
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                  example: ["量子", "众联"]
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              properties:
+                ad_accounts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      platform:
+                        type: string
+                      account_id:
+                        type: string
+                      account_name:
+                        type: string
+                      agency:
+                        type: string
+                      business_model:
+                        type: string
+                total:
+                  type: integer
+      500:
+        description: 服务器错误
     """
     from backend.database import db
 
