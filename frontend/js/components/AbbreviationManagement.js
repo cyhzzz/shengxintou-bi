@@ -3,6 +3,8 @@
  *
  * 用于管理代理商简称映射表 (agency_abbreviation_mapping)
  * 维护转化明细表 (backend_conversions) 中 agency 字段的拼音简称到全称的映射关系
+ *
+ * v2.0 - 使用 Vaadin Web Components (条件渲染，支持降级)
  */
 
 class AbbreviationManagement {
@@ -12,14 +14,49 @@ class AbbreviationManagement {
         this.editingItem = null;
         this.filterType = 'all'; // all, agency, platform
         this.filterStatus = 'all'; // all, active, inactive
+        this.vaadinReady = false; // Vaadin 组件是否加载完成
 
         this.init();
     }
 
     async init() {
         console.log('[简称管理] 初始化...');
+
+        // 尝试加载 Vaadin 组件
+        await this.loadVaadinComponents();
+
         this.render();
         await this.loadData();
+    }
+
+    /**
+     * 加载 Vaadin 组件
+     */
+    async loadVaadinComponents() {
+        try {
+            // 检查 VaadinLoader 是否存在
+            if (typeof VaadinLoader === 'undefined') {
+                console.log('[简称管理] VaadinLoader 未找到，使用原生组件');
+                this.vaadinReady = false;
+                return;
+            }
+
+            // 加载需要的组件：select, text-field, button, checkbox, text-area
+            await VaadinLoader.loadComponents([
+                'textField',
+                'select',
+                'item',
+                'button',
+                'checkbox',
+                'textArea'
+            ]);
+
+            this.vaadinReady = true;
+            console.log('[简称管理] Vaadin 组件加载成功');
+        } catch (error) {
+            console.warn('[简称管理] Vaadin 组件加载失败，使用原生组件:', error);
+            this.vaadinReady = false;
+        }
     }
 
     async loadData() {
@@ -45,15 +82,23 @@ class AbbreviationManagement {
         const container = document.getElementById('mainContent');
         if (!container) return;
 
+        const useVaadin = this.vaadinReady;
+
         container.innerHTML = `
             <div class="card card--full-width">
                 <div class="card__header">
                     <h3 class="card__title">简称映射管理</h3>
                     <div class="card__actions">
                         <span class="stat-label" id="totalCount">共 0 条</span>
-                        <button class="btn btn--primary btn--sm" id="addAbbreviationBtn">
-                            <span style="margin-right: 4px;">+</span>添加简称
-                        </button>
+                        ${useVaadin ? `
+                            <vaadin-button id="addAbbreviationBtn" theme="primary">
+                                <span style="margin-right: 4px;">+</span>添加简称
+                            </vaadin-button>
+                        ` : `
+                            <button class="btn btn--primary btn--sm" id="addAbbreviationBtn">
+                                <span style="margin-right: 4px;">+</span>添加简称
+                            </button>
+                        `}
                     </div>
                 </div>
                 <div class="card__body">
@@ -61,19 +106,35 @@ class AbbreviationManagement {
                     <div style="display: flex; gap: 16px; margin-bottom: 20px;">
                         <div class="filter-group">
                             <label class="filter-label">类型:</label>
-                            <select id="filterType" class="form-control" style="width: 120px;">
-                                <option value="all">全部</option>
-                                <option value="agency">代理商</option>
-                                <option value="platform">平台</option>
-                            </select>
+                            ${useVaadin ? `
+                                <vaadin-select id="filterType" theme="aura" style="width: 120px;">
+                                    <vaadin-item value="all">全部</vaadin-item>
+                                    <vaadin-item value="agency">代理商</vaadin-item>
+                                    <vaadin-item value="platform">平台</vaadin-item>
+                                </vaadin-select>
+                            ` : `
+                                <select id="filterType" class="form-control" style="width: 120px;">
+                                    <option value="all">全部</option>
+                                    <option value="agency">代理商</option>
+                                    <option value="platform">平台</option>
+                                </select>
+                            `}
                         </div>
                         <div class="filter-group">
                             <label class="filter-label">状态:</label>
-                            <select id="filterStatus" class="form-control" style="width: 120px;">
-                                <option value="all">全部</option>
-                                <option value="active">启用</option>
-                                <option value="inactive">禁用</option>
-                            </select>
+                            ${useVaadin ? `
+                                <vaadin-select id="filterStatus" theme="aura" style="width: 120px;">
+                                    <vaadin-item value="all">全部</vaadin-item>
+                                    <vaadin-item value="active">启用</vaadin-item>
+                                    <vaadin-item value="inactive">禁用</vaadin-item>
+                                </vaadin-select>
+                            ` : `
+                                <select id="filterStatus" class="form-control" style="width: 120px;">
+                                    <option value="all">全部</option>
+                                    <option value="active">启用</option>
+                                    <option value="inactive">禁用</option>
+                                </select>
+                            `}
                         </div>
                     </div>
 
@@ -107,7 +168,11 @@ class AbbreviationManagement {
                 <div class="modal-container" style="max-width: 500px;">
                     <div class="modal-header">
                         <h3 class="modal-title" id="modalTitle">添加简称</h3>
-                        <button class="modal-close" id="closeModal">&times;</button>
+                        ${useVaadin ? `
+                            <vaadin-button id="closeModal" theme="tertiary-inline" style="font-size: 24px;">&times;</vaadin-button>
+                        ` : `
+                            <button class="modal-close" id="closeModal">&times;</button>
+                        `}
                     </div>
                     <div class="modal-body">
                         <form id="abbreviationForm">
@@ -117,7 +182,12 @@ class AbbreviationManagement {
                                 <label class="form-label" for="abbreviation">
                                     简称 <span class="form-required">*</span>
                                 </label>
-                                <input type="text" id="abbreviation" class="form-control" placeholder="如: lz, fs, YJ" required>
+                                ${useVaadin ? `
+                                    <vaadin-text-field id="abbreviation" theme="aura"
+                                        placeholder="如: lz, fs, YJ" required style="width: 100%;"></vaadin-text-field>
+                                ` : `
+                                    <input type="text" id="abbreviation" class="form-control" placeholder="如: lz, fs, YJ" required>
+                                `}
                                 <small class="form-hint">拼音简称，对应转化表中的 agency 字段</small>
                             </div>
 
@@ -125,52 +195,93 @@ class AbbreviationManagement {
                                 <label class="form-label" for="fullName">
                                     全称 <span class="form-required">*</span>
                                 </label>
-                                <input type="text" id="fullName" class="form-control" placeholder="如: 量子, 风声, 云极" required>
+                                ${useVaadin ? `
+                                    <vaadin-text-field id="fullName" theme="aura"
+                                        placeholder="如: 量子, 风声, 云极" required style="width: 100%;"></vaadin-text-field>
+                                ` : `
+                                    <input type="text" id="fullName" class="form-control" placeholder="如: 量子, 风声, 云极" required>
+                                `}
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label" for="mappingType">
                                     类型 <span class="form-required">*</span>
                                 </label>
-                                <select id="mappingType" class="form-control" required>
-                                    <option value="">请选择</option>
-                                    <option value="agency">代理商</option>
-                                    <option value="platform">平台</option>
-                                </select>
+                                ${useVaadin ? `
+                                    <vaadin-select id="mappingType" theme="aura" required style="width: 100%;">
+                                        <vaadin-item value="">请选择</vaadin-item>
+                                        <vaadin-item value="agency">代理商</vaadin-item>
+                                        <vaadin-item value="platform">平台</vaadin-item>
+                                    </vaadin-select>
+                                ` : `
+                                    <select id="mappingType" class="form-control" required>
+                                        <option value="">请选择</option>
+                                        <option value="agency">代理商</option>
+                                        <option value="platform">平台</option>
+                                    </select>
+                                `}
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label" for="platform">适用平台</label>
-                                <select id="platform" class="form-control">
-                                    <option value="">通用（所有平台）</option>
-                                    <option value="腾讯">腾讯</option>
-                                    <option value="抖音">抖音</option>
-                                    <option value="小红书">小红书</option>
-                                </select>
+                                ${useVaadin ? `
+                                    <vaadin-select id="platform" theme="aura" style="width: 100%;">
+                                        <vaadin-item value="">通用（所有平台）</vaadin-item>
+                                        <vaadin-item value="腾讯">腾讯</vaadin-item>
+                                        <vaadin-item value="抖音">抖音</vaadin-item>
+                                        <vaadin-item value="小红书">小红书</vaadin-item>
+                                    </vaadin-select>
+                                ` : `
+                                    <select id="platform" class="form-control">
+                                        <option value="">通用（所有平台）</option>
+                                        <option value="腾讯">腾讯</option>
+                                        <option value="抖音">抖音</option>
+                                        <option value="小红书">小红书</option>
+                                    </select>
+                                `}
                                 <small class="form-hint">留空表示适用于所有平台</small>
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label" for="displayName">显示名称</label>
-                                <input type="text" id="displayName" class="form-control" placeholder="默认与全称相同">
+                                ${useVaadin ? `
+                                    <vaadin-text-field id="displayName" theme="aura"
+                                        placeholder="默认与全称相同" style="width: 100%;"></vaadin-text-field>
+                                ` : `
+                                    <input type="text" id="displayName" class="form-control" placeholder="默认与全称相同">
+                                `}
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label" for="description">说明</label>
-                                <textarea id="description" class="form-control" rows="2" placeholder="可选的说明备注"></textarea>
+                                ${useVaadin ? `
+                                    <vaadin-text-area id="description" theme="aura"
+                                        placeholder="可选的说明备注" style="width: 100%; height: 60px;"></vaadin-text-area>
+                                ` : `
+                                    <textarea id="description" class="form-control" rows="2" placeholder="可选的说明备注"></textarea>
+                                `}
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">
-                                    <input type="checkbox" id="isActive" checked>
-                                    启用此简称映射
-                                </label>
+                                ${useVaadin ? `
+                                    <vaadin-checkbox id="isActive" theme="aura" checked>启用此简称映射</vaadin-checkbox>
+                                ` : `
+                                    <label class="form-label">
+                                        <input type="checkbox" id="isActive" checked>
+                                        启用此简称映射
+                                    </label>
+                                `}
                             </div>
                         </form>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn--secondary" id="cancelBtn">取消</button>
-                        <button class="btn btn--primary" id="saveBtn">保存</button>
+                        ${useVaadin ? `
+                            <vaadin-button id="cancelBtn" theme="secondary">取消</vaadin-button>
+                            <vaadin-button id="saveBtn" theme="primary">保存</vaadin-button>
+                        ` : `
+                            <button class="btn btn--secondary" id="cancelBtn">取消</button>
+                            <button class="btn btn--primary" id="saveBtn">保存</button>
+                        `}
                     </div>
                 </div>
             </div>
@@ -180,23 +291,51 @@ class AbbreviationManagement {
     }
 
     bindEvents() {
-        // 筛选器事件
-        document.getElementById('filterType').addEventListener('change', (e) => {
-            this.filterType = e.target.value;
-            this.applyFilters();
-            this.renderTable();
-        });
+        const useVaadin = this.vaadinReady;
 
-        document.getElementById('filterStatus').addEventListener('change', (e) => {
-            this.filterStatus = e.target.value;
-            this.applyFilters();
-            this.renderTable();
-        });
+        // 筛选器事件
+        const filterTypeEl = document.getElementById('filterType');
+        const filterStatusEl = document.getElementById('filterStatus');
+
+        if (useVaadin) {
+            // Vaadin 使用 value-changed 事件
+            filterTypeEl.addEventListener('value-changed', (e) => {
+                this.filterType = e.detail.value;
+                this.applyFilters();
+                this.renderTable();
+            });
+
+            filterStatusEl.addEventListener('value-changed', (e) => {
+                this.filterStatus = e.detail.value;
+                this.applyFilters();
+                this.renderTable();
+            });
+        } else {
+            // 原生使用 change 事件
+            filterTypeEl.addEventListener('change', (e) => {
+                this.filterType = e.target.value;
+                this.applyFilters();
+                this.renderTable();
+            });
+
+            filterStatusEl.addEventListener('change', (e) => {
+                this.filterStatus = e.target.value;
+                this.applyFilters();
+                this.renderTable();
+            });
+        }
 
         // 添加按钮
-        document.getElementById('addAbbreviationBtn').addEventListener('click', () => {
-            this.openEditModal();
-        });
+        const addBtn = document.getElementById('addAbbreviationBtn');
+        if (useVaadin) {
+            addBtn.addEventListener('click', () => {
+                this.openEditModal();
+            });
+        } else {
+            addBtn.addEventListener('click', () => {
+                this.openEditModal();
+            });
+        }
 
         // 模态框事件
         document.getElementById('closeModal').addEventListener('click', () => {
@@ -306,6 +445,55 @@ class AbbreviationManagement {
         }
     }
 
+    /**
+     * 获取表单元素值（兼容 Vaadin 和原生组件）
+     */
+    getFormValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return '';
+        return (this.vaadinReady ? el.value : el.value).trim();
+    }
+
+    /**
+     * 获取复选框状态（兼容 Vaadin 和原生组件）
+     */
+    getCheckboxValue(id) {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        return this.vaadinReady ? el.checked : el.checked;
+    }
+
+    /**
+     * 设置表单元素值（兼容 Vaadin 和原生组件）
+     */
+    setFormValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = value || '';
+    }
+
+    /**
+     * 设置复选框状态（兼容 Vaadin 和原生组件）
+     */
+    setCheckboxValue(id, checked) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.checked = checked;
+    }
+
+    /**
+     * 设置表单元素禁用状态（兼容 Vaadin 和原生组件）
+     */
+    setFormDisabled(id, disabled) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (this.vaadinReady) {
+            el.disabled = disabled;
+        } else {
+            el.disabled = disabled;
+        }
+    }
+
     openEditModal(item = null) {
         const modal = document.getElementById('editModal');
         const title = document.getElementById('modalTitle');
@@ -314,24 +502,24 @@ class AbbreviationManagement {
         if (item) {
             // 编辑模式
             title.textContent = '编辑简称';
-            document.getElementById('editId').value = item.id;
-            document.getElementById('abbreviation').value = item.abbreviation;
-            document.getElementById('fullName').value = item.full_name;
-            document.getElementById('mappingType').value = item.mapping_type;
-            document.getElementById('platform').value = item.platform || '';
-            document.getElementById('displayName').value = item.display_name || '';
-            document.getElementById('description').value = item.description || '';
-            document.getElementById('isActive').checked = item.is_active;
+            this.setFormValue('editId', item.id);
+            this.setFormValue('abbreviation', item.abbreviation);
+            this.setFormValue('fullName', item.full_name);
+            this.setFormValue('mappingType', item.mapping_type);
+            this.setFormValue('platform', item.platform || '');
+            this.setFormValue('displayName', item.display_name || '');
+            this.setFormValue('description', item.description || '');
+            this.setCheckboxValue('isActive', item.is_active);
 
             // 编辑模式下简称不可修改（因为是主键）
-            document.getElementById('abbreviation').disabled = true;
+            this.setFormDisabled('abbreviation', true);
         } else {
             // 添加模式
             title.textContent = '添加简称';
             form.reset();
-            document.getElementById('editId').value = '';
-            document.getElementById('isActive').checked = true;
-            document.getElementById('abbreviation').disabled = false;
+            this.setFormValue('editId', '');
+            this.setCheckboxValue('isActive', true);
+            this.setFormDisabled('abbreviation', false);
         }
 
         modal.style.display = 'flex';
@@ -349,13 +537,13 @@ class AbbreviationManagement {
         }
 
         const data = {
-            abbreviation: document.getElementById('abbreviation').value.trim(),
-            full_name: document.getElementById('fullName').value.trim(),
-            mapping_type: document.getElementById('mappingType').value,
-            platform: document.getElementById('platform').value || null,
-            display_name: document.getElementById('displayName').value.trim() || null,
-            description: document.getElementById('description').value.trim() || null,
-            is_active: document.getElementById('isActive').checked
+            abbreviation: this.getFormValue('abbreviation'),
+            full_name: this.getFormValue('fullName'),
+            mapping_type: this.getFormValue('mappingType'),
+            platform: this.getFormValue('platform') || null,
+            display_name: this.getFormValue('displayName') || null,
+            description: this.getFormValue('description') || null,
+            is_active: this.getCheckboxValue('isActive')
         };
 
         const editId = document.getElementById('editId').value;
