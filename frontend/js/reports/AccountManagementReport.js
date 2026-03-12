@@ -2,12 +2,15 @@
  * 省心投 BI - 账号管理报表
  * 显示各平台广告账号对应的代理商和业务模式映射关系
  * 支持增删改操作
+ *
+ * v2.0 - 使用 Vaadin Web Components
  */
 
 class AccountManagementReport {
     constructor() {
         this.mappingData = null;
         this.editingId = null; // 当前编辑的记录 {platform, account_id}
+        this.vaadinReady = false; // Vaadin 组件加载状态
 
         this.init();
     }
@@ -17,6 +20,9 @@ class AccountManagementReport {
      */
     async init() {
         console.log('初始化账号管理报表');
+
+        // 加载 Vaadin 组件
+        await this.loadVaadinComponents();
 
         // 隐藏全局筛选器
         const globalFilterBar = document.getElementById('filterBar');
@@ -38,6 +44,23 @@ class AccountManagementReport {
 
         // 重新渲染（带数据）
         this.render();
+    }
+
+    /**
+     * 加载 Vaadin 组件
+     */
+    async loadVaadinComponents() {
+        if (this.vaadinReady) return;
+
+        try {
+            // 加载按钮、文本框、下拉框组件
+            await window.VaadinLoader.loadComponents(['button', 'textField', 'select', 'item']);
+            this.vaadinReady = true;
+            console.log('[Vaadin] 账号管理报表组件加载完成');
+        } catch (error) {
+            console.error('[Vaadin] 组件加载失败:', error);
+            // 继续使用原生组件作为降级方案
+        }
     }
 
     /**
@@ -75,6 +98,7 @@ class AccountManagementReport {
         }
 
         const totalCount = this.mappingData ? this.mappingData.length : 0;
+        const useVaadin = this.vaadinReady;
 
         // 按平台分组的卡片
         const platformCards = this.renderPlatformSections();
@@ -87,9 +111,15 @@ class AccountManagementReport {
                     <h3 class="card__title">账号代理商映射</h3>
                     <div class="card__actions">
                         <span class="stat-label">共 ${totalCount} 个账号</span>
+                        ${useVaadin ? `
+                        <vaadin-button theme="aura primary" class="add-account-btn">
+                            + 添加账号
+                        </vaadin-button>
+                        ` : `
                         <button class="btn btn--primary btn--sm add-account-btn">
                             + 添加账号
                         </button>
+                        `}
                     </div>
                 </div>
             </div>
@@ -118,6 +148,8 @@ class AccountManagementReport {
      * 按平台分组渲染映射表
      */
     renderPlatformSections() {
+        const useVaadin = this.vaadinReady;
+
         // 加载状态
         if (!this.mappingData) {
             return `
@@ -136,9 +168,15 @@ class AccountManagementReport {
                         <div class="table-empty">
                             <div class="table-empty-icon">📊</div>
                             <p>暂无映射数据</p>
+                            ${useVaadin ? `
+                            <vaadin-button theme="aura primary" class="add-account-btn" style="margin-top: 16px;">
+                                + 添加第一条映射
+                            </vaadin-button>
+                            ` : `
                             <button class="btn btn--primary btn--sm add-account-btn" style="margin-top: 16px;">
                                 + 添加第一条映射
                             </button>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -232,6 +270,8 @@ class AccountManagementReport {
      * 渲染账号行
      */
     renderAccountRows(accounts, platform) {
+        const useVaadin = this.vaadinReady;
+
         // 按代理商和业务模式排序
         const sortedAccounts = [...accounts].sort((a, b) => {
             if (a.agency !== b.agency) {
@@ -270,6 +310,20 @@ class AccountManagementReport {
                         <td>${accountType}</td>
                         <td>
                             <div class="table-actions">
+                                ${useVaadin ? `
+                                <vaadin-button theme="aura" class="btn-edit"
+                                        data-platform="${row.platform}"
+                                        data-account-id="${row.account_id || ''}"
+                                        data-main-account-id="${row.main_account_id || ''}">
+                                    编辑
+                                </vaadin-button>
+                                <vaadin-button theme="aura error" class="btn-delete"
+                                        data-platform="${row.platform}"
+                                        data-account-id="${row.account_id || ''}"
+                                        data-main-account-id="${row.main_account_id || ''}">
+                                    删除
+                                </vaadin-button>
+                                ` : `
                                 <button class="btn btn--sm btn--ghost btn-edit"
                                         data-platform="${row.platform}"
                                         data-account-id="${row.account_id || ''}"
@@ -282,6 +336,7 @@ class AccountManagementReport {
                                         data-main-account-id="${row.main_account_id || ''}">
                                     删除
                                 </button>
+                                `}
                             </div>
                         </td>
                     </tr>
@@ -301,6 +356,20 @@ class AccountManagementReport {
                         <td><span class="tag tag--primary">${businessModel}</span></td>
                         <td>
                             <div class="table-actions">
+                                ${useVaadin ? `
+                                <vaadin-button theme="aura" class="btn-edit"
+                                        data-platform="${row.platform}"
+                                        data-account-id="${row.account_id || ''}"
+                                        data-main-account-id="">
+                                    编辑
+                                </vaadin-button>
+                                <vaadin-button theme="aura error" class="btn-delete"
+                                        data-platform="${row.platform}"
+                                        data-account-id="${row.account_id || ''}"
+                                        data-main-account-id="">
+                                    删除
+                                </vaadin-button>
+                                ` : `
                                 <button class="btn btn--sm btn--ghost btn-edit"
                                         data-platform="${row.platform}"
                                         data-account-id="${row.account_id || ''}"
@@ -313,6 +382,7 @@ class AccountManagementReport {
                                         data-main-account-id="">
                                     删除
                                 </button>
+                                `}
                             </div>
                         </td>
                     </tr>
@@ -428,6 +498,7 @@ class AccountManagementReport {
         const isEdit = !!record;
         const title = isEdit ? '编辑账号' : '添加账号';
         const isXiaohongshu = record?.platform === '小红书';
+        const useVaadin = this.vaadinReady;
 
         // 创建模态框
         const modalHtml = `
@@ -444,15 +515,22 @@ class AccountManagementReport {
                         <div id="accountForm">
                             <!-- 平台 -->
                             <div class="form-group">
-                                <label class="form-label" for="formPlatform">
-                                    平台
-                                </label>
+                                <label class="form-label">平台</label>
+                                ${useVaadin ? `
+                                <vaadin-select id="formPlatform" theme="aura" ${isEdit ? 'disabled' : ''}>
+                                    <vaadin-item value="">请选择平台</vaadin-item>
+                                    <vaadin-item value="腾讯" ${record?.platform === '腾讯' ? 'selected' : ''}>腾讯</vaadin-item>
+                                    <vaadin-item value="抖音" ${record?.platform === '抖音' ? 'selected' : ''}>抖音</vaadin-item>
+                                    <vaadin-item value="小红书" ${record?.platform === '小红书' ? 'selected' : ''}>小红书</vaadin-item>
+                                </vaadin-select>
+                                ` : `
                                 <select class="form-control" id="formPlatform" ${isEdit ? 'disabled' : ''}>
                                     <option value="">请选择平台</option>
                                     <option value="腾讯" ${record?.platform === '腾讯' ? 'selected' : ''}>腾讯</option>
                                     <option value="抖音" ${record?.platform === '抖音' ? 'selected' : ''}>抖音</option>
                                     <option value="小红书" ${record?.platform === '小红书' ? 'selected' : ''}>小红书</option>
                                 </select>
+                                `}
                             </div>
 
                             <!-- 账号ID/代理商子账号ID -->
@@ -461,6 +539,15 @@ class AccountManagementReport {
                                     ${isXiaohongshu ? '代理商子账号ID' : '账号ID'}
                                     ${isXiaohongshu ? '' : '<span class="form-required">*</span>'}
                                 </label>
+                                ${useVaadin ? `
+                                <vaadin-text-field
+                                    id="formAccountId"
+                                    theme="aura"
+                                    value="${record?.account_id || ''}"
+                                    ${isEdit ? 'disabled' : ''}
+                                    placeholder="${isXiaohongshu ? '代理商子账号ID（直投账号留空）' : '请输入账号ID'}"
+                                ></vaadin-text-field>
+                                ` : `
                                 <input type="text"
                                        class="form-control"
                                        id="formAccountId"
@@ -468,17 +555,27 @@ class AccountManagementReport {
                                        ${!isXiaohongshu && !isEdit ? 'required' : ''}
                                        ${isEdit ? 'disabled' : ''}
                                        placeholder="${isXiaohongshu ? '代理商子账号ID（直投账号留空）' : '请输入账号ID'}">
+                                `}
                                 ${isEdit ? '<small class="form-hint">账号ID不可修改</small>' : ''}
                             </div>
 
                             <!-- 账号名称 -->
                             <div class="form-group">
                                 <label class="form-label" for="formAccountName">账号名称</label>
+                                ${useVaadin ? `
+                                <vaadin-text-field
+                                    id="formAccountName"
+                                    theme="aura"
+                                    value="${record?.account_name || ''}"
+                                    placeholder="请输入账号名称"
+                                ></vaadin-text-field>
+                                ` : `
                                 <input type="text"
                                        class="form-control"
                                        id="formAccountName"
                                        value="${record?.account_name || ''}"
                                        placeholder="请输入账号名称">
+                                `}
                             </div>
 
                             <!-- 小红书特有字段 -->
@@ -488,6 +585,15 @@ class AccountManagementReport {
                                     <label class="form-label" for="formMainAccountId">
                                         主账号ID <span class="form-required">*</span>
                                     </label>
+                                    ${useVaadin ? `
+                                    <vaadin-text-field
+                                        id="formMainAccountId"
+                                        theme="aura"
+                                        value="${record?.main_account_id || ''}"
+                                        ${isEdit ? 'disabled' : ''}
+                                        placeholder="请输入主账号ID（广告主账户ID）"
+                                    ></vaadin-text-field>
+                                    ` : `
                                     <input type="text"
                                            class="form-control"
                                            id="formMainAccountId"
@@ -495,45 +601,76 @@ class AccountManagementReport {
                                            required
                                            ${isEdit ? 'disabled' : ''}
                                            placeholder="请输入主账号ID（广告主账户ID）">
+                                    `}
                                     ${isEdit ? '<small class="form-hint">主账号ID不可修改</small>' : '<small class="form-hint">小红书广告主账户ID</small>'}
                                 </div>
 
                                 <!-- 代理商子账户名称 -->
                                 <div class="form-group">
                                     <label class="form-label" for="formSubAccountName">代理商子账户名称</label>
+                                    ${useVaadin ? `
+                                    <vaadin-text-field
+                                        id="formSubAccountName"
+                                        theme="aura"
+                                        value="${record?.sub_account_name || ''}"
+                                        placeholder="代理商子账户名称"
+                                    ></vaadin-text-field>
+                                    ` : `
                                     <input type="text"
                                            class="form-control"
                                            id="formSubAccountName"
                                            value="${record?.sub_account_name || ''}"
                                            placeholder="代理商子账户名称">
+                                    `}
                                 </div>
                             </div>
 
                             <!-- 代理商 -->
                             <div class="form-group">
                                 <label class="form-label" for="formAgency">代理商</label>
+                                ${useVaadin ? `
+                                <vaadin-text-field
+                                    id="formAgency"
+                                    theme="aura"
+                                    value="${record?.agency || ''}"
+                                    placeholder="请输入代理商名称"
+                                ></vaadin-text-field>
+                                ` : `
                                 <input type="text"
                                        class="form-control"
                                        id="formAgency"
                                        value="${record?.agency || ''}"
                                        placeholder="请输入代理商名称">
+                                `}
                             </div>
 
                             <!-- 业务模式 -->
                             <div class="form-group">
                                 <label class="form-label" for="formBusinessModel">业务模式</label>
+                                ${useVaadin ? `
+                                <vaadin-select id="formBusinessModel" theme="aura">
+                                    <vaadin-item value="信息流" ${record?.business_model === '信息流' ? 'selected' : ''}>信息流</vaadin-item>
+                                    <vaadin-item value="直播" ${record?.business_model === '直播' ? 'selected' : ''}>直播</vaadin-item>
+                                </vaadin-select>
+                                ` : `
                                 <select class="form-control" id="formBusinessModel">
                                     <option value="信息流" ${record?.business_model === '信息流' ? 'selected' : ''}>信息流</option>
                                     <option value="直播" ${record?.business_model === '直播' ? 'selected' : ''}>直播</option>
                                 </select>
+                                `}
                             </div>
-                        </form>
+                        </div>
                     </div>
 
                     <!-- 底部 -->
                     <div class="modal-footer">
+                        ${useVaadin ? `
+                        <vaadin-button id="cancelBtn" theme="aura secondary">取消</vaadin-button>
+                        <vaadin-button id="saveAccountBtn" theme="aura primary">保存</vaadin-button>
+                        ` : `
                         <button class="btn btn--secondary" id="cancelBtn">取消</button>
                         <button class="btn btn--primary" id="saveAccountBtn">保存</button>
+                        `}
                     </div>
                 </div>
             </div>
@@ -546,11 +683,15 @@ class AccountManagementReport {
             this.closeModal();
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', () => {
+        const cancelBtn = document.getElementById('cancelBtn');
+        const saveBtn = document.getElementById('saveAccountBtn');
+
+        // Vaadin button 使用 click 事件，与原生相同
+        cancelBtn.addEventListener('click', () => {
             this.closeModal();
         });
 
-        document.getElementById('saveAccountBtn').addEventListener('click', () => {
+        saveBtn.addEventListener('click', () => {
             this.saveAccount();
         });
 
@@ -563,8 +704,10 @@ class AccountManagementReport {
 
         // 平台选择变化时动态显示/隐藏小红书字段
         if (!isEdit) {
-            document.getElementById('formPlatform').addEventListener('change', (e) => {
-                const platform = e.target.value;
+            const platformSelect = document.getElementById('formPlatform');
+            const handleChange = (e) => {
+                // 获取值（Vaadin 使用 e.detail.value，原生使用 e.target.value）
+                const platform = useVaadin && e.detail ? e.detail.value : e.target.value;
                 const xiaohongshuFields = document.getElementById('xiaohongshuFields');
                 const accountIdGroup = document.getElementById('accountIdGroup');
                 const accountIdLabel = accountIdGroup.querySelector('.form-label');
@@ -573,15 +716,30 @@ class AccountManagementReport {
                 if (platform === '小红书') {
                     xiaohongshuFields.style.display = 'block';
                     accountIdLabel.innerHTML = '代理商子账号ID';
-                    accountIdInput.placeholder = '代理商子账号ID（直投账号留空）';
-                    accountIdInput.removeAttribute('required');
+                    if (useVaadin) {
+                        accountIdInput.placeholder = '代理商子账号ID（直投账号留空）';
+                    } else {
+                        accountIdInput.placeholder = '代理商子账号ID（直投账号留空）';
+                        accountIdInput.removeAttribute('required');
+                    }
                 } else {
                     xiaohongshuFields.style.display = 'none';
                     accountIdLabel.innerHTML = '账号ID <span class="form-required">*</span>';
-                    accountIdInput.placeholder = '请输入账号ID';
-                    accountIdInput.setAttribute('required', 'required');
+                    if (useVaadin) {
+                        accountIdInput.placeholder = '请输入账号ID';
+                    } else {
+                        accountIdInput.placeholder = '请输入账号ID';
+                        accountIdInput.setAttribute('required', 'required');
+                    }
                 }
-            });
+            };
+
+            // Vaadin 使用 value-changed 事件，原生使用 change 事件
+            if (useVaadin) {
+                platformSelect.addEventListener('value-changed', handleChange);
+            } else {
+                platformSelect.addEventListener('change', handleChange);
+            }
         }
     }
 
@@ -599,19 +757,27 @@ class AccountManagementReport {
      * 保存账号
      */
     async saveAccount() {
-        const platform = document.getElementById('formPlatform').value;
-        const accountId = document.getElementById('formAccountId').value.trim();
-        const accountName = document.getElementById('formAccountName').value.trim();
-        const agency = document.getElementById('formAgency').value.trim();
-        const businessModel = document.getElementById('formBusinessModel').value;
+        const useVaadin = this.vaadinReady;
+
+        // 获取表单值（Vaadin 使用 value 属性）
+        const getFormValue = (id) => {
+            const el = document.getElementById(id);
+            return el ? (useVaadin ? el.value : el.value).trim() : '';
+        };
+
+        const platform = getFormValue('formPlatform');
+        const accountId = getFormValue('formAccountId');
+        const accountName = getFormValue('formAccountName');
+        const agency = getFormValue('formAgency');
+        const businessModel = getFormValue('formBusinessModel');
 
         // 小红书特有字段
         let mainAccountId = null;
         let subAccountName = null;
 
         if (platform === '小红书') {
-            mainAccountId = document.getElementById('formMainAccountId').value.trim();
-            subAccountName = document.getElementById('formSubAccountName').value.trim();
+            mainAccountId = getFormValue('formMainAccountId');
+            subAccountName = getFormValue('formSubAccountName');
 
             // 小红书验证：主账号ID必填
             if (!mainAccountId) {
