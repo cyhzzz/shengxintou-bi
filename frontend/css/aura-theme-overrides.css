@@ -1,0 +1,116 @@
+/**
+ * Aura主题定制 - 匹配省心投品牌设计
+ *
+ * 用途：覆盖Vaadin Aura主题默认变量，与省心投品牌保持一致
+ * 引入：在index.html中，在Vaadin CSS之后引入
+ */
+
+:root {
+  /* ===== 主色调 - 匹配省心投品牌蓝色 ===== */
+  --vaadin-primary-color: #1890ff;
+  --vaadin-primary-contrast-color: #ffffff;
+  --vaadin-primary-hover-color: #40a9ff;
+  --vaadin-primary-active-color: #096dd9;
+
+  /* ===== 文本颜色 ===== */
+  --vaadin-body-text-color: #333333;
+  --vaadin-secondary-text-color: #666666;
+  --vaadin-tertiary-text-color: #999999;
+
+  /* ===== 边框和背景 ===== */
+  --vaadin-border-radius: 4px;
+  --vaadin-border-color: #d9d9d9;
+  --vaadin-background-color: #ffffff;
+  --vaadin-surface-color: #f5f7fa;
+
+  /* ===== 间距 ===== */
+  --vaadin-spacing-xs: 4px;
+  --vaadin-spacing-s: 8px;
+  --vaadin-spacing-m: 16px;
+  --vaadin-spacing-l: 20px;
+  --vaadin-spacing-xl: 24px;
+
+  /* ===== 字体 ===== */
+  --vaadin-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --vaadin-font-size-xs: 12px;
+  --vaadin-font-size-s: 14px;
+  --vaadin-font-size-m: 14px;
+  --vaadin-font-size-l: 16px;
+  --vaadin-font-size-xl: 18px;
+
+  /* ===== 组件特定变量 ===== */
+  --vaadin-button-height: 32px;
+  --vaadin-button-font-size: var(--vaadin-font-size-s);
+  --vaadin-button-border-radius: var(--vaadin-border-radius);
+
+  --vaadin-text-field-height: 32px;
+  --vaadin-text-field-font-size: var(--vaadin-font-size-s);
+  --vaadin-text-field-border-radius: var(--vaadin-border-radius);
+
+  --vaadin-select-height: 32px;
+  --vaadin-select-font-size: var(--vaadin-font-size-s);
+  --vaadin-select-border-radius: var(--vaadin-border-radius);
+
+  --vaadin-date-picker-height: 32px;
+  --vaadin-date-picker-font-size: var(--vaadin-font-size-s);
+  --vaadin-date-picker-border-radius: var(--vaadin-border-radius);
+
+  /* ===== 状态颜色 ===== */
+  --vaadin-success-color: #52c41a;
+  --vaadin-warning-color: #faad14;
+  --vaadin-error-color: #f5222d;
+  --vaadin-info-color: #1890ff;
+
+  /* ===== 阴影 ===== */
+  --vaadin-box-shadow-s: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  --vaadin-box-shadow-m: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  --vaadin-box-shadow-l: 0 6px 16px 8px rgba(0, 0, 0, 0.08), 0 3px 6px 4px rgba(0, 0, 0, 0.12), 0 9px 28px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ===== 暗色主题适配 ===== */
+[data-theme="dark"] {
+  --vaadin-body-text-color: #e5e7eb;
+  --vaadin-secondary-text-color: #9ca3af;
+  --vaadin-tertiary-text-color: #6b7280;
+  --vaadin-border-color: #374151;
+  --vaadin-background-color: #1f2937;
+  --vaadin-surface-color: #111827;
+}
+
+/* ===== 组件样式覆盖 ===== */
+
+/* 按钮样式 */
+vaadin-button[theme~="aura"] {
+  font-weight: 500;
+}
+
+vaadin-button[theme~="aura"][theme~="primary"] {
+  background-color: var(--vaadin-primary-color);
+  color: var(--vaadin-primary-contrast-color);
+}
+
+vaadin-button[theme~="aura"][theme~="primary"]:hover {
+  background-color: var(--vaadin-primary-hover-color);
+}
+
+vaadin-button[theme~="aura"][theme~="secondary"] {
+  background-color: #f5f7fa;
+  color: var(--vaadin-body-text-color);
+  border: 1px solid var(--vaadin-border-color);
+}
+
+/* 输入框样式 */
+vaadin-text-field[theme~="aura"],
+vaadin-select[theme~="aura"],
+vaadin-date-picker[theme~="aura"] {
+  background-color: var(--vaadin-background-color);
+}
+
+/* 卡片样式 */
+.aura-card {
+  background: var(--vaadin-background-color);
+  border: 1px solid var(--vaadin-border-color);
+  border-radius: var(--vaadin-border-radius);
+  padding: var(--vaadin-spacing-l);
+  box-shadow: var(--vaadin-box-shadow-s);
+}
