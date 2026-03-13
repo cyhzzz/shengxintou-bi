@@ -1,8 +1,6 @@
 /**
  * 省心投 BI - 系统配置管理组件
  * 管理系统各类配置参数
- *
- * v2.0 - 已迁移至 Vaadin Web Components
  */
 
 class ConfigManagement {
@@ -14,7 +12,6 @@ class ConfigManagement {
         this.categories = [];
         this.currentCategory = 'all';
         this.editingConfig = null;
-        this.vaadinReady = false;
 
         this.init();
     }
@@ -25,9 +22,6 @@ class ConfigManagement {
     async init() {
         console.log('初始化系统配置管理组件');
 
-        // 加载Vaadin组件
-        await this.loadVaadinComponents();
-
         // 渲染HTML
         this.render();
 
@@ -36,29 +30,6 @@ class ConfigManagement {
 
         // 加载配置数据
         await this.loadConfigs();
-    }
-
-    /**
-     * 加载Vaadin组件
-     */
-    async loadVaadinComponents() {
-        try {
-            if (typeof VaadinLoader === 'undefined') {
-                console.warn('VaadinLoader not found, using native components');
-                this.vaadinReady = false;
-                return;
-            }
-
-            await VaadinLoader.loadComponents([
-                'textField', 'select', 'item', 'button', 'checkbox', 'textArea'
-            ]);
-
-            this.vaadinReady = true;
-            console.log('Vaadin components loaded successfully');
-        } catch (error) {
-            console.warn('Failed to load Vaadin components, using native fallback:', error);
-            this.vaadinReady = false;
-        }
     }
 
     /**
@@ -77,8 +48,6 @@ class ConfigManagement {
             console.error('找不到主内容容器');
             return;
         }
-
-        const useVaadin = this.vaadinReady;
 
         container.innerHTML = `
             <div class="config-management-page">
@@ -113,15 +82,9 @@ class ConfigManagement {
                     <div class="card__header">
                         <h3 class="card__title">配置列表</h3>
                         <div class="card__actions">
-                            ${useVaadin ? `
-                                <vaadin-button id="addConfigBtn" theme="primary">
-                                    + 添加配置
-                                </vaadin-button>
-                            ` : `
-                                <button id="addConfigBtn" class="btn btn--primary btn--sm">
-                                    + 添加配置
-                                </button>
-                            `}
+                            <button id="addConfigBtn" class="btn btn--primary btn--sm">
+                                + 添加配置
+                            </button>
                         </div>
                     </div>
 
@@ -142,92 +105,53 @@ class ConfigManagement {
                         <form id="configForm">
                             <div class="form-group">
                                 <label class="form-label">配置键 <span class="required">*</span></label>
-                                ${useVaadin ? `
-                                    <vaadin-text-field id="configKey" theme="aura" placeholder="如: max_upload_size" required></vaadin-text-field>
-                                ` : `
-                                    <input type="text" id="configKey" class="form-control" placeholder="如: max_upload_size" required>
-                                `}
+                                <input type="text" id="configKey" class="form-control" placeholder="如: max_upload_size" required>
                                 <small class="form-hint">唯一标识，只能包含字母、数字和下划线</small>
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label">配置值 <span class="required">*</span></label>
-                                ${useVaadin ? `
-                                    <vaadin-text-field id="configValue" theme="aura" placeholder="配置值" required></vaadin-text-field>
-                                ` : `
-                                    <input type="text" id="configValue" class="form-control" placeholder="配置值" required>
-                                `}
+                                <input type="text" id="configValue" class="form-control" placeholder="配置值" required>
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label">配置类型 <span class="required">*</span></label>
-                                    ${useVaadin ? `
-                                        <vaadin-select id="configType" theme="aura" required>
-                                            <vaadin-item value="string">字符串</vaadin-item>
-                                            <vaadin-item value="number">数字</vaadin-item>
-                                            <vaadin-item value="boolean">布尔值</vaadin-item>
-                                            <vaadin-item value="json">JSON</vaadin-item>
-                                        </vaadin-select>
-                                    ` : `
-                                        <select id="configType" class="form-control" required>
-                                            <option value="string">字符串</option>
-                                            <option value="number">数字</option>
-                                            <option value="boolean">布尔值</option>
-                                            <option value="json">JSON</option>
-                                        </select>
-                                    `}
+                                    <select id="configType" class="form-control" required>
+                                        <option value="string">字符串</option>
+                                        <option value="number">数字</option>
+                                        <option value="boolean">布尔值</option>
+                                        <option value="json">JSON</option>
+                                    </select>
                                 </div>
 
                                 <div class="form-group">
                                     <label class="form-label">配置分类 <span class="required">*</span></label>
-                                    ${useVaadin ? `
-                                        <vaadin-select id="configCategory" theme="aura" required>
-                                            <vaadin-item value="general">通用设置</vaadin-item>
-                                            <vaadin-item value="budget">预算配置</vaadin-item>
-                                            <vaadin-item value="alert">告警设置</vaadin-item>
-                                            <vaadin-item value="api">API配置</vaadin-item>
-                                        </vaadin-select>
-                                    ` : `
-                                        <select id="configCategory" class="form-control" required>
-                                            <option value="general">通用设置</option>
-                                            <option value="budget">预算配置</option>
-                                            <option value="alert">告警设置</option>
-                                            <option value="api">API配置</option>
-                                        </select>
-                                    `}
+                                    <select id="configCategory" class="form-control" required>
+                                        <option value="general">通用设置</option>
+                                        <option value="budget">预算配置</option>
+                                        <option value="alert">告警设置</option>
+                                        <option value="api">API配置</option>
+                                    </select>
                                 </div>
                             </div>
 
                             <div class="form-group">
                                 <label class="form-label">配置说明</label>
-                                ${useVaadin ? `
-                                    <vaadin-text-area id="configDescription" theme="aura" placeholder="描述此配置的作用"></vaadin-text-area>
-                                ` : `
-                                    <textarea id="configDescription" class="form-control" rows="3" placeholder="描述此配置的作用"></textarea>
-                                `}
+                                <textarea id="configDescription" class="form-control" rows="3" placeholder="描述此配置的作用"></textarea>
                             </div>
 
                             <div class="form-group">
-                                ${useVaadin ? `
-                                    <vaadin-checkbox id="configEditable" theme="aura" checked>允许编辑</vaadin-checkbox>
-                                ` : `
-                                    <label class="form-checkbox">
-                                        <input type="checkbox" id="configEditable" checked>
-                                        <span>允许编辑</span>
-                                    </label>
-                                `}
+                                <label class="form-checkbox">
+                                    <input type="checkbox" id="configEditable" checked>
+                                    <span>允许编辑</span>
+                                </label>
                             </div>
                         </form>
                     </div>
                     <div class="modal-footer">
-                        ${useVaadin ? `
-                            <vaadin-button id="cancelBtn" theme="secondary">取消</vaadin-button>
-                            <vaadin-button id="saveConfigBtn" theme="primary">保存</vaadin-button>
-                        ` : `
-                            <button type="button" class="btn btn--secondary" id="cancelBtn">取消</button>
-                            <button type="button" class="btn btn--primary" id="saveConfigBtn">保存</button>
-                        `}
+                        <button type="button" class="btn btn--secondary" id="cancelBtn">取消</button>
+                        <button type="button" class="btn btn--primary" id="saveConfigBtn">保存</button>
                     </div>
                 </div>
             </div>
@@ -452,25 +376,8 @@ class ConfigManagement {
     openAddModal() {
         this.editingConfig = null;
         document.getElementById('modalTitle').textContent = '添加配置';
-
-        // 重置表单
-        this.setFormValue('configKey', '');
-        this.setFormValue('configValue', '');
-        this.setFormValue('configType', 'string');
-        this.setFormValue('configCategory', 'general');
-        this.setFormValue('configDescription', '');
-        this.setCheckboxValue('configEditable', true);
-
-        // 启用配置键输入
-        const configKeyEl = document.getElementById('configKey');
-        if (configKeyEl) {
-            if (this.vaadinReady) {
-                configKeyEl.disabled = false;
-            } else {
-                configKeyEl.disabled = false;
-            }
-        }
-
+        document.getElementById('configForm').reset();
+        document.getElementById('configKey').disabled = false;
         document.getElementById('configModal').style.display = 'block';
     }
 
@@ -486,20 +393,13 @@ class ConfigManagement {
                 this.editingConfig = config;
 
                 document.getElementById('modalTitle').textContent = '编辑配置';
-
-                // 使用辅助方法设置表单值
-                this.setFormValue('configKey', config.config_key);
-                this.setFormValue('configValue', this.valueToString(config.config_value, config.config_type));
-                this.setFormValue('configType', config.config_type);
-                this.setFormValue('configCategory', config.category || 'general');
-                this.setFormValue('configDescription', config.description || '');
-                this.setCheckboxValue('configEditable', config.is_editable);
-
-                // 禁用配置键输入
-                const configKeyEl = document.getElementById('configKey');
-                if (configKeyEl) {
-                    configKeyEl.disabled = true;
-                }
+                document.getElementById('configKey').value = config.config_key;
+                document.getElementById('configKey').disabled = true;
+                document.getElementById('configValue').value = this.valueToString(config.config_value, config.config_type);
+                document.getElementById('configType').value = config.config_type;
+                document.getElementById('configCategory').value = config.category || 'general';
+                document.getElementById('configDescription').value = config.description || '';
+                document.getElementById('configEditable').checked = config.is_editable;
 
                 document.getElementById('configModal').style.display = 'block';
             } else {
@@ -538,13 +438,12 @@ class ConfigManagement {
      * 保存配置
      */
     async saveConfig() {
-        // 使用辅助方法获取表单值
-        const configKey = this.getFormValue('configKey');
-        const configValue = this.getFormValue('configValue');
-        const configType = this.getFormValue('configType');
-        const configCategory = this.getFormValue('configCategory');
-        const configDescription = this.getFormValue('configDescription');
-        const configEditable = this.getCheckboxValue('configEditable');
+        const configKey = document.getElementById('configKey').value.trim();
+        const configValue = document.getElementById('configValue').value.trim();
+        const configType = document.getElementById('configType').value;
+        const configCategory = document.getElementById('configCategory').value;
+        const configDescription = document.getElementById('configDescription').value.trim();
+        const configEditable = document.getElementById('configEditable').checked;
 
         if (!configKey || !configValue) {
             this.showError('配置键和配置值不能为空');
@@ -607,50 +506,6 @@ class ConfigManagement {
             return typeof value === 'string' ? value : JSON.stringify(value);
         }
         return String(value);
-    }
-
-    /**
-     * 获取表单元素值（兼容Vaadin和原生组件）
-     * @param {string} id - 元素ID
-     * @returns {string} 元素值
-     */
-    getFormValue(id) {
-        const el = document.getElementById(id);
-        if (!el) return '';
-        return (el.value || '').trim();
-    }
-
-    /**
-     * 设置表单元素值（兼容Vaadin和原生组件）
-     * @param {string} id - 元素ID
-     * @param {string} value - 要设置的值
-     */
-    setFormValue(id, value) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.value = value || '';
-    }
-
-    /**
-     * 获取复选框状态（兼容Vaadin和原生组件）
-     * @param {string} id - 元素ID
-     * @returns {boolean} 复选框状态
-     */
-    getCheckboxValue(id) {
-        const el = document.getElementById(id);
-        if (!el) return false;
-        return this.vaadinReady ? el.checked : el.checked;
-    }
-
-    /**
-     * 设置复选框状态（兼容Vaadin和原生组件）
-     * @param {string} id - 元素ID
-     * @param {boolean} checked - 复选框状态
-     */
-    setCheckboxValue(id, checked) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.checked = checked;
     }
 
     /**
