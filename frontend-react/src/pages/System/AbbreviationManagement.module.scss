@@ -1,0 +1,37 @@
+.abbreviationManagementPage {
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+
+  .statLabel {
+    color: #666;
+    margin-right: 16px;
+  }
+
+  .filters {
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 4px;
+  }
+
+  .filterGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    label {
+      color: #666;
+      white-space: nowrap;
+    }
+  }
+}

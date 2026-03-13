@@ -3,7 +3,7 @@
  * 用于转化漏斗展示
  */
 import React from 'react';
-import { Progress, Space, Typography } from 'antd';
+import { Progress, Typography } from 'antd';
 import styles from './FunnelChart.module.scss';
 
 const { Text } = Typography;

@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, current_app
 import os
 import json
 from datetime import datetime
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('version', __name__)
 
@@ -90,6 +91,7 @@ def compare_versions(version1, version2):
 
 
 @bp.route('/local', methods=['GET'])
+@handle_exceptions
 def get_version_info():
     """
     获取本地版本信息
@@ -120,6 +122,7 @@ def get_version_info():
 
 
 @bp.route('/compare', methods=['GET'])
+@handle_exceptions
 def compare_with_cloud():
     """
     比较本地版本与云端版本
@@ -195,6 +198,7 @@ def compare_with_cloud():
 
 
 @bp.route('/sync-to-cloud', methods=['POST'])
+@handle_exceptions
 def sync_version_to_cloud():
     """
     将本地版本同步到云端

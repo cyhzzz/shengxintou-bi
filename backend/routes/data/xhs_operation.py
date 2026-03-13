@@ -14,6 +14,7 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 from .xhs_operation_helpers import (
     get_core_metrics,
@@ -31,17 +32,111 @@ bp = Blueprint('xhs_operation', __name__)
 
 
 @bp.route('/xhs-notes-operation-analysis', methods=['POST'])
+@handle_exceptions
 def get_xhs_notes_operation_analysis():
     """
-    小红书运营分析报表 (使用聚合表 DailyNotesMetricsUnified)
-    返回7个模块的数据：
-    1. 核心运营数据（6个指标卡片）
-    2. 创作者维度数据（双表格）
-    3. 内容运营数据（双图表）
-    4. 优秀笔记排行榜
-    5. 创作者年度排行榜
-    6. 代理商数据
-    7. 转化趋势数据（双图表+表格）
+    小红书运营分析报表
+    ---
+    tags:
+      - XHS Operation
+    description: |
+      获取小红书运营分析数据，包含7个模块：
+      - 核心运营数据：总花费、总曝光、总互动、总转化等
+      - 创作者维度数据：内容创作数据和转化数据
+      - 内容运营数据：创作趋势图表
+      - 优秀笔记排行榜：按转化量排序
+      - 创作者年度排行榜：年度数据汇总
+      - 代理商数据：各代理商投放效果
+      - 转化趋势数据：周度趋势图表
+
+      **支持筛选**：
+      - date_range: 日期范围
+      - top_notes_date_range: 优秀笔记排行榜日期范围
+      - creator_annual_date_range: 创作者年度排行榜日期范围
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            filters:
+              type: object
+              properties:
+                date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期范围 [开始日期, 结束日期]
+                  example: ["2025-01-01", "2025-01-31"]
+                top_notes_date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 优秀笔记排行榜日期范围
+                  example: ["2025-01-01", "2025-01-31"]
+                creator_annual_date_range:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 创作者年度排行榜日期范围
+                  example: ["2025-01-01", "2025-12-31"]
+    responses:
+      200:
+        description: 成功响应
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            data:
+              type: object
+              properties:
+                core_metrics:
+                  type: object
+                  description: 核心运营数据
+                creator_content_data:
+                  type: array
+                  description: 创作者内容创作数据
+                creator_conversion_data:
+                  type: array
+                  description: 创作者转化数据
+                creation_trend:
+                  type: array
+                  description: 创作趋势数据
+                top_notes:
+                  type: array
+                  description: 优秀笔记排行榜
+                creator_annual_ranking:
+                  type: array
+                  description: 创作者年度排行榜
+                agency_data:
+                  type: array
+                  description: 代理商数据
+                conversion_trend:
+                  type: array
+                  description: 转化趋势数据
+                note_conversion_ranking:
+                  type: array
+                  description: 笔记转化排行榜
+                creator_creation_data:
+                  type: array
+                  description: 创作者创作数据
+                creator_interaction_data:
+                  type: array
+                  description: 创作者互动数据
+                employee_conversion_ranking:
+                  type: array
+                  description: 员工转化排行榜
+                employee_weekly_conversion:
+                  type: array
+                  description: 呇度转化率数据
+      500:
+        description: 服务器错误
     """
     try:
         data = request.get_json()

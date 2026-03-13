@@ -1,0 +1,34 @@
+/**
+ * 员工转化周报页面样式
+ */
+.weeklyPage {
+  padding: 20px;
+}
+
+.configCard {
+  margin-bottom: 20px;
+}
+
+.configContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+}
+
+.reportCard {
+  margin-top: 20px;
+}

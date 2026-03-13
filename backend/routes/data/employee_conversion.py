@@ -18,6 +18,7 @@ from backend.routes.data.employee_conversion_helpers import (
     get_employee_list,
     get_platform_overview
 )
+from backend.utils.decorators import handle_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ bp = Blueprint('employee_conversion', __name__)
 
 
 @bp.route('/employee-conversion/analysis', methods=['POST'])
+@handle_exceptions
 def get_analysis_data():
     """
     获取员工转化效果分析数据
@@ -206,6 +208,7 @@ def get_analysis_data():
 
 
 @bp.route('/employee-conversion/weekly', methods=['POST'])
+@handle_exceptions
 def get_weekly_data():
     """
     获取转化周报数据
@@ -305,6 +308,7 @@ def get_weekly_data():
 
 
 @bp.route('/employee-conversion/employees', methods=['GET'])
+@handle_exceptions
 def get_employees():
     """
     获取服务人员列表
@@ -350,6 +354,7 @@ def get_employees():
 
 
 @bp.route('/employee-conversion/filter-options', methods=['GET'])
+@handle_exceptions
 def get_filter_options():
     """
     获取筛选器选项

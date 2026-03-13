@@ -1,0 +1,38 @@
+.result {
+  margin-top: 16px;
+
+  .summary {
+    margin-top: 8px;
+  }
+
+  .statRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .errorCollapse {
+    margin-top: 12px;
+
+    :global {
+      .ant-collapse-header {
+        background: #fff2f0;
+        border-color: #ffccc7;
+      }
+    }
+  }
+
+  .errorList {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .errorItem {
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}

@@ -4,7 +4,7 @@
  */
 import React, { useMemo } from 'react';
 import { Line } from '@ant-design/charts';
-import type { LineConfig } from '@ant-design/charts/es/line';
+import type { LineConfig } from '@ant-design/charts';
 
 interface DataItem {
   date: string;

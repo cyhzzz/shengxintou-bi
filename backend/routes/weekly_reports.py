@@ -16,11 +16,13 @@ import json
 from backend.database import db
 from backend.models import WeeklyReport
 from backend.utils.weekly_utils import get_week_info, generate_week_options, validate_week_period, get_all_fridays_in_year
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('weekly_reports', __name__, url_prefix='/api/v1/reports/weekly')
 
 # Diagnostic endpoint to test if code loading works
 @bp.route('/test-code-loading', methods=['GET'])
+@handle_exceptions
 def test_code_loading():
     """Test if updated code is being loaded"""
     import logging
@@ -38,6 +40,7 @@ def test_code_loading():
 
 
 @bp.route('/periods', methods=['GET'])
+@handle_exceptions
 def get_periods():
     """获取可选周次列表"""
     import logging
@@ -146,6 +149,7 @@ def get_periods():
 
 
 @bp.route('/generate', methods=['POST'])
+@handle_exceptions
 def generate_report():
     """生成周报数据"""
     try:
@@ -249,6 +253,7 @@ def generate_report():
 
 
 @bp.route('/<string:report_id>', methods=['GET'])
+@handle_exceptions
 def get_report(report_id):
     """获取指定周报"""
     try:
@@ -277,6 +282,7 @@ def get_report(report_id):
 
 
 @bp.route('/<string:report_id>', methods=['PUT'])
+@handle_exceptions
 def update_report(report_id):
     """更新或创建周报内容（支持Upsert）"""
     try:
@@ -415,6 +421,7 @@ def update_report(report_id):
 
 
 @bp.route('/<string:report_id>/export', methods=['GET'])
+@handle_exceptions
 def export_report(report_id):
     """导出周报数据（不包含HTML，由前端生成）"""
     try:

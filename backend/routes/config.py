@@ -6,12 +6,14 @@
 from flask import Blueprint, request, jsonify
 from backend.models import SystemConfiguration
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 import json
 
 bp = Blueprint('config', __name__, url_prefix='/api/v1/config')
 
 
 @bp.route('', methods=['GET'])
+@handle_exceptions
 def get_configs():
     """获取所有配置"""
     try:
@@ -37,6 +39,7 @@ def get_configs():
 
 
 @bp.route('/<config_key>', methods=['GET'])
+@handle_exceptions
 def get_config(config_key):
     """获取单个配置"""
     try:
@@ -60,6 +63,7 @@ def get_config(config_key):
 
 
 @bp.route('', methods=['POST'])
+@handle_exceptions
 def create_config():
     """创建配置"""
     try:
@@ -107,6 +111,7 @@ def create_config():
 
 
 @bp.route('/<config_key>', methods=['PUT'])
+@handle_exceptions
 def update_config(config_key):
     """更新配置"""
     try:
@@ -153,6 +158,7 @@ def update_config(config_key):
 
 
 @bp.route('/<config_key>', methods=['DELETE'])
+@handle_exceptions
 def delete_config(config_key):
     """删除配置"""
     try:
@@ -187,6 +193,7 @@ def delete_config(config_key):
 
 
 @bp.route('/batch', methods=['PUT'])
+@handle_exceptions
 def batch_update_configs():
     """批量更新配置"""
     try:

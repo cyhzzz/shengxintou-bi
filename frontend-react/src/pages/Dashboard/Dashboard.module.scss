@@ -2,6 +2,38 @@
   padding: 0;
 }
 
+.metricsGroupCard {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.groupHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.groupTitle {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
+}
+
+.groupDesc {
+  font-size: 12px;
+  color: #bfbfbf !important;
+}
+
 .sectionTitle {
   font-size: 14px;
   font-weight: 600;
@@ -17,6 +49,37 @@
 
 .metricsRow {
   margin-bottom: 8px;
+}
+
+// 5个卡片均匀分布的flex布局
+.metricsFlexRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 8px;
+
+  > * {
+    flex: 1 1 calc(20% - 16px);
+    min-width: 180px;
+  }
+
+  @media (max-width: 1200px) {
+    > * {
+      flex: 1 1 calc(33.33% - 16px);
+    }
+  }
+
+  @media (max-width: 768px) {
+    > * {
+      flex: 1 1 calc(50% - 16px);
+    }
+  }
+
+  @media (max-width: 576px) {
+    > * {
+      flex: 1 1 100%;
+    }
+  }
 }
 
 .metricCard {

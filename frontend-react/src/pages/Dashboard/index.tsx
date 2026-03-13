@@ -1,10 +1,15 @@
 /**
  * 数据概览页面
- * 展示核心指标、趋势图和平台分布
- * 使用 /dashboard/core-metrics 和 /dashboard/trend-data 接口（与原始前端一致）
+ * 展示核心指标、趋势图和业务分组
+ * 使用自动生成的 API 类型和自定义 Hooks
+ *
+ * 业务分组结构：
+ * - 前端投放: 阶段投入金额、总展示数、总点击数、总线索数
+ * - 后端转化: 新开客户数、新增有效户数、客户资产、客户贡献、存量客户资产
+ * - 运营效率: 单线索成本、单开户成本、单有效户成本
  */
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Statistic, Spin, message, Tooltip } from 'antd';
+import React, { useEffect, useCallback, useState } from 'react';
+import { Row, Col, Spin, Tooltip, Card, Typography } from 'antd';
 import {
   DollarOutlined,
   EyeOutlined,
@@ -12,15 +17,23 @@ import {
   UserOutlined,
   TeamOutlined,
   TrophyOutlined,
-  RiseOutlined,
-  FallOutlined,
   AccountBookOutlined,
   GoldOutlined,
+  RiseOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
-import { FilterBar, ChartCard, LineChart, PieChart } from '@/components';
-import { dataService } from '@/services';
-import type { CoreMetrics, WowChanges, DashboardTrendData } from '@/types';
+import { FilterBar } from '@/components';
+import MetricCard from './components/MetricCard';
+import TrendChart, { type MetricType } from './components/TrendChart';
+import {
+  useCoreMetrics,
+  useTrendData,
+  useDashboardFilters,
+} from './hooks';
+import type { PostDashboardCoreMetricsBody, PostDashboardTrendDataBody } from '@/types/api.schemas';
 import styles from './Dashboard.module.scss';
+
+const { Text } = Typography;
 
 // 指标卡片颜色
 const METRIC_COLORS = {
@@ -32,135 +45,160 @@ const METRIC_COLORS = {
   validCustomers: '#13c2c2',
   customerAssets: '#fa8c16',
   existingAssets: '#eb2f96',
+  contribution: '#722ed1',
 };
 
 const DashboardPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [coreMetrics, setCoreMetrics] = useState<CoreMetrics | null>(null);
-  const [wowChanges, setWowChanges] = useState<WowChanges | null>(null);
-  const [trendData, setTrendData] = useState<DashboardTrendData | null>(null);
-  const [dateRange, setDateRange] = useState<{ start_date: string; end_date: string } | null>(null);
+  // 趋势图指标类型状态
+  const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_per_lead');
+  // 趋势图粒度状态
+  const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
-  // 获取默认日期范围（近30天）
-  const getDefaultDateRange = () => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 30 + 1);
+  // 使用自定义 Hooks
+  const {
+    filters,
+    updateFilters,
+    resetFilters,
+    getDefaultDateRange,
+  } = useDashboardFilters();
 
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+  const {
+    coreMetrics,
+    wowChanges,
+    loading: coreMetricsLoading,
+    fetchCoreMetrics,
+  } = useCoreMetrics();
 
-    return {
-      start_date: formatDate(startDate),
-      end_date: formatDate(endDate),
-    };
-  };
+  const {
+    trendData,
+    loading: trendLoading,
+    fetchTrendData,
+  } = useTrendData();
+
+  // 合并加载状态
+  const loading = coreMetricsLoading || trendLoading;
 
   // 加载数据
-  const loadData = async (filters?: {
+  const loadData = useCallback(async (overrideFilters?: Partial<typeof filters>) => {
+    const activeFilters = overrideFilters ? { ...filters, ...overrideFilters } : filters;
+
+    const params: PostDashboardCoreMetricsBody = {
+      start_date: activeFilters.start_date,
+      end_date: activeFilters.end_date,
+    };
+
+    // 添加可选筛选条件
+    if (activeFilters.platforms.length > 0) {
+      params.platforms = activeFilters.platforms as PostDashboardCoreMetricsBody['platforms'];
+    }
+    if (activeFilters.agencies.length > 0) {
+      params.agencies = activeFilters.agencies;
+    }
+    if (activeFilters.business_models.length > 0) {
+      params.business_models = activeFilters.business_models as PostDashboardCoreMetricsBody['business_models'];
+    }
+
+    // 并行加载数据
+    await Promise.all([
+      fetchCoreMetrics(params),
+      fetchTrendData({
+        ...params,
+        metric_type: trendMetricType,
+        granularity: trendGranularity,
+      } as PostDashboardTrendDataBody),
+    ]);
+  }, [filters, fetchCoreMetrics, fetchTrendData, trendMetricType, trendGranularity]);
+
+  // 初始加载
+  useEffect(() => {
+    loadData();
+  }, []); // 只在组件挂载时加载一次
+
+  // 筛选器查询
+  const handleSearch = useCallback((searchFilters: {
     startDate: string;
     endDate: string;
     platforms: string[];
     agencies: string[];
     businessModels: string[];
   }) => {
-    setLoading(true);
-    try {
-      // 构建请求参数
-      const params = filters
-        ? {
-            start_date: filters.startDate,
-            end_date: filters.endDate,
-            platforms: filters.platforms,
-            agencies: filters.agencies,
-            business_models: filters.businessModels,
-          }
-        : {
-            ...getDefaultDateRange(),
-          };
+    const newFilters = {
+      start_date: searchFilters.startDate,
+      end_date: searchFilters.endDate,
+      platforms: searchFilters.platforms,
+      agencies: searchFilters.agencies,
+      business_models: searchFilters.businessModels,
+    };
 
-      // 保存日期范围用于趋势数据
-      setDateRange({ start_date: params.start_date, end_date: params.end_date });
+    // 更新状态
+    updateFilters(newFilters);
 
-      // 并行加载核心指标数据
-      const [coreMetricsRes] = await Promise.all([
-        dataService.getDashboardCoreMetrics(params),
-      ]);
-
-      if (coreMetricsRes.success && coreMetricsRes.data) {
-        setCoreMetrics(coreMetricsRes.data.core_metrics);
-        setWowChanges(coreMetricsRes.data.wow_changes);
-      }
-
-      // 加载趋势数据
-      if (params.start_date && params.end_date) {
-        const trendRes = await dataService.getDashboardTrendData({
-          start_date: params.start_date,
-          end_date: params.end_date,
-          platforms: params.platforms,
-          agencies: params.agencies,
-          business_models: params.business_models,
-          metric_type: 'cost_per_lead',
-        });
-
-        if (trendRes.success && trendRes.data) {
-          setTrendData(trendRes.data);
-        }
-      }
-    } catch (error) {
-      message.error('加载数据失败');
-      console.error('[Dashboard] 数据加载失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 初始加载
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // 筛选器查询
-  const handleSearch = (filters: Parameters<typeof loadData>[0]) => {
-    loadData(filters);
-  };
+    // 直接使用新筛选条件加载数据，不依赖状态更新
+    loadData(newFilters);
+  }, [updateFilters, loadData]);
 
   // 筛选器重置
-  const handleReset = () => {
-    loadData();
-  };
+  const handleReset = useCallback(() => {
+    resetFilters();
+    // 使用默认筛选条件加载数据
+    const defaultRange = {
+      start_date: getDefaultDateRange().start_date,
+      end_date: getDefaultDateRange().end_date,
+      platforms: [],
+      agencies: [],
+      business_models: [],
+    };
+    loadData(defaultRange);
+  }, [resetFilters, loadData]);
 
-  // 格式化数字
-  const formatNumber = (value: number) => {
-    if (value >= 10000) {
-      return `${(value / 10000).toFixed(2)}万`;
+  // 趋势图指标类型变化
+  const handleTrendMetricChange = useCallback((metricType: MetricType) => {
+    setTrendMetricType(metricType);
+    // 重新加载趋势数据
+    const params: PostDashboardTrendDataBody = {
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      metric_type: metricType,
+      granularity: trendGranularity,
+    };
+    if (filters.platforms.length > 0) {
+      params.platforms = filters.platforms as PostDashboardTrendDataBody['platforms'];
     }
-    return value.toLocaleString();
-  };
-
-  // 格式化金额
-  const formatCurrency = (value: number) => {
-    if (value >= 10000) {
-      return `¥${(value / 10000).toFixed(2)}万`;
+    if (filters.agencies.length > 0) {
+      params.agencies = filters.agencies;
     }
-    return `¥${value.toLocaleString()}`;
-  };
+    if (filters.business_models.length > 0) {
+      params.business_models = filters.business_models as PostDashboardTrendDataBody['business_models'];
+    }
+    fetchTrendData(params);
+  }, [filters, fetchTrendData, trendGranularity]);
 
-  // 渲染环比变化
-  const renderWowChange = (wow?: { value: number; trend: string; color: string }) => {
-    if (!wow) return null;
-    const icon = wow.trend === 'up' ? <RiseOutlined /> : <FallOutlined />;
-    const color = wow.color === 'green' ? '#52c41a' : '#f5222d';
-    return (
-      <span style={{ color, marginLeft: 8, fontSize: 12 }}>
-        {icon} {wow.value}%
-      </span>
-    );
-  };
+  // 趋势图粒度变化
+  const handleTrendGranularityChange = useCallback((granularity: 'daily' | 'weekly' | 'monthly') => {
+    setTrendGranularity(granularity);
+    // 重新加载趋势数据
+    const params: PostDashboardTrendDataBody = {
+      start_date: filters.start_date,
+      end_date: filters.end_date,
+      metric_type: trendMetricType,
+      granularity,
+    };
+    if (filters.platforms.length > 0) {
+      params.platforms = filters.platforms as PostDashboardTrendDataBody['platforms'];
+    }
+    if (filters.agencies.length > 0) {
+      params.agencies = filters.agencies;
+    }
+    if (filters.business_models.length > 0) {
+      params.business_models = filters.business_models as PostDashboardTrendDataBody['business_models'];
+    }
+    fetchTrendData(params);
+  }, [filters, fetchTrendData, trendMetricType]);
+
+  // 计算单开户成本
+  const costPerAccount = coreMetrics?.investment && coreMetrics?.new_customers
+    ? coreMetrics.investment / coreMetrics.new_customers
+    : 0;
 
   return (
     <div className={styles.dashboardPage}>
@@ -169,198 +207,228 @@ const DashboardPage: React.FC = () => {
         <FilterBar
           showPlatform
           showAgency
+          showBusinessModel
           onSearch={handleSearch}
           onReset={handleReset}
         />
 
-        {/* 投入效果指标卡片 */}
-        <div className={styles.sectionTitle}>投入效果</div>
-        <Row gutter={[16, 16]} className={styles.metricsRow}>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="总花费"
-                value={coreMetrics?.investment || 0}
-                precision={2}
-                prefix={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
-                suffix="元"
-                formatter={(value) => formatCurrency(Number(value))}
+        {/* 前端投放指标卡片 */}
+        <Card className={styles.metricsGroupCard} size="small">
+          <div className={styles.groupHeader}>
+            <Text type="secondary" className={styles.groupTitle}>
+              📊 前端投放
+            </Text>
+            <Text type="secondary" className={styles.groupDesc}>
+              广告投放与获取效果
+            </Text>
+          </div>
+          <Row gutter={[16, 16]} className={styles.metricsRow}>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <MetricCard
+                title="阶段投入金额"
+                value={coreMetrics?.investment}
+                wowChange={wowChanges?.investment ? {
+                  value: wowChanges.investment.value,
+                  trend: wowChanges.investment.trend,
+                  color: wowChanges.investment.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.investment)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="总曝光"
-                value={coreMetrics?.total_impressions || 0}
-                prefix={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
-                formatter={(value) => formatNumber(Number(value))}
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <MetricCard
+                title="总展示数"
+                value={coreMetrics?.total_impressions}
+                wowChange={wowChanges?.total_impressions ? {
+                  value: wowChanges.total_impressions.value,
+                  trend: wowChanges.total_impressions.trend,
+                  color: wowChanges.total_impressions.color,
+                } : undefined}
+                formatter="number"
+                icon={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.total_impressions)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="总点击"
-                value={coreMetrics?.total_clicks || 0}
-                prefix={<AimOutlined style={{ color: METRIC_COLORS.clicks }} />}
-                formatter={(value) => formatNumber(Number(value))}
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <MetricCard
+                title="总点击数"
+                value={coreMetrics?.total_clicks}
+                wowChange={wowChanges?.total_clicks ? {
+                  value: wowChanges.total_clicks.value,
+                  trend: wowChanges.total_clicks.trend,
+                  color: wowChanges.total_clicks.color,
+                } : undefined}
+                formatter="number"
+                icon={<AimOutlined style={{ color: METRIC_COLORS.clicks }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.total_clicks)}
-              </div>
-            </Card>
-          </Col>
-        </Row>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <MetricCard
+                title="总线索数"
+                value={coreMetrics?.total_leads}
+                wowChange={wowChanges?.total_leads ? {
+                  value: wowChanges.total_leads.value,
+                  trend: wowChanges.total_leads.trend,
+                  color: wowChanges.total_leads.color,
+                } : undefined}
+                formatter="number"
+                icon={<UserOutlined style={{ color: METRIC_COLORS.leads }} />}
+              />
+            </Col>
+          </Row>
+        </Card>
 
-        {/* 业务成果指标卡片 */}
-        <div className={styles.sectionTitle}>业务成果</div>
-        <Row gutter={[16, 16]} className={styles.metricsRow}>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="总线索"
-                value={coreMetrics?.total_leads || 0}
-                prefix={<UserOutlined style={{ color: METRIC_COLORS.leads }} />}
-                formatter={(value) => formatNumber(Number(value))}
+        {/* 后端转化指标卡片 */}
+        <Card className={styles.metricsGroupCard} size="small">
+          <div className={styles.groupHeader}>
+            <Text type="secondary" className={styles.groupTitle}>
+              💼 后端转化
+            </Text>
+            <Text type="secondary" className={styles.groupDesc}>
+              客户获取与价值创造
+            </Text>
+          </div>
+          {/* 使用 flex 布局让 5 个卡片均匀分布在一行 */}
+          <div className={styles.metricsFlexRow}>
+              <MetricCard
+                title="新开客户数"
+                value={coreMetrics?.new_customers}
+                wowChange={wowChanges?.new_customers ? {
+                  value: wowChanges.new_customers.value,
+                  trend: wowChanges.new_customers.trend,
+                  color: wowChanges.new_customers.color,
+                } : undefined}
+                formatter="number"
+                icon={<TeamOutlined style={{ color: METRIC_COLORS.openedAccounts }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.total_leads)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="新开客户"
-                value={coreMetrics?.new_customers || 0}
-                prefix={<TeamOutlined style={{ color: METRIC_COLORS.openedAccounts }} />}
+              <MetricCard
+                title="新增有效户数"
+                value={coreMetrics?.new_valid_accounts}
+                wowChange={wowChanges?.new_valid_accounts ? {
+                  value: wowChanges.new_valid_accounts.value,
+                  trend: wowChanges.new_valid_accounts.trend,
+                  color: wowChanges.new_valid_accounts.color,
+                } : undefined}
+                formatter="number"
+                icon={<TrophyOutlined style={{ color: METRIC_COLORS.validCustomers }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.new_customers)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="新有效户"
-                value={coreMetrics?.new_valid_accounts || 0}
-                prefix={<TrophyOutlined style={{ color: METRIC_COLORS.validCustomers }} />}
-              />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.new_valid_accounts)}
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 客户资产指标卡片 */}
-        <div className={styles.sectionTitle}>客户资产</div>
-        <Row gutter={[16, 16]} className={styles.metricsRow}>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
+              <MetricCard
                 title={
                   <Tooltip title="新开客户的资产总额">
-                    <span>新客户资产</span>
+                    <span>客户资产</span>
                   </Tooltip>
                 }
-                value={coreMetrics?.customer_assets || 0}
-                precision={2}
-                prefix={<AccountBookOutlined style={{ color: METRIC_COLORS.customerAssets }} />}
-                formatter={(value) => formatCurrency(Number(value))}
+                value={coreMetrics?.customer_assets}
+                wowChange={wowChanges?.customer_assets ? {
+                  value: wowChanges.customer_assets.value,
+                  trend: wowChanges.customer_assets.trend,
+                  color: wowChanges.customer_assets.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                icon={<AccountBookOutlined style={{ color: METRIC_COLORS.customerAssets }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.customer_assets)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
+              <MetricCard
+                title={
+                  <Tooltip title="客户今年创收金额">
+                    <span>客户贡献</span>
+                  </Tooltip>
+                }
+                value={coreMetrics?.customer_contribution}
+                wowChange={wowChanges?.customer_contribution ? {
+                  value: wowChanges.customer_contribution.value,
+                  trend: wowChanges.customer_contribution.trend,
+                  color: wowChanges.customer_contribution.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                icon={<RiseOutlined style={{ color: METRIC_COLORS.contribution }} />}
+              />
+              <MetricCard
                 title={
                   <Tooltip title="服务存量客户的资产总额">
                     <span>存量客户资产</span>
                   </Tooltip>
                 }
-                value={coreMetrics?.existing_customers_assets || 0}
-                precision={2}
-                prefix={<GoldOutlined style={{ color: METRIC_COLORS.existingAssets }} />}
-                formatter={(value) => formatCurrency(Number(value))}
-              />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.existing_customers_assets)}
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 效率指标 */}
-        <div className={styles.sectionTitle}>效率指标</div>
-        <Row gutter={[16, 16]} className={styles.metricsRow}>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="线索成本"
-                value={coreMetrics?.cost_per_lead || 0}
-                precision={2}
+                value={coreMetrics?.existing_customers_assets}
+                wowChange={wowChanges?.existing_customers_assets ? {
+                  value: wowChanges.existing_customers_assets.value,
+                  trend: wowChanges.existing_customers_assets.trend,
+                  color: wowChanges.existing_customers_assets.color,
+                } : undefined}
                 prefix="¥"
-                suffix="/条"
+                formatter="currency"
+                icon={<GoldOutlined style={{ color: METRIC_COLORS.existingAssets }} />}
               />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.cost_per_lead)}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={4}>
-            <Card className={styles.metricCard}>
-              <Statistic
-                title="有效户成本"
-                value={coreMetrics?.cost_per_valid_account || 0}
-                precision={2}
-                prefix="¥"
-                suffix="/户"
-              />
-              <div className={styles.wowChange}>
-                {renderWowChange(wowChanges?.cost_per_valid_account)}
-              </div>
-            </Card>
-          </Col>
-        </Row>
+          </div>
+        </Card>
 
-        {/* 图表区域 */}
+        {/* 运营效率指标卡片 */}
+        <Card className={styles.metricsGroupCard} size="small">
+          <div className={styles.groupHeader}>
+            <Text type="secondary" className={styles.groupTitle}>
+              ⚡ 运营效率
+            </Text>
+            <Text type="secondary" className={styles.groupDesc}>
+              单位成本分析
+            </Text>
+          </div>
+          <Row gutter={[16, 16]} className={styles.metricsRow}>
+            <Col xs={24} sm={12} lg={8}>
+              <MetricCard
+                title="单线索成本"
+                value={coreMetrics?.cost_per_lead}
+                wowChange={wowChanges?.cost_per_lead ? {
+                  value: wowChanges.cost_per_lead.value,
+                  trend: wowChanges.cost_per_lead.trend,
+                  color: wowChanges.cost_per_lead.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                inverseTrend
+                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.cost }} />}
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={8}>
+              <MetricCard
+                title="单开户成本"
+                value={costPerAccount}
+                prefix="¥"
+                formatter="currency"
+                inverseTrend
+                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={8}>
+              <MetricCard
+                title="单有效户成本"
+                value={coreMetrics?.cost_per_valid_account}
+                wowChange={wowChanges?.cost_per_valid_account ? {
+                  value: wowChanges.cost_per_valid_account.value,
+                  trend: wowChanges.cost_per_valid_account.trend,
+                  color: wowChanges.cost_per_valid_account.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                inverseTrend
+                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
+              />
+            </Col>
+          </Row>
+        </Card>
+
+        {/* 趋势图 */}
         <Row gutter={[16, 16]} className={styles.chartsRow}>
           <Col xs={24} lg={24}>
-            <ChartCard
-              title="线索成本趋势"
-              loading={loading}
-              onRefresh={() => dateRange && loadData({
-                startDate: dateRange.start_date,
-                endDate: dateRange.end_date,
-                platforms: [],
-                agencies: [],
-                businessModels: [],
-              })}
+            <TrendChart
+              data={trendData?.trend_data || []}
+              metricType={trendMetricType}
+              loading={trendLoading}
               height={350}
-            >
-              {trendData && trendData.trend_data.length > 0 && (
-                <LineChart
-                  data={trendData.trend_data.map((item) => ({
-                    date: item.date,
-                    value: item.value,
-                    category: '线索成本',
-                  }))}
-                  height={320}
-                />
-              )}
-            </ChartCard>
+              onMetricTypeChange={handleTrendMetricChange}
+              onGranularityChange={handleTrendGranularityChange}
+            />
           </Col>
         </Row>
       </Spin>

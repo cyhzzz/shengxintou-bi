@@ -66,6 +66,11 @@ const menuItems: MenuProps['items'] = [
   },
   { type: 'divider' },
   {
+    key: '/report-generation',
+    icon: <FilePdfOutlined />,
+    label: '报告生成',
+  },
+  {
     key: 'system',
     icon: <SettingOutlined />,
     label: '系统配置',
@@ -75,11 +80,6 @@ const menuItems: MenuProps['items'] = [
       { key: '/system/abbreviation-management', icon: <TagOutlined />, label: '简称管理' },
       { key: '/system/database-backup', icon: <SyncOutlined />, label: '数据同步' },
     ],
-  },
-  {
-    key: '/report-generation',
-    icon: <FilePdfOutlined />,
-    label: '报告生成',
   },
 ];
 

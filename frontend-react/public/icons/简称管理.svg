@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" class="design-iconfont">
+  <g fill="none" fill-rule="evenodd">
+    <!-- 背景卡片 -->
+    <rect x="2" y="3" width="16" height="14" rx="2" fill="#D2DAE8" opacity="0.3"/>
+
+    <!-- 左侧：简称框 (lz) -->
+    <rect x="3.5" y="5" width="5" height="4" rx="0.5" fill="#1D63FF" opacity="0.9"/>
+    <text x="6" y="8.2" font-family="Arial, sans-serif" font-size="2.5" font-weight="bold" fill="#FFF" text-anchor="middle">lz</text>
+
+    <!-- 中间：箭头 -->
+    <path d="M9,7 L11,7 M10.3,6.3 L11,7 L10.3,7.7" stroke="#55698F" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <!-- 右侧：全称框 (量子) -->
+    <rect x="11.5" y="5" width="5" height="4" rx="0.5" fill="#A3ADC4" opacity="0.5"/>
+    <text x="14" y="8.2" font-family="SimSun, serif" font-size="2.8" fill="#55698F" text-anchor="middle">量</text>
+
+    <!-- 第二行示例 -->
+    <rect x="3.5" y="10.5" width="5" height="4" rx="0.5" fill="#1D63FF" opacity="0.9"/>
+    <text x="6" y="13.7" font-family="Arial, sans-serif" font-size="2.5" font-weight="bold" fill="#FFF" text-anchor="middle">fs</text>
+
+    <!-- 箭头2 -->
+    <path d="M9,12.5 L11,12.5 M10.3,11.8 L11,12.5 L10.3,13.2" stroke="#55698F" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <rect x="11.5" y="10.5" width="5" height="4" rx="0.5" fill="#A3ADC4" opacity="0.5"/>
+    <text x="14" y="13.7" font-family="SimSun, serif" font-size="2.8" fill="#55698F" text-anchor="middle">风</text>
+
+    <!-- 右下角：齿轮设置图标 -->
+    <circle cx="17" cy="17" r="2.2" fill="#52C41A" opacity="0.9"/>
+    <circle cx="17" cy="17" r="1" fill="#FFF"/>
+    <!-- 齿轮齿 -->
+    <path d="M17,15 L17,15.5 M17,18.5 L17,19 M15,17 L15.5,17 M18.5,17 L19,17" stroke="#52C41A" stroke-width="0.6" stroke-linecap="round"/>
+  </g>
+</svg>

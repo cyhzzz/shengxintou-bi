@@ -9,6 +9,7 @@ from backend.database import db
 from backend.models import DailyMetricsUnified
 from backend.utils.feishu_client import FeishuClient
 from backend.utils.feishu_field_mapping import FIELD_MAPPING
+from backend.utils.decorators import handle_exceptions
 import threading
 import uuid
 import requests
@@ -21,6 +22,7 @@ sync_tasks = {}
 
 
 @bp.route('/push', methods=['POST', 'OPTIONS'])
+@handle_exceptions
 def push_to_feishu():
     """
     推送本地数据到飞书（智能同步）
@@ -72,6 +74,7 @@ def push_to_feishu():
 
 
 @bp.route('/pull', methods=['POST', 'OPTIONS'])
+@handle_exceptions
 def pull_from_feishu():
     """从飞书拉取数据到本地"""
     # 处理OPTIONS预检请求
@@ -108,6 +111,7 @@ def pull_from_feishu():
 
 
 @bp.route('/progress/<task_id>', methods=['GET'])
+@handle_exceptions
 def get_progress(task_id):
     """查询同步进度"""
     task = sync_tasks.get(task_id)
@@ -124,6 +128,7 @@ def get_progress(task_id):
 
 
 @bp.route('/tables', methods=['GET'])
+@handle_exceptions
 def get_tables_info():
     """
     获取表信息对比

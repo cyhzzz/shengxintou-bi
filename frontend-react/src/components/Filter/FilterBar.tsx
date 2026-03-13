@@ -8,6 +8,7 @@ import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import DateRangeFilter from './DateRangeFilter';
 import PlatformFilter from './PlatformFilter';
 import AgencyFilter from './AgencyFilter';
+import BusinessModelFilter from './BusinessModelFilter';
 import { useFilterStore } from '@/stores';
 import styles from './FilterBar.module.scss';
 
@@ -79,6 +80,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>代理商:</span>
             <AgencyFilter />
+          </div>
+        )}
+
+        {/* 业务模式筛选 */}
+        {showBusinessModel && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>业务模式:</span>
+            <BusinessModelFilter />
           </div>
         )}
 

@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('cost_analysis', __name__)
 
 @bp.route('/cost-analysis', methods=['POST'])
+@handle_exceptions
 def get_cost_analysis():
     """
     成本分析
@@ -251,6 +253,7 @@ def get_cost_analysis():
 
 
 @bp.route('/conversion-funnel', methods=['POST'])
+@handle_exceptions
 def get_conversion_funnel():
     """
     获取转化漏斗数据

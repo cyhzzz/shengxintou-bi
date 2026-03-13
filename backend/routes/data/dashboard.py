@@ -13,6 +13,7 @@ from backend.models import (
     XhsNoteInfo
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
@@ -161,6 +162,16 @@ description: |
   - cost_per_lead: 线索成本趋势
   - cost_per_customer: 开户成本趋势
   - cost_per_valid_account: 有效户成本趋势
+  - investment: 阶段投入金额趋势
+  - impressions: 总展示数趋势
+  - clicks: 总点击数趋势
+  - leads: 总线索数趋势
+  - new_customers: 新开客户数趋势
+
+  支持的聚合粒度：
+  - daily: 按日聚合（默认）
+  - weekly: 按周聚合
+  - monthly: 按月聚合
 parameters:
   - name: body
     in: body
@@ -198,9 +209,14 @@ parameters:
           description: 业务模式筛选
         metric_type:
           type: string
-          enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account"]
+          enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account", "investment", "impressions", "clicks", "leads", "new_customers"]
           default: "cost_per_lead"
           description: 指标类型
+        granularity:
+          type: string
+          enum: ["daily", "weekly", "monthly"]
+          default: "daily"
+          description: 聚合粒度
 responses:
   200:
     description: 成功响应
@@ -239,6 +255,7 @@ responses:
 """
 
 @bp.route('/dashboard/accounts', methods=['POST'])
+@handle_exceptions
 def get_dashboard_accounts():
     """
     获取数据概览账号列表
@@ -362,6 +379,7 @@ def get_dashboard_accounts():
 
 
 @bp.route('/dashboard/core-metrics', methods=['POST'])
+@handle_exceptions
 def get_dashboard_core_metrics():
     """
     获取数据概览核心指标
@@ -611,13 +629,14 @@ def get_dashboard_core_metrics():
 
 
 @bp.route('/dashboard/trend-data', methods=['POST'])
+@handle_exceptions
 def get_dashboard_trend_data():
     """
     获取趋势数据
     ---
     tags:
       - Dashboard
-    description: 获取指定指标的趋势数据，支持线索成本、开户成本、有效户成本等指标
+    description: 获取指定指标的趋势数据，支持多种指标和聚合粒度
     parameters:
       - name: body
         in: body
@@ -655,9 +674,14 @@ def get_dashboard_trend_data():
               description: 业务模式筛选
             metric_type:
               type: string
-              enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account"]
+              enum: ["cost_per_lead", "cost_per_customer", "cost_per_valid_account", "investment", "impressions", "clicks", "leads", "new_customers"]
               default: "cost_per_lead"
               description: 指标类型
+            granularity:
+              type: string
+              enum: ["daily", "weekly", "monthly"]
+              default: "daily"
+              description: 聚合粒度
     responses:
       200:
         description: 成功响应
@@ -704,14 +728,32 @@ def get_dashboard_trend_data():
         start_date = data.get('start_date')
         end_date = data.get('end_date')
         metric_type = data.get('metric_type', 'cost_per_lead')
+        granularity = data.get('granularity', 'daily')
 
         if not start_date or not end_date:
             return jsonify({'success': False, 'error': '日期范围不能为空'}), 400
 
-        # 构建查询 - 按日期聚合
+        # 根据粒度选择日期分组方式
+        if granularity == 'weekly':
+            # 按周聚合：使用 strftime 获取年份和周数
+            date_group = func.strftime('%Y-%W', DailyMetricsUnified.date).label('period')
+            date_display = func.strftime('%Y-%m-%d', DailyMetricsUnified.date).label('date_display')
+        elif granularity == 'monthly':
+            # 按月聚合：使用 strftime 获取年份和月份
+            date_group = func.strftime('%Y-%m', DailyMetricsUnified.date).label('period')
+            date_display = func.strftime('%Y-%m-01', DailyMetricsUnified.date).label('date_display')
+        else:
+            # 按日聚合（默认）
+            date_group = DailyMetricsUnified.date.label('period')
+            date_display = DailyMetricsUnified.date.label('date_display')
+
+        # 构建查询 - 按日期聚合，包含所有需要的指标
         query = db.session.query(
-            DailyMetricsUnified.date,
+            date_group,
+            func.min(DailyMetricsUnified.date).label('min_date'),
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
+            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
+            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
             func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
             func.sum(DailyMetricsUnified.opened_account_users).label('total_opened'),
             func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid')
@@ -730,8 +772,13 @@ def get_dashboard_trend_data():
         if business_models:
             query = query.filter(DailyMetricsUnified.business_model.in_(business_models))
 
-        # 分组
-        query = query.group_by(DailyMetricsUnified.date).order_by(DailyMetricsUnified.date)
+        # 分组 - 根据粒度分组
+        if granularity == 'weekly':
+            query = query.group_by('period').order_by('period')
+        elif granularity == 'monthly':
+            query = query.group_by('period').order_by('period')
+        else:
+            query = query.group_by(DailyMetricsUnified.date).order_by(DailyMetricsUnified.date)
 
         results = query.all()
 
@@ -739,6 +786,8 @@ def get_dashboard_trend_data():
         trend_data = []
         for row in results:
             cost = float(row.total_cost) if row.total_cost else 0
+            impressions = int(row.total_impressions) if row.total_impressions else 0
+            clicks = int(row.total_clicks) if row.total_clicks else 0
             leads = int(row.total_leads) if row.total_leads else 0
             opened = int(row.total_opened) if row.total_opened else 0
             valid = int(row.total_valid) if row.total_valid else 0
@@ -750,41 +799,67 @@ def get_dashboard_trend_data():
                 value = (cost / opened) if opened > 0 else 0
             elif metric_type == 'cost_per_valid_account':
                 value = (cost / valid) if valid > 0 else 0
+            elif metric_type == 'investment':
+                value = cost
+            elif metric_type == 'impressions':
+                value = impressions
+            elif metric_type == 'clicks':
+                value = clicks
+            elif metric_type == 'leads':
+                value = leads
+            elif metric_type == 'new_customers':
+                value = opened
             else:
                 value = 0
 
+            # 格式化日期显示
+            if granularity == 'weekly':
+                # 周粒度：显示该周的第一天
+                date_str = row.min_date.strftime('%Y-%m-%d') if row.min_date else row.period
+            elif granularity == 'monthly':
+                # 月粒度：显示月份第一天
+                date_str = row.min_date.strftime('%Y-%m-01') if row.min_date else row.period
+            else:
+                date_str = row.min_date.strftime('%Y-%m-%d') if row.min_date else str(row.period)
+
             trend_data.append({
-                'date': row.date.strftime('%Y-%m-%d'),
-                'value': round(value, 2)
+                'date': date_str,
+                'value': round(value, 2) if metric_type in ['cost_per_lead', 'cost_per_customer', 'cost_per_valid_account', 'investment'] else value
             })
 
         # 计算汇总数据
         total_cost = 0
+        total_impressions_all = 0
+        total_clicks_all = 0
         total_leads_all = 0
         total_opened_all = 0
         total_valid_all = 0
 
         for r in results:
-            cost = float(r.total_cost) if r.total_cost else 0
-            leads = int(r.total_leads) if r.total_leads else 0
-            opened = int(r.total_opened) if r.total_opened else 0
-            valid = int(r.total_valid) if r.total_valid else 0
-            total_cost += cost
-            total_leads_all += leads
-            total_opened_all += opened
-            total_valid_all += valid
+            total_cost += float(r.total_cost) if r.total_cost else 0
+            total_impressions_all += int(r.total_impressions) if r.total_impressions else 0
+            total_clicks_all += int(r.total_clicks) if r.total_clicks else 0
+            total_leads_all += int(r.total_leads) if r.total_leads else 0
+            total_opened_all += int(r.total_opened) if r.total_opened else 0
+            total_valid_all += int(r.total_valid) if r.total_valid else 0
 
         summary = {
             'cost_per_lead': round((total_cost / total_leads_all) if total_leads_all > 0 else 0, 2),
             'cost_per_customer': round((total_cost / total_opened_all) if total_opened_all > 0 else 0, 2),
-            'cost_per_valid_account': round((total_cost / total_valid_all) if total_valid_all > 0 else 0, 2)
+            'cost_per_valid_account': round((total_cost / total_valid_all) if total_valid_all > 0 else 0, 2),
+            'investment': round(total_cost, 2),
+            'impressions': total_impressions_all,
+            'clicks': total_clicks_all,
+            'leads': total_leads_all,
+            'new_customers': total_opened_all
         }
 
         return jsonify({
             'success': True,
             'data': {
                 'trend_data': trend_data,
-                'summary': summary
+                'summary': summary,
+                'metric_type': metric_type
             }
         })
 
