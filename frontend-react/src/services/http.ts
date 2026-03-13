@@ -2,7 +2,7 @@
  * HTTP 客户端
  * 基于 Fetch API 的 HTTP 请求封装
  */
-import { API_URL, API_TIMEOUT, API_STATUS } from './config';
+import { API_URL, API_TIMEOUT } from './config';
 import type { ApiResponse } from '@/types';
 
 // 请求配置接口
@@ -132,7 +132,8 @@ class HttpClient {
 
   // GET 请求
   async get<T>(url: string, params?: Record<string, unknown>, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'GET', params });
+    const fullUrl = this.buildUrl(url, params);
+    return this.request<T>(fullUrl, { ...config, method: 'GET' });
   }
 
   // POST 请求

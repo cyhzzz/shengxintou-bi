@@ -10,11 +10,13 @@ from config import PLATFORMS, BUSINESS_MODELS
 from sqlalchemy import distinct, or_, func
 from datetime import datetime, date
 import logging
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('metadata', __name__)
 logger = logging.getLogger(__name__)
 
 @bp.route('/metadata', methods=['GET'])
+@handle_exceptions
 def get_metadata():
     """
     获取系统元数据
@@ -148,6 +150,7 @@ def get_metadata():
 
 
 @bp.route('/platforms', methods=['GET'])
+@handle_exceptions
 def get_platforms():
     """获取平台列表（从 daily_metrics_unified 动态获取）"""
     from backend.database import db
@@ -163,11 +166,15 @@ def get_platforms():
         platforms = PLATFORMS
 
     return jsonify({
-        'platforms': platforms
+        'success': True,
+        'data': {
+            'platforms': platforms
+        }
     })
 
 
 @bp.route('/agencies', methods=['GET'])
+@handle_exceptions
 def get_agencies():
     """获取代理商列表（从 daily_metrics_unified 动态获取）"""
     from backend.database import db
@@ -186,11 +193,15 @@ def get_agencies():
         agencies = ['量子', '众联', '绩牛', '风声', '优品', '信则', '美洋', '申万宏源直投', '未归因']
 
     return jsonify({
-        'agencies': agencies
+        'success': True,
+        'data': {
+            'agencies': agencies
+        }
     })
 
 
 @bp.route('/business-models', methods=['GET'])
+@handle_exceptions
 def get_business_models():
     """获取业务模式列表（从 daily_metrics_unified 动态获取）"""
     from backend.database import db
@@ -214,7 +225,10 @@ def get_business_models():
         business_models = BUSINESS_MODELS + ['未归因']
 
     return jsonify({
-        'business_models': business_models
+        'success': True,
+        'data': {
+            'business_models': business_models
+        }
     })
 
 
@@ -355,6 +369,7 @@ def get_data_status():
 
 
 @bp.route('/data-freshness', methods=['GET'])
+@handle_exceptions
 def get_data_freshness():
     """
     获取数据新鲜度状态

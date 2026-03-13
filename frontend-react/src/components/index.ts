@@ -9,6 +9,10 @@ export * from './Icon';
 // 帮助模态框
 export { HelpModal } from './HelpModal';
 
+// 数据新鲜度指示器
+export { DataFreshnessIndicator } from './DataFreshness';
+export type { DataFreshnessIndicatorRef } from './DataFreshness';
+
 // 筛选器组件
 export * from './Filter';
 

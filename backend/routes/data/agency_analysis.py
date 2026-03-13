@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('agency_analysis', __name__)
 
 @bp.route('/agency-analysis', methods=['POST'])
+@handle_exceptions
 def get_agency_analysis():
     """
     代理商投放分析

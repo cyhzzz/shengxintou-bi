@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Button } from 'antd';
-import { QuestionCircleOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Modal, Button, Card, Row, Col, Typography } from 'antd';
+import { QuestionCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { dataService } from '@/services';
+import { DataFreshnessIndicator, DataFreshnessIndicatorRef } from '@/components/DataFreshness';
 import styles from './index.module.scss';
+
+const { Text, Paragraph } = Typography;
 
 interface VersionInfo {
   version: string;
@@ -19,6 +22,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   const [visible, setVisible] = useState(false);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [loading, setLoading] = useState(false);
+  const dataFreshnessRef = useRef<DataFreshnessIndicatorRef>(null);
 
   const loadVersionInfo = async () => {
     setLoading(true);
@@ -34,6 +38,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     }
   };
 
+  const handleRefresh = () => {
+    loadVersionInfo();
+    dataFreshnessRef.current?.refresh();
+  };
+
   useEffect(() => {
     if (visible) {
       loadVersionInfo();
@@ -46,82 +55,121 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
         className={`${styles.helpBtn} ${className || ''}`}
         type="text"
         onClick={() => setVisible(true)}
-        icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />}
+        icon={<QuestionCircleOutlined style={{ fontSize: 16 }} />}
       />
       <Modal
-        title="关于省心投平台"
+        title={null}
         open={visible}
         onCancel={() => setVisible(false)}
-        footer={[
-          <Button key="ok" type="primary" onClick={() => setVisible(false)}>
-            知道了
-          </Button>,
-        ]}
-        width={600}
+        footer={null}
+        width={720}
         className={styles.helpModal}
+        centered
       >
         <div className={styles.helpContent}>
-          {/* Logo */}
+          {/* Logo 区域 */}
           <div className={styles.logoSection}>
             <img src="/icons/logo-横版.png" alt="省心投" className={styles.logoImage} />
           </div>
 
-          {/* 项目简介 */}
-          <section className={styles.helpSection}>
-            <h4>项目简介</h4>
-            <p>
-              省心投平台是一个轻量级互联网广告投放分析平台，提供多平台广告数据聚合、分析和可视化功能。
-            </p>
-            <p className={styles.warning}>
-              本平台仅供申万宏源证券 - 财富管理事业部 - 渠道建设部内部使用，数据仅供参考。
-            </p>
-          </section>
+          {/* 主要内容区域 - 两列布局 */}
+          <Row gutter={16}>
+            {/* 左列：项目简介 + 核心功能 + 版本信息 */}
+            <Col span={12}>
+              <Card
+                title="项目简介"
+                size="small"
+                className={styles.infoCard}
+              >
+                <Paragraph className={styles.description}>
+                  省心投平台是一个轻量级互联网广告投放分析平台，提供多平台广告数据聚合、分析和可视化功能。
+                </Paragraph>
+                <div className={styles.warning}>
+                  ⚠️ 本平台仅供申万宏源证券 - 财富管理事业部 - 渠道建设部内部使用，数据仅供参考。
+                </div>
+              </Card>
 
-          {/* 核心功能 */}
-          <section className={styles.helpSection}>
-            <h4>核心功能</h4>
-            <ul>
-              <li><strong>数据概览</strong> - 整体数据概览，展示核心指标和趋势</li>
-              <li><strong>转化漏斗</strong> - 从转化率角度针对性查看和分析</li>
-              <li><strong>线索明细</strong> - 所有客户线索到转化的数据明细</li>
-              <li><strong>厂商分析</strong> - 代理商投放和转化数据分析</li>
-              <li><strong>小红书</strong> - 笔记列表、运营分析</li>
-              <li><strong>员工转化</strong> - 服务人员转化效果分析与周报生成</li>
-            </ul>
-          </section>
+              <Card
+                title="核心功能"
+                size="small"
+                className={styles.infoCard}
+              >
+                <ul className={styles.featureList}>
+                  <li><strong>数据概览</strong> - 整体数据概览，展示核心指标和趋势</li>
+                  <li><strong>转化漏斗</strong> - 从转化率角度针对性查看和分析</li>
+                  <li><strong>线索明细</strong> - 所有客户线索到转化的数据明细</li>
+                  <li><strong>厂商分析</strong> - 代理商投放和转化数据分析</li>
+                  <li><strong>小红书</strong> - 笔记列表、运营分析</li>
+                  <li><strong>员工转化</strong> - 服务人员转化效果分析与周报生成</li>
+                </ul>
+              </Card>
 
-          {/* 版本信息 */}
-          <section className={styles.helpSection}>
-            <h4>版本信息</h4>
-            {loading ? (
-              <p>加载中...</p>
-            ) : versionInfo ? (
-              <div>
-                <p>版本：v{versionInfo.version}</p>
-                <p>更新时间：{versionInfo.release_date}</p>
-                {versionInfo.changelog && versionInfo.changelog.length > 0 && (
-                  <ul>
-                    {versionInfo.changelog.map((item, index) => (
-                      <li key={index}>{item}</li>
-                    ))}
-                  </ul>
+              <Card
+                title="版本信息"
+                size="small"
+                className={styles.infoCard}
+              >
+                {loading ? (
+                  <Text type="secondary">加载中...</Text>
+                ) : versionInfo ? (
+                  <div className={styles.versionInfo}>
+                    <div className={styles.versionRow}>
+                      <Text type="secondary">版本：</Text>
+                      <Text strong>v{versionInfo.version}</Text>
+                    </div>
+                    <div className={styles.versionRow}>
+                      <Text type="secondary">更新时间：</Text>
+                      <Text>{versionInfo.release_date}</Text>
+                    </div>
+                    {versionInfo.changelog && versionInfo.changelog.length > 0 && (
+                      <div className={styles.changelog}>
+                        <Text type="secondary">更新内容：</Text>
+                        <ul>
+                          {versionInfo.changelog.map((item, index) => (
+                            <li key={index}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Text type="secondary">版本信息加载失败</Text>
                 )}
-              </div>
-            ) : (
-              <p>版本信息加载失败</p>
-            )}
-          </section>
+              </Card>
+            </Col>
 
-          {/* 创建者信息 */}
-          <section className={styles.creatorSection}>
-            <div className={styles.creatorInfo}>
-              <img src="/icons/陈元昊肖像.svg" alt="陈元昊" className={styles.creatorAvatar} />
-              <div>
-                <p className={styles.creatorName}>创建者：陈元昊</p>
-                <p className={styles.creatorOrg}>申万宏源证券 - 财富管理事业部 - 产品经理</p>
-              </div>
-            </div>
-          </section>
+            {/* 右列：数据状态 + 创建者 */}
+            <Col span={12}>
+              <Card
+                title="数据状态"
+                size="small"
+                className={styles.infoCard}
+                extra={<SyncOutlined onClick={handleRefresh} className={styles.refreshIcon} />}
+              >
+                <DataFreshnessIndicator
+                  ref={dataFreshnessRef}
+                  showActions={false}
+                />
+              </Card>
+
+              <Card
+                title="创建者"
+                size="small"
+                className={styles.infoCard}
+              >
+                <div className={styles.creatorInfo}>
+                  <img src="/icons/陈元昊肖像.svg" alt="陈元昊" className={styles.creatorAvatar} />
+                  <div>
+                    <Text strong>陈元昊</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      申万宏源证券 - 财富管理事业部 - 产品经理
+                    </Text>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          </Row>
         </div>
       </Modal>
     </>

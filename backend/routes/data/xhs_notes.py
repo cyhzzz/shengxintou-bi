@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('xhs_notes', __name__)
 
 @bp.route('/xhs-notes-analysis', methods=['POST'])
+@handle_exceptions
 def get_xhs_notes_analysis():
     """
     小红书笔记分析
@@ -215,6 +217,7 @@ def get_xhs_notes_analysis():
 
 
 @bp.route('/xhs-notes-list', methods=['POST'])
+@handle_exceptions
 def get_xhs_notes_list():
     """
     小红书笔记列表

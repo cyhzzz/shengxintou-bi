@@ -8,11 +8,11 @@ import XhsNotesListPage from '@/pages/XhsNotes/List';
 import XhsNotesOperationPage from '@/pages/XhsNotes/Operation';
 import EmployeeConversionAnalysisPage from '@/pages/EmployeeConversion/Analysis';
 import EmployeeConversionWeeklyPage from '@/pages/EmployeeConversion/Weekly';
-import ReportGenerationPage from '@/pages/ReportGeneration';
 import DataImportPage from '@/pages/System/DataImport';
 import AccountManagementPage from '@/pages/System/AccountManagement';
 import AbbreviationManagementPage from '@/pages/System/AbbreviationManagement';
 import DatabaseBackupPage from '@/pages/System/DatabaseBackup';
+import ReportGenerationPage from '@/pages/ReportGeneration';
 
 export const router = createBrowserRouter([
   {
@@ -24,7 +24,6 @@ export const router = createBrowserRouter([
       { path: 'conversion-funnel', element: <ConversionFunnelPage /> },
       { path: 'leads-detail', element: <LeadsDetailPage /> },
       { path: 'agency-analysis', element: <AgencyAnalysisPage /> },
-      { path: 'report-generation', element: <ReportGenerationPage /> },
       {
         path: 'xhs-notes',
         children: [
@@ -39,6 +38,7 @@ export const router = createBrowserRouter([
           { path: 'weekly', element: <EmployeeConversionWeeklyPage /> },
         ],
       },
+      { path: 'report-generation', element: <ReportGenerationPage /> },
       {
         path: 'system',
         children: [

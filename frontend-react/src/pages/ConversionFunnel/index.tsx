@@ -52,6 +52,7 @@ const ConversionFunnelPage: React.FC = () => {
             end_date: filters.endDate,
             platforms: filters.platforms,
             agencies: filters.agencies,
+            business_models: filters.businessModels,
           }
         : undefined;
 
@@ -62,11 +63,11 @@ const ConversionFunnelPage: React.FC = () => {
 
         // 构建漏斗数据
         const funnel: FunnelStage[] = [
-          { name: '曝光', count: data.funnel[0]?.count || 0, rate: 100, conversionRate: 100 },
-          { name: '点击', count: data.funnel[1]?.count || 0, rate: 0, conversionRate: 0 },
-          { name: '线索', count: data.funnel[2]?.count || 0, rate: 0, conversionRate: 0 },
-          { name: '开户', count: data.funnel[3]?.count || 0, rate: 0, conversionRate: 0 },
-          { name: '有效户', count: data.funnel[4]?.count || 0, rate: 0, conversionRate: 0 },
+          { name: '曝光', count: data.funnel?.[0]?.value || 0, rate: 100, conversionRate: 100 },
+          { name: '点击', count: data.funnel?.[1]?.value || 0, rate: 0, conversionRate: 0 },
+          { name: '线索', count: data.funnel?.[2]?.value || 0, rate: 0, conversionRate: 0 },
+          { name: '开户', count: data.funnel?.[3]?.value || 0, rate: 0, conversionRate: 0 },
+          { name: '有效户', count: data.funnel?.[4]?.value || 0, rate: 0, conversionRate: 0 },
         ];
 
         // 计算转化率
@@ -81,9 +82,12 @@ const ConversionFunnelPage: React.FC = () => {
 
         setFunnelData(funnel);
 
-        // 设置平台数据
-        if (data.by_platform) {
-          setPlatformData(data.by_platform);
+        // 设置平台数据 (API 可能返回 by_platform 字段)
+        const responseData = data as typeof data & {
+          by_platform?: PlatformConversion[];
+        };
+        if (responseData.by_platform) {
+          setPlatformData(responseData.by_platform);
         }
       }
     } catch (error) {
@@ -182,6 +186,7 @@ const ConversionFunnelPage: React.FC = () => {
         <FilterBar
           showPlatform
           showAgency
+          showBusinessModel
           onSearch={handleSearch}
           onReset={handleReset}
         />

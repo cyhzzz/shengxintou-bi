@@ -40,11 +40,30 @@ export interface AbbreviationMapping {
   is_active: boolean;
 }
 
+// 数据新鲜度接口
+export interface DataFreshnessItem {
+  name: string;
+  latest_date: string | null;
+  days_ago: number | null;
+  status: 'normal' | 'warning' | 'critical' | 'no_data';
+  group: string;
+  order: number;
+}
+
+export interface DataFreshness {
+  [key: string]: DataFreshnessItem;
+}
+
 // 元数据服务
 export const metadataService = {
   // 获取元数据
   getMetadata: async (): Promise<ApiResponse<Metadata>> => {
     return http.get('/metadata');
+  },
+
+  // 获取数据新鲜度
+  getDataFreshness: async (): Promise<ApiResponse<DataFreshness>> => {
+    return http.get('/data-freshness');
   },
 
   // 获取账号映射列表

@@ -1,7 +1,7 @@
 {
-  "name": "frontend-react",
+  "name": "shengxintou-platform",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.9.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,9 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "generate:api": "orval --config orval.config.ts",
+    "generate:api:watch": "orval --config orval.config.ts --watch"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
@@ -20,6 +22,7 @@
     "dayjs": "^1.11.19",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.1",
     "zustand": "^5.0.11"
   },
@@ -34,6 +37,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "openapi-typescript": "^7.4.0",
+    "orval": "^7.3.0",
     "sass": "^1.98.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",

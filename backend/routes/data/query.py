@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('query', __name__)
 
 @bp.route('/query', methods=['POST'])
+@handle_exceptions
 def query_data():
     """
     通用数据查询接口
@@ -429,6 +431,7 @@ def query_data():
 
 
 @bp.route('/test/conversion-data', methods=['GET'])
+@handle_exceptions
 def test_conversion_data():
     """
     测试接口：查询客户资产和客户贡献数据
@@ -501,6 +504,7 @@ def test_conversion_data():
 
 
 @bp.route('/summary', methods=['POST'])
+@handle_exceptions
 def get_summary():
     """
     获取汇总数据
@@ -654,6 +658,7 @@ def get_summary():
 
 
 @bp.route('/employees', methods=['GET'])
+@handle_exceptions
 def get_employees():
     """
     获取服务人员列表

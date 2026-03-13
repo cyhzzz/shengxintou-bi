@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('account_mapping', __name__)
 
 @bp.route('/account-mapping', methods=['GET'])
+@handle_exceptions
 def get_account_mapping():
     """
     获取账号代理商映射数据
@@ -113,6 +115,7 @@ def get_account_mapping():
 
 
 @bp.route('/account-agency-mapping', methods=['GET'])
+@handle_exceptions
 def get_account_agency_mapping():
     """
     获取账号代理商映射数据（别名路由）
@@ -165,6 +168,7 @@ def get_account_agency_mapping():
 
 
 @bp.route('/account-mapping', methods=['POST'])
+@handle_exceptions
 def create_account_mapping():
     """
     创建新的账号代理商映射
@@ -334,6 +338,7 @@ def create_account_mapping():
 
 
 @bp.route('/account-mapping/<string:platform>/<string:account_id>', methods=['PUT'])
+@handle_exceptions
 def update_account_mapping(platform, account_id):
     """
     更新账号代理商映射
@@ -497,6 +502,7 @@ def update_account_mapping(platform, account_id):
 
 
 @bp.route('/account-mapping/<string:platform>/<string:account_id>', methods=['DELETE'])
+@handle_exceptions
 def delete_account_mapping(platform, account_id):
     """
     删除账号代理商映射
@@ -567,6 +573,7 @@ def delete_account_mapping(platform, account_id):
 
 
 @bp.route('/account-mapping/<string:platform>/main/<string:main_account_id>', methods=['DELETE'])
+@handle_exceptions
 def delete_account_mapping_by_main(platform, main_account_id):
     """
     通过主账号ID删除账号代理商映射

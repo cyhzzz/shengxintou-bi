@@ -1,0 +1,66 @@
+/**
+ * TrendChart 组件样式
+ */
+
+.trendCard {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chartTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.chartControls {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlLabel {
+  font-size: 14px;
+  color: #666;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 14px;
+}
+
+// 响应式
+@media (max-width: 768px) {
+  .chartControls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .controlGroup {
+    width: 100%;
+
+    :global(.ant-radio-group) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+  }
+}

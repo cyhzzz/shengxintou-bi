@@ -1,0 +1,173 @@
+.container {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 140px);
+  padding: 0;
+  background: #f5f7fa;
+}
+
+/* 左侧控制面板 */
+.controlPanel {
+  width: 320px;
+  flex-shrink: 0;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8e8e8;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+  }
+}
+
+.panelBody {
+  padding: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.controlGroup {
+  margin-bottom: 24px;
+}
+
+.controlLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.btnGroup {
+  display: flex;
+  gap: 8px;
+
+  button {
+    flex: 1;
+  }
+}
+
+.periodSelect {
+  width: 100%;
+}
+
+.periodInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.periodDate {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.periodSequence {
+  font-size: 12px;
+  color: #909399;
+}
+
+.controlActions {
+  margin-top: auto;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 右侧预览画布 */
+.previewPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  &.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    border-radius: 0;
+  }
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.previewTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.previewActions {
+  display: flex;
+  gap: 8px;
+}
+
+.previewCanvas {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px;
+  overflow-y: auto;
+  background: #e8e8e8;
+}
+
+.previewPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #909399;
+  gap: 16px;
+
+  .anticon {
+    color: #c0c4cc;
+  }
+
+  span {
+    font-size: 14px;
+  }
+}
+
+.placeholderHint {
+  font-size: 12px;
+  color: #c0c4cc;
+}
+
+.reportFrame {
+  width: 480px;
+  min-height: 800px;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: none;
+}

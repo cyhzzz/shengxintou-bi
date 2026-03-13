@@ -1,0 +1,113 @@
+/**
+ * 线索明细页面样式
+ */
+.leadsDetailPage {
+  padding: 20px;
+}
+
+.filterCard {
+  margin-bottom: 16px;
+
+  :global {
+    .ant-card-body {
+      padding: 12px 16px;
+    }
+  }
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 14px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.filterActions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.tableCard {
+  margin-top: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  :global {
+    .ant-card-head {
+      border-bottom: 1px solid #f0f0f0;
+    }
+  }
+}
+
+.tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tableTitle {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.statText {
+  color: #666;
+  font-size: 14px;
+}
+
+// 状态标签样式
+.statusTag {
+  min-width: 60px;
+  text-align: center;
+}
+
+// 详情弹窗样式
+.detailModal {
+  :global {
+    .ant-modal-body {
+      padding: 16px 24px;
+    }
+  }
+}
+
+.detailItem {
+  display: flex;
+  margin-bottom: 12px;
+
+  .detailLabel {
+    width: 100px;
+    color: #666;
+    flex-shrink: 0;
+  }
+
+  .detailValue {
+    flex: 1;
+    color: #333;
+  }
+}
+
+.detailSection {
+  margin-bottom: 20px;
+
+  .sectionTitle {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+}

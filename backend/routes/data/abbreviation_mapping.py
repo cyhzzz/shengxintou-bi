@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('abbreviation_mapping', __name__)
 
 @bp.route('/abbreviation-mapping', methods=['GET'])
+@handle_exceptions
 def get_abbreviation_mapping():
     """
     获取所有简称映射
@@ -151,6 +153,7 @@ def get_abbreviation_mapping():
 
 
 @bp.route('/abbreviation-mapping', methods=['POST'])
+@handle_exceptions
 def create_abbreviation_mapping():
     """
     创建新的简称映射
@@ -282,6 +285,7 @@ def create_abbreviation_mapping():
 
 
 @bp.route('/abbreviation-mapping/<int:id>', methods=['PUT'])
+@handle_exceptions
 def update_abbreviation_mapping(id):
     """
     更新简称映射
@@ -380,6 +384,7 @@ def update_abbreviation_mapping(id):
 
 
 @bp.route('/abbreviation-mapping/<int:id>', methods=['DELETE'])
+@handle_exceptions
 def delete_abbreviation_mapping(id):
     """
     删除简称映射

@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('external_analysis', __name__)
 
 @bp.route('/external-data-analysis', methods=['POST'])
+@handle_exceptions
 def get_external_data_analysis():
     """
     外部数据分析

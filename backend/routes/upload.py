@@ -35,6 +35,7 @@ from backend.processors import (
     XhsNotesContentDailyProcessor
 )
 from backend.processors.xhs_notes_content_daily_processor_fast import XhsNotesContentDailyProcessorFast
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('upload', __name__)
 
@@ -73,6 +74,7 @@ def allowed_file(filename):
 
 
 @bp.route('/upload', methods=['POST'])
+@handle_exceptions
 def upload_file():
     """
     上传数据文件（PRD v1.1）
@@ -411,6 +413,7 @@ def process_file_async(task_id, filepath, data_type, overwrite, log_id):
 
 
 @bp.route('/status/<task_id>', methods=['GET'])
+@handle_exceptions
 def get_task_status(task_id):
     """
     获取导入任务状态（PRD v1.1）
@@ -475,6 +478,7 @@ def get_task_status(task_id):
 
 
 @bp.route('/history', methods=['GET'])
+@handle_exceptions
 def get_import_history():
     """
     获取导入历史记录（PRD v1.1）
@@ -547,6 +551,7 @@ def get_import_history():
 
 
 @bp.route('/data-types', methods=['GET'])
+@handle_exceptions
 def get_data_types():
     """
     获取支持的数据类型列表

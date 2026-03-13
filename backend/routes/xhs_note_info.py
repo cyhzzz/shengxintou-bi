@@ -8,11 +8,13 @@ from flask import Blueprint, request, jsonify
 from backend.models import XhsNoteInfo
 from backend.database import db
 from sqlalchemy import func
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('xhs_note_info', __name__)
 
 
 @bp.route('/enums', methods=['GET'])
+@handle_exceptions
 def get_enums():
     """
     获取枚举值选项
@@ -59,6 +61,7 @@ def get_enums():
 
 
 @bp.route('/update', methods=['POST'])
+@handle_exceptions
 def update_note():
     """
     更新笔记信息
@@ -153,6 +156,7 @@ def update_note():
 
 
 @bp.route('/batch-update', methods=['POST'])
+@handle_exceptions
 def batch_update_notes():
     """
     批量更新笔记信息
@@ -261,6 +265,7 @@ def batch_update_notes():
 
 
 @bp.route('/note/<note_id>', methods=['GET'])
+@handle_exceptions
 def get_note(note_id):
     """
     获取单个笔记信息

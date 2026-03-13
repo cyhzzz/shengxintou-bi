@@ -2,18 +2,12 @@
  * 平台筛选器组件
  * 多选平台筛选
  */
-import React from 'react';
-import { Select, Space } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Select } from 'antd';
 import { useFilterStore } from '@/stores';
+import { metadataService } from '@/services';
 
 const { Option } = Select;
-
-// 平台选项
-const PLATFORMS = [
-  { value: '腾讯', label: '腾讯广告' },
-  { value: '抖音', label: '抖音广告' },
-  { value: '小红书', label: '小红书' },
-];
 
 interface PlatformFilterProps {
   onChange?: (platforms: string[]) => void;
@@ -27,6 +21,18 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
   placeholder = '选择平台',
 }) => {
   const { selectedPlatforms, setPlatforms } = useFilterStore();
+  const [platformOptions, setPlatformOptions] = useState<string[]>([]);
+
+  // 加载平台列表
+  useEffect(() => {
+    const loadPlatforms = async () => {
+      const response = await metadataService.getMetadata();
+      if (response.success && response.data) {
+        setPlatformOptions(response.data.platforms);
+      }
+    };
+    loadPlatforms();
+  }, []);
 
   const handleChange = (values: string[]) => {
     setPlatforms(values);
@@ -43,9 +49,9 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
       style={{ minWidth: 200 }}
       maxTagCount="responsive"
     >
-      {PLATFORMS.map((platform) => (
-        <Option key={platform.value} value={platform.value}>
-          {platform.label}
+      {platformOptions.map((platform) => (
+        <Option key={platform} value={platform}>
+          {platform}
         </Option>
       ))}
     </Select>

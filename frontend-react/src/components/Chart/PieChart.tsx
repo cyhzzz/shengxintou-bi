@@ -4,7 +4,7 @@
  */
 import React, { useMemo } from 'react';
 import { Pie } from '@ant-design/charts';
-import type { PieConfig } from '@ant-design/charts/es/pie';
+import type { PieConfig } from '@ant-design/charts';
 
 interface DataItem {
   type: string;

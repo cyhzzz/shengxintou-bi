@@ -11,13 +11,12 @@ import styles from './DateRangeFilter.module.scss';
 
 const { RangePicker } = DatePicker;
 
-// 快速选择选项
+// 快速选择选项（与原始UI保持一致）
 const quickOptions = [
+  { label: '全部', days: 0 },      // 0 表示全部日期
   { label: '近7天', days: 7 },
   { label: '近30天', days: 30 },
   { label: '近90天', days: 90 },
-  { label: '近180天', days: 180 },
-  { label: '近365天', days: 365 },
 ];
 
 interface DateRangeFilterProps {
@@ -37,10 +36,19 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   // 处理快速选择
   const handleQuickSelect = (days: number) => {
     setActiveQuick(days);
-    setQuickDateRange(days);
-    const start = dayjs().subtract(days, 'day').format('YYYY-MM-DD');
-    const end = dayjs().format('YYYY-MM-DD');
-    onChange?.(start, end);
+
+    if (days === 0) {
+      // "全部" - 使用一个很宽的日期范围来获取所有数据
+      const start = '2020-01-01';  // 一个足够早的日期
+      const end = dayjs().format('YYYY-MM-DD');
+      setDateRange({ startDate: start, endDate: end });
+      onChange?.(start, end);
+    } else {
+      setQuickDateRange(days);
+      const start = dayjs().subtract(days, 'day').format('YYYY-MM-DD');
+      const end = dayjs().format('YYYY-MM-DD');
+      onChange?.(start, end);
+    }
   };
 
   // 处理自定义日期选择

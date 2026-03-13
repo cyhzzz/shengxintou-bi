@@ -11,11 +11,13 @@ import sqlalchemy as sa
 
 from backend.database import db
 from backend.models import DailyMetricsUnified
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('aggregation', __name__)
 
 
 @bp.route('/api/v1/aggregation/update', methods=['POST'])
+@handle_exceptions
 def update_aggregation():
     """
     手动触发聚合表更新
@@ -96,6 +98,7 @@ def update_aggregation():
 
 
 @bp.route('/api/v1/aggregation/status', methods=['GET'])
+@handle_exceptions
 def get_aggregation_status():
     """
     获取聚合表状态信息

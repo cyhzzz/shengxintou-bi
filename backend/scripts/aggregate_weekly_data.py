@@ -69,7 +69,7 @@ def _do_aggregate(start_date, end_date):
     ad_data = db.session.query(
         DailyMetricsUnified.date,
         db.func.sum(DailyMetricsUnified.impressions).label('impressions'),
-        db.func.sum(DailyMetricsUnified.click_users).label('click_users')
+        db.func.sum(DailyMetricsUnified.clicks).label('clicks')
     ).filter(
         DailyMetricsUnified.date >= start_date,
         DailyMetricsUnified.date <= end_date
@@ -79,10 +79,10 @@ def _do_aggregate(start_date, end_date):
 
     # 汇总投放数据
     total_impressions = sum(row.impressions or 0 for row in ad_data)
-    total_click_users = sum(row.click_users or 0 for row in ad_data)
+    total_clicks = sum(row.clicks or 0 for row in ad_data)
 
     print(f"  广告展示量: {total_impressions:,}")
-    print(f"  广告点击人数: {total_click_users:,}")
+    print(f"  广告点击量: {total_clicks:,}")
 
     # ===== 2. 聚合转化数据 =====
     conversion_data = db.session.query(
@@ -116,7 +116,7 @@ def _do_aggregate(start_date, end_date):
     # 查询年初到累计结束日期的所有数据
     cumulative_data = db.session.query(
         db.func.sum(DailyMetricsUnified.impressions).label('impressions'),
-        db.func.sum(DailyMetricsUnified.click_users).label('click_users'),
+        db.func.sum(DailyMetricsUnified.clicks).label('clicks'),
         db.func.sum(DailyMetricsUnified.opened_account_users).label('new_accounts')
     ).filter(
         DailyMetricsUnified.date >= year_start,
@@ -124,19 +124,19 @@ def _do_aggregate(start_date, end_date):
     ).first()
 
     cumulative_impressions = cumulative_data.impressions or 0
-    cumulative_click_users = cumulative_data.click_users or 0
+    cumulative_clicks = cumulative_data.clicks or 0
     cumulative_new_accounts = cumulative_data.new_accounts or 0
 
     print(f"\n  当年累计展示量: {cumulative_impressions:,}")
-    print(f"  当年累计点击人数: {cumulative_click_users:,}")
+    print(f"  当年累计点击量: {cumulative_clicks:,}")
     print(f"  当年累计新开户: {cumulative_new_accounts:,}")
 
     # ===== 4. 返回聚合数据 =====
     return {
         'ad_impressions': total_impressions,
         'ad_impressions_cumulative': cumulative_impressions,
-        'ad_clicks': total_click_users,
-        'ad_clicks_cumulative': cumulative_click_users,
+        'ad_clicks': total_clicks,
+        'ad_clicks_cumulative': cumulative_clicks,
         'new_accounts': total_new_accounts,
         'new_accounts_cumulative': cumulative_new_accounts,
 

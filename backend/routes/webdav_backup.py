@@ -9,6 +9,7 @@ import uuid
 import os
 from datetime import datetime
 import shutil
+from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('webdav_backup', __name__)
 
@@ -17,6 +18,7 @@ backup_tasks = {}
 
 
 @bp.route('/backup', methods=['POST'])
+@handle_exceptions
 def create_backup():
     """
     创建数据库备份到坚果云
@@ -59,6 +61,7 @@ def create_backup():
 
 
 @bp.route('/restore', methods=['POST'])
+@handle_exceptions
 def restore_backup():
     """
     从坚果云恢复数据库
@@ -108,6 +111,7 @@ def restore_backup():
 
 
 @bp.route('/list', methods=['GET'])
+@handle_exceptions
 def list_backups():
     """
     获取备份列表
@@ -153,6 +157,7 @@ def list_backups():
 
 
 @bp.route('/delete', methods=['POST'])
+@handle_exceptions
 def delete_backup():
     """
     删除备份文件
@@ -205,6 +210,7 @@ def delete_backup():
 
 
 @bp.route('/progress/<task_id>', methods=['GET'])
+@handle_exceptions
 def get_progress(task_id):
     """
     查询备份/恢复任务进度

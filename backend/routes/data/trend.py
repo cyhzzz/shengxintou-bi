@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('trend', __name__)
 
 @bp.route('/trend', methods=['POST'])
+@handle_exceptions
 def get_trend():
     """
     获取趋势数据

@@ -1,0 +1,1095 @@
+openapi: 3.0.0
+info:
+  title: 省心投 BI API
+  description: |
+    互联网广告投放分析平台 API 接口文档
+
+    ## 功能模块
+    - **数据概览**: 核心指标展示、趋势分析
+    - **厂商分析**: 代理商投放效果分析
+    - **转化漏斗**: 转化率追踪与分析
+    - **小红书报表**: 笔记数据、运营分析
+    - **线索明细**: 客户线索到转化明细
+    - **账号管理**: 账号与代理商映射
+    - **数据导入**: Excel/CSV 文件导入
+  version: 1.0.0
+  contact:
+    name: 省心投 BI 开发团队
+
+servers:
+  - url: http://127.0.0.1:5000/api/v1
+    description: 本地开发服务器
+
+tags:
+  - name: Dashboard
+    description: 数据概览相关接口
+  - name: Trend
+    description: 趋势分析接口
+  - name: Agency Analysis
+    description: 厂商分析接口
+  - name: XHS Notes
+    description: 小红书笔记相关接口
+  - name: Conversion Funnel
+    description: 转化漏斗相关接口
+  - name: Leads
+    description: 线索明细相关接口
+  - name: Account Mapping
+    description: 账号代理商映射接口
+  - name: Upload
+    description: 文件上传接口
+  - name: Metadata
+    description: 元数据接口
+
+paths:
+  # ============================================================================
+  # Dashboard - 数据概览
+  # ============================================================================
+  /dashboard/accounts:
+    post:
+      tags:
+        - Dashboard
+      summary: 获取账号列表
+      description: 获取数据概览报表的账号列表，支持按平台和代理商筛选
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filters:
+                  type: object
+                  properties:
+                    platforms:
+                      type: array
+                      items:
+                        type: string
+                        enum: [腾讯, 抖音, 小红书]
+                      description: 平台筛选
+                    agencies:
+                      type: array
+                      items:
+                        type: string
+                      description: 代理商筛选
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardAccountsResponse'
+
+  /dashboard/core-metrics:
+    post:
+      tags:
+        - Dashboard
+      summary: 获取核心指标
+      description: |
+        获取数据概览核心指标，包含投入、曝光、点击、线索、开户、资产等数据
+
+        指标分类：
+        - 投入效果：总花费(investment)、总曝光(total_impressions)、总点击(total_clicks)
+        - 业务成果：总线索(total_leads)、新开客户(new_customers)、新有效户(new_valid_accounts)
+        - 客户资产：新客户资产(customer_assets)、客户贡献(customer_contribution)、存量客户资产(existing_customers_assets)
+        - 效率指标：线索成本(cost_per_lead)、有效户成本(cost_per_valid_account)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: 开始日期 (YYYY-MM-DD)
+                end_date:
+                  type: string
+                  format: date
+                  description: 结束日期 (YYYY-MM-DD)
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                    enum: [腾讯, 抖音, 小红书]
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                    enum: [直播, 信息流, 搜索]
+                  description: 业务模式筛选
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoreMetricsResponse'
+
+  /dashboard/trend-data:
+    post:
+      tags:
+        - Dashboard
+      summary: 获取趋势数据
+      description: |
+        获取指定指标的趋势数据，用于绘制趋势图
+
+        支持的指标类型：
+        - cost_per_lead: 线索成本趋势
+        - cost_per_customer: 开户成本趋势
+        - cost_per_valid_account: 有效户成本趋势
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - start_date
+                - end_date
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  description: 开始日期 (YYYY-MM-DD)
+                end_date:
+                  type: string
+                  format: date
+                  description: 结束日期 (YYYY-MM-DD)
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                  description: 平台筛选
+                agencies:
+                  type: array
+                  items:
+                    type: string
+                  description: 代理商筛选
+                business_models:
+                  type: array
+                  items:
+                    type: string
+                  description: 业务模式筛选
+                metric_type:
+                  type: string
+                  enum: [cost_per_lead, cost_per_customer, cost_per_valid_account]
+                  default: cost_per_lead
+                  description: 指标类型
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardTrendDataResponse'
+
+  # ============================================================================
+  # Trend - 趋势分析
+  # ============================================================================
+  /trend/daily:
+    get:
+      tags:
+        - Trend
+      summary: 获取日级趋势数据
+      description: 获取指定日期范围内的日级趋势数据
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: 开始日期 (YYYY-MM-DD)
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: 结束日期 (YYYY-MM-DD)
+        - name: platforms
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+          description: 平台筛选
+        - name: metrics
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [cost, impressions, clicks, leads, opened_accounts]
+          description: 指标列表
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendResponse'
+
+  # ============================================================================
+  # Agency Analysis - 厂商分析
+  # ============================================================================
+  /agency-analysis:
+    get:
+      tags:
+        - Agency Analysis
+      summary: 获取厂商分析数据
+      description: 获取代理商维度的投放和转化数据分析
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: platforms
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: business_models
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [直播, 信息流, 搜索]
+        - name: agencies
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgencyAnalysisResponse'
+
+  # ============================================================================
+  # Conversion Funnel - 转化漏斗
+  # ============================================================================
+  /conversion-funnel:
+    get:
+      tags:
+        - Conversion Funnel
+      summary: 获取转化漏斗数据
+      description: 获取从曝光到开户的完整转化漏斗
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: platforms
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: agencies
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: employee_mode
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: 是否按服务人员维度统计
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversionFunnelResponse'
+
+  # ============================================================================
+  # Leads - 线索明细
+  # ============================================================================
+  /leads-detail:
+    get:
+      tags:
+        - Leads
+      summary: 获取线索明细列表
+      description: 获取分页的客户线索到转化的数据明细
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: platform
+          in: query
+          schema:
+            type: string
+        - name: is_customer
+          in: query
+          schema:
+            type: boolean
+        - name: is_opened_account
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadsDetailResponse'
+
+  # ============================================================================
+  # XHS Notes - 小红书笔记
+  # ============================================================================
+  /xhs-notes/list:
+    get:
+      tags:
+        - XHS Notes
+      summary: 获取笔记列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: creator_name
+          in: query
+          schema:
+            type: string
+        - name: producer
+          in: query
+          schema:
+            type: string
+        - name: ad_strategy
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/XhsNotesListResponse'
+
+  # ============================================================================
+  # Account Mapping - 账号映射
+  # ============================================================================
+  /account-mapping:
+    get:
+      tags:
+        - Account Mapping
+      summary: 获取账号映射列表
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountMappingListResponse'
+    post:
+      tags:
+        - Account Mapping
+      summary: 创建账号映射
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountMappingCreate'
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /account-mapping/{platform}/{account_id}:
+    put:
+      tags:
+        - Account Mapping
+      summary: 更新账号映射
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountMappingUpdate'
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    delete:
+      tags:
+        - Account Mapping
+      summary: 删除账号映射
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ============================================================================
+  # Upload - 文件上传
+  # ============================================================================
+  /upload:
+    post:
+      tags:
+        - Upload
+      summary: 上传文件
+      description: 上传 Excel/CSV 文件导入各类数据
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - data_type
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 上传的文件
+                data_type:
+                  type: string
+                  enum: [tencent_ads, douyin_ads, xiaohongshu_ads, xhs_notes, backend_conversion]
+                  description: 数据类型
+                overwrite:
+                  type: boolean
+                  default: false
+                  description: 是否覆盖已有数据
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+
+  # ============================================================================
+  # Metadata - 元数据
+  # ============================================================================
+  /metadata:
+    get:
+      tags:
+        - Metadata
+      summary: 获取元数据
+      description: 获取平台、代理商、业务模式等元数据列表
+      responses:
+        '200':
+          description: 成功响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataResponse'
+
+components:
+  schemas:
+    # ============================================================================
+    # 通用响应
+    # ============================================================================
+    SuccessResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+          example: 操作成功
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: ERROR_CODE
+        message:
+          type: string
+          example: 错误描述
+
+    # ============================================================================
+    # 核心指标
+    # ============================================================================
+    CoreMetrics:
+      type: object
+      properties:
+        investment:
+          type: number
+          format: float
+          description: 总投入（元）
+        total_impressions:
+          type: integer
+          description: 总曝光数
+        total_clicks:
+          type: integer
+          description: 总点击数
+        total_leads:
+          type: integer
+          description: 总线索数
+        new_customers:
+          type: integer
+          description: 新开客户数
+        new_valid_accounts:
+          type: integer
+          description: 新有效户数
+        cost_per_lead:
+          type: number
+          format: float
+          description: 线索成本
+        cost_per_valid_account:
+          type: number
+          format: float
+          description: 有效户成本
+        customer_assets:
+          type: number
+          format: float
+          description: 新客户资产
+        customer_contribution:
+          type: number
+          format: float
+          description: 客户贡献
+        existing_customers_assets:
+          type: number
+          format: float
+          description: 存量客户资产
+
+    WowChange:
+      type: object
+      description: 环比变化
+      additionalProperties:
+        type: object
+        properties:
+          value:
+            type: number
+            format: float
+            description: 变化百分比
+          trend:
+            type: string
+            enum: [up, down, flat]
+            description: 趋势方向
+          color:
+            type: string
+            enum: [green, red]
+            description: 显示颜色（绿色表示正向，红色表示负向）
+
+    CoreMetricsResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                core_metrics:
+                  $ref: '#/components/schemas/CoreMetrics'
+                wow_changes:
+                  $ref: '#/components/schemas/WowChange'
+
+    DashboardAccountsResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                accounts:
+                  type: array
+                  items:
+                    type: string
+                  description: 账号列表
+
+    DashboardTrendDataResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                dates:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                  description: 日期数组
+                values:
+                  type: array
+                  items:
+                    type: number
+                    format: float
+                  description: 指标值数组
+                metric_type:
+                  type: string
+                  enum: [cost_per_lead, cost_per_customer, cost_per_valid_account]
+                  description: 指标类型
+
+    # ============================================================================
+    # 趋势数据
+    # ============================================================================
+    TrendDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        cost:
+          type: number
+          format: float
+        impressions:
+          type: integer
+        clicks:
+          type: integer
+        leads:
+          type: integer
+        opened_accounts:
+          type: integer
+
+    TrendResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                dates:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+                series:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      data:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+
+    # ============================================================================
+    # 厂商分析
+    # ============================================================================
+    AgencyAnalysisItem:
+      type: object
+      properties:
+        platform:
+          type: string
+        agency:
+          type: string
+        business_model:
+          type: string
+        cost:
+          type: number
+          format: float
+        impressions:
+          type: integer
+        clicks:
+          type: integer
+        leads:
+          type: integer
+        opened_accounts:
+          type: integer
+        valid_customers:
+          type: integer
+
+    AgencyAnalysisResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                summary:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AgencyAnalysisItem'
+                trend:
+                  $ref: '#/components/schemas/TrendResponse'
+
+    # ============================================================================
+    # 转化漏斗
+    # ============================================================================
+    FunnelStage:
+      type: object
+      properties:
+        step:
+          type: string
+          description: 漏斗阶段名称
+        value:
+          type: integer
+          description: 该阶段数值
+        rate:
+          type: number
+          format: float
+          description: 转化率（百分比）
+
+    ConversionFunnelResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                funnel:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/FunnelStage'
+                core_metrics:
+                  $ref: '#/components/schemas/CoreMetrics'
+                is_employee_mode:
+                  type: boolean
+
+    # ============================================================================
+    # 线索明细
+    # ============================================================================
+    LeadsDetailItem:
+      type: object
+      properties:
+        lead_date:
+          type: string
+          format: date
+        platform_source:
+          type: string
+        ad_account:
+          type: string
+        agency:
+          type: string
+        wechat_nickname:
+          type: string
+        capital_account:
+          type: string
+        is_customer:
+          type: boolean
+        is_valid_lead:
+          type: boolean
+        is_opened_account:
+          type: boolean
+        is_valid_customer:
+          type: boolean
+
+    LeadsDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total:
+                  type: integer
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LeadsDetailItem'
+
+    # ============================================================================
+    # 小红书笔记
+    # ============================================================================
+    XhsNotesListItem:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        note_id:
+          type: string
+        note_title:
+          type: string
+        note_url:
+          type: string
+        creator_name:
+          type: string
+        producer:
+          type: string
+        ad_strategy:
+          type: string
+        note_type:
+          type: string
+        cost:
+          type: number
+          format: float
+        impressions:
+          type: integer
+        clicks:
+          type: integer
+        lead_users:
+          type: integer
+        opened_account_users:
+          type: integer
+
+    XhsNotesListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total:
+                  type: integer
+                page:
+                  type: integer
+                page_size:
+                  type: integer
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/XhsNotesListItem'
+
+    # ============================================================================
+    # 账号映射
+    # ============================================================================
+    AccountMapping:
+      type: object
+      properties:
+        id:
+          type: integer
+        platform:
+          type: string
+          enum: [腾讯, 抖音, 小红书]
+        account_id:
+          type: string
+        account_name:
+          type: string
+        main_account_id:
+          type: string
+        agency:
+          type: string
+        business_model:
+          type: string
+          enum: [直播, 信息流, 搜索]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AccountMappingCreate:
+      type: object
+      required:
+        - platform
+        - agency
+      properties:
+        platform:
+          type: string
+          enum: [腾讯, 抖音, 小红书]
+        account_id:
+          type: string
+        account_name:
+          type: string
+        main_account_id:
+          type: string
+        agency:
+          type: string
+        business_model:
+          type: string
+          enum: [直播, 信息流, 搜索]
+
+    AccountMappingUpdate:
+      type: object
+      properties:
+        account_name:
+          type: string
+        agency:
+          type: string
+        business_model:
+          type: string
+          enum: [直播, 信息流, 搜索]
+
+    AccountMappingListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AccountMapping'
+
+    # ============================================================================
+    # 文件上传
+    # ============================================================================
+    UploadResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                total_rows:
+                  type: integer
+                success_count:
+                  type: integer
+                failed_count:
+                  type: integer
+                failed_rows:
+                  type: array
+                  items:
+                    type: integer
+                errors:
+                  type: array
+                  items:
+                    type: string
+
+    # ============================================================================
+    # 元数据
+    # ============================================================================
+    Metadata:
+      type: object
+      properties:
+        platforms:
+          type: array
+          items:
+            type: string
+        agencies:
+          type: array
+          items:
+            type: string
+        business_models:
+          type: array
+          items:
+            type: string
+        date_range:
+          type: object
+          properties:
+            min:
+              type: string
+              format: date
+            max:
+              type: string
+              format: date
+
+    MetadataResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/Metadata'

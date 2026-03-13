@@ -14,12 +14,14 @@ from backend.models import (
     BackendConversions
 )
 from backend.database import db
+from backend.utils.decorators import handle_exceptions
 from datetime import datetime, date, timedelta
 
 # 创建Blueprint
 bp = Blueprint('leads', __name__)
 
 @bp.route('/leads-detail', methods=['GET'])
+@handle_exceptions
 def get_leads_detail():
     """
     获取线索明细数据
@@ -328,6 +330,7 @@ def get_leads_detail():
 
 
 @bp.route('/leads-detail/filter-options', methods=['GET'])
+@handle_exceptions
 def get_leads_detail_filter_options():
     """
     获取线索明细筛选器选项
