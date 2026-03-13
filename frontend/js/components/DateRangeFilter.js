@@ -5,8 +5,6 @@
  * - 左侧：日期自定义选择的时间区间（开始日期 - 结束日期）
  * - 右侧：快速选择按钮（全部、近7天、近30天、今年以来）
  * - 使用统一的按钮系统和表单组件
- *
- * v2.0 - 已迁移至 Vaadin Web Components
  */
 
 class DateRangeFilter {
@@ -19,7 +17,6 @@ class DateRangeFilter {
 
         this.dateButtons = [];
         this.currentRange = this.defaultRange;
-        this.vaadinReady = false;
 
         this.init();
     }
@@ -27,11 +24,8 @@ class DateRangeFilter {
     /**
      * 初始化
      */
-    async init() {
+    init() {
         console.log('初始化标准日期筛选器');
-
-        // 加载Vaadin组件
-        await this.loadVaadinComponents();
 
         const container = document.getElementById(this.containerId);
         if (!container) {
@@ -48,32 +42,9 @@ class DateRangeFilter {
     }
 
     /**
-     * 加载Vaadin组件
-     */
-    async loadVaadinComponents() {
-        try {
-            if (typeof VaadinLoader === 'undefined') {
-                console.warn('VaadinLoader not found, using native date inputs');
-                this.vaadinReady = false;
-                return;
-            }
-
-            await VaadinLoader.loadComponents(['datePicker', 'button']);
-
-            this.vaadinReady = true;
-            console.log('Vaadin date picker components loaded successfully');
-        } catch (error) {
-            console.warn('Failed to load Vaadin components, using native fallback:', error);
-            this.vaadinReady = false;
-        }
-    }
-
-    /**
      * 渲染 HTML
      */
     render() {
-        const useVaadin = this.vaadinReady;
-
         return `
             <div class="filter-group" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <label class="filter-label">日期范围:</label>
@@ -86,41 +57,21 @@ class DateRangeFilter {
                     padding-right: 16px;
                     border-right: 1px solid var(--border-color);
                 ">
-                    ${useVaadin ? `
-                        <vaadin-date-picker
-                            id="${this.startDateInputId}"
-                            theme="aura"
-                            placeholder="开始日期"
-                            style="width: 140px;"
-                            aria-label="开始日期"
-                        ></vaadin-date-picker>
-                    ` : `
-                        <input
-                            type="date"
-                            id="${this.startDateInputId}"
-                            class="form-control"
-                            style="width: 140px;"
-                            aria-label="开始日期"
-                        >
-                    `}
+                    <input
+                        type="date"
+                        id="${this.startDateInputId}"
+                        class="form-control"
+                        style="width: 140px;"
+                        aria-label="开始日期"
+                    >
                     <span style="color: var(--text-secondary); white-space: nowrap;">至</span>
-                    ${useVaadin ? `
-                        <vaadin-date-picker
-                            id="${this.endDateInputId}"
-                            theme="aura"
-                            placeholder="结束日期"
-                            style="width: 140px;"
-                            aria-label="结束日期"
-                        ></vaadin-date-picker>
-                    ` : `
-                        <input
-                            type="date"
-                            id="${this.endDateInputId}"
-                            class="form-control"
-                            style="width: 140px;"
-                            aria-label="结束日期"
-                        >
-                    `}
+                    <input
+                        type="date"
+                        id="${this.endDateInputId}"
+                        class="form-control"
+                        style="width: 140px;"
+                        aria-label="结束日期"
+                    >
                 </div>
 
                 <!-- 快速选择按钮组 -->
@@ -147,7 +98,6 @@ class DateRangeFilter {
      */
     bindEvents() {
         const container = document.getElementById(this.containerId);
-        const useVaadin = this.vaadinReady;
 
         // 绑定快速选择按钮事件
         container.querySelectorAll('.btn-group .btn').forEach(btn => {
@@ -162,25 +112,13 @@ class DateRangeFilter {
         const startDateInput = document.getElementById(this.startDateInputId);
         const endDateInput = document.getElementById(this.endDateInputId);
 
-        if (useVaadin) {
-            // Vaadin date picker 使用 'value-changed' 事件
-            startDateInput.addEventListener('value-changed', () => {
-                this.handleDateInputChange();
-            });
+        startDateInput.addEventListener('change', () => {
+            this.handleDateInputChange();
+        });
 
-            endDateInput.addEventListener('value-changed', () => {
-                this.handleDateInputChange();
-            });
-        } else {
-            // 原生 date input 使用 'change' 事件
-            startDateInput.addEventListener('change', () => {
-                this.handleDateInputChange();
-            });
-
-            endDateInput.addEventListener('change', () => {
-                this.handleDateInputChange();
-            });
-        }
+        endDateInput.addEventListener('change', () => {
+            this.handleDateInputChange();
+        });
     }
 
     /**
