@@ -36,7 +36,7 @@ def analyze_empty_agency_data():
         DailyMetricsUnified.account_name,
         sa.func.sum(DailyMetricsUnified.cost).label('total_cost'),
         sa.func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-        sa.func.sum(DailyMetricsUnified.click_users).label('total_click_users'),
+        sa.func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
         sa.func.count(DailyMetricsUnified.id).label('record_count')
     ).filter(
         sa.or_(
@@ -64,7 +64,7 @@ def analyze_empty_agency_data():
         account_name = row.account_name or ''
         total_cost = float(row.total_cost or 0)
         total_impressions = int(row.total_impressions or 0)
-        total_click_users = int(row.total_click_users or 0)
+        total_clicks = int(row.total_clicks or 0)
         record_count = row.record_count
 
         print(f"Platform: {platform}")
@@ -72,7 +72,7 @@ def analyze_empty_agency_data():
         print(f"  Account Name: {account_name}")
         print(f"  Total Cost: {total_cost:,.2f} CNY")
         print(f"  Total Impressions: {total_impressions:,}")
-        print(f"  Click Users: {total_click_users:,}")
+        print(f"  Clicks: {total_clicks:,}")
         print(f"  Record Count: {record_count}")
         print()
 
