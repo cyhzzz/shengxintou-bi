@@ -38,9 +38,10 @@ export interface DashboardTrendData {
 /**
  * 将 API 响应转换为前端图表数据格式
  *
- * 支持两种 API 响应格式：
+ * 支持三种 API 响应格式：
  * 1. 新格式: { trend_data: [{date, value}], metric_type }
  * 2. 旧格式: { dates: [], values: [], metric_type }
+ * 3. 系列格式: { dates: [], series: [{name, data}], metric_type }
  *
  * @param data - API 返回的原始数据
  * @returns 转换后的趋势数据
@@ -50,6 +51,7 @@ export function transformDashboardTrendData(
     trend_data?: Array<{ date: string; value: number }>;
     dates?: string[];
     values?: number[];
+    series?: Array<{ name: string; data: number[] }>;
     metric_type?: string;
   }
 ): DashboardTrendData {
@@ -61,6 +63,23 @@ export function transformDashboardTrendData(
       date: item.date,
       value: item.value ?? 0,
     }));
+  }
+  // 系列格式：dates + series (多系列数据)
+  else if (data.dates && data.series && Array.isArray(data.series)) {
+    const dates = data.dates;
+    trend_data = [];
+
+    // 将每个系列转换为数据项，带 category 字段
+    for (const seriesItem of data.series) {
+      const seriesData = seriesItem.data || [];
+      for (let i = 0; i < dates.length; i++) {
+        trend_data.push({
+          date: dates[i],
+          value: seriesData[i] ?? 0,
+          category: seriesItem.name,
+        });
+      }
+    }
   }
   // 旧格式：需要从 dates 和 values 转换
   else {

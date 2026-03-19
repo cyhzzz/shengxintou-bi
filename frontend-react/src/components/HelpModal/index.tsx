@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Button, Card, Row, Col, Typography } from 'antd';
 import { QuestionCircleOutlined, SyncOutlined } from '@ant-design/icons';
 import { dataService } from '@/services';
-import { DataFreshnessIndicator, DataFreshnessIndicatorRef } from '@/components/DataFreshness';
+import { DataFreshnessIndicator } from '@/components';
+import type { DataFreshnessIndicatorRef } from '@/components';
 import styles from './index.module.scss';
 
 const { Text, Paragraph } = Typography;
