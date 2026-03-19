@@ -194,7 +194,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
   return (
     <Card
       className={styles.trendCard}
-      bordered={false}
+      variant="borderless"
     >
       <Spin spinning={loading}>
         {/* 图表标题和控制栏 */}
