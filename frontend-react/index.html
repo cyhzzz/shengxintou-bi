@@ -10,6 +10,65 @@
     <title>省心投平台 - 互联网广告投放分析平台</title>
     <!-- Favicon -->
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <!-- 旧版 JS 加载器 - 开发模式从旧前端服务加载 -->
+    <script>
+      (function() {
+        // 开发模式：旧前端运行在 localhost:3001
+        // 生产模式：旧前端 JS 文件由 Flask 服务器提供
+        var isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        var legacyBase = isDev ? 'http://localhost:3001/js' : '/js';
+
+        // 核心工具文件（必须按顺序加载）
+        var coreScripts = [
+          legacyBase + '/utils/api.js',
+          legacyBase + '/utils/EventManager.js',
+          legacyBase + '/utils/MetadataManager.js',
+          legacyBase + '/utils/chartHelper.js',
+          legacyBase + '/utils/formatHelper.js',
+          legacyBase + '/utils/dateHelper.js',
+        ];
+
+        // 报表类文件
+        var reportScripts = [
+          legacyBase + '/reports/AgencyAnalysisReport.js',
+        ];
+
+        // 合并所有脚本
+        var allScripts = coreScripts.concat(reportScripts);
+
+        // 同步加载脚本以保持依赖顺序
+        var loadScript = function(src, callback) {
+          var script = document.createElement('script');
+          script.src = src;
+          script.async = false; // 保持加载顺序
+          script.onload = function() {
+            console.log('[legacy-loader] 已加载: ' + src);
+            if (callback) callback();
+          };
+          script.onerror = function() {
+            console.warn('[legacy-loader] 加载失败: ' + src);
+            if (callback) callback(); // 继续加载其他脚本
+          };
+          document.head.appendChild(script);
+        };
+
+        // 依次加载所有脚本
+        var index = 0;
+        var loadNext = function() {
+          if (index < allScripts.length) {
+            loadScript(allScripts[index], function() {
+              index++;
+              loadNext();
+            });
+          } else {
+            console.log('[legacy-loader] 所有旧版 JS 加载完成');
+          }
+        };
+
+        // 开始加载
+        loadNext();
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
