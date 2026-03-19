@@ -37,38 +37,86 @@ export function useLegacyReport(className: string): UseLegacyReportReturn {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    const LegacyClass = (window as any)[className];
+    // 等待旧版类加载的函数
+    const waitForLegacyClass = (className: string, maxWait: number = 10000): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        const checkInterval = 100;
 
-    if (!LegacyClass) {
-      console.warn(`[useLegacyReport] 未找到旧版类: ${className}`);
-      setError(new Error(`Legacy class "${className}" not found`));
-      return;
-    }
-
-    try {
-      // 延迟初始化，确保 DOM 已渲染
-      const timer = setTimeout(() => {
-        const instance = new LegacyClass();
-        setReport(instance);
-        console.log(`[useLegacyReport] 成功初始化: ${className}`);
-      }, 100);
-
-      // 清理函数
-      return () => {
-        clearTimeout(timer);
-        setReport((currentReport) => {
-          if (currentReport && typeof currentReport.destroy === 'function') {
-            console.log(`[useLegacyReport] 销毁实例: ${className}`);
-            currentReport.destroy();
+        const check = () => {
+          const LegacyClass = (window as any)[className];
+          if (LegacyClass) {
+            resolve(LegacyClass);
+            return;
           }
-          return null;
-        });
-        isInitialized.current = false;
-      };
-    } catch (err) {
-      console.error(`[useLegacyReport] 初始化失败:`, err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-    }
+
+          if (Date.now() - startTime > maxWait) {
+            reject(new Error(`Legacy class "${className}" not found after ${maxWait}ms`));
+            return;
+          }
+
+          setTimeout(check, checkInterval);
+        };
+
+        check();
+      });
+    };
+
+    // 初始化旧版报表
+    const initLegacyReport = async () => {
+      try {
+        // 等待旧版类加载
+        const LegacyClass = await waitForLegacyClass(className);
+
+        // 为旧版类创建必要的容器（如果不存在）
+        // 旧版 AgencyAnalysisReport 需要 #mainContent 来渲染筛选器
+        // 但在混合迁移模式下，我们使用 React 筛选器，所以创建一个隐藏容器
+        let tempMainContent = document.getElementById('mainContent');
+        if (!tempMainContent) {
+          tempMainContent = document.createElement('div');
+          tempMainContent.id = 'mainContent';
+          tempMainContent.style.display = 'none'; // 隐藏旧版筛选器
+          document.body.appendChild(tempMainContent);
+          console.log('[useLegacyReport] 创建隐藏的 #mainContent 容器');
+        }
+
+        // 延迟初始化，确保 DOM 已渲染
+        setTimeout(() => {
+          try {
+            const instance = new LegacyClass();
+            setReport(instance);
+            console.log(`[useLegacyReport] 成功初始化: ${className}`);
+          } catch (err) {
+            console.error(`[useLegacyReport] 实例化失败:`, err);
+            setError(err instanceof Error ? err : new Error(String(err)));
+          }
+        }, 100);
+      } catch (err) {
+        console.warn(`[useLegacyReport] ${err}`);
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
+    };
+
+    initLegacyReport();
+
+    // 清理函数
+    return () => {
+      setReport((currentReport) => {
+        if (currentReport && typeof currentReport.destroy === 'function') {
+          console.log(`[useLegacyReport] 销毁实例: ${className}`);
+          currentReport.destroy();
+        }
+        return null;
+      });
+      isInitialized.current = false;
+
+      // 清理隐藏容器
+      const hiddenContainer = document.getElementById('mainContent');
+      if (hiddenContainer && hiddenContainer.style.display === 'none') {
+        hiddenContainer.remove();
+        console.log('[useLegacyReport] 清理隐藏容器');
+      }
+    };
   }, [className]);
 
   // 刷新数据

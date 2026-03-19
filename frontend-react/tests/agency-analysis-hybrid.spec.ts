@@ -7,12 +7,14 @@ import { test, expect } from '@playwright/test';
 
 test.describe('厂商分析页面测试', () => {
   test.beforeEach(async ({ page }) => {
-    // 访问页面
-    await page.goto('http://localhost:5173/agency-analysis');
-    // 等待页面加载完成
-    await page.waitForLoadState('networkidle');
-    // 等待旧版 JS 加载
-    await page.waitForTimeout(2000);
+    // 访问页面（Vite 开发服务器端口）
+    await page.goto('http://localhost:3001/agency-analysis');
+    // 等待 DOM 加载完成（Vite 开发模式有 WebSocket，不适合用 networkidle）
+    await page.waitForLoadState('domcontentloaded');
+    // 等待 React 渲染完成（等待筛选器出现）
+    await page.waitForSelector('.ant-card', { timeout: 10000 });
+    // 等待旧版 JS 加载和初始化
+    await page.waitForTimeout(3000);
   });
 
   test('应该显示筛选器', async ({ page }) => {
@@ -35,22 +37,22 @@ test.describe('厂商分析页面测试', () => {
   });
 
   test('应该显示日级趋势图', async ({ page }) => {
-    // 检查趋势图容器
-    const chartContainer = page.locator('#trendChart');
+    // 检查趋势图容器（React 页面中的）
+    const chartContainer = page.locator('#root #trendChart').first();
     await expect(chartContainer).toBeVisible();
 
-    // 检查图表标题
-    const chartTitle = page.locator('text=日级趋势图');
+    // 检查图表标题（React 页面中的）
+    const chartTitle = page.locator('#root').getByRole('heading', { name: '日级趋势图' });
     await expect(chartTitle).toBeVisible();
   });
 
   test('应该显示聚合数据表格', async ({ page }) => {
-    // 检查表格容器
-    const tableContainer = page.locator('#agencyTable');
+    // 检查表格容器（React 页面中的）
+    const tableContainer = page.locator('#root #agencyTable').first();
     await expect(tableContainer).toBeVisible();
 
-    // 检查表格标题
-    const tableTitle = page.locator('text=平台×代理商聚合数据');
+    // 检查表格标题（React 页面中的）
+    const tableTitle = page.locator('#root').getByRole('heading', { name: '平台×代理商聚合数据' });
     await expect(tableTitle).toBeVisible();
   });
 
@@ -72,14 +74,14 @@ test.describe('厂商分析页面测试', () => {
     const metricSelector = page.locator('.ant-segmented').first();
 
     // 点击"曝光"选项
-    const impressionsOption = metricSelector.locator('text=曝光');
+    const impressionsOption = metricSelector.locator('.ant-segmented-item:has-text("曝光")');
     await impressionsOption.click();
 
     // 等待图表更新
     await page.waitForTimeout(500);
 
-    // 验证选中状态
-    await expect(impressionsOption).toHaveAttribute('aria-checked', 'true');
+    // 验证选中状态（Ant Design 使用 ant-segmented-item-selected 类）
+    await expect(impressionsOption).toHaveClass(/ant-segmented-item-selected/);
   });
 
   test('导出按钮应该可用', async ({ page }) => {
