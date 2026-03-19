@@ -34,7 +34,7 @@ from backend.models import (
     AccountAgencyMapping,
     AgencyAbbreviationMapping
 )
-from sqlalchemy import func, and_, or_, distinct, case, text
+from sqlalchemy import func, and_, or_, distinct, case, text, literal_column
 
 
 # 业务模式映射规则（代理商 → 业务模式）
@@ -781,12 +781,13 @@ def _calculate_click_users(start_date, end_date):
     """
     print("    计算点击人数...")
 
-    # 构建用户标识
-    user_identifier = func.concat(
-        BackendConversions.platform_source, '|',
-        func.coalesce(BackendConversions.wechat_nickname, ''), '|',
-        func.coalesce(BackendConversions.capital_account, ''), '|',
-        func.coalesce(BackendConversions.platform_user_id, '')
+    # 构建用户标识（使用 SQLite 的 || 操作符进行字符串连接）
+    # SQLite 不支持 concat() 函数，需要使用 || 操作符
+    user_identifier = literal_column(
+        "backend_conversions.platform_source || '|' || "
+        "COALESCE(backend_conversions.wechat_nickname, '') || '|' || "
+        "COALESCE(backend_conversions.capital_account, '') || '|' || "
+        "COALESCE(backend_conversions.platform_user_id, '')"
     )
 
     # 业务模式推断逻辑

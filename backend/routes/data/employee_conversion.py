@@ -134,17 +134,18 @@ def get_analysis_data():
 
         # 参数提取
         platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
+        start_date = data.get('start_date')  # 可选，为空时查询全部
+        end_date = data.get('end_date')  # 可选，为空时查询全部
         employees = data.get('employees', [])  # 空列表表示全部
         lead_type = data.get('lead_type', 'all')
 
-        # 参数验证
-        if not start_date or not end_date:
+        # 日期参数验证：允许为空（查询全部数据）
+        # 如果只传了一个日期，返回错误
+        if (start_date and not end_date) or (not start_date and end_date):
             return jsonify({
                 'success': False,
-                'error': 'MISSING_DATE',
-                'message': '缺少日期参数'
+                'error': 'INVALID_DATE_RANGE',
+                'message': '开始日期和结束日期必须同时提供或同时为空'
             }), 400
 
         # 获取排行榜数据

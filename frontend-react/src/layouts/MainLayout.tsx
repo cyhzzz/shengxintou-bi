@@ -146,7 +146,7 @@ export default function MainLayout() {
           className={styles.menu}
         />
       </Sider>
-      <Layout>
+      <Layout className={styles.mainLayout}>
         <Header className={styles.header}>
           <div className={styles.breadcrumb}>
             <span className={styles.brand}>省心投</span>

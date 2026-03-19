@@ -1,7 +1,7 @@
 /**
  * /**
  *  * API 类型定义 - 自动生成
- *  * 生成时间: 2026-03-12T04:01:15.202Z
+ *  * 生成时间: 2026-03-17T02:47:31.528Z
  *  * 请勿手动修改此文件
  *  *\/
  */
@@ -114,11 +114,6 @@ export const DashboardTrendDataResponseAllOfDataMetricType = {
   cost_per_lead: 'cost_per_lead',
   cost_per_customer: 'cost_per_customer',
   cost_per_valid_account: 'cost_per_valid_account',
-  investment: 'investment',
-  impressions: 'impressions',
-  clicks: 'clicks',
-  leads: 'leads',
-  new_customers: 'new_customers',
 } as const;
 
 export type DashboardTrendDataResponseAllOfData = {
@@ -145,21 +140,29 @@ export interface TrendDataPoint {
   opened_accounts?: number;
 }
 
+/**
+ * 趋势数据系列项（每个日期的详细数据）
+ */
 export type TrendResponseAllOfDataSeriesItem = {
-  name?: string;
-  data?: number[];
+  date?: string;
+  platform?: string;
+  business_model?: string;
+  agency?: string;
+  metrics?: {
+    cost?: number;
+    impressions?: number;
+    clicks?: number;
+    lead_users?: number;
+    opened_account_users?: number;
+    valid_customer_users?: number;
+  };
 };
 
-export type TrendResponseAllOfData = {
+// TrendResponse 直接包含 dates 和 series（与后端返回一致）
+export type TrendResponse = {
   dates?: string[];
   series?: TrendResponseAllOfDataSeriesItem[];
 };
-
-export type TrendResponseAllOf = {
-  data?: TrendResponseAllOfData;
-};
-
-export type TrendResponse = SuccessResponse & TrendResponseAllOf;
 
 export interface AgencyAnalysisItem {
   platform?: string;
@@ -232,19 +235,59 @@ export type LeadsDetailResponseAllOf = {
 export type LeadsDetailResponse = SuccessResponse & LeadsDetailResponseAllOf;
 
 export interface XhsNotesListItem {
-  date?: string;
+  // 基本字段
   note_id?: string;
+  note_name?: string;
   note_title?: string;
   note_url?: string;
-  creator_name?: string;
-  producer?: string;
-  ad_strategy?: string;
   note_type?: string;
-  cost?: number;
+  content_type?: string;
+  // 创作者信息
+  producer?: string;
+  creator_name?: string;
+  // 账号和发布信息
+  publish_account?: string;
+  publish_time?: string;
+  // 广告策略
+  ad_strategy?: string;
+  is_ad?: boolean;
+  // 总量指标（投放+自然）
+  exposure?: number;
   impressions?: number;
+  reads?: number;
   clicks?: number;
+  interactions?: number;
+  click_rate?: number;
+  // 成本指标
+  ad_spend?: number;
+  cost?: number;
+  // 互动指标
+  likes?: number;
+  comments?: number;
+  favorites?: number;
+  shares?: number;
+  // 私信指标
+  private_messages?: number;
+  // 转化指标
   lead_users?: number;
+  customer_mouth_users?: number;
+  valid_lead_users?: number;
   opened_account_users?: number;
+  valid_customer_users?: number;
+  customer_assets_users?: number;
+  customer_assets_amount?: number;
+  // 推广数据（投放）
+  ad_impressions?: number;
+  ad_clicks?: number;
+  ad_interactions?: number;
+  ad_click_rate?: number;
+  // 自然数据
+  organic_impressions?: number;
+  organic_clicks?: number;
+  organic_interactions?: number;
+  // 计算成本
+  add_wechat_cost?: number;
+  open_account_cost?: number;
 }
 
 export type XhsNotesListResponseAllOfData = {
@@ -375,6 +418,140 @@ export type MetadataResponseAllOf = {
 
 export type MetadataResponse = SuccessResponse & MetadataResponseAllOf;
 
+// ============================================
+// Employee Conversion - 员工转化分析
+// ============================================
+
+/**
+ * 员工转化排行榜项
+ */
+export interface EmployeeConversionRankingItem {
+  /** 排名 */
+  rank: number;
+  /** 员工姓名 */
+  employee_name: string;
+  /** 总线索数 */
+  total_leads: number;
+  /** 开口数 */
+  mouth_count: number;
+  /** 有效线索数 */
+  valid_lead_count: number;
+  /** 开户数 */
+  opened_count: number;
+  /** 有效户数 */
+  valid_customer_count: number;
+  /** 开户率 */
+  opening_rate: number;
+  /** 有效户率 */
+  valid_customer_rate: number;
+  /** 总资产 */
+  total_assets: number;
+}
+
+/**
+ * 员工转化分析核心指标
+ */
+export interface EmployeeConversionCoreMetrics {
+  total_leads: number;
+  total_mouth: number;
+  total_valid_lead: number;
+  total_opened: number;
+  total_valid_customer: number;
+  avg_opening_rate: number;
+  total_assets: number;
+}
+
+/**
+ * 转化趋势数据
+ */
+export interface EmployeeConversionTrend {
+  weeks: string[];
+  dateRanges?: string[];
+  lead_users: number[];
+  customer_mouth_users: number[];
+  valid_lead_users: number[];
+  opened_account_users: number[];
+}
+
+/**
+ * 员工转化率走势数据（与小红书报表格式一致）
+ */
+export interface EmployeeConversionRateTrend {
+  weeks: string[];
+  employees: string[];
+  series: number[][]; // 每个员工的周度转化率数据
+}
+
+/**
+ * 平台概览项
+ */
+export interface EmployeeConversionPlatformItem {
+  platform: string;
+  total_leads: number;
+  mouth_count: number;
+  valid_lead_count: number;
+  opened_count: number;
+  valid_customer_count: number;
+  opening_rate: number;
+}
+
+/**
+ * 员工转化分析数据
+ */
+export interface EmployeeConversionAnalysisData {
+  core_metrics: EmployeeConversionCoreMetrics;
+  platform_overview: EmployeeConversionPlatformItem[];
+  conversion_trend: EmployeeConversionTrend;
+  employee_rate_trend: EmployeeConversionRateTrend;
+  ranking: EmployeeConversionRankingItem[];
+}
+
+/**
+ * 员工转化分析响应
+ */
+export interface EmployeeConversionAnalysisResponse extends SuccessResponse {
+  data?: EmployeeConversionAnalysisData;
+}
+
+/**
+ * 员工转化筛选选项响应
+ */
+export interface EmployeeConversionFilterOptionsResponse extends SuccessResponse {
+  data?: {
+    platforms: string[];
+    employees: string[];
+    lead_types: Array<{ value: string; label: string }>;
+  };
+}
+
+/**
+ * 员工转化周报数据
+ */
+export interface EmployeeConversionWeeklyData {
+  period: {
+    start_date: string;
+    end_date: string;
+  };
+  overview: EmployeeConversionCoreMetrics;
+  rankings: {
+    opening_rate: EmployeeConversionRankingItem[];
+    valid_customer_rate: EmployeeConversionRankingItem[];
+    assets: EmployeeConversionRankingItem[];
+  };
+  stars?: {
+    opening_rate_star?: EmployeeConversionRankingItem;
+    valid_customer_rate_star?: EmployeeConversionRankingItem;
+    assets_star?: EmployeeConversionRankingItem;
+  };
+}
+
+/**
+ * 员工转化周报响应
+ */
+export interface EmployeeConversionWeeklyResponse extends SuccessResponse {
+  data?: EmployeeConversionWeeklyData;
+}
+
 export type PostDashboardAccountsBodyFiltersPlatformsItem = typeof PostDashboardAccountsBodyFiltersPlatformsItem[keyof typeof PostDashboardAccountsBodyFiltersPlatformsItem];
 
 
@@ -440,23 +617,6 @@ export const PostDashboardTrendDataBodyMetricType = {
   cost_per_lead: 'cost_per_lead',
   cost_per_customer: 'cost_per_customer',
   cost_per_valid_account: 'cost_per_valid_account',
-  investment: 'investment',
-  impressions: 'impressions',
-  clicks: 'clicks',
-  leads: 'leads',
-  new_customers: 'new_customers',
-} as const;
-
-/**
- * 趋势数据聚合粒度
- */
-export type PostDashboardTrendDataBodyGranularity = typeof PostDashboardTrendDataBodyGranularity[keyof typeof PostDashboardTrendDataBodyGranularity];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const PostDashboardTrendDataBodyGranularity = {
-  daily: 'daily',
-  weekly: 'weekly',
-  monthly: 'monthly',
 } as const;
 
 export type PostDashboardTrendDataBody = {
@@ -472,8 +632,6 @@ export type PostDashboardTrendDataBody = {
   business_models?: string[];
   /** 指标类型 */
   metric_type?: PostDashboardTrendDataBodyMetricType;
-  /** 聚合粒度 (daily/weekly/monthly) */
-  granularity?: PostDashboardTrendDataBodyGranularity;
 };
 
 export type GetTrendDailyParams = {
@@ -530,7 +688,6 @@ start_date: string;
 end_date: string;
 platforms?: string[];
 agencies?: string[];
-business_models?: string[];
 /**
  * 是否按服务人员维度统计
  */
@@ -542,8 +699,14 @@ page?: number;
 page_size?: number;
 start_date?: string;
 end_date?: string;
-platform?: string;
-is_customer?: boolean;
+/**
+ * 平台列表（逗号分隔）
+ */
+platforms?: string;
+/**
+ * 服务员工姓名
+ */
+employee_name?: string;
 is_opened_account?: boolean;
 };
 
@@ -581,600 +744,266 @@ export type PostUploadBody = {
   overwrite?: boolean;
 };
 
-// ===== 简称映射API类型 =====
+// ============================================
+// XHS Operation Analysis - 小红书运营分析
+// ============================================
 
 /**
- * 映射类型
+ * 创作者内容数据项
  */
-export type MappingType = typeof MappingType[keyof typeof MappingType];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const MappingType = {
-  agency: 'agency',
-  platform: 'platform',
-} as const;
-
-export interface AbbreviationMapping {
-  id: number;
-  abbreviation: string;
-  full_name: string;
-  mapping_type: MappingType;
-  platform: string | null;
-  display_name: string | null;
-  description: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CreateAbbreviationMappingBody {
-  abbreviation: string;
-  full_name: string;
-  mapping_type: MappingType;
-  platform?: string;
-  display_name?: string;
-  description?: string;
-  is_active?: boolean;
-}
-
-export interface UpdateAbbreviationMappingBody {
-  full_name?: string;
-  mapping_type?: MappingType;
-  platform?: string;
-  display_name?: string;
-  description?: string;
-  is_active?: boolean;
-}
-
-export interface AbbreviationMappingListResponse {
-  success: boolean;
-  data: AbbreviationMapping[];
-}
-
-// ===== WebDAV 数据同步API类型 =====
-
-export interface WebdavBackupResponse {
-  success: boolean;
-  task_id: string;
-  message?: string;
-}
-
-export interface WebdavRestoreResponse {
-  success: boolean;
-  task_id: string;
-  message?: string;
-}
-
-export interface WebdavBackupFile {
-  filename: string;
-  size: number;
-  created: string;
-}
-
-export interface WebdavListResponse {
-  success: boolean;
-  data: WebdavBackupFile[];
-}
-
-export interface WebdavProgressData {
-  status: 'pending' | 'uploading' | 'downloading' | 'completed' | 'failed';
-  progress: number;
-  message: string;
-}
-
-export interface WebdavProgressResponse {
-  success: boolean;
-  data: WebdavProgressData;
-}
-
-export interface WebdavDeleteResponse {
-  success: boolean;
-  message?: string;
-}
-
-export interface VersionCompareData {
-  needs_update: boolean;
-  message?: string;
-  cloud_version?: string;
-  support_contact?: string;
-}
-
-export interface VersionCompareResponse {
-  success: boolean;
-  data: VersionCompareData;
-}
-
-// ===== 员工转化周报API类型 =====
-
-export interface PostEmployeeConversionWeeklyBody {
-  start_date: string;
-  end_date: string;
-  platforms?: string[];
-  top_count?: number;
-}
-
-export interface EmployeeWeeklyRankingItem {
-  employee_name: string;
-  employee_no?: string;
-  total_leads: number;
-  mouth_count?: number;
-  valid_lead_count?: number;
-  opened_count: number;
-  valid_customer_count?: number;
-  total_assets?: number;
-  opening_rate: number;
-  valid_customer_rate?: number;
-}
-
-export interface EmployeeWeeklyOverview {
-  leads: number;
-  opened: number;
-  rate: number;
-}
-
-export interface EmployeeWeeklyPlatformData {
-  overview: EmployeeWeeklyOverview;
-  rankings: {
-    total: EmployeeWeeklyRankingItem[];
-    existing: EmployeeWeeklyRankingItem[];
-    new: EmployeeWeeklyRankingItem[];
-  };
-  star?: {
-    name: string;
-    rate: number;
-  };
-}
-
-export interface EmployeeConversionWeeklyData {
-  period: {
-    start_date: string;
-    end_date: string;
-  };
-  overview: Record<string, EmployeeWeeklyOverview>;
-  rankings: Record<string, EmployeeWeeklyPlatformData['rankings']>;
-  stars: Record<string, { name: string; rate: number }>;
-}
-
-export interface EmployeeConversionWeeklyResponse {
-  success: boolean;
-  data: EmployeeConversionWeeklyData;
-  message?: string;
-}
-
-// ===== 员工转化分析API类型 =====
-
-export interface PostEmployeeConversionAnalysisBody {
-  platforms?: string[];
-  start_date: string;
-  end_date: string;
-  employees?: string[];
-  lead_type?: 'all' | 'existing' | 'new';
-}
-
-export interface EmployeeConversionCoreMetrics {
-  total_leads: number;
-  total_mouth: number;
-  total_valid_lead: number;
-  total_opened: number;
-  total_valid_customer: number;
-  avg_opening_rate: number;
-  total_assets: number;
-}
-
-export interface EmployeeConversionPlatformOverview {
-  platform: string;
-  leads: number;
-  opened: number;
-  rate: number;
-}
-
-export interface EmployeeConversionTrendData {
-  weeks: string[];
-  dateRanges: string[];
-  lead_users: number[];
-  customer_mouth_users: number[];
-  valid_lead_users: number[];
-  opened_account_users: number[];
-}
-
-export interface EmployeeRateTrendItem {
-  week: string;
-  dateRange: string;
-  employee_name: string;
-  opening_rate: number;
-}
-
-export interface EmployeeConversionRankingItem {
-  rank: number;
-  employee_name: string;
-  total_leads: number;
-  mouth_count: number;
-  valid_lead_count: number;
-  opened_count: number;
-  valid_customer_count: number;
-  opening_rate: number;
-  valid_customer_rate: number;
-  total_assets: number;
-}
-
-export interface EmployeeConversionAnalysisData {
-  core_metrics: EmployeeConversionCoreMetrics;
-  platform_overview: EmployeeConversionPlatformOverview[];
-  conversion_trend: EmployeeConversionTrendData;
-  employee_rate_trend: EmployeeRateTrendItem[];
-  ranking: EmployeeConversionRankingItem[];
-}
-
-export interface EmployeeConversionAnalysisResponse {
-  success: boolean;
-  data: EmployeeConversionAnalysisData;
-  message?: string;
-}
-
-export interface EmployeeConversionFilterOptionsResponse {
-  success: boolean;
-  data: {
-    platforms: string[];
-    employees: string[];
-    lead_types: Array<{ value: string; label: string }>;
-  };
-}
-
-// ===== 数据导入API类型 =====
-
-export type DataType =
-  | 'tencent_ads'
-  | 'douyin_ads'
-  | 'xiaohongshu_ads'
-  | 'xhs_notes_list'
-  | 'xhs_notes_daily'
-  | 'xhs_notes_content'
-  | 'conversion';
-
-export interface UploadResponseData {
-  total_rows: number;
-  success_count: number;
-  failed_count: number;
-  failed_rows: number[];
-  errors: string[];
-}
-
-export interface UploadResponse {
-  success: boolean;
-  message: string;
-  data: UploadResponseData;
-}
-
-export interface DataTypeInfo {
-  type: DataType;
-  label: string;
-  description: string;
-  requiredFields: string[];
-}
-
-export const DATA_TYPES: DataTypeInfo[] = [
-  {
-    type: 'tencent_ads',
-    label: '腾讯广告数据',
-    description: '腾讯广告平台投放数据',
-    requiredFields: ['日期', '账户ID', '花费', '曝光量', '点击量'],
-  },
-  {
-    type: 'douyin_ads',
-    label: '抖音广告数据',
-    description: '抖音广告平台投放数据',
-    requiredFields: ['日期', '账户ID', '消耗', '展示数', '点击数'],
-  },
-  {
-    type: 'xiaohongshu_ads',
-    label: '小红书广告数据',
-    description: '小红书广告平台投放数据',
-    requiredFields: ['周期', '广告主账户ID', '总消耗', '总展现', '总点击'],
-  },
-  {
-    type: 'xhs_notes_list',
-    label: '小红书笔记列表',
-    description: '小红书笔记基础信息',
-    requiredFields: ['笔记ID', '笔记标题'],
-  },
-  {
-    type: 'xhs_notes_daily',
-    label: '小红书笔记投放数据',
-    description: '小红书笔记日级投放数据',
-    requiredFields: ['日期', '笔记ID', '消耗'],
-  },
-  {
-    type: 'xhs_notes_content',
-    label: '小红书笔记运营数据',
-    description: '小红书笔记日级运营数据',
-    requiredFields: ['数据日期', '笔记ID'],
-  },
-  {
-    type: 'conversion',
-    label: '后端转化数据',
-    description: '客户转化明细数据',
-    requiredFields: ['线索日期'],
-  },
-];
-
-
-// ===== 报告生成API类型 =====
-
-/**
- * 报告配置
- */
-export interface ReportConfig {
-  title: string;
-  format: 'pdf' | 'excel' | 'html';
-  includeSummary: boolean;
-  includeTrends: boolean;
-  includeComparison: boolean;
-  includeCharts: boolean;
-}
-
-/**
- * 报告数据
- */
-export interface ReportData {
-  summary: SummaryResponse | null;
-  trend: TrendResponse | null;
-  comparison: ConversionFunnelResponse | null;
-  funnel: ConversionFunnelResponse | null;
-  external: ExternalDataAnalysisResponse | null;
-}
-
-/**
- * 汇总数据响应
- */
-export interface SummaryResponse {
-  success: boolean;
-  data: Array<{
-    platform: string;
-    metrics: {
-      cost: number;
-      impressions: number;
-      clicks: number;
-      leads: number;
-      new_accounts: number;
-    };
-  }>;
-}
-
-/**
- * 趋势数据响应
- */
-export interface TrendResponse {
-  dates: string[];
-  series: Array<{
-    name: string;
-    metric?: string;
-    data: number[];
-  }>;
-}
-
-/**
- * 转化漏斗响应 (报告用)
- */
-export interface ConversionFunnelResponse {
-  platform_funnel: Array<{
-    platform: string;
-    impressions: number;
-    clicks: number;
-    leads: number;
-    new_accounts: number;
-    rates: {
-      overall_conversion_rate: number;
-    };
-  }>;
-}
-
-/**
- * 外部数据分析响应
- */
-export interface ExternalDataAnalysisResponse {
-  roi_analysis?: {
-    roi: number;
-    total_investment: number;
-    total_returns: number;
-    metrics: {
-      cost_per_account: number;
-    };
-  };
-  agency_ranking?: Array<{
-    agency: string;
-    score: number;
-    metrics: {
-      new_accounts: number;
-      cost_per_account: number;
-    };
-  }>;
-}
-
-// ===== 小红书运营分析API类型 =====
-
-export interface XhsOperationFilters {
-  date_range?: [string, string];
-  top_notes_date_range?: [string, string];
-  creator_annual_date_range?: [string, string];
-}
-
-export interface PostXhsOperationAnalysisBody {
-  filters?: XhsOperationFilters;
-}
-
-export interface XhsCoreMetrics {
-  new_notes_count: number;
-  ad_notes_count: number;
-  total_cost: number;
-  total_impressions: number;
-  total_clicks: number;
-  total_interactions: number;
-  total_private_messages: number;
-  total_lead_users: number;
-  total_opened_accounts: number;
-  impression_click_rate: number;
-  click_lead_rate: number;
-  lead_to_wechat_rate: number;
-  wechat_to_account_rate: number;
-  cost_per_mille: number;
-  cost_per_click: number;
-  cost_per_lead_user: number;
-  cost_per_opened_account: number;
-}
-
 export interface XhsCreatorContentItem {
-  producer: string;
-  note_count: number;
-  total_impressions: number;
-  total_clicks: number;
-  total_interactions: number;
-  total_cost: number;
-  avg_click_rate: number;
-  avg_interaction_rate: number;
+  /** 制作人 */
+  producer?: string;
+  /** 笔记数量 */
+  note_count?: number;
+  /** 总曝光数 */
+  total_impressions?: number;
+  /** 总点击数 */
+  total_clicks?: number;
+  /** 总互动数 */
+  total_interactions?: number;
+  /** 总花费 */
+  total_cost?: number;
+  /** 平均点击率 */
+  avg_click_rate?: number;
+  /** 平均互动率 */
+  avg_interaction_rate?: number;
 }
 
+/**
+ * 创作者转化数据项
+ */
 export interface XhsCreatorConversionItem {
-  producer: string;
-  private_messages: number;
-  lead_users: number;
-  customer_mouth_users: number;
-  valid_lead_users: number;
-  opened_account_users: number;
-  valid_customer_users: number;
+  /** 制作人 */
+  producer?: string;
+  /** 私信数 */
+  private_messages?: number;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 开口用户数 */
+  customer_mouth_users?: number;
+  /** 有效线索用户数 */
+  valid_lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
+  /** 有效户用户数 */
+  valid_customer_users?: number;
 }
 
-export interface XhsCreationTrend {
-  dates: string[];
-  note_counts: number[];
-  impression_series: number[];
-  interaction_series: number[];
-  cost_series: number[];
-}
-
+/**
+ * 热门笔记项
+ */
 export interface XhsTopNoteItem {
-  note_id: string;
-  note_title: string;
-  note_publish_time: string;
-  note_url: string;
-  producer: string;
-  ad_strategy: string;
-  total_cost: number;
-  total_impressions: number;
-  total_clicks: number;
-  total_private_messages: number;
-  lead_users: number;
-  opened_account_users: number;
+  /** 笔记ID */
+  note_id?: string;
+  /** 笔记标题 */
+  note_title?: string;
+  /** 发布时间 */
+  note_publish_time?: string;
+  /** 笔记链接 */
+  note_url?: string;
+  /** 制作人 */
+  producer?: string;
+  /** 推广策略 */
+  ad_strategy?: string;
+  /** 总花费 */
+  total_cost?: number;
+  /** 总曝光数 */
+  total_impressions?: number;
+  /** 总点击数 */
+  total_clicks?: number;
+  /** 总私信数 */
+  total_private_messages?: number;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
 }
 
+/**
+ * 创作者年度排行项
+ */
 export interface XhsCreatorAnnualRankingItem {
-  producer: string;
-  note_count: number;
-  total_cost: number;
-  total_impressions: number;
-  total_clicks: number;
-  total_private_messages: number;
-  lead_users: number;
-  opened_account_users: number;
+  /** 制作人 */
+  producer?: string;
+  /** 总花费 */
+  total_cost?: number;
+  /** 总曝光数 */
+  total_impressions?: number;
+  /** 总点击数 */
+  total_clicks?: number;
+  /** 总私信数 */
+  total_private_messages?: number;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
+  /** 笔记数量 */
+  note_count?: number;
 }
 
+/**
+ * 代理商数据项
+ */
 export interface XhsAgencyDataItem {
-  agency: string;
-  total_cost: number;
-  total_impressions: number;
-  total_clicks: number;
-  lead_users: number;
-  potential_customers: number;
-  customer_mouth_users: number;
-  valid_lead_users: number;
-  opened_account_users: number;
-  valid_customer_users: number;
+  /** 代理商 */
+  agency?: string;
+  /** 总花费 */
+  total_cost?: number;
+  /** 总曝光数 */
+  total_impressions?: number;
+  /** 总点击数 */
+  total_clicks?: number;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 潜在客户数 */
+  potential_customers?: number;
+  /** 开口用户数 */
+  customer_mouth_users?: number;
+  /** 有效线索用户数 */
+  valid_lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
+  /** 有效户用户数 */
+  valid_customer_users?: number;
 }
 
-export interface XhsConversionTrend {
-  weeks: string[];
-  dateRanges: string[];
-  lead_users: number[];
-  customer_mouth_users: number[];
-  valid_lead_users: number[];
-  opened_account_users: number[];
-}
-
-export interface XhsWeeklyConversionItem {
-  week: string;
-  date_range: string;
-  lead_users: number;
-  customer_mouth_users: number;
-  valid_lead_users: number;
-  opened_account_users: number;
-}
-
+/**
+ * 笔记转化排行项
+ */
 export interface XhsNoteConversionItem {
-  note_id: string;
-  note_title: string;
-  note_publish_time: string;
-  note_url: string;
-  producer: string;
-  ad_strategy: string;
-  total_cost: number;
-  total_impressions: number;
-  total_clicks: number;
-  total_private_messages: number;
-  lead_users: number;
-  opened_account_users: number;
+  /** 笔记ID */
+  note_id?: string;
+  /** 笔记标题 */
+  note_title?: string;
+  /** 制作人 */
+  producer?: string;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
+  /** 转化率 */
+  conversion_rate?: number;
 }
 
+/**
+ * 创作者创作数据项
+ */
 export interface XhsCreatorCreationItem {
-  producer: string;
-  note_count: number;
-  impressions: number;
+  /** 制作人 */
+  producer?: string;
+  /** 笔记数量 */
+  note_count?: number;
+  /** 曝光数 */
+  impressions?: number;
 }
 
+/**
+ * 创作者互动数据项
+ */
 export interface XhsCreatorInteractionItem {
-  producer: string;
-  likes: number;
-  favorites: number;
-  comments: number;
-  shares: number;
-  total_interactions: number;
+  /** 制作人 */
+  producer?: string;
+  /** 点赞数 */
+  likes?: number;
+  /** 收藏数 */
+  favorites?: number;
+  /** 评论数 */
+  comments?: number;
+  /** 分享数 */
+  shares?: number;
+  /** 总互动数 */
+  total_interactions?: number;
 }
 
+/**
+ * 员工转化排行项
+ */
 export interface XhsEmployeeConversionItem {
-  employee_name: string;
-  lead_users: number;
-  wechat_adds: number;
-  valid_lead_users: number;
-  opened_account_users: number;
-  valid_customer_users: number;
-  opening_rate: number;
-  valid_customer_rate: number;
-  total_assets: number;
+  /** 员工姓名 */
+  employee_name?: string;
+  /** 线索用户数 */
+  lead_users?: number;
+  /** 微信添加数 */
+  wechat_adds?: number;
+  /** 有效线索用户数 */
+  valid_lead_users?: number;
+  /** 开户用户数 */
+  opened_account_users?: number;
+  /** 有效户用户数 */
+  valid_customer_users?: number;
+  /** 开户率 */
+  opening_rate?: number;
+  /** 有效户率 */
+  valid_customer_rate?: number;
+  /** 总资产 */
+  total_assets?: number;
 }
 
+/**
+ * 小红书创作趋势数据
+ */
+export interface XhsCreationTrend {
+  dates?: string[];
+  note_counts?: number[];
+  impression_series?: number[];
+  interaction_series?: number[];
+  cost_series?: number[];
+}
+
+/**
+ * 小红书转化趋势数据
+ */
+export interface XhsConversionTrend {
+  weeks?: string[];
+  dateRanges?: string[];
+  lead_users?: number[];
+  customer_mouth_users?: number[];
+  valid_lead_users?: number[];
+  opened_account_users?: number[];
+}
+
+/**
+ * 员工周转化率数据
+ */
 export interface XhsEmployeeWeeklyConversion {
+  /** 周列表 */
   weeks: string[];
+  /** 员工列表 */
   employees: string[];
+  /** 转化率数据（二维数组，每个员工每周的转化率） */
   series: number[][];
 }
 
+/**
+ * 小红书运营分析数据
+ */
 export interface XhsOperationAnalysisData {
-  core_metrics: XhsCoreMetrics;
-  creator_content_data: XhsCreatorContentItem[];
-  creator_conversion_data: XhsCreatorConversionItem[];
-  creation_trend: XhsCreationTrend;
-  top_notes: XhsTopNoteItem[];
-  creator_annual_ranking: XhsCreatorAnnualRankingItem[];
-  agency_data: XhsAgencyDataItem[];
-  conversion_trend: XhsConversionTrend;
-  note_conversion_ranking: XhsNoteConversionItem[];
-  creator_creation_data: XhsCreatorCreationItem[];
-  creator_interaction_data: XhsCreatorInteractionItem[];
-  employee_conversion_ranking: XhsEmployeeConversionItem[];
-  employee_weekly_conversion: XhsEmployeeWeeklyConversion;
-}
-
-export interface XhsOperationAnalysisResponse {
-  success: boolean;
-  data: XhsOperationAnalysisData;
-  message?: string;
+  /** 核心指标 */
+  core_metrics?: Record<string, unknown>;
+  /** 创作者内容数据 */
+  creator_content_data?: XhsCreatorContentItem[];
+  /** 创作者转化数据 */
+  creator_conversion_data?: XhsCreatorConversionItem[];
+  /** 创作趋势 */
+  creation_trend?: XhsCreationTrend;
+  /** 热门笔记 */
+  top_notes?: XhsTopNoteItem[];
+  /** 创作者年度排行 */
+  creator_annual_ranking?: XhsCreatorAnnualRankingItem[];
+  /** 代理商数据 */
+  agency_data?: XhsAgencyDataItem[];
+  /** 转化趋势 */
+  conversion_trend?: XhsConversionTrend;
+  /** 笔记转化排行 */
+  note_conversion_ranking?: XhsNoteConversionItem[];
+  /** 创作者创作数据 */
+  creator_creation_data?: XhsCreatorCreationItem[];
+  /** 创作者互动数据 */
+  creator_interaction_data?: XhsCreatorInteractionItem[];
+  /** 员工转化排行 */
+  employee_conversion_ranking?: XhsEmployeeConversionItem[];
+  /** 员工周转化率趋势 */
+  employee_weekly_conversion?: XhsEmployeeWeeklyConversion;
 }
 

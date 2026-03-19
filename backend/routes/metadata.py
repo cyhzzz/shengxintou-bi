@@ -114,6 +114,23 @@ def get_metadata():
             'end': None
         }
 
+    # ===== 4.1 获取小红书笔记日期范围（从 daily_notes_metrics_unified） =====
+    xhs_notes_date_range = {'start': None, 'end': None}
+    try:
+        from backend.models import DailyNotesMetricsUnified
+        xhs_date_query = db.session.query(
+            func.min(DailyNotesMetricsUnified.date).label('min_date'),
+            func.max(DailyNotesMetricsUnified.date).label('max_date')
+        ).first()
+
+        if xhs_date_query and xhs_date_query.min_date:
+            xhs_notes_date_range = {
+                'start': xhs_date_query.min_date.strftime('%Y-%m-%d'),
+                'end': xhs_date_query.max_date.strftime('%Y-%m-%d') if xhs_date_query.max_date else None
+            }
+    except Exception as e:
+        logger.warning(f"获取小红书笔记日期范围失败: {str(e)}")
+
     # 获取所有账号映射（从 account_agency_mapping 表）
     try:
         accounts_query = db.session.query(
@@ -140,6 +157,7 @@ def get_metadata():
         'business_models': business_models,
         'agencies': agencies,
         'date_range': date_range,
+        'xhs_notes_date_range': xhs_notes_date_range,
         'accounts': accounts
     }
 

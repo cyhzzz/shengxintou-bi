@@ -411,7 +411,14 @@ class AgencyAnalysisReport {
                 throw new Error(response.error);
             }
 
-            this.currentData = response;
+            // 兼容新旧API返回格式
+            // 新格式: { success: true, data: { summary: [...], trend: {...} } }
+            // 旧格式: { summary: [...], trend: {...} }
+            if (response.success && response.data) {
+                this.currentData = response.data;
+            } else {
+                this.currentData = response;
+            }
             console.log('代理商分析数据加载成功');
 
             if (this.currentData.summary) {

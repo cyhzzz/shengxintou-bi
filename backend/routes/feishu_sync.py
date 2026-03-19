@@ -39,14 +39,6 @@ def push_to_feishu():
             "task_id": "任务ID"
         }
     """
-    # 处理OPTIONS预检请求
-    if request.method == 'OPTIONS':
-        response = jsonify({'success': True})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        return response
-
     data = request.get_json() or {}
     table_name = data.get('table', 'daily_metrics_unified')
     force_full_sync = data.get('force_full_sync', False)
@@ -77,14 +69,6 @@ def push_to_feishu():
 @handle_exceptions
 def pull_from_feishu():
     """从飞书拉取数据到本地"""
-    # 处理OPTIONS预检请求
-    if request.method == 'OPTIONS':
-        response = jsonify({'success': True})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        return response
-
     data = request.get_json() or {}
     table_name = data.get('table', 'daily_metrics_unified')
 

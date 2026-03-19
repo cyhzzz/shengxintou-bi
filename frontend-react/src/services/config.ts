@@ -3,8 +3,10 @@
  * 定义 API 基础 URL 和超时配置
  */
 
-// API 基础 URL（开发环境使用本地服务器）
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+// API 基础 URL
+// 开发环境：使用空字符串，让请求通过 Vite 代理（避免 CORS 问题）
+// 生产环境：可通过环境变量配置完整的后端地址
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // API 版本前缀
 export const API_PREFIX = '/api/v1';

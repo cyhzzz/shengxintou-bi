@@ -2,7 +2,7 @@
  * 员工转化分析页面
  * 分析员工维度的转化效果数据
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -24,7 +24,8 @@ import {
   SearchOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { Column, Line } from '@ant-design/charts';
+import type { EChartsOption } from 'echarts';
+import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
 import {
   postEmployeeConversionAnalysis,
@@ -84,20 +85,25 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     loadFilterOptions();
   }, [loadFilterOptions]);
 
+  // 初始加载数据（默认查询全部数据，不限制日期）
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 仅在组件挂载时执行一次
+
   // 加载数据
   const fetchData = useCallback(async () => {
-    if (!dateRange[0] || !dateRange[1]) {
-      message.warning('请选择日期范围');
-      return;
-    }
-
     setLoading(true);
     try {
       const params: Record<string, unknown> = {
-        start_date: dateRange[0],
-        end_date: dateRange[1],
         lead_type: leadType,
       };
+
+      // 只有在有日期时才传递日期参数
+      if (dateRange[0] && dateRange[1]) {
+        params.start_date = dateRange[0];
+        params.end_date = dateRange[1];
+      }
 
       if (selectedPlatforms.length > 0) {
         params.platforms = selectedPlatforms;
@@ -134,6 +140,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     setSelectedEmployees([]);
     setLeadType('all');
     setData(null);
+    // 重置后重新加载数据（查询全部数据）
+    setTimeout(() => {
+      fetchData();
+    }, 0);
   };
 
   // 导出CSV
@@ -180,7 +190,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `员工转化排行_${dateRange[0]}_${dateRange[1]}.csv`;
+    // 如果没有选择日期，使用"全部"作为文件名
+    const dateStr = dateRange[0] && dateRange[1]
+      ? `${dateRange[0]}_${dateRange[1]}`
+      : '全部';
+    link.download = `员工转化排行_${dateStr}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -189,55 +203,267 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   };
 
   // 转化趋势柱状图配置
-  const conversionTrendConfig = {
-    data: data?.conversion_trend
-      ? data.conversion_trend.weeks.map((week, index) => ({
-          week,
-          dateRange: data.conversion_trend?.dateRanges?.[index] || '',
-          加微数: data.conversion_trend?.lead_users?.[index] || 0,
-          开户数: data.conversion_trend?.opened_account_users?.[index] || 0,
-        }))
-      : [],
-    xField: 'week',
-    yField: '加微数',
-    seriesField: 'type',
-    isGroup: true,
-    height: 300,
-    legend: {
-      position: 'bottom' as const,
-    },
-    tooltip: {
-      shared: true,
-      showCrosshairs: true,
-    },
+  // 后端返回格式: { weeks: string[], dateRanges: string[], lead_users: number[], customer_mouth_users: number[], valid_lead_users: number[], opened_account_users: number[] }
+  // 需要转换为图表需要的分组柱状图格式
+  const getConversionTrendData = () => {
+    if (!data?.conversion_trend?.weeks?.length) return [];
+
+    const { weeks, dateRanges, lead_users, customer_mouth_users, valid_lead_users, opened_account_users } = data.conversion_trend;
+    const result: Array<{
+      week: string;
+      dateRange: string;
+      metric: string;
+      value: number;
+    }> = [];
+
+    weeks.forEach((week, index) => {
+      // 格式化周标签：将 "2025-03" 转换为 "2025-第3周"
+      const [year, weekNum] = week.split('-');
+      const weekLabel = `${year}-第${weekNum}周`;
+
+      // 格式化日期范围：将 "0106-0112" 转换为 "01-06 ~ 01-12"
+      let dateRangeLabel = '';
+      if (dateRanges?.[index]) {
+        const dr = dateRanges[index];
+        const [start, end] = dr.split('-');
+        dateRangeLabel = `${start.substring(0, 2)}-${start.substring(2)} ~ ${end.substring(0, 2)}-${end.substring(2)}`;
+      }
+
+      // 加微数
+      result.push({
+        week: weekLabel,
+        dateRange: dateRangeLabel,
+        metric: '加微数',
+        value: lead_users?.[index] || 0,
+      });
+      // 开口客户数
+      result.push({
+        week: weekLabel,
+        dateRange: dateRangeLabel,
+        metric: '开口客户数',
+        value: customer_mouth_users?.[index] || 0,
+      });
+      // 有效线索数
+      result.push({
+        week: weekLabel,
+        dateRange: dateRangeLabel,
+        metric: '有效线索数',
+        value: valid_lead_users?.[index] || 0,
+      });
+      // 开户数
+      result.push({
+        week: weekLabel,
+        dateRange: dateRangeLabel,
+        metric: '开户数',
+        value: opened_account_users?.[index] || 0,
+      });
+    });
+
+    return result;
   };
 
-  // 员工转化率走势图配置
-  const employeeRateTrendConfig = {
-    data: data?.employee_rate_trend
-      ? data.employee_rate_trend.map((item) => ({
-          date: item.dateRange || item.week,
-          value: item.opening_rate,
-          category: item.employee_name,
-        }))
-      : [],
-    xField: 'date',
-    yField: 'value',
-    seriesField: 'category',
-    height: 300,
-    smooth: true,
-    point: {
-      size: 3,
-      shape: 'circle',
-    },
-    legend: {
-      position: 'bottom' as const,
-    },
-    tooltip: {
-      shared: true,
-      showCrosshairs: true,
-    },
+  // 柱状图渐变颜色配置（与旧版 ECharts 渐变一致）
+  const METRIC_COLORS: Record<string, string[]> = {
+    '加微数': ['#6366f1', '#818cf8'],
+    '开口客户数': ['#10b981', '#34d399'],
+    '有效线索数': ['#f59e0b', '#fbbf24'],
+    '开户数': ['#ec4899', '#f472b6'],
   };
+
+  // 转化趋势柱状图 ECharts 配置
+  const conversionTrendOption = useMemo((): EChartsOption => {
+    const trendData = getConversionTrendData();
+    if (!trendData.length) return {};
+
+    const weeks = [...new Set(trendData.map(d => d.week))];
+    const metrics = ['加微数', '开口客户数', '有效线索数', '开户数'];
+
+    // 构建每个指标的数据
+    const series = metrics.map(metric => ({
+      name: metric,
+      type: 'bar' as const,
+      data: weeks.map(week => {
+        const item = trendData.find(d => d.week === week && d.metric === metric);
+        return item?.value || 0;
+      }),
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: METRIC_COLORS[metric]?.[0] || '#1890ff' },
+            { offset: 1, color: METRIC_COLORS[metric]?.[1] || '#40a9ff' },
+          ],
+        },
+        borderRadius: [4, 4, 0, 0],
+      },
+    }));
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+      },
+      legend: {
+        bottom: 0,
+        data: metrics,
+      },
+      xAxis: {
+        type: 'category',
+        data: weeks,
+        axisLabel: {
+          rotate: 30,
+          fontSize: 11,
+        },
+      },
+      yAxis: {
+        type: 'value',
+        name: '个数',
+        nameTextStyle: { fontSize: 12, color: '#8a8d99' },
+        axisLabel: {
+          formatter: (value: number) => value >= 1000 ? `${(value/1000).toFixed(1)}k` : String(value),
+        },
+        splitLine: {
+          lineStyle: { type: 'dashed', color: '#f0f1f3' },
+        },
+      },
+      series,
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        containLabel: true,
+      },
+    };
+  }, [data?.conversion_trend]);
+
+  // 员工转化率走势图配置
+  // 后端返回格式: { weeks: string[], employees: string[], series: number[][] }
+  // 需要转换为图表需要的数组格式
+  // 剔除总线索数低于50的员工
+  const getEmployeeRateTrendData = () => {
+    if (!data?.employee_rate_trend?.weeks?.length) return [];
+
+    const { weeks, employees, series } = data.employee_rate_trend;
+    const result: Array<{ date: string; value: number; category: string }> = [];
+
+    // 从 ranking 数据中构建员工总线索数映射
+    const employeeLeadsMap: Record<string, number> = {};
+    if (data?.ranking) {
+      data.ranking.forEach((item) => {
+        employeeLeadsMap[item.employee_name] = item.total_leads;
+      });
+    }
+
+    // 过滤掉总线索数低于50的员工
+    const filteredEmployees = employees.filter((empName) => {
+      const totalLeads = employeeLeadsMap[empName] || 0;
+      return totalLeads >= 50;
+    });
+
+    filteredEmployees.forEach((empName) => {
+      // 找到原始员工索引
+      const empIdx = employees.indexOf(empName);
+      if (empIdx === -1) return;
+
+      weeks.forEach((week, weekIdx) => {
+        // 格式化周标签：将 "2025-03" 转换为 "2025-第3周"
+        const [year, weekNum] = week.split('-');
+        const weekLabel = `${year}-第${weekNum}周`;
+
+        result.push({
+          date: weekLabel,
+          value: series[empIdx]?.[weekIdx] ?? 0,
+          category: empName,
+        });
+      });
+    });
+
+    return result;
+  };
+
+  // 折线图颜色配置（与旧版 ECharts 一致）
+  const LINE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
+
+  // 员工转化率走势图 ECharts 配置
+  const employeeRateTrendOption = useMemo((): EChartsOption => {
+    const trendData = getEmployeeRateTrendData();
+    if (!trendData.length) return {};
+
+    const dates = [...new Set(trendData.map(d => d.date))].sort();
+    const categories = [...new Set(trendData.map(d => d.category))];
+
+    // 构建每个员工的数据
+    const series = categories.map((cat, index) => ({
+      name: cat,
+      type: 'line' as const,
+      smooth: true,
+      data: dates.map(date => {
+        const item = trendData.find(d => d.date === date && d.category === cat);
+        return item?.value ?? null;
+      }),
+      symbol: 'circle',
+      symbolSize: 5,
+      connectNulls: true,
+      lineStyle: {
+        color: LINE_COLORS[index % LINE_COLORS.length],
+        width: 2.5,
+      },
+      itemStyle: {
+        color: LINE_COLORS[index % LINE_COLORS.length],
+      },
+    }));
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          if (!params || params.length === 0) return '';
+          let html = `<div style="font-weight:600;margin-bottom:10px;font-size:13px;color:#1a1a1a;">${params[0].axisValue}</div>`;
+          params.forEach((param: any) => {
+            if (param.value !== null && param.value !== undefined) {
+              html += `<div style="margin:5px 0;">
+                <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${param.color};margin-right:8px;"></span>
+                <span style="color:#5a5c66;">${param.seriesName}:</span>
+                <span style="float:right;font-weight:600;color:#1a1a1a;">${param.value.toFixed(2)}%</span>
+              </div>`;
+            }
+          });
+          return html;
+        },
+      },
+      legend: {
+        bottom: 0,
+        type: 'scroll',
+      },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: {
+          rotate: 30,
+          fontSize: 11,
+        },
+      },
+      yAxis: {
+        type: 'value',
+        name: '转化率 (%)',
+        nameTextStyle: { fontSize: 12, color: '#8a8d99' },
+        axisLabel: {
+          formatter: '{value}%',
+        },
+        splitLine: {
+          lineStyle: { type: 'dashed', color: '#f0f1f3' },
+        },
+      },
+      series,
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        containLabel: true,
+      },
+    };
+  }, [data?.employee_rate_trend, data?.ranking]);
 
   // 排行榜表格列配置
   const rankingColumns = [
@@ -455,9 +681,8 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
             <Statistic
               title="总资产"
               value={data?.core_metrics?.total_assets || 0}
-              precision={2}
               prefix={<DollarOutlined />}
-              formatter={(value) => `¥${Number(value).toLocaleString()}`}
+              formatter={(value) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             />
           </Card>
         </Col>
@@ -470,28 +695,9 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       ) : (
         <>
           {/* 转化趋势图 */}
-          <Card className={styles.chartCard} title="转化趋势">
+          <Card className={styles.chartCard} title="整体转化走势（周度）">
             {data?.conversion_trend?.weeks?.length ? (
-              <Column
-                {...conversionTrendConfig}
-                data={[
-                  ...conversionTrendConfig.data.map((d: Record<string, unknown>) => ({
-                    ...d,
-                    type: '加微数',
-                  })),
-                  ...conversionTrendConfig.data.map((d: Record<string, unknown>) => ({
-                    ...d,
-                    type: '开户数',
-                    yField: '开户数',
-                    加微数: undefined,
-                    yValue: d['开户数'],
-                  })),
-                ]}
-                xField="week"
-                yField="加微数"
-                isGroup={true}
-                seriesField="type"
-              />
+              <EChartsComponent option={conversionTrendOption} height={300} />
             ) : (
               <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
                 暂无数据，请选择日期范围后点击查询
@@ -500,9 +706,9 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           </Card>
 
           {/* 员工转化率走势图 */}
-          <Card className={styles.chartCard} title="员工转化率走势">
-            {data?.employee_rate_trend?.length ? (
-              <Line {...employeeRateTrendConfig} />
+          <Card className={styles.chartCard} title="员工开户转化率走势">
+            {data?.employee_rate_trend?.weeks?.length ? (
+              <EChartsComponent option={employeeRateTrendOption} height={300} />
             ) : (
               <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
                 暂无数据

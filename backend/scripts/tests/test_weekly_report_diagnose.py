@@ -109,7 +109,7 @@ def test_aggregation():
 
             result = db.session.query(
                 db.func.sum(DailyMetricsUnified.impressions).label('impressions'),
-                db.func.sum(DailyMetricsUnified.click_users).label('click_users'),
+                db.func.sum(DailyMetricsUnified.clicks).label('clicks'),
                 db.func.sum(DailyMetricsUnified.opened_account_users).label('new_accounts')
             ).filter(
                 DailyMetricsUnified.date >= week_ago,
@@ -119,7 +119,7 @@ def test_aggregation():
             if result:
                 print(f"  ✓ 最近7天数据聚合结果:")
                 print(f"    - 广告展示量: {result.impressions or 0:,}")
-                print(f"    - 广告点击人数: {result.click_users or 0:,}")
+                print(f"    - 广告点击量: {result.clicks or 0:,}")
                 print(f"    - 新开户数: {result.new_accounts or 0:,}")
             else:
                 print(f"  ✗ 聚合查询返回空结果")

@@ -89,23 +89,13 @@ app = Flask(__name__,
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# CORS配置
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# CORS配置 - 使用Flask-CORS扩展（推荐）
+CORS(app, resources={r"/api/*": {"origins": "*", "headers": "Content-Type,Authorization", "methods": "GET,PUT,POST,DELETE,OPTIONS", "supports_credentials": True}})
 
 # ============================================================================
 # Swagger/OpenAPI 文档配置
 # 注意：Swagger 初始化必须在所有 Blueprint 注册之后
 # ============================================================================
-
-# 统一CORS处理
-@app.after_request
-def after_request(response):
-    """统一处理CORS响应头"""
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
 
 # 请求日志中间件 - DISABLED due to datetime import bug
 # @app.before_request

@@ -1,10 +1,13 @@
 /**
  * 海报导出按钮组件
+ * 点击按钮打开模态框展示海报，支持在模态框中导出 PNG 和 PDF
+ * 参照旧版前端的海报模板实现
  */
 import React, { useState } from 'react';
-import { Button, Space, message } from 'antd';
-import { PictureOutlined, DownloadOutlined } from '@ant-design/icons';
-import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
+import { Button, Space } from 'antd';
+import { PictureOutlined } from '@ant-design/icons';
+import type { EmployeeConversionWeeklyData, EmployeeConversionWeeklyRankings } from '@/types/api.schemas';
+import PosterModal from './PosterModal';
 import styles from './PosterExportButtons.module.scss';
 
 interface PosterExportButtonsProps {
@@ -16,21 +19,35 @@ const PosterExportButtons: React.FC<PosterExportButtonsProps> = ({
   reportData,
   dateRange,
 }) => {
-  const [exportingPlatform, setExportingPlatform] = useState<string | null>(null);
+  // 当前选中的平台
+  const [currentPlatform, setCurrentPlatform] = useState<string>('');
+  // 模态框是否可见
+  const [modalVisible, setModalVisible] = useState(false);
 
-  // 导出海报
-  const handleExportPoster = async (platform: string) => {
-    setExportingPlatform(platform);
-    try {
-      // TODO: 实现海报导出逻辑
-      // 这里可以使用 html2canvas 或其他库生成海报
-      message.info(`${platform}平台海报导出功能开发中...`);
-    } catch (error) {
-      console.error('导出海报失败:', error);
-      message.error('导出海报失败，请重试');
-    } finally {
-      setExportingPlatform(null);
-    }
+  // 获取平台对应的榜单数据
+  const getRankingsForPlatform = (platform: string): {
+    total: EmployeeConversionWeeklyRankings[];
+    existing: EmployeeConversionWeeklyRankings[];
+    new: EmployeeConversionWeeklyRankings[];
+  } => {
+    const rankings = reportData?.rankings?.[platform];
+    return {
+      total: rankings?.total || [],
+      existing: rankings?.existing || [],
+      new: rankings?.new || [],
+    };
+  };
+
+  // 打开海报模态框
+  const handleOpenPoster = (platform: string) => {
+    setCurrentPlatform(platform);
+    setModalVisible(true);
+  };
+
+  // 关闭模态框
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setCurrentPlatform('');
   };
 
   // 获取有数据的平台列表
@@ -51,13 +68,22 @@ const PosterExportButtons: React.FC<PosterExportButtonsProps> = ({
           <Button
             key={platform}
             icon={<PictureOutlined />}
-            onClick={() => handleExportPoster(platform)}
-            loading={exportingPlatform === platform}
+            onClick={() => handleOpenPoster(platform)}
           >
             {platform}海报
           </Button>
         ))}
       </Space>
+
+      {/* 海报模态框 */}
+      <PosterModal
+        open={modalVisible}
+        platform={currentPlatform}
+        startDate={dateRange[0]}
+        endDate={dateRange[1]}
+        rankings={getRankingsForPlatform(currentPlatform)}
+        onCancel={handleCloseModal}
+      />
     </div>
   );
 };

@@ -62,7 +62,19 @@ export const dataService = {
 
   // 获取代理商分析数据
   getAgencyAnalysis: async (filters?: FilterParams): Promise<ApiResponse<AgencyAnalysisData>> => {
-    return http.post('/agency-analysis', { filters });
+    // 后端使用 GET 请求，需要将 filters 转换为查询参数
+    const params: Record<string, string> = {};
+
+    if (filters) {
+      if (filters.start_date) params.start_date = filters.start_date;
+      if (filters.end_date) params.end_date = filters.end_date;
+      // 数组参数转换为逗号分隔的字符串
+      if (filters.platforms?.length) params.platforms = filters.platforms.join(',');
+      if (filters.agencies?.length) params.agencies = filters.agencies.join(',');
+      if (filters.business_models?.length) params.business_models = filters.business_models.join(',');
+    }
+
+    return http.get('/agency-analysis', params);
   },
 
   // 获取转化漏斗数据
@@ -80,8 +92,12 @@ export const dataService = {
   // 获取小红书笔记列表
   getXhsNotesList: async (
     params?: FilterParams & PaginationParams
-  ): Promise<ApiResponse<{ total: number; items: unknown[] }>> => {
-    return http.get('/xhs-notes-list', params as Record<string, unknown>);
+  ): Promise<ApiResponse<{
+    notes?: unknown[];
+    pagination?: { page: number; page_size: number; total: number; total_pages?: number };
+    filters?: Record<string, unknown>;
+  }>> => {
+    return http.post('/xhs-notes-list', params);
   },
 
   // 获取小红书运营分析
@@ -91,7 +107,7 @@ export const dataService = {
 
   // 获取员工转化分析
   getEmployeeConversionAnalysis: async (filters?: FilterParams): Promise<ApiResponse<unknown>> => {
-    return http.post('/employee-conversion-analysis', { filters });
+    return http.post('/employee-conversion/analysis', { filters });
   },
 
   // 获取版本信息

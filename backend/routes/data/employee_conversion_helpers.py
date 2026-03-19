@@ -73,14 +73,14 @@ def get_platform_filter(platform):
         return BackendConversions.platform_source == platform
 
 
-def get_employee_conversion_ranking(platforms, start_date, end_date, lead_type='all', employees=None):
+def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, lead_type='all', employees=None):
     """
     获取员工转化排行榜
 
     Args:
         platforms: 平台列表 ['小红书', '腾讯', '抖音']
-        start_date: 开始日期 (YYYY-MM-DD)
-        end_date: 结束日期 (YYYY-MM-DD)
+        start_date: 开始日期 (YYYY-MM-DD)，可选，为空时查询全部
+        end_date: 结束日期 (YYYY-MM-DD)，可选，为空时查询全部
         lead_type: 线索类型 (all/existing/new)
         employees: 服务人员列表（可选，用于筛选特定人员）
 
@@ -100,12 +100,19 @@ def get_employee_conversion_ranking(platforms, start_date, end_date, lead_type='
             func.sum(BackendConversions.assets).label('total_assets')
         ).filter(
             and_(
-                BackendConversions.lead_date >= start_date,
-                BackendConversions.lead_date <= end_date,
                 BackendConversions.add_employee_name.isnot(None),
                 BackendConversions.add_employee_name != ''
             )
         )
+
+        # 日期筛选（可选）
+        if start_date and end_date:
+            query = query.filter(
+                and_(
+                    BackendConversions.lead_date >= start_date,
+                    BackendConversions.lead_date <= end_date
+                )
+            )
 
         # 【新增】获取符合条件的员工列表（全量线索数 >= 5）
         qualified_employees = get_qualified_employees(min_leads=5)
@@ -200,7 +207,7 @@ def get_employee_conversion_ranking(platforms, start_date, end_date, lead_type='
         return []
 
 
-def get_weekly_trend_data(platforms, start_date, end_date, employees=None):
+def get_weekly_trend_data(platforms, start_date=None, end_date=None, employees=None):
     """
     获取周度趋势数据（与小红书报表格式一致）
 
@@ -212,8 +219,8 @@ def get_weekly_trend_data(platforms, start_date, end_date, employees=None):
 
     Args:
         platforms: 平台列表
-        start_date: 开始日期
-        end_date: 结束日期
+        start_date: 开始日期，可选，为空时查询全部
+        end_date: 结束日期，可选，为空时查询全部
         employees: 服务人员列表（可选）
 
     Returns:
@@ -228,10 +235,10 @@ def get_weekly_trend_data(platforms, start_date, end_date, employees=None):
         }
     """
     try:
-        # 将日期字符串转换为日期对象
-        if isinstance(start_date, str):
+        # 将日期字符串转换为日期对象（如果有）
+        if start_date and isinstance(start_date, str):
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        if isinstance(end_date, str):
+        if end_date and isinstance(end_date, str):
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
 
         # 构建基础查询 - 按周聚合（与小红书报表一致的数据口径）
@@ -243,12 +250,19 @@ def get_weekly_trend_data(platforms, start_date, end_date, employees=None):
             func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('total_opened_accounts')  # 开户数
         ).filter(
             and_(
-                BackendConversions.lead_date >= start_date,
-                BackendConversions.lead_date <= end_date,
                 BackendConversions.add_employee_name.isnot(None),
                 BackendConversions.add_employee_name != ''
             )
         )
+
+        # 日期筛选（可选）
+        if start_date and end_date:
+            query = query.filter(
+                and_(
+                    BackendConversions.lead_date >= start_date,
+                    BackendConversions.lead_date <= end_date
+                )
+            )
 
         # 平台筛选
         platform_filters = []
@@ -312,7 +326,7 @@ def get_weekly_trend_data(platforms, start_date, end_date, employees=None):
         }
 
 
-def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
+def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees=None):
     """
     获取员工开户转化率走势（与小红书报表格式一致）
 
@@ -325,8 +339,8 @@ def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
 
     Args:
         platforms: 平台列表
-        start_date: 开始日期
-        end_date: 结束日期
+        start_date: 开始日期，可选，为空时查询全部
+        end_date: 结束日期，可选，为空时查询全部
         employees: 服务人员列表（可选，为空则返回所有符合条件的员工）
 
     Returns:
@@ -352,10 +366,10 @@ def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
         if not employees:
             return {'weeks': [], 'employees': [], 'series': []}
 
-        # 将日期字符串转换为日期对象
-        if isinstance(start_date, str):
+        # 将日期字符串转换为日期对象（如果有）
+        if start_date and isinstance(start_date, str):
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
-        if isinstance(end_date, str):
+        if end_date and isinstance(end_date, str):
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
 
         # 构建查询 - 按员工和周聚合
@@ -365,12 +379,17 @@ def get_employee_rate_trend(platforms, start_date, end_date, employees=None):
             func.count(BackendConversions.id).label('total_wechat_adds'),  # 加微数（所有行数）
             func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('opened_accounts')  # 开户数
         ).filter(
-            and_(
-                BackendConversions.lead_date >= start_date,
-                BackendConversions.lead_date <= end_date,
-                BackendConversions.add_employee_name.in_(employees)
-            )
+            BackendConversions.add_employee_name.in_(employees)
         )
+
+        # 日期筛选（可选）
+        if start_date and end_date:
+            query = query.filter(
+                and_(
+                    BackendConversions.lead_date >= start_date,
+                    BackendConversions.lead_date <= end_date
+                )
+            )
 
         # 平台筛选
         platform_filters = []
@@ -514,14 +533,14 @@ def get_employee_list():
         return []
 
 
-def get_platform_overview(platforms, start_date, end_date):
+def get_platform_overview(platforms, start_date=None, end_date=None):
     """
     获取平台维度概览数据
 
     Args:
         platforms: 平台列表
-        start_date: 开始日期
-        end_date: 结束日期
+        start_date: 开始日期，可选，为空时查询全部
+        end_date: 结束日期，可选，为空时查询全部
 
     Returns:
         dict: 各平台的概览数据
@@ -538,12 +557,16 @@ def get_platform_overview(platforms, start_date, end_date):
                 func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('opened_count'),
                 func.sum(case((BackendConversions.is_valid_customer == True, 1), else_=0)).label('valid_customer_count'),
                 func.sum(BackendConversions.assets).label('total_assets')
-            ).filter(
-                and_(
-                    BackendConversions.lead_date >= start_date,
-                    BackendConversions.lead_date <= end_date
-                )
             )
+
+            # 日期筛选（可选）
+            if start_date and end_date:
+                query = query.filter(
+                    and_(
+                        BackendConversions.lead_date >= start_date,
+                        BackendConversions.lead_date <= end_date
+                    )
+                )
 
             # 平台筛选
             if platform == '腾讯':

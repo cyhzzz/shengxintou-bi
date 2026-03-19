@@ -1,0 +1,653 @@
+/**
+ * 海报模态框样式
+ * 参照旧版前端的海报模板实现
+ * 支持小红书、腾讯、抖音三种平台样式
+ */
+
+/* 模态框容器 */
+.posterModal {
+  :global(.ant-modal-content) {
+    padding: 0;
+    background: #f0f2f5;
+    max-height: 90vh;
+    overflow: hidden;
+  }
+
+  :global(.ant-modal-close) {
+    top: 12px;
+    right: 12px;
+    z-index: 100;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  :global(.ant-modal-body) {
+    padding: 0;
+    max-height: calc(90vh - 20px);
+    overflow-y: auto;
+  }
+}
+
+/* 浮动工具栏 */
+.floatingToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  .toolbarBtn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    span {
+      font-size: 14px;
+    }
+  }
+}
+
+/* 海报包装器 */
+.posterWrapper {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  background: #f0f2f5;
+}
+
+/* 基础容器 */
+.posterContainer {
+  width: 800px;
+  min-height: 600px;
+  background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== 小红书样式 ==================== */
+.xiaohongshu {
+  background: linear-gradient(135deg, #ff4757 0%, #ff6b7a 50%, #ff7f50 100%);
+
+  .header {
+    padding: 40px 30px 30px;
+    text-align: center;
+    position: relative;
+
+    .platformTitle {
+      font-size: 42px;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      margin-bottom: 10px;
+    }
+
+    .subTitle {
+      font-size: 28px;
+      font-weight: 600;
+      color: #fff8e1;
+      margin-bottom: 15px;
+    }
+
+    .dateRange {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px 20px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+
+    .waveDecoration {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z' fill='%23ffffff'%3E%3C/path%3E%3C/svg%3E") no-repeat;
+      background-size: cover;
+    }
+  }
+
+  .content {
+    background: #ffffff;
+    padding: 25px 30px;
+    border-radius: 20px 20px 0 0;
+    margin-top: -10px;
+  }
+
+  .rankingSection {
+    margin-bottom: 25px;
+
+    .rankingHeader {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #ff4757;
+
+      .rankingIcon {
+        font-size: 24px;
+        margin-right: 10px;
+      }
+
+      .rankingTitle {
+        font-size: 20px;
+        font-weight: 600;
+        color: #ff4757;
+      }
+    }
+  }
+
+  .rankingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th {
+      background: linear-gradient(135deg, #ff4757, #ff6b7a);
+      color: #ffffff;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 500;
+      border: none;
+    }
+
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #ffe0e0;
+      color: #333;
+    }
+
+    .totalRow {
+      background: #fff5f5;
+      font-weight: 600;
+
+      td {
+        border-top: 2px solid #ff4757;
+        color: #ff4757;
+      }
+    }
+
+    .employeeName {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .number {
+      font-family: 'Roboto Mono', monospace;
+      color: #666;
+    }
+
+    .highlight {
+      font-family: 'Roboto Mono', monospace;
+      color: #ff4757;
+      font-weight: 600;
+    }
+
+    .rate {
+      font-family: 'Roboto Mono', monospace;
+      color: #52c41a;
+    }
+  }
+
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .rank1 {
+    background: linear-gradient(135deg, #ffd700, #ffed4a);
+    color: #8b4513;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  }
+
+  .rank2 {
+    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+    color: #555;
+    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+  }
+
+  .rank3 {
+    background: linear-gradient(135deg, #cd7f32, #dda15e);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+  }
+
+  .rankOther {
+    background: #f0f0f0;
+    color: #666;
+  }
+
+  .footerNote {
+    background: #fff8f8;
+    border-left: 4px solid #ff4757;
+    padding: 15px 20px;
+    margin-top: 20px;
+    border-radius: 0 8px 8px 0;
+
+    .footerNoteTitle {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ff4757;
+      margin-bottom: 10px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      list-style-type: decimal;
+
+      li {
+        font-size: 13px;
+        color: #666;
+        line-height: 1.8;
+      }
+    }
+  }
+}
+
+/* ==================== 腾讯样式 ==================== */
+.tencent {
+  background: linear-gradient(135deg, #0a2463 0%, #1e5bb5 50%, #00d4ff 100%);
+
+  .header {
+    padding: 40px 30px 30px;
+    text-align: center;
+    position: relative;
+
+    .platformTitle {
+      font-size: 42px;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      margin-bottom: 10px;
+    }
+
+    .subTitle {
+      font-size: 28px;
+      font-weight: 600;
+      color: #e0f7ff;
+      margin-bottom: 15px;
+    }
+
+    .dateRange {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.95);
+      background: rgba(255, 255, 255, 0.15);
+      padding: 8px 20px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+  }
+
+  .content {
+    background: #ffffff;
+    padding: 25px 30px;
+  }
+
+  .rankingSection {
+    margin-bottom: 25px;
+
+    .rankingHeader {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #1e5bb5;
+
+      .rankingIcon {
+        font-size: 24px;
+        margin-right: 10px;
+      }
+
+      .rankingTitle {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1e5bb5;
+      }
+    }
+  }
+
+  .rankingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th {
+      background: linear-gradient(135deg, #1e5bb5, #00d4ff);
+      color: #ffffff;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 500;
+      border: none;
+    }
+
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #e0e8ff;
+      color: #333;
+    }
+
+    .totalRow {
+      background: #f0f7ff;
+      font-weight: 600;
+
+      td {
+        border-top: 2px solid #1e5bb5;
+        color: #1e5bb5;
+      }
+    }
+
+    .employeeName {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .number {
+      font-family: 'Roboto Mono', monospace;
+      color: #666;
+    }
+
+    .highlight {
+      font-family: 'Roboto Mono', monospace;
+      color: #1e5bb5;
+      font-weight: 600;
+    }
+
+    .rate {
+      font-family: 'Roboto Mono', monospace;
+      color: #52c41a;
+    }
+  }
+
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .rank1 {
+    background: linear-gradient(135deg, #ffd700, #ffed4a);
+    color: #8b4513;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  }
+
+  .rank2 {
+    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+    color: #555;
+    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+  }
+
+  .rank3 {
+    background: linear-gradient(135deg, #cd7f32, #dda15e);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+  }
+
+  .rankOther {
+    background: #f0f0f0;
+    color: #666;
+  }
+
+  .footerNote {
+    background: #f0f7ff;
+    border-left: 4px solid #1e5bb5;
+    padding: 15px 20px;
+    margin-top: 20px;
+    border-radius: 0 8px 8px 0;
+
+    .footerNoteTitle {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e5bb5;
+      margin-bottom: 10px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      list-style-type: decimal;
+
+      li {
+        font-size: 13px;
+        color: #666;
+        line-height: 1.8;
+      }
+    }
+  }
+}
+
+/* ==================== 抖音样式 ==================== */
+.douyin {
+  background: linear-gradient(135deg, #000000 0%, #1a1a2e 50%, #16213e 100%);
+
+  .header {
+    padding: 40px 30px 30px;
+    text-align: center;
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    .platformTitle {
+      font-size: 42px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00f2fe, #4facfe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      margin-bottom: 10px;
+      position: relative;
+    }
+
+    .subTitle {
+      font-size: 28px;
+      font-weight: 600;
+      color: #00f2fe;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .dateRange {
+      font-size: 16px;
+      color: #ffffff;
+      background: rgba(0, 242, 254, 0.2);
+      padding: 8px 20px;
+      border-radius: 20px;
+      display: inline-block;
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      position: relative;
+    }
+  }
+
+  .content {
+    background: #ffffff;
+    padding: 25px 30px;
+  }
+
+  .rankingSection {
+    margin-bottom: 25px;
+
+    .rankingHeader {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #000000;
+
+      .rankingIcon {
+        font-size: 24px;
+        margin-right: 10px;
+      }
+
+      .rankingTitle {
+        font-size: 20px;
+        font-weight: 600;
+        color: #000000;
+      }
+    }
+  }
+
+  .rankingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      color: #00f2fe;
+      padding: 12px 8px;
+      text-align: center;
+      font-weight: 500;
+      border: none;
+    }
+
+    td {
+      padding: 10px 8px;
+      text-align: center;
+      border-bottom: 1px solid #e0e0e0;
+      color: #333;
+    }
+
+    .totalRow {
+      background: #f5f5f5;
+      font-weight: 600;
+
+      td {
+        border-top: 2px solid #000000;
+        color: #000000;
+      }
+    }
+
+    .employeeName {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .number {
+      font-family: 'Roboto Mono', monospace;
+      color: #666;
+    }
+
+    .highlight {
+      font-family: 'Roboto Mono', monospace;
+      color: #000000;
+      font-weight: 600;
+    }
+
+    .rate {
+      font-family: 'Roboto Mono', monospace;
+      color: #52c41a;
+    }
+  }
+
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .rank1 {
+    background: linear-gradient(135deg, #ffd700, #ffed4a);
+    color: #8b4513;
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  }
+
+  .rank2 {
+    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+    color: #555;
+    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+  }
+
+  .rank3 {
+    background: linear-gradient(135deg, #cd7f32, #dda15e);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+  }
+
+  .rankOther {
+    background: #f0f0f0;
+    color: #666;
+  }
+
+  .footerNote {
+    background: #f8f8f8;
+    border-left: 4px solid #000000;
+    padding: 15px 20px;
+    margin-top: 20px;
+    border-radius: 0 8px 8px 0;
+
+    .footerNoteTitle {
+      font-size: 16px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 10px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+      list-style-type: decimal;
+
+      li {
+        font-size: 13px;
+        color: #666;
+        line-height: 1.8;
+      }
+    }
+  }
+}

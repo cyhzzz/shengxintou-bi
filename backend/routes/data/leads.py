@@ -138,6 +138,8 @@ def get_leads_detail():
         end_date = request.args.get('end_date')
         platforms = request.args.get('platforms', '').split(',') if request.args.get('platforms') else []
         agencies = request.args.get('agencies', '').split(',') if request.args.get('agencies') else []
+        employee_name = request.args.get('employee_name', '')  # 服务员工筛选
+        is_opened_account = request.args.get('is_opened_account', type=str)  # 是否开户
 
         # 获取代理商简称映射（全称 -> 简称）
         # 前端传递的是全称（如"量子"），数据库存储的是简称（如"lz"）
@@ -179,6 +181,17 @@ def get_leads_detail():
 
         if platforms and platforms[0]:
             query = query.filter(BackendConversions.platform_source.in_(platforms))
+
+        # 服务员工筛选
+        if employee_name:
+            query = query.filter(BackendConversions.add_employee_name == employee_name)
+
+        # 是否开户筛选
+        if is_opened_account:
+            if is_opened_account.lower() == 'true':
+                query = query.filter(BackendConversions.is_opened_account == True)
+            elif is_opened_account.lower() == 'false':
+                query = query.filter(BackendConversions.is_opened_account == False)
 
         if agency_abbreviations and agency_abbreviations[0]:
             # 处理"申万宏源直投"（空值）的筛选
@@ -312,11 +325,13 @@ def get_leads_detail():
 
         return jsonify({
             'success': True,
-            'data': data,
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': (total + page_size - 1) // page_size if total > 0 else 1
+            'data': {
+                'items': data,
+                'total': total,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total + page_size - 1) // page_size if total > 0 else 1
+            }
         })
 
     except Exception as e:
@@ -469,11 +484,22 @@ def get_leads_detail_filter_options():
             'label': '申万宏源直投'
         })
 
+        # 获取所有服务员工（从 backend_conversions.add_employee_name）
+        employees = db.session.query(
+            BackendConversions.add_employee_name
+        ).distinct().filter(
+            BackendConversions.add_employee_name.isnot(None),
+            BackendConversions.add_employee_name != ''
+        ).order_by(BackendConversions.add_employee_name).all()
+
+        employee_options = [{'value': emp[0], 'label': emp[0]} for emp in employees]
+
         return jsonify({
             'success': True,
             'data': {
                 'platforms': platform_options,
-                'agencies': agency_options
+                'agencies': agency_options,
+                'employees': employee_options
             }
         })
 

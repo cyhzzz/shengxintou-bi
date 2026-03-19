@@ -2,7 +2,7 @@
  * 线索明细页面
  * 展示客户线索到转化的数据明细
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   Table,
@@ -25,36 +25,42 @@ import type { FilterValue } from 'antd/es/table/interface';
 import { DateRangePicker } from '@/components/Filter';
 import { getLeadsDetail } from '@/types/api';
 import type { LeadsDetailItem, LeadsDetailResponse } from '@/types/api.schemas';
+import { http } from '@/services/http';
 import styles from './index.module.scss';
 
-// 平台选项
-const PLATFORM_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '腾讯', value: '腾讯' },
-  { label: '抖音', value: '抖音' },
-  { label: '小红书', value: '小红书' },
-];
+// 筛选选项类型
+interface FilterOption {
+  value: string;
+  label: string;
+}
 
-// 客户状态选项
-const CUSTOMER_STATUS_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '是客户', value: 'true' },
-  { label: '非客户', value: 'false' },
-];
-
-// 开户状态选项
-const ACCOUNT_STATUS_OPTIONS = [
-  { label: '全部', value: '' },
-  { label: '已开户', value: 'true' },
-  { label: '未开户', value: 'false' },
-];
+// 筛选选项响应
+interface FilterOptionsResponse {
+  success: boolean;
+  data: {
+    platforms: FilterOption[];
+    agencies: FilterOption[];
+    employees: FilterOption[];
+  };
+}
 
 const LeadsDetailPage: React.FC = () => {
   // 筛选状态
   const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
   const [platform, setPlatform] = useState<string>('');
-  const [isCustomer, setIsCustomer] = useState<string>('');
+  const [employeeName, setEmployeeName] = useState<string>('');  // 服务员工
   const [isOpenedAccount, setIsOpenedAccount] = useState<string>('');
+
+  // 筛选选项（从API加载）
+  const [platformOptions, setPlatformOptions] = useState<FilterOption[]>([]);
+  const [employeeOptions, setEmployeeOptions] = useState<FilterOption[]>([]);
+
+  // 开户状态选项（固定）
+  const ACCOUNT_STATUS_OPTIONS = [
+    { label: '全部', value: '' },
+    { label: '已开户', value: 'true' },
+    { label: '未开户', value: 'false' },
+  ];
 
   // 数据状态
   const [data, setData] = useState<LeadsDetailItem[]>([]);
@@ -67,32 +73,74 @@ const LeadsDetailPage: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<LeadsDetailItem | null>(null);
 
-  // 加载数据
+  // 使用 ref 来追踪是否需要触发查询
+  const shouldFetchRef = useRef(false);
+  // 使用 ref 来存储最新的筛选条件
+  const filtersRef = useRef({
+    page: 1,
+    pageSize: 20,
+    dateRange: ['', ''] as [string, string],
+    platform: '',
+    employeeName: '',
+    isOpenedAccount: '',
+  });
+
+  // 加载筛选选项
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        const response: FilterOptionsResponse = await http.get('/leads-detail/filter-options');
+        if (response.success && response.data) {
+          // 添加"全部"选项
+          setPlatformOptions([
+            { value: '', label: '全部' },
+            ...response.data.platforms
+          ]);
+          setEmployeeOptions([
+            { value: '', label: '全部' },
+            ...response.data.employees
+          ]);
+        }
+      } catch (error) {
+        console.error('加载筛选选项失败:', error);
+        // 使用默认选项
+        setPlatformOptions([
+          { value: '', label: '全部' },
+          { value: '腾讯', label: '腾讯' },
+          { value: '抖音', label: '抖音' },
+          { value: '小红书', label: '小红书' },
+        ]);
+        setEmployeeOptions([{ value: '', label: '全部' }]);
+      }
+    };
+    loadFilterOptions();
+  }, []);
+
+  // 加载数据 - 使用 ref 来避免闭包问题
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const filters = filtersRef.current;
       const params: Record<string, unknown> = {
-        page: currentPage,
-        page_size: pageSize,
+        page: filters.page,
+        page_size: filters.pageSize,
       };
 
-      if (dateRange[0]) {
-        params.start_date = dateRange[0];
+      if (filters.dateRange[0]) {
+        params.start_date = filters.dateRange[0];
       }
-      if (dateRange[1]) {
-        params.end_date = dateRange[1];
+      if (filters.dateRange[1]) {
+        params.end_date = filters.dateRange[1];
       }
-      if (platform) {
-        params.platform = platform;
+      if (filters.platform) {
+        params.platforms = filters.platform;
       }
-      if (isCustomer === 'true') {
-        params.is_customer = true;
-      } else if (isCustomer === 'false') {
-        params.is_customer = false;
+      if (filters.employeeName) {
+        params.employee_name = filters.employeeName;
       }
-      if (isOpenedAccount === 'true') {
+      if (filters.isOpenedAccount === 'true') {
         params.is_opened_account = true;
-      } else if (isOpenedAccount === 'false') {
+      } else if (filters.isOpenedAccount === 'false') {
         params.is_opened_account = false;
       }
 
@@ -110,7 +158,7 @@ const LeadsDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, dateRange, platform, isCustomer, isOpenedAccount]);
+  }, []);
 
   // 初始加载
   useEffect(() => {
@@ -119,6 +167,15 @@ const LeadsDetailPage: React.FC = () => {
 
   // 处理查询
   const handleSearch = () => {
+    // 更新 ref 中的筛选条件
+    filtersRef.current = {
+      ...filtersRef.current,
+      page: 1,
+      dateRange,
+      platform,
+      employeeName,
+      isOpenedAccount,
+    };
     setCurrentPage(1);
     fetchData();
   };
@@ -127,9 +184,19 @@ const LeadsDetailPage: React.FC = () => {
   const handleReset = () => {
     setDateRange(['', '']);
     setPlatform('');
-    setIsCustomer('');
+    setEmployeeName('');
     setIsOpenedAccount('');
     setCurrentPage(1);
+    // 重置 ref 中的筛选条件
+    filtersRef.current = {
+      page: 1,
+      pageSize: filtersRef.current.pageSize,
+      dateRange: ['', ''],
+      platform: '',
+      employeeName: '',
+      isOpenedAccount: '',
+    };
+    fetchData();
   };
 
   // 处理分页变化
@@ -138,12 +205,18 @@ const LeadsDetailPage: React.FC = () => {
     _filters: Record<string, FilterValue | null>,
     _sorter: unknown
   ) => {
-    if (pagination.current) {
-      setCurrentPage(pagination.current);
-    }
-    if (pagination.pageSize) {
-      setPageSize(pagination.pageSize);
-    }
+    const newPage = pagination.current || 1;
+    const newPageSize = pagination.pageSize || 20;
+
+    // 更新 ref 和 state
+    filtersRef.current = {
+      ...filtersRef.current,
+      page: newPage,
+      pageSize: newPageSize,
+    };
+    setCurrentPage(newPage);
+    setPageSize(newPageSize);
+    fetchData();
   };
 
   // 查看详情
@@ -152,9 +225,150 @@ const LeadsDetailPage: React.FC = () => {
     setDetailModalVisible(true);
   };
 
+  // 获取筛选后的全部数据（用于导出）
+  const fetchAllDataForExport = useCallback(async (): Promise<LeadsDetailItem[]> => {
+    const filters = filtersRef.current;
+    const params: Record<string, unknown> = {
+      page: 1,
+      page_size: 10000, // 获取全部数据
+    };
+
+    if (filters.dateRange[0]) {
+      params.start_date = filters.dateRange[0];
+    }
+    if (filters.dateRange[1]) {
+      params.end_date = filters.dateRange[1];
+    }
+    if (filters.platform) {
+      params.platforms = filters.platform;
+    }
+    if (filters.employeeName) {
+      params.employee_name = filters.employeeName;
+    }
+    if (filters.isOpenedAccount === 'true') {
+      params.is_opened_account = true;
+    } else if (filters.isOpenedAccount === 'false') {
+      params.is_opened_account = false;
+    }
+
+    const response: LeadsDetailResponse = await getLeadsDetail(params);
+
+    if (response.success && response.data) {
+      return response.data.items || [];
+    }
+    return [];
+  }, []);
+
   // 导出数据
-  const handleExport = () => {
-    message.info('导出功能开发中...');
+  const handleExport = async () => {
+    if (total === 0) {
+      message.warning('暂无数据可导出');
+      return;
+    }
+
+    const hideLoading = message.loading('正在导出，请稍候...', 0);
+
+    try {
+      // 获取筛选后的全部数据
+      const allData = await fetchAllDataForExport();
+
+      if (allData.length === 0) {
+        message.warning('暂无数据可导出');
+        return;
+      }
+
+      // 定义所有字段（与后端API返回一致）
+      const exportFields = [
+        { key: 'lead_date', label: '线索日期' },
+        { key: 'platform_source', label: '平台来源' },
+        { key: 'wechat_nickname', label: '微信昵称' },
+        { key: 'capital_account', label: '资金账号' },
+        { key: 'opening_branch', label: '开户营业部' },
+        { key: 'customer_gender', label: '客户性别' },
+        { key: 'traffic_type', label: '流量类型' },
+        { key: 'customer_source', label: '客户来源' },
+        { key: 'is_customer_mouth', label: '是否客户开口' },
+        { key: 'is_valid_lead', label: '是否有效线索' },
+        { key: 'is_open_account_interrupted', label: '是否开户中断' },
+        { key: 'open_account_interrupted_date', label: '开户中断日期' },
+        { key: 'is_opened_account', label: '是否开户' },
+        { key: 'is_valid_customer', label: '是否为有效户' },
+        { key: 'is_existing_customer', label: '是否为存量客户' },
+        { key: 'is_existing_valid_customer', label: '是否为存量有效户' },
+        { key: 'is_delete_enterprise_wechat', label: '是否删除企微' },
+        { key: 'first_contact_time', label: '首次触达时间' },
+        { key: 'last_contact_time', label: '最近互动时间' },
+        { key: 'interaction_count', label: '互动次数' },
+        { key: 'sales_interaction_count', label: '营销人员互动次数' },
+        { key: 'add_employee_no', label: '添加员工号' },
+        { key: 'add_employee_name', label: '添加员工姓名' },
+        { key: 'account_opening_time', label: '开户时间' },
+        { key: 'wechat_verify_status', label: '微信认证状态' },
+        { key: 'wechat_verify_time', label: '微信认证时间' },
+        { key: 'valid_customer_time', label: '有效户时间' },
+        { key: 'assets', label: '资产' },
+        { key: 'customer_contribution', label: '客户贡献' },
+        { key: 'ad_account', label: '广告账号' },
+        { key: 'agency', label: '代理商' },
+        { key: 'ad_id', label: '广告ID' },
+        { key: 'creative_id', label: '创意ID' },
+        { key: 'note_id', label: '笔记ID' },
+        { key: 'note_title', label: '笔记名称' },
+        { key: 'platform_user_id', label: '平台用户ID' },
+        { key: 'platform_user_nickname', label: '平台用户昵称' },
+        { key: 'ad_click_date', label: '广告点击日期' },
+        { key: 'producer', label: '生产者' },
+        { key: 'enterprise_wechat_tags', label: '企微标签' },
+      ];
+
+      // 格式化布尔值
+      const formatBool = (value?: boolean) => (value ? '是' : '否');
+      // 格式化空值
+      const formatValue = (value: unknown) =>
+        value === null || value === undefined || value === '' ? '-' : String(value);
+
+      // 生成CSV内容
+      const header = exportFields.map(f => f.label).join(',');
+      const rows = allData.map(item =>
+        exportFields.map(f => {
+          const value = item[f.key as keyof LeadsDetailItem];
+          // 布尔值特殊处理
+          if (typeof value === 'boolean') {
+            return formatBool(value);
+          }
+          // 数字直接输出
+          if (typeof value === 'number') {
+            return value;
+          }
+          // 字符串需要处理逗号和引号
+          const str = formatValue(value);
+          if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        }).join(',')
+      );
+
+      const csvContent = '\uFEFF' + header + '\n' + rows.join('\n'); // 添加BOM以支持中文
+
+      // 创建下载
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `线索明细_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      message.success(`导出成功，共 ${allData.length} 条数据`);
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败，请重试');
+    } finally {
+      hideLoading();
+    }
   };
 
   // 渲染状态标签
@@ -279,19 +493,23 @@ const LeadsDetailPage: React.FC = () => {
             <Select
               value={platform}
               onChange={setPlatform}
-              options={PLATFORM_OPTIONS}
+              options={platformOptions}
               style={{ width: 120 }}
+              placeholder="请选择平台"
             />
           </div>
 
-          {/* 客户状态 */}
+          {/* 服务员工 */}
           <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>客户状态:</span>
+            <span className={styles.filterLabel}>服务员工:</span>
             <Select
-              value={isCustomer}
-              onChange={setIsCustomer}
-              options={CUSTOMER_STATUS_OPTIONS}
-              style={{ width: 100 }}
+              value={employeeName}
+              onChange={setEmployeeName}
+              options={employeeOptions}
+              style={{ width: 120 }}
+              placeholder="请选择员工"
+              showSearch
+              optionFilterProp="label"
             />
           </div>
 
@@ -360,40 +578,147 @@ const LeadsDetailPage: React.FC = () => {
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         footer={null}
-        width={600}
+        width={800}
         className={styles.detailModal}
       >
         {selectedRecord && (
           <Descriptions column={2} bordered size="small">
-            <Descriptions.Item label="线索日期" span={1}>
+            {/* 基本信息 */}
+            <Descriptions.Item label="线索日期">
               {selectedRecord.lead_date || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="平台" span={1}>
+            <Descriptions.Item label="平台来源">
               {selectedRecord.platform_source || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="广告账号" span={2}>
-              {selectedRecord.ad_account || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="代理商" span={1}>
-              {selectedRecord.agency || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="微信昵称" span={1}>
+            <Descriptions.Item label="微信昵称">
               {selectedRecord.wechat_nickname || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="资金账号" span={2}>
+            <Descriptions.Item label="资金账号">
               {selectedRecord.capital_account || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="是否客户">
-              {renderStatusTag(selectedRecord.is_customer)}
+            <Descriptions.Item label="开户营业部">
+              {selectedRecord.opening_branch || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="有效线索">
+            <Descriptions.Item label="客户性别">
+              {selectedRecord.customer_gender || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="流量类型">
+              {selectedRecord.traffic_type || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="客户来源">
+              {selectedRecord.customer_source || '-'}
+            </Descriptions.Item>
+
+            {/* 状态字段 */}
+            <Descriptions.Item label="是否客户开口">
+              {renderStatusTag(selectedRecord.is_customer_mouth)}
+            </Descriptions.Item>
+            <Descriptions.Item label="是否有效线索">
               {renderStatusTag(selectedRecord.is_valid_lead)}
             </Descriptions.Item>
-            <Descriptions.Item label="已开户">
+            <Descriptions.Item label="是否开户中断">
+              {renderStatusTag(selectedRecord.is_open_account_interrupted)}
+            </Descriptions.Item>
+            <Descriptions.Item label="开户中断日期">
+              {selectedRecord.open_account_interrupted_date || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="是否开户">
               {renderStatusTag(selectedRecord.is_opened_account)}
             </Descriptions.Item>
-            <Descriptions.Item label="有效户">
+            <Descriptions.Item label="是否为有效户">
               {renderStatusTag(selectedRecord.is_valid_customer)}
+            </Descriptions.Item>
+            <Descriptions.Item label="是否为存量客户">
+              {renderStatusTag(selectedRecord.is_existing_customer)}
+            </Descriptions.Item>
+            <Descriptions.Item label="是否为存量有效户">
+              {renderStatusTag(selectedRecord.is_existing_valid_customer)}
+            </Descriptions.Item>
+            <Descriptions.Item label="是否删除企微">
+              {renderStatusTag(selectedRecord.is_delete_enterprise_wechat)}
+            </Descriptions.Item>
+
+            {/* 时间字段 */}
+            <Descriptions.Item label="首次触达时间">
+              {selectedRecord.first_contact_time || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="最近互动时间">
+              {selectedRecord.last_contact_time || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="开户时间">
+              {selectedRecord.account_opening_time || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="微信认证状态">
+              {selectedRecord.wechat_verify_status || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="微信认证时间">
+              {selectedRecord.wechat_verify_time || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="有效户时间">
+              {selectedRecord.valid_customer_time || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="广告点击日期">
+              {selectedRecord.ad_click_date || '-'}
+            </Descriptions.Item>
+
+            {/* 互动数据 */}
+            <Descriptions.Item label="互动次数">
+              {selectedRecord.interaction_count ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="营销人员互动次数">
+              {selectedRecord.sales_interaction_count ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="资产">
+              {selectedRecord.assets != null ? `¥${selectedRecord.assets.toLocaleString()}` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="客户贡献">
+              {selectedRecord.customer_contribution != null ? `¥${selectedRecord.customer_contribution.toLocaleString()}` : '-'}
+            </Descriptions.Item>
+
+            {/* 人员信息 */}
+            <Descriptions.Item label="添加员工号">
+              {selectedRecord.add_employee_no || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="添加员工姓名">
+              {selectedRecord.add_employee_name || '-'}
+            </Descriptions.Item>
+
+            {/* 广告投放信息 */}
+            <Descriptions.Item label="广告账号">
+              {selectedRecord.ad_account || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="代理商">
+              {selectedRecord.agency || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="广告ID">
+              {selectedRecord.ad_id || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="创意ID">
+              {selectedRecord.creative_id || '-'}
+            </Descriptions.Item>
+
+            {/* 小红书笔记信息 */}
+            <Descriptions.Item label="笔记ID">
+              {selectedRecord.note_id || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="笔记名称">
+              {selectedRecord.note_title || '-'}
+            </Descriptions.Item>
+
+            {/* 平台用户信息 */}
+            <Descriptions.Item label="平台用户ID">
+              {selectedRecord.platform_user_id || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="平台用户昵称">
+              {selectedRecord.platform_user_nickname || '-'}
+            </Descriptions.Item>
+
+            {/* 其他信息 */}
+            <Descriptions.Item label="生产者">
+              {selectedRecord.producer || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="企微标签">
+              {selectedRecord.enterprise_wechat_tags || '-'}
             </Descriptions.Item>
           </Descriptions>
         )}

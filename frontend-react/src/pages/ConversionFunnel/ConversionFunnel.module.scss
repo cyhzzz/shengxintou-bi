@@ -1,7 +1,20 @@
+// 转化漏斗页面样式 - 使用 Ant Design 标准样式和配色
+
 .conversionFunnelPage {
   padding: 0;
 }
 
+// 核心指标卡片
+.metricCard {
+  :global {
+    .ant-statistic-title {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.45);
+    }
+  }
+}
+
+// 漏斗数据卡片
 .detailCard {
   height: 100%;
 }
@@ -9,42 +22,139 @@
 .funnelTable {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+}
+
+.funnelStageItem {
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .funnelRow {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 12px 0;
 }
 
-.stageName {
-  font-weight: 600;
-  min-width: 60px;
-}
-
-.stageCount {
-  color: #1890ff;
-  font-size: 18px;
-  font-weight: 600;
-  min-width: 100px;
-  text-align: right;
+.stageInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
 }
 
 .stageRate {
-  color: #52c41a;
-  min-width: 80px;
+  font-size: 15px;
+  color: #1890ff;
+}
+
+.progressSection {
+  flex: 1;
+  min-width: 100px;
+}
+
+.stageCount {
+  min-width: 100px;
   text-align: right;
+  font-size: 13px;
 }
 
-.stageConversion {
-  color: #666;
+.nextStepRate {
+  padding: 8px 0 8px 48px;
   font-size: 12px;
+  background: #fafafa;
+  border-radius: 4px;
+  margin-bottom: 8px;
 }
 
+// 合并转化率卡片
+.combinedRatesCard {
+  :global {
+    .ant-card-head-title {
+      font-size: 14px;
+    }
+  }
+}
+
+.combinedRates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rateItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+// 平台对比表格
 .tableRow {
   margin-top: 16px;
+}
+
+.platformTable {
+  width: 100%;
+  overflow-x: auto;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 12px 8px;
+      text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    th {
+      background: #fafafa;
+      font-weight: 600;
+      color: rgba(0, 0, 0, 0.85);
+    }
+
+    td {
+      color: rgba(0, 0, 0, 0.65);
+    }
+
+    td:not(:first-child) {
+      text-align: right;
+    }
+  }
+}
+
+// 响应式
+@media (max-width: 768px) {
+  .funnelRow {
+    flex-wrap: wrap;
+  }
+
+  .stageInfo {
+    min-width: 120px;
+  }
+
+  .progressSection {
+    order: 3;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .stageCount {
+    min-width: 80px;
+  }
+
+  .platformTable {
+    table {
+      th, td {
+        padding: 8px 4px;
+        font-size: 12px;
+      }
+    }
+  }
 }

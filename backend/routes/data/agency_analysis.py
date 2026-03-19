@@ -20,7 +20,7 @@ from datetime import datetime, date, timedelta
 # 创建Blueprint
 bp = Blueprint('agency_analysis', __name__)
 
-@bp.route('/agency-analysis', methods=['POST'])
+@bp.route('/agency-analysis', methods=['GET'])
 @handle_exceptions
 def get_agency_analysis():
     """
@@ -41,43 +41,37 @@ def get_agency_analysis():
       - account_cost: 单开户成本 = 花费 / 开户人数
 
       **支持筛选**：
-      - date_range: 日期范围
+      - start_date/end_date: 日期范围
       - platforms: 平台筛选
       - agencies: 代理商筛选
       - business_models: 业务模式筛选
     parameters:
-      - name: body
-        in: body
-        required: true
+      - name: start_date
+        in: query
         schema:
-          type: object
-          properties:
-            filters:
-              type: object
-              properties:
-                date_range:
-                  type: array
-                  items:
-                    type: string
-                    format: date
-                  description: 日期范围 [开始日期, 结束日期]
-                  example: ["2025-01-01", "2025-01-31"]
-                platforms:
-                  type: array
-                  items:
-                    type: string
-                    enum: ["腾讯", "抖音", "小红书"]
-                  description: 平台筛选
-                agencies:
-                  type: array
-                  items:
-                    type: string
-                  description: 代理商筛选
-                  example: ["量子", "众联"]
-                business_models:
-                  type: array
-                  items:
-                    type: string
+          type: string
+          format: date
+      - name: end_date
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: platforms
+        in: query
+        style: form
+        explode: true
+        schema:
+          type: array
+          items:
+            type: string
+      - name: business_models
+        in: query
+        style: form
+        explode: true
+        schema:
+          type: array
+          items:
+            type: string
                     enum: ["直播", "信息流", "搜索"]
                   description: 业务模式筛选
     responses:
@@ -136,8 +130,23 @@ def get_agency_analysis():
     """
     from backend.database import db
 
-    data = request.get_json()
-    filters = data.get('filters', {})
+    # 从查询参数获取筛选条件
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    platforms = request.args.get('platforms', '').split(',') if request.args.get('platforms') else []
+    agencies = request.args.get('agencies', '').split(',') if request.args.get('agencies') else []
+    business_models = request.args.get('business_models', '').split(',') if request.args.get('business_models') else []
+
+    # 构建 filters 对象
+    filters = {}
+    if start_date and end_date:
+        filters['date_range'] = [start_date, end_date]
+    if platforms and platforms[0]:
+        filters['platforms'] = platforms
+    if agencies and agencies[0]:
+        filters['agencies'] = agencies
+    if business_models and business_models[0]:
+        filters['business_models'] = business_models
 
     try:
         # 1. 获取平台×业务模式×代理商汇总数据
@@ -377,10 +386,13 @@ def get_agency_analysis():
         dates = sorted(list(set([row.date.strftime('%Y-%m-%d') for row in trend_results])))
 
         return jsonify({
-            'summary': final_summary,
-            'trend': {
-                'dates': dates,
-                'series': series_data
+            'success': True,
+            'data': {
+                'summary': final_summary,
+                'trend': {
+                    'dates': dates,
+                    'series': series_data
+                }
             }
         })
 

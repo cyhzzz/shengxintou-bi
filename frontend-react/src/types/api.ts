@@ -1,7 +1,7 @@
 /**
  * /**
  *  * API 类型定义 - 自动生成
- *  * 生成时间: 2026-03-12T04:01:15.202Z
+ *  * 生成时间: 2026-03-17T02:47:31.528Z
  *  * 请勿手动修改此文件
  *  *\/
  */
@@ -27,8 +27,6 @@ import type {
   PostDashboardAccountsBody,
   PostDashboardCoreMetricsBody,
   PostDashboardTrendDataBody,
-  PostEmployeeConversionAnalysisBody,
-  PostEmployeeConversionWeeklyBody,
   PostUploadBody,
   SuccessResponse,
   TrendResponse,
@@ -271,49 +269,93 @@ export type DeleteAccountMappingPlatformAccountIdResult = NonNullable<Awaited<Re
 export type PostUploadResult = NonNullable<Awaited<ReturnType<typeof postUpload>>>
 export type GetMetadataResult = NonNullable<Awaited<ReturnType<typeof getMetadata>>>
 
-/**
- * 生成员工转化周报
- * @summary 生成员工转化周报
- */
-export const postEmployeeConversionWeekly = (
-    postEmployeeConversionWeeklyBody: PostEmployeeConversionWeeklyBody,
-  ) => {
-      return customMutator<EmployeeConversionWeeklyResponse>(
-      {url: `/employee-conversion/weekly`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: postEmployeeConversionWeeklyBody
-    },
-      );
-    }
-
-export type PostEmployeeConversionWeeklyResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionWeekly>>>
+// ============================================
+// Employee Conversion - 员工转化分析
+// ============================================
 
 /**
- * 获取员工转化效果分析数据
- * @summary 员工转化效果分析
+ * 获取员工转化分析数据
+ * @summary 员工转化分析
  */
 export const postEmployeeConversionAnalysis = (
-    postEmployeeConversionAnalysisBody: PostEmployeeConversionAnalysisBody,
-  ) => {
-      return customMutator<EmployeeConversionAnalysisResponse>(
-      {url: `/employee-conversion/analysis`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: postEmployeeConversionAnalysisBody
-    },
-      );
-    }
-
-export type PostEmployeeConversionAnalysisResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionAnalysis>>>
+  params: Record<string, unknown>,
+) => {
+  return customMutator<EmployeeConversionAnalysisResponse>(
+    {url: `/employee-conversion/analysis`, method: 'POST',
+    headers: {'Content-Type': 'application/json', },
+    data: params
+  },
+  );
+}
 
 /**
- * 获取筛选器选项
- * @summary 员工转化筛选选项
+ * 获取员工转化周报数据
+ * @summary 员工转化周报
+ */
+export const postEmployeeConversionWeekly = (
+  params: Record<string, unknown>,
+) => {
+  return customMutator<EmployeeConversionWeeklyResponse>(
+    {url: `/employee-conversion/weekly`, method: 'POST',
+    headers: {'Content-Type': 'application/json', },
+    data: params
+  },
+  );
+}
+
+/**
+ * 获取员工列表
+ * @summary 员工列表
+ */
+export const getEmployeeConversionEmployees = () => {
+  return customMutator<{ success: boolean; data?: string[] }>(
+    {url: `/employee-conversion/employees`, method: 'GET'
+  },
+  );
+}
+
+/**
+ * 获取筛选选项
+ * @summary 筛选选项
  */
 export const getEmployeeConversionFilterOptions = () => {
-      return customMutator<EmployeeConversionFilterOptionsResponse>(
-      {url: `/employee-conversion/filter-options`, method: 'GET'
-    },
-      );
-    }
+  return customMutator<EmployeeConversionFilterOptionsResponse>(
+    {url: `/employee-conversion/filter-options`, method: 'GET'
+  },
+  );
+}
 
+export type PostEmployeeConversionAnalysisResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionAnalysis>>>
+export type PostEmployeeConversionWeeklyResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionWeekly>>>
+export type GetEmployeeConversionEmployeesResult = NonNullable<Awaited<ReturnType<typeof getEmployeeConversionEmployees>>>
 export type GetEmployeeConversionFilterOptionsResult = NonNullable<Awaited<ReturnType<typeof getEmployeeConversionFilterOptions>>>
+
+// ============================================
+// XHS Notes Operation Analysis - 小红书运营分析
+// ============================================
+
+/**
+ * 获取小红书运营分析数据
+ * @summary 小红书运营分析
+ */
+export const postXhsOperationAnalysis = (
+  params: {
+    filters?: {
+      date_range?: [string, string];
+      top_notes_date_range?: [string, string];
+      creator_annual_date_range?: [string, string];
+    };
+  },
+) => {
+  return customMutator<{
+    success: boolean;
+    data?: XhsOperationAnalysisData;
+  }>(
+    {url: `/xhs-notes-operation-analysis`, method: 'POST',
+    headers: {'Content-Type': 'application/json', },
+    data: params
+  },
+  );
+}
+
+export type PostXhsOperationAnalysisResult = NonNullable<Awaited<ReturnType<typeof postXhsOperationAnalysis>>>

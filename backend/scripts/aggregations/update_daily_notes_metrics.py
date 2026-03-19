@@ -44,7 +44,7 @@ from backend.models import (
     BackendConversions,
     AccountAgencyMapping
 )
-from sqlalchemy import func, and_, or_, distinct, case, literal
+from sqlalchemy import func, and_, or_, distinct, case, literal, literal_column
 
 
 def update_daily_notes_metrics(start_date=None, end_date=None):
@@ -446,12 +446,13 @@ def _aggregate_notes_conversion_data(start_date, end_date):
 
     返回: List of dict
     """
-    # 构建用户标识去重表达式
-    user_identifier = func.concat(
-        BackendConversions.platform_source, '|',
-        func.coalesce(BackendConversions.wechat_nickname, ''), '|',
-        func.coalesce(BackendConversions.capital_account, ''), '|',
-        func.coalesce(BackendConversions.platform_user_id, '')
+    # 构建用户标识去重表达式（使用 SQLite 的 || 操作符进行字符串连接）
+    # SQLite 不支持 concat() 函数，需要使用 || 操作符
+    user_identifier = literal_column(
+        "backend_conversions.platform_source || '|' || "
+        "COALESCE(backend_conversions.wechat_nickname, '') || '|' || "
+        "COALESCE(backend_conversions.capital_account, '') || '|' || "
+        "COALESCE(backend_conversions.platform_user_id, '')"
     )
 
     query = db.session.query(

@@ -33,7 +33,7 @@ const DatabaseBackupPage: React.FC = () => {
   const loadBackupList = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await http.get<WebdavBackupFile[]>('/api/v1/webdav/list');
+      const response = await http.get<WebdavBackupFile[]>('/webdav/list');
       if (response.success) {
         setBackupList(response.data || []);
       } else {
@@ -48,7 +48,7 @@ const DatabaseBackupPage: React.FC = () => {
 
   const checkVersion = useCallback(async () => {
     try {
-      const response = await http.get<VersionCompareResponse['data']>('/api/v1/version/compare');
+      const response = await http.get<VersionCompareResponse['data']>('/version/compare');
       if (response.success && response.data?.needs_update) {
         setVersionInfo({
           message: response.data.message || '',
@@ -81,7 +81,7 @@ const DatabaseBackupPage: React.FC = () => {
     pollIntervalRef.current = setInterval(async () => {
       try {
         const response = await http.get<WebdavProgressResponse['data']>(
-          `/api/v1/webdav/progress/${taskId}`
+          `/webdav/progress/${taskId}`
         );
         if (response.success && response.data) {
           setProgress({
@@ -116,7 +116,7 @@ const DatabaseBackupPage: React.FC = () => {
 
   const handleBackup = async () => {
     try {
-      const response = await http.post<{ task_id: string }>('/api/v1/webdav/backup', {
+      const response = await http.post<{ task_id: string }>('/webdav/backup', {
         description: '',
       });
 
@@ -139,7 +139,7 @@ const DatabaseBackupPage: React.FC = () => {
       content: `确定要恢复备份 "${filename}" 吗？恢复前会自动备份当前数据库。`,
       onOk: async () => {
         try {
-          const response = await http.post<{ task_id: string }>('/api/v1/webdav/restore', {
+          const response = await http.post<{ task_id: string }>('/webdav/restore', {
             filename,
           });
 
@@ -164,7 +164,7 @@ const DatabaseBackupPage: React.FC = () => {
       content: `确定要删除备份 "${filename}" 吗？`,
       onOk: async () => {
         try {
-          const response = await http.post<void>('/api/v1/webdav/delete', {
+          const response = await http.post<void>('/webdav/delete', {
             filename,
           });
 

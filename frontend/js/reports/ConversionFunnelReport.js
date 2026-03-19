@@ -795,6 +795,17 @@ class ConversionFunnelReport {
         const funnel = this.data.funnel;
         const isEmployeeMode = this.data.is_employee_mode;
 
+        // 通过阶段名称查找数据，避免索引偏移问题
+        const findStageValue = (names) => {
+            for (const name of names) {
+                const stage = funnel.find(s =>
+                    s.step === name || s.step.includes(name)
+                );
+                if (stage) return stage.value;
+            }
+            return 0;
+        };
+
         // 🎨 品牌蓝色渐变配色
         const brandColors = ['#00ABEB', '#0088C2', '#006699', '#00479D'];
 
@@ -810,9 +821,9 @@ class ConversionFunnelReport {
 
         if (isEmployeeMode) {
             // ===== 服务人员模式（5层漏斗）=====
-            const leadUsers = funnel[0].value || 0;       // 客户线索
-            const openedUsers = funnel[3].value || 0;    // 成功开户
-            const validUsers = funnel[4].value || 0;     // 有效户
+            const leadUsers = findStageValue(['客户线索', '线索']);       // 客户线索
+            const openedUsers = findStageValue(['成功开户', '开户']);    // 成功开户
+            const validUsers = findStageValue(['有效户']);     // 有效户
 
             const leadToOpenRate = leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0;
             const openToValidRate = openedUsers > 0 ? (validUsers / openedUsers * 100) : 0;
@@ -834,10 +845,10 @@ class ConversionFunnelReport {
             `;
         } else {
             // ===== 广告投放模式（7层漏斗）=====
-            const impressions = funnel[0].value || 0;    // 广告曝光
-            const leadUsers = funnel[2].value || 0;     // 客户线索
-            const openedUsers = funnel[5].value || 0;   // 成功开户
-            const validUsers = funnel[6].value || 0;    // 有效户
+            const impressions = findStageValue(['广告曝光', '曝光']);    // 广告曝光
+            const leadUsers = findStageValue(['客户线索', '线索']);     // 客户线索
+            const openedUsers = findStageValue(['成功开户', '开户']);   // 成功开户
+            const validUsers = findStageValue(['有效户']);    // 有效户
 
             const impressionToLeadRate = impressions > 0 ? (leadUsers / impressions * 100) : 0;
             const leadToOpenRate = leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0;

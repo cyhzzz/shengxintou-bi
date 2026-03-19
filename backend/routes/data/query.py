@@ -379,8 +379,8 @@ def query_data():
                         'cost': float(row.cost) if row.cost else 0,
                         'impressions': int(row.impressions) if row.impressions else 0,
                         'clicks': int(row.clicks) if row.clicks else 0,
-                        'leads': int(row.leads) if row.leads else 0,
-                        'new_accounts': int(row.new_accounts) if row.new_accounts else 0
+                        'leads': int(row.lead_users) if row.lead_users else 0,
+                        'new_accounts': int(row.opened_account_users) if row.opened_account_users else 0
                     }
                 }
             elif granularity == 'summary':
@@ -602,8 +602,8 @@ def get_summary():
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
             func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
-            func.sum(DailyMetricsUnified.leads).label('total_leads'),
-            func.sum(DailyMetricsUnified.new_accounts).label('total_new_accounts')
+            func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
+            func.sum(DailyMetricsUnified.opened_account_users).label('total_new_accounts')
         )
 
         # 应用筛选条件

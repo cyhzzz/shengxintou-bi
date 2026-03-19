@@ -143,8 +143,8 @@ def get_cost_analysis():
             func.sum(DailyMetricsUnified.cost).label('total_cost'),
             func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
             func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
-            func.sum(DailyMetricsUnified.leads).label('total_leads'),
-            func.sum(DailyMetricsUnified.new_accounts).label('total_new_accounts')
+            func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
+            func.sum(DailyMetricsUnified.opened_account_users).label('total_new_accounts')
         )
 
         # 应用筛选条件

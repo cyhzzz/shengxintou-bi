@@ -48,9 +48,9 @@ interface FilterState {
   resetAll: () => void;
 }
 
-// 默认日期范围（最近30天）
+// 默认日期范围（全部日期：使用一个足够宽的范围）
 const getDefaultDateRange = (): DateRange => ({
-  startDate: dayjs().subtract(30, 'day').format('YYYY-MM-DD'),
+  startDate: '2020-01-01',  // 一个足够早的日期，表示"全部"
   endDate: dayjs().format('YYYY-MM-DD'),
 });
 

@@ -12,7 +12,7 @@ sys.path.insert(0, project_root)
 from app import app
 from backend.database import db
 from backend.models import BackendConversions, AccountAgencyMapping
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, literal_column
 
 
 def check_conversion_fields():
@@ -121,12 +121,13 @@ def check_conversion_fields():
 
         from sqlalchemy import case
 
-        # 构建用户标识（去重）
-        user_identifier = func.concat(
-            BackendConversions.platform_source, '|',
-            func.coalesce(BackendConversions.wechat_nickname, ''), '|',
-            func.coalesce(BackendConversions.capital_account, ''), '|',
-            func.coalesce(BackendConversions.platform_user_id, '')
+        # 构建用户标识（去重，使用 SQLite 的 || 操作符进行字符串连接）
+        # SQLite 不支持 concat() 函数，需要使用 || 操作符
+        user_identifier = literal_column(
+            "backend_conversions.platform_source || '|' || "
+            "COALESCE(backend_conversions.wechat_nickname, '') || '|' || "
+            "COALESCE(backend_conversions.capital_account, '') || '|' || "
+            "COALESCE(backend_conversions.platform_user_id, '')"
         )
 
         # 业务模式推断

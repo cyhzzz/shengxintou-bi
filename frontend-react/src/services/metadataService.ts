@@ -11,9 +11,19 @@ export interface Metadata {
   business_models: string[];
   agencies: string[];
   date_range: {
-    min: string;
-    max: string;
+    start: string | null;
+    end: string | null;
   };
+  xhs_notes_date_range: {
+    start: string | null;
+    end: string | null;
+  };
+  accounts: Array<{
+    account_id: string;
+    account_name: string;
+    platform: string;
+    agency: string;
+  }>;
 }
 
 // 账号映射接口
@@ -50,6 +60,12 @@ export interface DataFreshnessItem {
   order: number;
 }
 
+// 员工接口
+export interface Employee {
+  employee_no: string;
+  employee_name: string;
+}
+
 export interface DataFreshness {
   [key: string]: DataFreshnessItem;
 }
@@ -59,6 +75,11 @@ export const metadataService = {
   // 获取元数据
   getMetadata: async (): Promise<ApiResponse<Metadata>> => {
     return http.get('/metadata');
+  },
+
+  // 获取员工列表
+  getEmployees: async (): Promise<ApiResponse<Employee[]>> => {
+    return http.get('/employees');
   },
 
   // 获取数据新鲜度
