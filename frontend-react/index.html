@@ -10,13 +10,12 @@
     <title>省心投平台 - 互联网广告投放分析平台</title>
     <!-- Favicon -->
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <!-- 旧版 JS 加载器 - 开发模式从旧前端服务加载 -->
+    <!-- 旧版 JS 加载器 - 从Flask后端(端口5000)加载旧前端JS文件 -->
     <script>
       (function() {
-        // 开发模式：旧前端运行在 localhost:3001
-        // 生产模式：旧前端 JS 文件由 Flask 服务器提供
-        var isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        var legacyBase = isDev ? 'http://localhost:3001/js' : '/js';
+        // 开发模式：Flask后端运行在 localhost:5000，提供旧前端静态文件
+        // 生产模式：同样由Flask服务器提供
+        var legacyBase = 'http://localhost:5000/js';
 
         // 核心工具文件（必须按顺序加载）
         var coreScripts = [
