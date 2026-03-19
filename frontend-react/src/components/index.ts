@@ -13,6 +13,9 @@ export { HelpModal } from './HelpModal';
 export { DataFreshnessIndicator } from './DataFreshness';
 export type { DataFreshnessIndicatorRef } from './DataFreshness';
 
+// 指南弹窗
+export { default as GuideModal } from './GuideModal';
+
 // 筛选器组件
 export * from './Filter';
 

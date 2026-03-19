@@ -56,22 +56,21 @@ class FilterBar {
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
 
-        // 设置默认日期范围（近7天）
-        const { start, end } = DateHelper.getDateRange(7);
-        startDateInput.value = DateHelper.formatDate(start);
-        endDateInput.value = DateHelper.formatDate(end);
+        // 设置默认日期范围为"全部"（空值）
+        startDateInput.value = '';
+        endDateInput.value = '';
 
-        // 更新筛选条件
+        // 更新筛选条件为空（代表"全部"）
         this.filters.dateRange = {
-            start: startDateInput.value,
-            end: endDateInput.value
+            start: null,
+            end: null
         };
 
         // 绑定日期变化事件（不再自动触发查询）
         const onDateChange = () => {
             this.filters.dateRange = {
-                start: startDateInput.value,
-                end: endDateInput.value
+                start: startDateInput.value || null,
+                end: endDateInput.value || null
             };
 
             // 移除日期按钮的激活状态
@@ -261,23 +260,21 @@ class FilterBar {
             businessModels: []
         };
 
-        // 重置日期范围（不自动触发查询）
-        const { start, end } = DateHelper.getDateRange(7);
+        // 重置日期范围为"全部"（空值）
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
 
-        startDateInput.value = DateHelper.formatDate(start);
-        endDateInput.value = DateHelper.formatDate(end);
+        startDateInput.value = '';
+        endDateInput.value = '';
 
         this.filters.dateRange = {
-            start: DateHelper.formatDate(start),
-            end: DateHelper.formatDate(end)
+            start: null,
+            end: null
         };
 
-        // 重置日期按钮激活状态
+        // 重置日期按钮激活状态 - 不激活任何按钮（表示"全部"）
         const dateButtons = this.container.querySelectorAll('.date-btn');
         dateButtons.forEach(b => b.classList.remove('active'));
-        dateButtons[0].classList.add('active'); // 激活第一个（近7天）
 
         // 重置标签
         this.renderPlatformTags();

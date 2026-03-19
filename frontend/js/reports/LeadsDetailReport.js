@@ -223,9 +223,25 @@ class LeadsDetailReport {
                 throw new Error(result.error || '查询失败');
             }
 
-            this.currentData = result.data || [];
-            this.totalPages = result.total_pages || 1;
-            this.totalRecords = result.total || 0;
+            // 兼容新旧API返回格式
+            // 新格式: { data: { items: [...], total: ..., ... } }
+            // 旧格式: { data: [...], total: ..., ... }
+            if (result.data && Array.isArray(result.data.items)) {
+                // 新格式
+                this.currentData = result.data.items || [];
+                this.totalPages = result.data.total_pages || 1;
+                this.totalRecords = result.data.total || 0;
+            } else if (Array.isArray(result.data)) {
+                // 旧格式
+                this.currentData = result.data || [];
+                this.totalPages = result.total_pages || 1;
+                this.totalRecords = result.total || 0;
+            } else {
+                // 异常情况，初始化为空
+                this.currentData = [];
+                this.totalPages = 1;
+                this.totalRecords = 0;
+            }
 
             console.log('线索明细数据加载成功:', this.currentData.length, '条记录，总计', this.totalRecords, '条');
 

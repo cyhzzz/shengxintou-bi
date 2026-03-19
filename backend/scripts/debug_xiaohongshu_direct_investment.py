@@ -143,7 +143,7 @@ def check_xiaohongshu_direct_investment():
             DailyMetricsUnified.business_model,
             DailyMetricsUnified.cost,
             DailyMetricsUnified.impressions,
-            DailyMetricsUnified.click_users,
+            DailyMetricsUnified.clicks,
             DailyMetricsUnified.lead_users
         ).filter(
             DailyMetricsUnified.platform == '小红书',
@@ -159,7 +159,7 @@ def check_xiaohongshu_direct_investment():
             print(f"   [{idx}] 日期: {row.date}")
             print(f"       平台: {row.platform}, 代理商: {row.agency}, 业务模式: {row.business_model}")
             print(f"       花费: {float(row.cost or 0):,.2f}, 曝光: {int(row.impressions or 0):,}")
-            print(f"       点击: {int(row.click_users or 0)}, 线索: {int(row.lead_users or 0)}")
+            print(f"       点击: {int(row.clicks or 0)}, 线索: {int(row.lead_users or 0)}")
             print()
 
         # ===== 5. 关键检查：哪些advertiser_account_id既有sub_account_id为NULL又有不为NULL的数据 =====

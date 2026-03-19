@@ -9,6 +9,7 @@ import DateRangeFilter from './DateRangeFilter';
 import PlatformFilter from './PlatformFilter';
 import AgencyFilter from './AgencyFilter';
 import BusinessModelFilter from './BusinessModelFilter';
+import EmployeeFilter from './EmployeeFilter';
 import { useFilterStore } from '@/stores';
 import styles from './FilterBar.module.scss';
 
@@ -16,12 +17,14 @@ interface FilterBarProps {
   showPlatform?: boolean;
   showAgency?: boolean;
   showBusinessModel?: boolean;
+  showEmployee?: boolean;
   onSearch?: (filters: {
     startDate: string;
     endDate: string;
     platforms: string[];
     agencies: string[];
     businessModels: string[];
+    employees: string[];
   }) => void;
   onReset?: () => void;
 }
@@ -30,6 +33,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   showPlatform = true,
   showAgency = true,
   showBusinessModel = false,
+  showEmployee = false,
   onSearch,
   onReset,
 }) => {
@@ -38,6 +42,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
     selectedPlatforms,
     selectedAgencies,
     selectedBusinessModels,
+    selectedEmployees,
     resetAll,
   } = useFilterStore();
 
@@ -49,6 +54,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
       platforms: selectedPlatforms,
       agencies: selectedAgencies,
       businessModels: selectedBusinessModels,
+      employees: selectedEmployees,
     });
   };
 
@@ -88,6 +94,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>业务模式:</span>
             <BusinessModelFilter />
+          </div>
+        )}
+
+        {/* 服务人员筛选 */}
+        {showEmployee && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>服务人员:</span>
+            <EmployeeFilter />
           </div>
         )}
 

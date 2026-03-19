@@ -1,9 +1,9 @@
 /**
  * 文件上传组件
  */
-import React, { useState } from 'react';
-import { Upload, message, Progress, Switch, Space } from 'antd';
-import { InboxOutlined } from '@ant-design/icons';
+import React, { useState, useRef } from 'react';
+import { Upload, message, Progress, Switch, Space, Spin } from 'antd';
+import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import type { DataType, UploadResponse } from '@/types/api.schemas';
 import ImportResult from './ImportResult';
@@ -16,11 +16,129 @@ interface FileUploaderProps {
   onImportSuccess: () => void;
 }
 
+// 任务状态响应类型
+interface TaskStatusData {
+  task_id: string;
+  import_type: string;
+  import_type_name: string;
+  file_name: string;
+  status: 'processing' | 'completed' | 'failed';
+  progress: number;
+  message: string;
+  total_rows: number | null;
+  processed_rows: number | null;
+  inserted_rows: number | null;
+  updated_rows: number | null;
+  failed_rows: number | null;
+  quality_score: number | null;
+  error_code?: string;
+  error_message?: string;
+}
+
+interface TaskStatusResponse {
+  success: boolean;
+  data: TaskStatusData;
+  message?: string;
+}
+
 const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }) => {
-  const [overwrite, setOverwrite] = useState(false);
+  const [overwrite, setOverwrite] = useState(true); // 默认开启覆盖更新模式
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<UploadResponse | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 轮询任务状态
+  const pollTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
+    const response = await fetch(`/api/v1/status/${taskId}`);
+    return response.json();
+  };
+
+  // 将任务状态响应转换为导入结果格式
+  const convertToUploadResult = (statusData: TaskStatusData): UploadResponse => {
+    const isSuccess = statusData.status === 'completed';
+    const insertedRows = statusData.inserted_rows || 0;
+    const updatedRows = statusData.updated_rows || 0;
+    const failedRows = statusData.failed_rows || 0;
+    const totalRows = statusData.total_rows || 0;
+
+    return {
+      success: isSuccess,
+      message: statusData.message || (isSuccess ? '导入完成' : '导入失败'),
+      data: {
+        total_rows: totalRows,
+        success_count: insertedRows + updatedRows,
+        failed_count: failedRows,
+        errors: statusData.error_message ? [statusData.error_message] : [],
+      },
+    };
+  };
+
+  // 开始轮询任务状态
+  const startPolling = async (taskId: string) => {
+    const pollInterval = 1000; // 1秒轮询一次
+    const maxAttempts = 300; // 最多轮询5分钟
+    let attempts = 0;
+
+    const poll = async () => {
+      attempts++;
+      try {
+        const statusResponse = await pollTaskStatus(taskId);
+
+        if (!statusResponse.success || !statusResponse.data) {
+          clearInterval(pollingRef.current!);
+          setUploading(false);
+          message.error('获取任务状态失败');
+          return;
+        }
+
+        const { data } = statusResponse;
+        setStatusMessage(data.message || '正在处理...');
+
+        // 更新进度条
+        if (data.progress !== null) {
+          setProgress(data.progress);
+        }
+
+        // 检查任务是否完成
+        if (data.status === 'completed') {
+          clearInterval(pollingRef.current!);
+          setUploading(false);
+          setProgress(100);
+
+          const uploadResult = convertToUploadResult(data);
+          setResult(uploadResult);
+          message.success(`导入成功！共 ${uploadResult.data?.success_count || 0} 条数据`);
+          onImportSuccess();
+        } else if (data.status === 'failed') {
+          clearInterval(pollingRef.current!);
+          setUploading(false);
+
+          const uploadResult = convertToUploadResult(data);
+          setResult(uploadResult);
+          message.error(data.error_message || '导入失败');
+        } else if (attempts >= maxAttempts) {
+          // 超时处理
+          clearInterval(pollingRef.current!);
+          setUploading(false);
+          message.error('导入超时，请稍后刷新页面查看结果');
+        }
+      } catch (error) {
+        console.error('轮询任务状态失败:', error);
+        if (attempts >= maxAttempts) {
+          clearInterval(pollingRef.current!);
+          setUploading(false);
+          message.error('获取任务状态失败');
+        }
+      }
+    };
+
+    // 立即执行一次
+    await poll();
+    // 设置定时轮询
+    pollingRef.current = setInterval(poll, pollInterval);
+  };
 
   const uploadProps: UploadProps = {
     name: 'file',
@@ -32,6 +150,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
       setUploading(true);
       setProgress(0);
       setResult(null);
+      setStatusMessage('正在上传文件...');
 
       const formData = new FormData();
       formData.append('file', file as File);
@@ -40,35 +159,46 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
       formData.append('overwrite', String(overwrite));
 
       try {
-        // 模拟进度
-        const progressInterval = setInterval(() => {
-          setProgress((prev) => Math.min(prev + 10, 90));
-        }, 100);
-
         const response = await fetch('/api/v1/upload', {
           method: 'POST',
           body: formData,
         });
 
-        clearInterval(progressInterval);
-        setProgress(100);
+        const data = await response.json();
 
-        const data: UploadResponse = await response.json();
-        setResult(data);
-
-        if (data.success) {
+        if (data.success && data.data?.task_id) {
+          // 后端返回了任务ID，开始轮询
+          setStatusMessage('文件上传成功，正在处理...');
+          setProgress(10);
+          await startPolling(data.data.task_id);
+        } else if (data.success && data.data?.success_count !== undefined) {
+          // 同步返回结果（兼容旧模式）
+          setUploading(false);
+          setProgress(100);
+          setResult(data);
           message.success(`导入成功！共 ${data.data?.success_count || 0} 条数据`);
           onImportSuccess();
         } else {
-          message.error(data.message || '导入失败');
+          // 上传失败
+          setUploading(false);
+          setResult(data);
+          message.error(data.message || '上传失败');
         }
       } catch {
         message.error('上传失败，请检查网络');
-      } finally {
         setUploading(false);
       }
     },
   };
+
+  // 组件卸载时清理轮询
+  React.useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className={styles.uploader}>
@@ -76,21 +206,29 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
         <Space>
           <span>覆盖模式:</span>
           <Switch checked={overwrite} onChange={setOverwrite} />
-          <span className={styles.hint}>开启后将删除已有数据再导入</span>
+          <span className={styles.hint}>开启后同一天数据会覆盖更新</span>
         </Space>
       </div>
 
       <Dragger {...uploadProps} disabled={uploading} className={styles.dragger}>
         <p className="ant-upload-drag-icon">
-          <InboxOutlined />
+          {uploading ? <LoadingOutlined /> : <InboxOutlined />}
         </p>
-        <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+        <p className="ant-upload-text">
+          {uploading ? '正在导入，请稍候...' : '点击或拖拽文件到此区域上传'}
+        </p>
         <p className="ant-upload-hint">支持 .xlsx, .xls, .csv 格式</p>
       </Dragger>
 
       {uploading && (
         <div className={styles.progress}>
           <Progress percent={progress} status="active" />
+          {statusMessage && (
+            <div className={styles.statusMessage}>
+              <Spin size="small" />
+              <span>{statusMessage}</span>
+            </div>
+          )}
         </div>
       )}
 

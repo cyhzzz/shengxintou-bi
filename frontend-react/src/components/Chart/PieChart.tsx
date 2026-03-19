@@ -1,10 +1,10 @@
 /**
  * 饼图组件
- * 基于 @ant-design/charts 封装
+ * 基于 ECharts 封装
  */
 import React, { useMemo } from 'react';
-import { Pie } from '@ant-design/charts';
-import type { PieConfig } from '@ant-design/charts';
+import type { EChartsOption } from 'echarts';
+import EChartsComponent from './ECharts';
 
 interface DataItem {
   type: string;
@@ -26,38 +26,59 @@ const PieChart: React.FC<PieChartProps> = ({
   colors,
   labelVisible = true,
 }) => {
-  const config: PieConfig = useMemo(
-    () => ({
-      data,
-      height,
-      innerRadius,
-      color: colors,
-      appendPadding: 10,
-      angleField: 'value',
-      colorField: 'type',
-      radius: 0.8,
-      label: labelVisible
-        ? {
-            type: 'outer',
-            content: '{name} {percentage}',
-          }
-        : false,
-      interactions: [
-        {
-          type: 'pie-legend-active',
+  const echartsOption = useMemo((): EChartsOption => {
+    // 默认颜色
+    const defaultColors = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#eb2f96'];
+    const colorPalette = colors || defaultColors;
+
+    // 计算总值用于百分比
+    const total = data.reduce((sum, item) => sum + (item.value || 0), 0);
+
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) => {
+          const percent = total > 0 ? ((params.value / total) * 100).toFixed(2) : '0.00';
+          return `${params.name}<br/>${params.value.toLocaleString()} (${percent}%)`;
         },
+      },
+      legend: {
+        bottom: 0,
+        type: 'scroll',
+      },
+      color: colorPalette,
+      series: [
         {
-          type: 'element-active',
+          type: 'pie',
+          radius: innerRadius > 0 ? [`${innerRadius * 50}%`, '70%'] : '70%',
+          center: ['50%', '45%'],
+          data: data.map(item => ({
+            name: item.type,
+            value: item.value,
+          })),
+          label: labelVisible
+            ? {
+                show: true,
+                formatter: (params: any) => {
+                  const percent = total > 0 ? ((params.value / total) * 100).toFixed(1) : '0.0';
+                  return `${params.name}\n${percent}%`;
+                },
+                position: 'outer',
+              }
+            : { show: false },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)',
+            },
+          },
         },
       ],
-      legend: {
-        position: 'bottom',
-      },
-    }),
-    [data, height, innerRadius, colors, labelVisible]
-  );
+    };
+  }, [data, innerRadius, colors, labelVisible]);
 
-  return <Pie {...config} />;
+  return <EChartsComponent option={echartsOption} height={height} />;
 };
 
 export default PieChart;

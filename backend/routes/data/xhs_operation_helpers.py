@@ -410,12 +410,18 @@ def get_conversion_trend(date_range):
         func.sum(case((BackendConversions.is_valid_lead == True, 1), else_=0)).label('total_valid_leads'),
         func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('total_opened_accounts')
     ).filter(
-        and_(
-            BackendConversions.platform_source == '小红书',
-            BackendConversions.lead_date >= date_range[0],
-            BackendConversions.lead_date <= date_range[1]
+        BackendConversions.platform_source == '小红书'
+    )
+
+    if date_range and len(date_range) == 2:
+        weekly_conversion_query = weekly_conversion_query.filter(
+            and_(
+                BackendConversions.lead_date >= date_range[0],
+                BackendConversions.lead_date <= date_range[1]
+            )
         )
-    ).group_by(
+
+    weekly_conversion_query = weekly_conversion_query.group_by(
         func.strftime('%Y-%W', BackendConversions.lead_date)
     ).order_by(
         func.strftime('%Y-%W', BackendConversions.lead_date)

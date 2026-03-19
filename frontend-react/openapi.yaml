@@ -376,14 +376,16 @@ paths:
           schema:
             type: string
             format: date
-        - name: platform
+        - name: platforms
           in: query
+          description: 平台列表（逗号分隔）
           schema:
             type: string
-        - name: is_customer
+        - name: employee_name
           in: query
+          description: 服务员工姓名
           schema:
-            type: boolean
+            type: string
         - name: is_opened_account
           in: query
           schema:

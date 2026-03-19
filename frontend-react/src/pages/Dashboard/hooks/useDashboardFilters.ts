@@ -49,16 +49,12 @@ const formatDate = (date: Date): string => {
 };
 
 /**
- * 获取默认日期范围（近30天）
+ * 获取默认日期范围（全部日期：使用一个足够宽的范围）
  */
 const getDefaultDateRange = (): { start_date: string; end_date: string } => {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 30 + 1);
-
   return {
-    start_date: formatDate(startDate),
-    end_date: formatDate(endDate),
+    start_date: '2020-01-01',  // 一个足够早的日期，表示"全部"
+    end_date: formatDate(new Date()),
   };
 };
 

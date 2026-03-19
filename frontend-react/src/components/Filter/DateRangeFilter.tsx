@@ -28,7 +28,7 @@ interface DateRangeFilterProps {
 const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   onChange,
   showQuickSelect = true,
-  defaultDays = 30,
+  defaultDays = 0,  // 默认选中"全部"
 }) => {
   const { dateRange, setDateRange, setQuickDateRange } = useFilterStore();
   const [activeQuick, setActiveQuick] = useState<number | null>(defaultDays);

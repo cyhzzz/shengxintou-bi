@@ -30,7 +30,7 @@ try:
     from app import app
     from backend.database import db
     from backend.models import BackendConversions, AccountAgencyMapping
-    from sqlalchemy import func, and_
+    from sqlalchemy import func, and_, literal_column
 except ImportError as e:
     print(f"导入错误: {e}")
     print(f"项目根目录: {project_root}")
@@ -55,10 +55,10 @@ def compare_account_names():
             func.count(BackendConversions.id).label('count'),
             func.count(
                 func.distinct(
-                    func.concat(
-                        BackendConversions.wechat_nickname, '|',
-                        BackendConversions.capital_account, '|',
-                        BackendConversions.platform_user_id
+                    literal_column(
+                        "backend_conversions.wechat_nickname || '|' || "
+                        "backend_conversions.capital_account || '|' || "
+                        "backend_conversions.platform_user_id"
                     )
                 )
             ).label('unique_users')

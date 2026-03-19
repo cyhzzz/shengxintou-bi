@@ -255,8 +255,8 @@ def get_external_data_analysis():
             platform_stats[platform]['cost'] += record.cost or 0
             platform_stats[platform]['impressions'] += record.impressions or 0
             platform_stats[platform]['clicks'] += record.clicks or 0
-            platform_stats[platform]['leads'] += record.leads or 0
-            platform_stats[platform]['new_accounts'] += record.new_accounts or 0
+            platform_stats[platform]['leads'] += record.lead_users or 0
+            platform_stats[platform]['new_accounts'] += record.opened_account_users or 0
 
         for platform, stats in platform_stats.items():
             cost = stats['cost']
@@ -297,8 +297,8 @@ def get_external_data_analysis():
             agency_stats[agency]['cost'] += record.cost or 0
             agency_stats[agency]['impressions'] += record.impressions or 0
             agency_stats[agency]['clicks'] += record.clicks or 0
-            agency_stats[agency]['leads'] += record.leads or 0
-            agency_stats[agency]['new_accounts'] += record.new_accounts or 0
+            agency_stats[agency]['leads'] += record.lead_users or 0
+            agency_stats[agency]['new_accounts'] += record.opened_account_users or 0
 
         for agency, stats in agency_stats.items():
             cost = stats['cost']
@@ -352,8 +352,8 @@ def get_external_data_analysis():
             bm_stats[bm]['cost'] += record.cost or 0
             bm_stats[bm]['impressions'] += record.impressions or 0
             bm_stats[bm]['clicks'] += record.clicks or 0
-            bm_stats[bm]['leads'] += record.leads or 0
-            bm_stats[bm]['new_accounts'] += record.new_accounts or 0
+            bm_stats[bm]['leads'] += record.lead_users or 0
+            bm_stats[bm]['new_accounts'] += record.opened_account_users or 0
 
         for bm, stats in bm_stats.items():
             cost = stats['cost']
@@ -381,8 +381,8 @@ def get_external_data_analysis():
         total_cost = sum(r.cost or 0 for r in records)
         total_impressions = sum(r.impressions or 0 for r in records)
         total_clicks = sum(r.clicks or 0 for r in records)
-        total_leads = sum(r.leads or 0 for r in records)
-        total_accounts = sum(r.new_accounts or 0 for r in records)
+        total_leads = sum(r.lead_users or 0 for r in records)
+        total_accounts = sum(r.opened_account_users or 0 for r in records)
 
         roi_analysis = {
             'total_investment': total_cost,
@@ -416,8 +416,8 @@ def get_external_data_analysis():
             daily_stats[record.date]['cost'] += record.cost or 0
             daily_stats[record.date]['impressions'] += record.impressions or 0
             daily_stats[record.date]['clicks'] += record.clicks or 0
-            daily_stats[record.date]['leads'] += record.leads or 0
-            daily_stats[record.date]['new_accounts'] += record.new_accounts or 0
+            daily_stats[record.date]['leads'] += record.lead_users or 0
+            daily_stats[record.date]['new_accounts'] += record.opened_account_users or 0
 
         sorted_dates = sorted(daily_stats.keys())
 
@@ -479,8 +479,8 @@ def get_external_data_analysis():
             matrix_stats[key]['cost'] += record.cost or 0
             matrix_stats[key]['impressions'] += record.impressions or 0
             matrix_stats[key]['clicks'] += record.clicks or 0
-            matrix_stats[key]['leads'] += record.leads or 0
-            matrix_stats[key]['new_accounts'] += record.new_accounts or 0
+            matrix_stats[key]['leads'] += record.lead_users or 0
+            matrix_stats[key]['new_accounts'] += record.opened_account_users or 0
 
         for (platform, agency), stats in matrix_stats.items():
             cost = stats['cost']

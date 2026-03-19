@@ -1,5 +1,6 @@
 .layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sider {
@@ -7,6 +8,25 @@
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
   position: relative;
   z-index: 10;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  // 覆盖 Ant Design 折叠按钮样式
+  :global {
+    .ant-layout-sider-trigger {
+      background: #fafafa !important;
+      border-top: 1px solid #f0f0f0;
+      color: #666;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: #f5f5f5 !important;
+        color: #1890ff;
+      }
+    }
+  }
 }
 
 // Sidebar header with logo - matching original frontend
@@ -49,6 +69,27 @@
 
 .menu {
   border-right: none !important;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // 美化滚动条
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #d9d9d9;
+    border-radius: 3px;
+
+    &:hover {
+      background: #bfbfbf;
+    }
+  }
 }
 
 .header {
@@ -60,6 +101,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.mainLayout {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .breadcrumb {
@@ -106,6 +155,26 @@
   padding: 24px;
   background: #fff;
   border-radius: 8px;
-  min-height: calc(100vh - 48px - 32px);
-  overflow: auto;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // 美化滚动条
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #d9d9d9;
+    border-radius: 4px;
+
+    &:hover {
+      background: #bfbfbf;
+    }
+  }
 }

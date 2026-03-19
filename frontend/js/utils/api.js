@@ -249,7 +249,20 @@ class API {
      * @returns {Promise}
      */
     static async getAgencyAnalysis(filters) {
-        return this.post('/agency-analysis', { filters });
+        // 构建 GET 查询参数
+        const params = {};
+        if (filters.start_date) params.start_date = filters.start_date;
+        if (filters.end_date) params.end_date = filters.end_date;
+        if (filters.platforms && filters.platforms.length > 0) {
+            params.platforms = filters.platforms.join(',');
+        }
+        if (filters.agencies && filters.agencies.length > 0) {
+            params.agencies = filters.agencies.join(',');
+        }
+        if (filters.business_models && filters.business_models.length > 0) {
+            params.business_models = filters.business_models.join(',');
+        }
+        return this.get('/agency-analysis', params);
     }
 
     /**

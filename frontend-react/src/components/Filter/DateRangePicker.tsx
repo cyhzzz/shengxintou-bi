@@ -10,7 +10,7 @@ import dayjs, { Dayjs } from 'dayjs';
 const { RangePicker } = DatePicker;
 
 interface DateRangePickerProps {
-  value: [string, string];
+  value: [string, string] | null;
   onChange: (dates: [string, string]) => void;
   placeholder?: [string, string];
 }
@@ -20,11 +20,10 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onChange,
   placeholder = ['开始日期', '结束日期'],
 }) => {
-  // 将字符串日期转换为 Dayjs 对象
-  const dayjsValue: [Dayjs | null, Dayjs | null] = [
-    value[0] ? dayjs(value[0]) : null,
-    value[1] ? dayjs(value[1]) : null,
-  ];
+  // 将字符串日期转换为 Dayjs 对象，处理 null 值
+  const dayjsValue: [Dayjs | null, Dayjs | null] = value
+    ? [value[0] ? dayjs(value[0]) : null, value[1] ? dayjs(value[1]) : null]
+    : [null, null];
 
   // 处理日期变化
   const handleChange = (dates: [Dayjs | null, Dayjs | null] | null) => {

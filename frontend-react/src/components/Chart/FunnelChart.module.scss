@@ -1,23 +1,21 @@
+/**
+ * 漏斗图组件样式
+ * 使用 @ant-design/charts Funnel 组件，样式由组件内部处理
+ */
+
+// 容器样式（如需要可在此添加）
 .funnelChart {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px 0;
+  width: 100%;
 }
 
-.funnelStage {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stageLabel {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.conversionRate {
-  font-size: 12px;
+// 强制覆盖漏斗图内部标签颜色为白色
+:global {
+  // G2 图表标签样式覆盖
+  .g2-label text,
+  .g2-html-label,
+  text[class*="label"],
+  .funnel-label text {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+  }
 }
