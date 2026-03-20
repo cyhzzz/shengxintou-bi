@@ -61,14 +61,19 @@ def get_platform_filter(platform):
     获取平台筛选条件
 
     Args:
-        platform: 平台名称 (小红书/腾讯/抖音)
+        platform: 平台名称 (小红书/腾讯/抖音/云集/高德/nj)
 
     Returns:
         筛选条件
     """
     if platform == '腾讯':
-        # 腾讯平台包含多个来源标识
-        return BackendConversions.platform_source.in_(['腾讯', 'yj', '高德'])
+        return BackendConversions.platform_source == '腾讯'
+    elif platform == '云集':
+        return BackendConversions.platform_source == 'yj'
+    elif platform == '高德':
+        return BackendConversions.platform_source == '高德'
+    elif platform == 'nj':
+        return BackendConversions.platform_source == 'nj'
     else:
         return BackendConversions.platform_source == platform
 
@@ -125,10 +130,7 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
         # 平台筛选（支持多选）
         platform_filters = []
         for platform in platforms:
-            if platform == '腾讯':
-                platform_filters.append(BackendConversions.platform_source.in_(['腾讯', 'yj', '高德']))
-            else:
-                platform_filters.append(BackendConversions.platform_source == platform)
+            platform_filters.append(get_platform_filter(platform))
 
         if platform_filters:
             query = query.filter(or_(*platform_filters))
@@ -264,20 +266,17 @@ def get_weekly_trend_data(platforms, start_date=None, end_date=None, employees=N
                 )
             )
 
-        # 平台筛选
-        platform_filters = []
-        for platform in platforms:
-            if platform == '腾讯':
-                platform_filters.append(BackendConversions.platform_source.in_(['腾讯', 'yj', '高德']))
-            else:
-                platform_filters.append(BackendConversions.platform_source == platform)
-
-        if platform_filters:
-            query = query.filter(or_(*platform_filters))
-
         # 服务人员筛选
         if employees and len(employees) > 0:
             query = query.filter(BackendConversions.add_employee_name.in_(employees))
+
+        # 平台筛选
+        platform_filters = []
+        for platform in platforms:
+            platform_filters.append(get_platform_filter(platform))
+
+        if platform_filters:
+            query = query.filter(or_(*platform_filters))
 
         # 按周分组并排序
         query = query.group_by('week').order_by('week')
@@ -400,10 +399,7 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
         # 平台筛选
         platform_filters = []
         for platform in platforms:
-            if platform == '腾讯':
-                platform_filters.append(BackendConversions.platform_source.in_(['腾讯', 'yj', '高德']))
-            else:
-                platform_filters.append(BackendConversions.platform_source == platform)
+            platform_filters.append(get_platform_filter(platform))
 
         if platform_filters:
             query = query.filter(or_(*platform_filters))
@@ -575,10 +571,7 @@ def get_platform_overview(platforms, start_date=None, end_date=None):
                 )
 
             # 平台筛选
-            if platform == '腾讯':
-                query = query.filter(BackendConversions.platform_source.in_(['腾讯', 'yj', '高德']))
-            else:
-                query = query.filter(BackendConversions.platform_source == platform)
+            query = query.filter(get_platform_filter(platform))
 
             result = query.first()
 

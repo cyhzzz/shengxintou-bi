@@ -359,8 +359,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         axisPointer: { type: 'shadow' },
       },
       legend: {
-        bottom: 0,
-        data: metrics,
+        show: false,
       },
       xAxis: {
         type: 'category',
@@ -498,8 +497,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         },
       },
       legend: {
-        bottom: 0,
-        type: 'scroll',
+        show: false,
       },
       xAxis: {
         type: 'category',

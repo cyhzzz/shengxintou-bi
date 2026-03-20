@@ -8,7 +8,10 @@
     "✅ 修复旧版JS getAPIUrl双重前缀问题",
     "✅ 便携版打包脚本全面优化：排除旧启动器、测试脚本、构建工具",
     "🔧 修复前端TypeScript类型错误（若干strict检查问题）",
-    "🔧 修复运营分析页面大量possibly undefined错误"
+    "🔧 修复运营分析页面大量possibly undefined错误",
+    "🔧 修复数据聚合逻辑：转化数据business_model推断使用customer_source",
+    "🔧 修复厂商分析页指标卡片重复计算问题（跳过小计/合计行）",
+    "🔧 修复员工转化分析核心指标被错误过滤问题（顶部卡片不过滤）"
   ],
   "major_changes": [
     {
@@ -28,6 +31,17 @@
           "WSGI中间件修复/api/api/双重前缀问题",
           "新增/js/、/libs/、/assets/显式路由",
           "旧版JS getAPIUrl函数修正"
+        ]
+      }
+    },
+    {
+      "type": "bugfix",
+      "description": "数据聚合和报表数据一致性修复",
+      "details": {
+        "fixes": [
+          "转化数据business_model推断使用customer_source（正确）",
+          "厂商分析页指标卡片跳过小计/合计行（避免重复计算）",
+          "员工转化分析核心指标改为从平台概览计算（不过滤）"
         ]
       }
     },
@@ -57,11 +71,15 @@
   "support_contact": "产品经理 陈元昊",
   "technical_details": {
     "backend_changes": [
-      "app.py - WSGI中间件、静态文件路由、before_request处理"
+      "app.py - WSGI中间件、静态文件路由、before_request处理",
+      "backend/routes/data/employee_conversion.py - 核心指标计算改为从平台概览获取",
+      "backend/routes/data/employee_conversion_helpers.py - get_qualified_employees函数",
+      "backend/scripts/aggregations/update_daily_metrics_unified.py - business_model推断逻辑"
     ],
     "frontend_changes": [
       "frontend-react/ - React + TypeScript新前端",
-      "frontend-react/dist/ - Vite构建产物（生产使用）"
+      "frontend-react/dist/ - Vite构建产物（生产使用）",
+      "frontend/js/reports/AgencyAnalysisReport.js - 跳过小计合计行"
     ],
     "build_changes": [
       "打包脚本新增启动器存在性检查",

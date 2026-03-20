@@ -52,7 +52,7 @@ def get_analysis_data():
               type: array
               items:
                 type: string
-                enum: ["小红书", "腾讯", "抖音"]
+                enum: ["腾讯", "抖音", "小红书", "云集", "高德", "nj"]
               description: 平台筛选
               example: ["小红书", "腾讯"]
             start_date:
@@ -133,7 +133,7 @@ def get_analysis_data():
         data = request.get_json() or {}
 
         # 参数提取
-        platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
+        platforms = data.get('platforms', ['腾讯', '抖音', '小红书', '云集', '高德', 'nj'])
         start_date = data.get('start_date')  # 可选，为空时查询全部
         end_date = data.get('end_date')  # 可选，为空时查询全部
         employees = data.get('employees', [])  # 空列表表示全部
@@ -148,23 +148,24 @@ def get_analysis_data():
                 'message': '开始日期和结束日期必须同时提供或同时为空'
             }), 400
 
-        # 获取排行榜数据
+        # 获取排行榜数据（已过滤：只包含线索数>=5的员工）
         ranking = get_employee_conversion_ranking(
             platforms, start_date, end_date, lead_type,
             employees if employees else None
         )
 
-        # 计算核心指标
-        total_leads = sum(item['total_leads'] for item in ranking)
-        total_opened = sum(item['opened_count'] for item in ranking)
-        total_mouth = sum(item['mouth_count'] for item in ranking)
-        total_valid_lead = sum(item['valid_lead_count'] for item in ranking)
-        total_valid_customer = sum(item['valid_customer_count'] for item in ranking)
-        total_assets = sum(item['total_assets'] for item in ranking)
-        avg_opening_rate = round(total_opened * 100.0 / total_leads, 2) if total_leads > 0 else 0
-
-        # 获取平台维度概览
+        # 【修复】获取平台维度概览数据（不过滤，用于核心指标计算）
+        # 核心指标使用全量数据，不受员工过滤影响
         platform_overview = get_platform_overview(platforms, start_date, end_date)
+
+        # 从平台概览计算核心指标（未过滤的真实数据）
+        total_leads = sum(p['total_leads'] for p in platform_overview.values())
+        total_opened = sum(p['opened_count'] for p in platform_overview.values())
+        total_mouth = sum(p['mouth_count'] for p in platform_overview.values())
+        total_valid_lead = sum(p['valid_lead_count'] for p in platform_overview.values())
+        total_valid_customer = sum(p['valid_customer_count'] for p in platform_overview.values())
+        total_assets = sum(p['total_assets'] for p in platform_overview.values())
+        avg_opening_rate = round(total_opened * 100.0 / total_leads, 2) if total_leads > 0 else 0
 
         # 获取周度趋势
         conversion_trend = get_weekly_trend_data(
@@ -241,7 +242,7 @@ def get_weekly_data():
               type: array
               items:
                 type: string
-                enum: ["小红书", "腾讯", "抖音"]
+                enum: ["腾讯", "抖音", "小红书", "云集", "高德", "nj"]
               description: 平台筛选
               example: ["小红书", "腾讯", "抖音"]
             top_count:
@@ -282,7 +283,7 @@ def get_weekly_data():
 
         start_date = data.get('start_date')
         end_date = data.get('end_date')
-        platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
+        platforms = data.get('platforms', ['腾讯', '抖音', '小红书', '云集', '高德', 'nj'])
         top_count = data.get('top_count', 10)
 
         if not start_date or not end_date:
@@ -426,8 +427,14 @@ def get_filter_options():
         platform_set = set()
         for p in platforms_query:
             source = p[0]
-            if source in ['腾讯', 'yj', '高德']:
+            if source == '腾讯':
                 platform_set.add('腾讯')
+            elif source == 'yj':
+                platform_set.add('云集')
+            elif source == '高德':
+                platform_set.add('高德')
+            elif source == 'nj':
+                platform_set.add('nj')
             elif source in ['抖音', 'douyin']:
                 platform_set.add('抖音')
             elif source in ['小红书', 'xiaohongshu']:
