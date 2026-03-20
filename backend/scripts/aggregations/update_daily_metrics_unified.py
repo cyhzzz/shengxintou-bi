@@ -71,10 +71,14 @@ def apply_business_model_mapping(agency, business_model, platform=None):
     优先级：
     1. 如果已有业务模式且不为空，保持不变
     2. 腾讯申万宏源直投，未归因业务模式的，默认为直播
-    3. 小红书平台，未归因业务模式的，默认为信息流（转化链路特殊）
-    4. 腾讯众联，未归因业务模式的，默认为信息流
-    5. 否则根据代理商名称映射
-    6. 如果代理商也不在映射表中，返回空字符串
+    3. 腾讯众联，未归因业务模式的，默认为信息流
+    4. 否则根据代理商名称映射
+    5. 如果代理商也不在映射表中，返回空字符串
+
+    注意：
+    - 对于小红书平台，不再默认返回"信息流"
+    - 小红书的业务模式应由转化数据的 customer_source 字段推断
+    - 这样可以避免广告数据和转化数据因 business_model 不一致而产生重复记录
 
     Args:
         agency: 代理商名称
@@ -92,10 +96,6 @@ def apply_business_model_mapping(agency, business_model, platform=None):
     if platform == '腾讯' and agency == '申万宏源直投':
         return '直播'
 
-    # 特殊规则：小红书平台，默认为信息流（转化链路特殊）
-    if platform == '小红书':
-        return '信息流'
-
     # 特殊规则：腾讯众联，默认为信息流
     if platform == '腾讯' and agency == '众联':
         return '信息流'
@@ -106,6 +106,8 @@ def apply_business_model_mapping(agency, business_model, platform=None):
         return mapped_model
 
     # 无法映射，返回空字符串
+    # 注意：对于小红书平台，不再默认返回"信息流"
+    # 业务模式由转化数据的 customer_source 字段推断
     return ''
 
 
@@ -434,25 +436,14 @@ def _calculate_conversion_aggregation(start_date, end_date):
     # 从 AgencyAbbreviationMapping 表动态构建简称映射（仅用于抖音）
     agency_name_mapping = build_abbreviation_mapping_case()
 
-    # 业务模式推断逻辑
-    # customer_source 包含"引流" → 直播
-    # customer_source 有值但不包含"引流" → 信息流
-    # 其他 → 空字符串
-    business_model_mapping = case(
-        (BackendConversions.customer_source.like('%引流%'), '直播'),
-        (and_(
-            BackendConversions.customer_source.isnot(None),
-            BackendConversions.customer_source != ''
-        ), '信息流'),
-        else_=''
-    )
-
     # ===== 1. 查询腾讯转化数据（需要通过广告账号表关联） =====
     print("   2.1 计算腾讯转化数据（通过广告账号关联）...")
     tencent_conversions = db.session.query(
         BackendConversions.lead_date.label('date'),
         func.coalesce(AccountAgencyMapping.agency, '').label('agency'),
-        func.coalesce(business_model_mapping, '').label('business_model'),
+        # 重要：使用账号映射表的 business_model，而不是 customer_source 推断
+        # 这样可以保证广告数据和转化数据使用相同的 business_model
+        func.coalesce(AccountAgencyMapping.business_model, '').label('business_model'),
         # 直接使用 id 计数（每条记录代表一个独立的线索）
         func.count(BackendConversions.id).label('lead_users'),
         # 带条件的计数（使用 CASE WHEN + id）
@@ -526,7 +517,7 @@ def _calculate_conversion_aggregation(start_date, end_date):
     ).group_by(
         BackendConversions.lead_date,
         AccountAgencyMapping.agency,
-        business_model_mapping
+        AccountAgencyMapping.business_model
     ).all()
 
     print(f"      找到 {len(tencent_conversions)} 条腾讯转化聚合记录")
@@ -560,6 +551,17 @@ def _calculate_conversion_aggregation(start_date, end_date):
         (BackendConversions.platform_source == '小红书', xiaohongshu_agency),
         (BackendConversions.platform_source == 'yj', ''),
         (BackendConversions.platform_source == '高德', ''),
+        else_=''
+    )
+
+    # 业务模式映射：转化数据使用 customer_source 推断 business_model
+    # 这是正确的设计，因为转化数据中投放账号不全，不能依赖账号映射表
+    business_model_mapping = case(
+        (BackendConversions.customer_source.like('%引流%'), '直播'),
+        (and_(
+            BackendConversions.customer_source.isnot(None),
+            BackendConversions.customer_source != ''
+        ), '信息流'),
         else_=''
     )
 
@@ -790,16 +792,6 @@ def _calculate_click_users(start_date, end_date):
         "COALESCE(backend_conversions.platform_user_id, '')"
     )
 
-    # 业务模式推断逻辑
-    business_model_mapping = case(
-        (BackendConversions.customer_source.like('%引流%'), '直播'),
-        (and_(
-            BackendConversions.customer_source.isnot(None),
-            BackendConversions.customer_source != ''
-        ), '信息流'),
-        else_=''
-    )
-
     # ===== 1. 腾讯点击人数：直接通过 ad_account 关联 account_agency_mapping =====
     # 不再通过 raw_ad_data_tencent 作为中间表，避免日期不匹配导致数据丢失
     print("      处理腾讯点击人数（通过 ad_account → account_agency_mapping）...")
@@ -856,11 +848,21 @@ def _calculate_click_users(start_date, end_date):
         else_=''
     )
 
+    # 小红书业务模式：优先使用账号映射表的 business_model
+    xiaohongshu_business_model = AccountAgencyMapping.business_model
+
+    # 业务模式映射：腾讯/小红书使用账号映射表的 business_model，其他使用空字符串
+    bm_mapping = case(
+        (BackendConversions.platform_source == '腾讯', AccountAgencyMapping.business_model),
+        (BackendConversions.platform_source == '小红书', xiaohongshu_business_model),
+        else_=''
+    )
+
     other_clicks = db.session.query(
         BackendConversions.lead_date.label('date'),
         BackendConversions.platform_source.label('platform'),
         func.coalesce(agency_mapping, '').label('agency'),
-        func.coalesce(business_model_mapping, '').label('business_model'),
+        func.coalesce(bm_mapping, '').label('business_model'),
         func.count(func.distinct(user_identifier)).label('click_users')
     ).outerjoin(
         AccountAgencyMapping,
@@ -879,7 +881,7 @@ def _calculate_click_users(start_date, end_date):
         BackendConversions.lead_date,
         BackendConversions.platform_source,
         agency_mapping,
-        business_model_mapping
+        bm_mapping
     ).all()
 
     print(f"      找到 {len(other_clicks)} 条抖音/小红书点击人数聚合记录")

@@ -709,6 +709,10 @@ class AgencyAnalysisReport {
         let totalValidCustomerUsers = 0;
 
         this.currentData.summary.forEach(item => {
+            // 跳过平台小计行和合计行，只累加明细行
+            if (item.is_subtotal || item.is_total) {
+                return;
+            }
             totalCost += item.metrics.cost || 0;
             totalImpressions += item.metrics.impressions || 0;
             totalClickUsers += item.metrics.clicks || 0;

@@ -385,6 +385,15 @@ def serve_vite_assets(filename):
     response.headers['Expires'] = '0'
     return response
 
+@app.route('/icons/<path:filename>')
+def serve_icons(filename):
+    """服务图标文件（React 侧边栏 Logo 等）"""
+    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist', 'icons'), filename)
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 @app.before_request
 def serve_react_app():
     """React Router SPA 兜底路由 - 在所有路由匹配失败后处理"""
