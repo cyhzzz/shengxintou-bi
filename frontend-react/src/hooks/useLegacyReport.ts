@@ -83,9 +83,10 @@ export function useLegacyReport(className: string): UseLegacyReportReturn {
         // 延迟初始化，确保 DOM 已渲染
         setTimeout(() => {
           try {
-            const instance = new LegacyClass();
+            // 混合迁移模式：跳过筛选器，使用外部容器渲染图表和表格
+            const instance = new LegacyClass({ hybridMode: true });
             setReport(instance);
-            console.log(`[useLegacyReport] 成功初始化: ${className}`);
+            console.log(`[useLegacyReport] 成功初始化: ${className} (混合模式)`);
           } catch (err) {
             console.error(`[useLegacyReport] 实例化失败:`, err);
             setError(err instanceof Error ? err : new Error(String(err)));

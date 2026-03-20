@@ -294,6 +294,20 @@ const PosterModal: React.FC<PosterModalProps> = ({
     }
   };
 
+  // 获取工具栏样式类
+  const getToolbarClass = () => {
+    switch (platform) {
+      case '小红书':
+        return `${styles.floatingToolbar} ${styles.xiaohongshuToolbar}`;
+      case '腾讯':
+        return `${styles.floatingToolbar} ${styles.tencentToolbar}`;
+      case '抖音':
+        return `${styles.floatingToolbar} ${styles.douyinToolbar}`;
+      default:
+        return `${styles.floatingToolbar} ${styles.xiaohongshuToolbar}`;
+    }
+  };
+
   // 获取平台标题
   const getPlatformTitle = () => {
     return `${platform}渠道`;
@@ -316,7 +330,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
       closable={true}
     >
       {/* 浮动工具栏 */}
-      <div className={styles.floatingToolbar}>
+      <div className={getToolbarClass()}>
         <button
           className={styles.toolbarBtn}
           onClick={handleExportImage}

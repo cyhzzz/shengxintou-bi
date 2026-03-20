@@ -173,9 +173,11 @@ def get_analysis_data():
         )
 
         # 获取员工转化率走势
+        granularity = data.get('granularity', 'weekly')  # 支持 weekly/monthly
         employee_rate_trend = get_employee_rate_trend(
             platforms, start_date, end_date,
-            employees if employees else None
+            employees if employees else None,
+            granularity
         )
 
         return jsonify({

@@ -326,7 +326,7 @@ def get_weekly_trend_data(platforms, start_date=None, end_date=None, employees=N
         }
 
 
-def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees=None):
+def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees=None, granularity='weekly'):
     """
     获取员工开户转化率走势（与小红书报表格式一致）
 
@@ -342,13 +342,14 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
         start_date: 开始日期，可选，为空时查询全部
         end_date: 结束日期，可选，为空时查询全部
         employees: 服务人员列表（可选，为空则返回所有符合条件的员工）
+        granularity: 时间粒度 ('weekly' 或 'monthly')，默认 'weekly'
 
     Returns:
         dict: 员工转化率走势数据，格式与小红书报表一致
         {
-            'weeks': ['2025-01', '2025-02', ...],  # YYYY-WW格式
+            'periods': ['2025-01', '2025-02', ...],  # YYYY-WW (周) 或 YYYY-MM (月) 格式
             'employees': ['张三', '李四', ...],     # 员工列表
-            'series': [[15.5, 20.3, ...], ...]      # 每个员工的周度转化率数据
+            'series': [[15.5, 20.3, ...], ...]      # 每个员工的转化率数据
         }
     """
     try:
@@ -364,7 +365,7 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
         employees = [emp for emp in employees if emp in qualified_employees]
 
         if not employees:
-            return {'weeks': [], 'employees': [], 'series': []}
+            return {'periods': [], 'employees': [], 'series': []}
 
         # 将日期字符串转换为日期对象（如果有）
         if start_date and isinstance(start_date, str):
@@ -372,10 +373,15 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
         if end_date and isinstance(end_date, str):
             end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
 
-        # 构建查询 - 按员工和周聚合
+        # 构建查询 - 按员工和时间粒度聚合
+        if granularity == 'monthly':
+            period_expr = func.strftime('%Y-%m', BackendConversions.lead_date).label('period')
+        else:
+            period_expr = func.strftime('%Y-%W', BackendConversions.lead_date).label('period')
+
         query = db.session.query(
             BackendConversions.add_employee_name,
-            func.strftime('%Y-%W', BackendConversions.lead_date).label('week'),
+            period_expr,
             func.count(BackendConversions.id).label('total_wechat_adds'),  # 加微数（所有行数）
             func.sum(case((BackendConversions.is_opened_account == True, 1), else_=0)).label('opened_accounts')  # 开户数
         ).filter(
@@ -402,15 +408,15 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
         if platform_filters:
             query = query.filter(or_(*platform_filters))
 
-        # 按员工和周分组
-        query = query.group_by(BackendConversions.add_employee_name, 'week').order_by('week')
+        # 按员工和时间粒度分组
+        query = query.group_by(BackendConversions.add_employee_name, 'period').order_by('period')
 
         # 执行查询
         results = query.all()
 
-        # 构建周度数据结构
-        weekly_data = {
-            'weeks': set(),
+        # 构建数据结构
+        period_data = {
+            'periods': set(),
             'employees': set(),
             'rates': {}
         }
@@ -419,48 +425,48 @@ def get_employee_rate_trend(platforms, start_date=None, end_date=None, employees
             if not row.add_employee_name:
                 continue
 
-            week = row.week  # 格式: YYYY-WW
+            period = row.period  # 格式: YYYY-WW (周) 或 YYYY-MM (月)
             wechat_adds = row.total_wechat_adds or 0  # 加微数
             opened_accounts = row.opened_accounts or 0  # 开户数
 
             # 计算开户转化率 = 开户数 / 加微数
             rate = (opened_accounts / wechat_adds * 100) if wechat_adds > 0 else 0
 
-            weekly_data['weeks'].add(week)
-            weekly_data['employees'].add(row.add_employee_name)
+            period_data['periods'].add(period)
+            period_data['employees'].add(row.add_employee_name)
 
-            if row.add_employee_name not in weekly_data['rates']:
-                weekly_data['rates'][row.add_employee_name] = {}
+            if row.add_employee_name not in period_data['rates']:
+                period_data['rates'][row.add_employee_name] = {}
 
-            weekly_data['rates'][row.add_employee_name][week] = round(rate, 2)
+            period_data['rates'][row.add_employee_name][period] = round(rate, 2)
 
-        # 排序并去重周
-        sorted_weeks = sorted(list(weekly_data['weeks']))
+        # 排序并去重
+        sorted_periods = sorted(list(period_data['periods']))
 
         # 保持员工顺序与输入一致（TOP5顺序）
-        sorted_employees = [emp for emp in employees if emp in weekly_data['employees']]
+        sorted_employees = [emp for emp in employees if emp in period_data['employees']]
 
-        # 构建图表数据（与小红书报表格式一致）
-        employee_weekly_conversion = {
-            'weeks': sorted_weeks,
+        # 构建图表数据
+        employee_rate_trend_data = {
+            'periods': sorted_periods,
             'employees': sorted_employees,
             'series': []
         }
 
-        # 为每个员工生成周度数据
+        # 为每个员工生成数据
         for emp_name in sorted_employees:
             series_data = []
-            for week in sorted_weeks:
-                rate = weekly_data['rates'].get(emp_name, {}).get(week, 0)
+            for period in sorted_periods:
+                rate = period_data['rates'].get(emp_name, {}).get(period, 0)
                 series_data.append(rate)
-            employee_weekly_conversion['series'].append(series_data)
+            employee_rate_trend_data['series'].append(series_data)
 
-        logger.info(f"[EmployeeRateTrend] weeks={len(sorted_weeks)}, employees={len(sorted_employees)}, series={len(employee_weekly_conversion['series'])}")
-        return employee_weekly_conversion
+        logger.info(f"[EmployeeRateTrend] granularity={granularity}, periods={len(sorted_periods)}, employees={len(sorted_employees)}, series={len(employee_rate_trend_data['series'])}")
+        return employee_rate_trend_data
 
     except Exception as e:
         logger.error(f"获取员工转化率走势失败: {e}")
-        return {'weeks': [], 'employees': [], 'series': []}
+        return {'periods': [], 'employees': [], 'series': []}
 
 
 def get_weekly_report_data(start_date, end_date, platforms, top_count=10):

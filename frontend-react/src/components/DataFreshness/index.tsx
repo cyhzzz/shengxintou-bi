@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Tag, Spin, Button } from 'antd';
 import {
   CheckCircleOutlined,
@@ -69,7 +69,7 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
         if (response.success && response.data) {
           setData(response.data);
           // 如果有严重警告，自动展开
-          const hasCritical = Object.values(response.data).some(
+          const hasCritical = Object.values(response.data as Record<string, { status?: string }>).some(
             (item) => item.status === 'critical'
           );
           if (hasCritical && compact) {

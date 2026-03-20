@@ -81,9 +81,27 @@ if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
 
 app = Flask(__name__,
-            template_folder=os.path.join(BASE_DIR, 'frontend'),
-            static_folder=os.path.join(BASE_DIR, 'frontend'),
-            static_url_path='')
+            template_folder=os.path.join(BASE_DIR, 'frontend-react', 'dist'),
+            static_folder=os.path.join(BASE_DIR, 'frontend-react', 'dist'),
+            static_url_path='/static')  # 静态文件通过 /static/... 访问，释放根路径给 React Router
+
+# WSGI中间件：处理 /api/api/... 错误路径（由缓存的旧版JS产生）
+# 在Flask处理请求之前，将路径重写为正确格式
+class DoubleApiRewriteMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        path = environ.get('PATH_INFO', '')
+        if path.startswith('/api/api/'):
+            environ['PATH_INFO'] = path.replace('/api/api/', '/api/', 1)
+            # 同时修正SCRIPT_NAME
+            script_name = environ.get('SCRIPT_NAME', '')
+            if script_name:
+                environ['SCRIPT_NAME'] = script_name.replace('/api/api/', '/api/', 1)
+        return self.app(environ, start_response)
+
+app.wsgi_app = DoubleApiRewriteMiddleware(app.wsgi_app)
 
 # 禁用模板和静态文件缓存
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -334,6 +352,82 @@ for rule in app.url_map.iter_rules():
     if rule.endpoint != 'static':
         methods_str = ', '.join(list(rule.methods))
         logger.info(f"  {methods_str:20} {rule.rule:50} -> {rule.endpoint}")
+
+# React Router SPA 兜底路由
+# 通过 before_request 钩子处理，确保在所有其他路由之后检查
+from flask import request, send_from_directory
+
+# 旧版 JS 静态文件路由（新版前端混合模式依赖）
+@app.route('/js/<path:filename>')
+def serve_legacy_js(filename):
+    """服务旧版 JS 文件"""
+    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist'), f'js/{filename}')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/libs/<path:filename>')
+def serve_legacy_libs(filename):
+    """服务旧版 libs 文件"""
+    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist'), f'libs/{filename}')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/assets/<path:filename>')
+def serve_vite_assets(filename):
+    """服务 Vite 构建的资源文件（CSS、JS chunks 等）"""
+    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist'), f'assets/{filename}')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.before_request
+def serve_react_app():
+    """React Router SPA 兜底路由 - 在所有路由匹配失败后处理"""
+    from flask import make_response
+
+    # 排除 API 路由
+    if request.path.startswith('/api'):
+        return None  # 继续其他匹配
+
+    # 排除静态文件路由（由 Flask 内置 static 处理）
+    if request.path.startswith('/static/') or request.path == '/favicon.ico':
+        return None  # 继续其他匹配
+
+    # 排除 Vite 构建资源路径（映射到 /static/...）
+    if request.path.startswith('/assets/'):
+        return None  # 继续其他匹配
+
+    # 排除旧版 JS 路由（新版前端混合模式依赖）
+    if request.path.startswith('/js/') or request.path.startswith('/libs/'):
+        return None  # 继续其他匹配
+
+    # 排除 Swagger 文档路由
+    if request.path.startswith('/apidocs') or request.path.startswith('/flasgger') or request.path == '/oauth2-redirect.html':
+        return None
+
+    # 检查是否是已存在的路由（通过 url_map 检查）
+    adapter = app.url_map.bind('127.0.0.1:5000')
+    try:
+        endpoint, values = adapter.match(request.path, method=request.method)
+        # 找到了匹配的路由，不干预
+        return None
+    except Exception:
+        # 没有匹配的路由，返回 index.html 让 React Router 处理
+        pass
+
+    # 返回 index.html
+    index_path = os.path.join(app.template_folder, 'index.html')
+    if os.path.exists(index_path):
+        response = make_response(render_template('index.html'))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    return "index.html not found", 404
+
 
 # 错误处理
 @app.errorhandler(404)

@@ -1,14 +1,41 @@
 /**
  * 海报模态框样式
- * 参照旧版前端的海报模板实现
- * 支持小红书、腾讯、抖音三种平台样式
+ * Monochrome Data Design System
+ * 三个平台各自基于单一主色调，高极感、克制优雅、留白充足
  */
+
+/* ==================== 设计变量 ==================== */
+:root {
+  /* 小红书 — Rose Monochrome */
+  --rose-bg-light: #FFF5F5;
+  --rose-bg-dark: #FFE4E1;
+  --rose-primary: #E8A0A0;
+  --rose-accent: #C4696B;
+  --rose-text: #5C3A3A;
+  --rose-text-muted: #9A7A7A;
+
+  /* 腾讯 — Azure Monochrome */
+  --azure-bg-light: #F0F8FF;
+  --azure-bg-dark: #1A2F4A;
+  --azure-primary: #4A90D9;
+  --azure-accent: #00B4D8;
+  --azure-text: #0D1B2A;
+  --azure-text-muted: #5C7A9A;
+
+  /* 抖音 — Violet Monochrome */
+  --violet-bg-light: #F8F5FF;
+  --violet-bg-dark: #1A1030;
+  --violet-primary: #8B5CF6;
+  --violet-accent: #D946EF;
+  --violet-text: #1A1030;
+  --violet-text-muted: #7C5CBF;
+}
 
 /* 模态框容器 */
 .posterModal {
   :global(.ant-modal-content) {
     padding: 0;
-    background: #f0f2f5;
+    background: #fafafa;
     max-height: 90vh;
     overflow: hidden;
   }
@@ -19,7 +46,7 @@
     z-index: 100;
 
     &:hover {
-      background: rgba(0, 0, 0, 0.1);
+      background: rgba(0, 0, 0, 0.08);
     }
   }
 
@@ -36,10 +63,12 @@
   top: 0;
   z-index: 50;
   display: flex;
-  gap: 12px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 
   .toolbarBtn {
     display: flex;
@@ -48,36 +77,82 @@
     padding: 10px 20px;
     border: none;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.95);
-    color: #333;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
+    transition: all 0.2s ease;
+    font-family: inherit;
+    letter-spacing: 0.3px;
 
     &:disabled {
-      opacity: 0.7;
+      opacity: 0.6;
       cursor: not-allowed;
     }
 
     span {
-      font-size: 14px;
+      font-size: 13px;
+    }
+  }
+}
+
+/* 小红书工具栏 — Rose Monochrome */
+.xiaohongshuToolbar {
+  background: linear-gradient(135deg, var(--rose-bg-light) 0%, var(--rose-bg-dark) 100%);
+
+  .toolbarBtn {
+    background: var(--rose-primary);
+    color: var(--rose-text);
+    box-shadow: 0 2px 8px rgba(232, 160, 160, 0.3);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(232, 160, 160, 0.4);
+      background: var(--rose-accent);
+      color: white;
+    }
+  }
+}
+
+/* 腾讯工具栏 — Azure Monochrome */
+.tencentToolbar {
+  background: linear-gradient(135deg, var(--azure-bg-light) 0%, #d4e8f7 100%);
+
+  .toolbarBtn {
+    background: var(--azure-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(74, 144, 217, 0.4);
+      background: var(--azure-accent);
+    }
+  }
+}
+
+/* 抖音工具栏 — Violet Monochrome */
+.douyinToolbar {
+  background: linear-gradient(135deg, var(--violet-bg-light) 0%, #ede9fe 100%);
+
+  .toolbarBtn {
+    background: var(--violet-primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
+      background: var(--violet-accent);
     }
   }
 }
 
 /* 海报包装器 */
 .posterWrapper {
-  padding: 20px;
+  padding: 24px;
   display: flex;
   justify-content: center;
-  background: #f0f2f5;
+  background: #f5f5f5;
 }
 
 /* 基础容器 */
@@ -85,454 +160,166 @@
   width: 800px;
   min-height: 600px;
   background: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 }
 
-/* ==================== 小红书样式 ==================== */
+/* ==================== 小红书样式 — Rose Monochrome ==================== */
 .xiaohongshu {
-  background: linear-gradient(135deg, #ff4757 0%, #ff6b7a 50%, #ff7f50 100%);
+  background: linear-gradient(160deg, #fff5f5 0%, #ffe4e1 50%, #fadbd8 100%);
+  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+
+  /* 丝绸编织纹理 — Silk Weave Texture */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 2px,
+        rgba(232, 160, 160, 0.06) 2px,
+        rgba(232, 160, 160, 0.06) 4px
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
 
   .header {
-    padding: 40px 30px 30px;
+    padding: 52px 40px 48px;
     text-align: center;
     position: relative;
-
-    .platformTitle {
-      font-size: 42px;
-      font-weight: 700;
-      color: #ffffff;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      margin-bottom: 10px;
-    }
-
-    .subTitle {
-      font-size: 28px;
-      font-weight: 600;
-      color: #fff8e1;
-      margin-bottom: 15px;
-    }
-
-    .dateRange {
-      font-size: 16px;
-      color: rgba(255, 255, 255, 0.9);
-      background: rgba(255, 255, 255, 0.2);
-      padding: 8px 20px;
-      border-radius: 20px;
-      display: inline-block;
-    }
-
-    .waveDecoration {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 30px;
-      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z' fill='%23ffffff'%3E%3C/path%3E%3C/svg%3E") no-repeat;
-      background-size: cover;
-    }
-  }
-
-  .content {
-    background: #ffffff;
-    padding: 25px 30px;
-    border-radius: 20px 20px 0 0;
-    margin-top: -10px;
-  }
-
-  .rankingSection {
-    margin-bottom: 25px;
-
-    .rankingHeader {
-      display: flex;
-      align-items: center;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #ff4757;
-
-      .rankingIcon {
-        font-size: 24px;
-        margin-right: 10px;
-      }
-
-      .rankingTitle {
-        font-size: 20px;
-        font-weight: 600;
-        color: #ff4757;
-      }
-    }
-  }
-
-  .rankingTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-
-    th {
-      background: linear-gradient(135deg, #ff4757, #ff6b7a);
-      color: #ffffff;
-      padding: 12px 8px;
-      text-align: center;
-      font-weight: 500;
-      border: none;
-    }
-
-    td {
-      padding: 10px 8px;
-      text-align: center;
-      border-bottom: 1px solid #ffe0e0;
-      color: #333;
-    }
-
-    .totalRow {
-      background: #fff5f5;
-      font-weight: 600;
-
-      td {
-        border-top: 2px solid #ff4757;
-        color: #ff4757;
-      }
-    }
-
-    .employeeName {
-      font-weight: 500;
-      color: #333;
-    }
-
-    .number {
-      font-family: 'Roboto Mono', monospace;
-      color: #666;
-    }
-
-    .highlight {
-      font-family: 'Roboto Mono', monospace;
-      color: #ff4757;
-      font-weight: 600;
-    }
-
-    .rate {
-      font-family: 'Roboto Mono', monospace;
-      color: #52c41a;
-    }
-  }
-
-  .rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .rank1 {
-    background: linear-gradient(135deg, #ffd700, #ffed4a);
-    color: #8b4513;
-    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
-  }
-
-  .rank2 {
-    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
-    color: #555;
-    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
-  }
-
-  .rank3 {
-    background: linear-gradient(135deg, #cd7f32, #dda15e);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
-  }
-
-  .rankOther {
-    background: #f0f0f0;
-    color: #666;
-  }
-
-  .footerNote {
-    background: #fff8f8;
-    border-left: 4px solid #ff4757;
-    padding: 15px 20px;
-    margin-top: 20px;
-    border-radius: 0 8px 8px 0;
-
-    .footerNoteTitle {
-      font-size: 16px;
-      font-weight: 600;
-      color: #ff4757;
-      margin-bottom: 10px;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      list-style-type: decimal;
-
-      li {
-        font-size: 13px;
-        color: #666;
-        line-height: 1.8;
-      }
-    }
-  }
-}
-
-/* ==================== 腾讯样式 ==================== */
-.tencent {
-  background: linear-gradient(135deg, #0a2463 0%, #1e5bb5 50%, #00d4ff 100%);
-
-  .header {
-    padding: 40px 30px 30px;
-    text-align: center;
+    z-index: 1;
+    background: linear-gradient(160deg, #e8a0a0 0%, #c4696b 100%);
+    margin: 0;
     position: relative;
+    overflow: hidden;
 
-    .platformTitle {
-      font-size: 42px;
-      font-weight: 700;
-      color: #ffffff;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      margin-bottom: 10px;
-    }
-
-    .subTitle {
-      font-size: 28px;
-      font-weight: 600;
-      color: #e0f7ff;
-      margin-bottom: 15px;
-    }
-
-    .dateRange {
-      font-size: 16px;
-      color: rgba(255, 255, 255, 0.95);
-      background: rgba(255, 255, 255, 0.15);
-      padding: 8px 20px;
-      border-radius: 20px;
-      display: inline-block;
-    }
-  }
-
-  .content {
-    background: #ffffff;
-    padding: 25px 30px;
-  }
-
-  .rankingSection {
-    margin-bottom: 25px;
-
-    .rankingHeader {
-      display: flex;
-      align-items: center;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #1e5bb5;
-
-      .rankingIcon {
-        font-size: 24px;
-        margin-right: 10px;
-      }
-
-      .rankingTitle {
-        font-size: 20px;
-        font-weight: 600;
-        color: #1e5bb5;
-      }
-    }
-  }
-
-  .rankingTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-
-    th {
-      background: linear-gradient(135deg, #1e5bb5, #00d4ff);
-      color: #ffffff;
-      padding: 12px 8px;
-      text-align: center;
-      font-weight: 500;
-      border: none;
-    }
-
-    td {
-      padding: 10px 8px;
-      text-align: center;
-      border-bottom: 1px solid #e0e8ff;
-      color: #333;
-    }
-
-    .totalRow {
-      background: #f0f7ff;
-      font-weight: 600;
-
-      td {
-        border-top: 2px solid #1e5bb5;
-        color: #1e5bb5;
-      }
-    }
-
-    .employeeName {
-      font-weight: 500;
-      color: #333;
-    }
-
-    .number {
-      font-family: 'Roboto Mono', monospace;
-      color: #666;
-    }
-
-    .highlight {
-      font-family: 'Roboto Mono', monospace;
-      color: #1e5bb5;
-      font-weight: 600;
-    }
-
-    .rate {
-      font-family: 'Roboto Mono', monospace;
-      color: #52c41a;
-    }
-  }
-
-  .rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .rank1 {
-    background: linear-gradient(135deg, #ffd700, #ffed4a);
-    color: #8b4513;
-    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
-  }
-
-  .rank2 {
-    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
-    color: #555;
-    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
-  }
-
-  .rank3 {
-    background: linear-gradient(135deg, #cd7f32, #dda15e);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
-  }
-
-  .rankOther {
-    background: #f0f0f0;
-    color: #666;
-  }
-
-  .footerNote {
-    background: #f0f7ff;
-    border-left: 4px solid #1e5bb5;
-    padding: 15px 20px;
-    margin-top: 20px;
-    border-radius: 0 8px 8px 0;
-
-    .footerNoteTitle {
-      font-size: 16px;
-      font-weight: 600;
-      color: #1e5bb5;
-      margin-bottom: 10px;
-    }
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      list-style-type: decimal;
-
-      li {
-        font-size: 13px;
-        color: #666;
-        line-height: 1.8;
-      }
-    }
-  }
-}
-
-/* ==================== 抖音样式 ==================== */
-.douyin {
-  background: linear-gradient(135deg, #000000 0%, #1a1a2e 50%, #16213e 100%);
-
-  .header {
-    padding: 40px 30px 30px;
-    text-align: center;
-    position: relative;
-
+    /* 云纹装饰 — Cloud Pattern */
     &::before {
       content: '';
       position: absolute;
-      top: 0;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background-image:
+        radial-gradient(ellipse 80px 40px at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 70%),
+        radial-gradient(ellipse 60px 30px at 80% 20%, rgba(255,255,255,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 100px 50px at 60% 70%, rgba(255,255,255,0.1) 0%, transparent 70%),
+        radial-gradient(ellipse 70px 35px at 40% 80%, rgba(255,255,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      animation: cloudDrift 20s ease-in-out infinite;
+    }
+
+    /* 底部装饰线 */
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
       left: 0;
       right: 0;
-      bottom: 0;
-      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      pointer-events: none;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    }
+
+    @keyframes cloudDrift {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      50% { transform: translate(2%, 1%) rotate(1deg); }
     }
 
     .platformTitle {
-      font-size: 42px;
-      font-weight: 700;
-      background: linear-gradient(90deg, #00f2fe, #4facfe);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-shadow: none;
-      margin-bottom: 10px;
+      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
+      font-size: 46px;
+      font-weight: 400;
+      color: #ffffff;
+      margin-bottom: 14px;
+      letter-spacing: 3px;
       position: relative;
+      display: inline-block;
+      text-shadow: 0 2px 8px rgba(196, 105, 107, 0.3);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 2px;
+      }
     }
 
     .subTitle {
-      font-size: 28px;
-      font-weight: 600;
-      color: #00f2fe;
-      margin-bottom: 15px;
-      position: relative;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-top: 24px;
     }
 
     .dateRange {
-      font-size: 16px;
-      color: #ffffff;
-      background: rgba(0, 242, 254, 0.2);
-      padding: 8px 20px;
-      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.85);
+      margin-top: 18px;
+      letter-spacing: 2px;
+      padding: 10px 28px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
       display: inline-block;
-      border: 1px solid rgba(0, 242, 254, 0.3);
-      position: relative;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
   }
 
   .content {
     background: #ffffff;
-    padding: 25px 30px;
+    padding: 32px 28px;
+    position: relative;
+    z-index: 1;
+    border-radius: 20px 20px 0 0;
+    margin-top: 8px;
   }
 
   .rankingSection {
-    margin-bottom: 25px;
+    margin-bottom: 24px;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(232, 160, 160, 0.08);
+    border: 1px solid rgba(232, 160, 160, 0.12);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(232, 160, 160, 0.12);
+    }
 
     .rankingHeader {
+      background: var(--rose-primary);
+      padding: 14px 20px;
       display: flex;
       align-items: center;
-      margin-bottom: 15px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #000000;
+      gap: 12px;
 
       .rankingIcon {
-        font-size: 24px;
-        margin-right: 10px;
+        font-size: 20px;
+        opacity: 0.9;
       }
 
       .rankingTitle {
-        font-size: 20px;
+        font-size: 15px;
         font-weight: 600;
-        color: #000000;
+        color: #ffffff;
+        letter-spacing: 0.5px;
       }
     }
   }
@@ -540,53 +327,68 @@
   .rankingTable {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 13px;
+
+    thead {
+      background: rgba(232, 160, 160, 0.06);
+    }
 
     th {
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      color: #00f2fe;
       padding: 12px 8px;
+      font-weight: 600;
+      color: var(--rose-text);
+      border-bottom: 1px solid rgba(232, 160, 160, 0.15);
       text-align: center;
-      font-weight: 500;
-      border: none;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
 
     td {
-      padding: 10px 8px;
+      padding: 14px 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
       text-align: center;
-      border-bottom: 1px solid #e0e0e0;
-      color: #333;
+      color: var(--rose-text);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(232, 160, 160, 0.03);
+    }
+
+    tbody tr:hover {
+      background: rgba(232, 160, 160, 0.06);
     }
 
     .totalRow {
-      background: #f5f5f5;
+      background: rgba(232, 160, 160, 0.08) !important;
       font-weight: 600;
 
       td {
-        border-top: 2px solid #000000;
-        color: #000000;
+        border-top: 1px solid rgba(232, 160, 160, 0.2);
+        color: var(--rose-accent);
       }
     }
 
     .employeeName {
       font-weight: 500;
-      color: #333;
+      color: var(--rose-text);
     }
 
     .number {
-      font-family: 'Roboto Mono', monospace;
-      color: #666;
+      font-family: 'Instrument Sans', monospace;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--rose-text-muted);
     }
 
     .highlight {
-      font-family: 'Roboto Mono', monospace;
-      color: #000000;
+      color: var(--rose-accent);
       font-weight: 600;
     }
 
     .rate {
-      font-family: 'Roboto Mono', monospace;
-      color: #52c41a;
+      font-weight: 500;
+      color: var(--rose-text-muted);
     }
   }
 
@@ -594,59 +396,688 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.08);
+    }
   }
 
   .rank1 {
-    background: linear-gradient(135deg, #ffd700, #ffed4a);
-    color: #8b4513;
-    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+    background: linear-gradient(135deg, #f5d5c8 0%, #e8b4a8 100%);
+    color: var(--rose-accent);
   }
 
   .rank2 {
-    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
-    color: #555;
-    box-shadow: 0 2px 8px rgba(192, 192, 192, 0.4);
+    background: rgba(232, 160, 160, 0.2);
+    color: var(--rose-text-muted);
   }
 
   .rank3 {
-    background: linear-gradient(135deg, #cd7f32, #dda15e);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(205, 127, 50, 0.4);
+    background: rgba(196, 105, 107, 0.15);
+    color: var(--rose-accent);
   }
 
   .rankOther {
-    background: #f0f0f0;
-    color: #666;
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--rose-text-muted);
   }
 
   .footerNote {
-    background: #f8f8f8;
-    border-left: 4px solid #000000;
-    padding: 15px 20px;
+    background: rgba(232, 160, 160, 0.06);
+    padding: 20px 24px;
+    border-radius: 12px;
     margin-top: 20px;
-    border-radius: 0 8px 8px 0;
+    border-left: 3px solid var(--rose-primary);
 
     .footerNoteTitle {
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 600;
-      color: #000000;
-      margin-bottom: 10px;
+      color: var(--rose-text);
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
     }
 
     ul {
+      list-style: none;
+      padding-left: 0;
       margin: 0;
-      padding-left: 20px;
-      list-style-type: decimal;
+    }
 
-      li {
-        font-size: 13px;
-        color: #666;
-        line-height: 1.8;
+    li {
+      font-size: 12px;
+      color: var(--rose-text-muted);
+      margin-bottom: 6px;
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.6;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 7px;
+        width: 5px;
+        height: 5px;
+        background: var(--rose-primary);
+        border-radius: 50%;
+      }
+    }
+  }
+}
+
+/* ==================== 腾讯样式 — Azure Monochrome ==================== */
+.tencent {
+  background: linear-gradient(160deg, #e8f4fc 0%, #1a2f4a 50%, #0d1b2a 100%);
+  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+
+  /* 电路网格纹理 — Circuit Grid Texture */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(74, 144, 217, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74, 144, 217, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .header {
+    padding: 52px 40px 48px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(160deg, #1a2f4a 0%, #0d1b2a 100%);
+    position: relative;
+    overflow: hidden;
+
+    /* 云纹装饰 — Cloud Pattern */
+    &::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background-image:
+        radial-gradient(ellipse 100px 50px at 15% 25%, rgba(0, 180, 216, 0.15) 0%, transparent 70%),
+        radial-gradient(ellipse 80px 40px at 85% 35%, rgba(74, 144, 217, 0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 120px 60px at 70% 75%, rgba(0, 180, 216, 0.1) 0%, transparent 70%),
+        radial-gradient(ellipse 60px 30px at 30% 70%, rgba(74, 144, 217, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      animation: cloudPulse 15s ease-in-out infinite;
+    }
+
+    /* 底部发光装饰线 */
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--azure-accent), transparent);
+      box-shadow: 0 0 20px var(--azure-accent);
+    }
+
+    @keyframes cloudPulse {
+      0%, 100% { opacity: 0.8; transform: translate(0, 0); }
+      50% { opacity: 1; transform: translate(1%, 0.5%); }
+    }
+
+    .platformTitle {
+      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
+      font-size: 46px;
+      font-weight: 400;
+      color: #ffffff;
+      margin-bottom: 14px;
+      letter-spacing: 4px;
+      position: relative;
+      display: inline-block;
+      text-shadow: 0 2px 12px rgba(0, 180, 216, 0.4);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 3px;
+        background: var(--azure-accent);
+        border-radius: 2px;
+        box-shadow: 0 0 12px var(--azure-accent);
+      }
+    }
+
+    .subTitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.85);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-top: 24px;
+    }
+
+    .dateRange {
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 18px;
+      letter-spacing: 2px;
+      padding: 10px 28px;
+      background: rgba(0, 180, 216, 0.12);
+      border-radius: 24px;
+      display: inline-block;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0, 180, 216, 0.25);
+    }
+  }
+
+  .content {
+    background: #ffffff;
+    padding: 32px 28px;
+    position: relative;
+    z-index: 1;
+    border-radius: 20px 20px 0 0;
+    margin-top: 8px;
+  }
+
+  .rankingSection {
+    margin-bottom: 24px;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(74, 144, 217, 0.1);
+    border: 1px solid rgba(74, 144, 217, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(74, 144, 217, 0.15);
+    }
+
+    .rankingHeader {
+      background: var(--azure-primary);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .rankingIcon {
+        font-size: 20px;
+        opacity: 0.9;
+      }
+
+      .rankingTitle {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: 0.5px;
+      }
+    }
+  }
+
+  .rankingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    thead {
+      background: rgba(74, 144, 217, 0.06);
+    }
+
+    th {
+      padding: 12px 8px;
+      font-weight: 600;
+      color: var(--azure-text);
+      border-bottom: 1px solid rgba(74, 144, 217, 0.15);
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 14px 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+      text-align: center;
+      color: var(--azure-text);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(74, 144, 217, 0.03);
+    }
+
+    tbody tr:hover {
+      background: rgba(74, 144, 217, 0.06);
+    }
+
+    .totalRow {
+      background: rgba(74, 144, 217, 0.08) !important;
+      font-weight: 600;
+
+      td {
+        border-top: 1px solid rgba(74, 144, 217, 0.2);
+        color: var(--azure-primary);
+      }
+    }
+
+    .employeeName {
+      font-weight: 500;
+      color: var(--azure-text);
+    }
+
+    .number {
+      font-family: 'Instrument Sans', monospace;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--azure-text-muted);
+    }
+
+    .highlight {
+      color: var(--azure-primary);
+      font-weight: 600;
+    }
+
+    .rate {
+      font-weight: 500;
+      color: var(--azure-text-muted);
+    }
+  }
+
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.08);
+    }
+  }
+
+  .rank1 {
+    background: linear-gradient(135deg, #d4e8f7 0%, #a8cce8 100%);
+    color: var(--azure-primary);
+  }
+
+  .rank2 {
+    background: rgba(74, 144, 217, 0.15);
+    color: var(--azure-text-muted);
+  }
+
+  .rank3 {
+    background: rgba(0, 180, 216, 0.12);
+    color: var(--azure-accent);
+  }
+
+  .rankOther {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--azure-text-muted);
+  }
+
+  .footerNote {
+    background: rgba(74, 144, 217, 0.06);
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin-top: 20px;
+    border-left: 3px solid var(--azure-primary);
+
+    .footerNoteTitle {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--azure-text);
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+
+    li {
+      font-size: 12px;
+      color: var(--azure-text-muted);
+      margin-bottom: 6px;
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.6;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 7px;
+        width: 5px;
+        height: 5px;
+        background: var(--azure-accent);
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+/* ==================== 抖音样式 — Violet Monochrome ==================== */
+.douyin {
+  background: linear-gradient(160deg, #f3e8ff 0%, #1a1030 50%, #0d0a1a 100%);
+  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+
+  /* 脉冲环纹理 — Pulse Rings Texture */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+      repeating-radial-gradient(
+        circle at 50% 0%,
+        transparent 0,
+        transparent 35px,
+        rgba(139, 92, 246, 0.04) 36px,
+        rgba(139, 92, 246, 0.04) 38px
+      );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .header {
+    padding: 52px 40px 48px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(160deg, #1a1030 0%, #0d0a1a 100%);
+    position: relative;
+    overflow: hidden;
+
+    /* 云纹装饰 — Cloud Pattern */
+    &::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background-image:
+        radial-gradient(ellipse 90px 45px at 20% 30%, rgba(139, 92, 246, 0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 70px 35px at 80% 25%, rgba(217, 70, 239, 0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 110px 55px at 65% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 70%),
+        radial-gradient(ellipse 50px 25px at 35% 75%, rgba(217, 70, 239, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+      animation: violetGlow 18s ease-in-out infinite;
+    }
+
+    /* 底部霓虹装饰线 */
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--violet-accent), var(--violet-primary), transparent);
+      box-shadow: 0 0 16px var(--violet-accent);
+    }
+
+    @keyframes violetGlow {
+      0%, 100% { opacity: 0.7; transform: translate(0, 0) scale(1); }
+      50% { opacity: 1; transform: translate(-1%, 0.5%) scale(1.02); }
+    }
+
+    .platformTitle {
+      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
+      font-size: 46px;
+      font-weight: 400;
+      color: #ffffff;
+      margin-bottom: 14px;
+      letter-spacing: 4px;
+      position: relative;
+      display: inline-block;
+      text-shadow: 0 2px 16px rgba(139, 92, 246, 0.5);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: -14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 3px;
+        background: linear-gradient(90deg, var(--violet-primary), var(--violet-accent));
+        border-radius: 2px;
+        box-shadow: 0 0 12px var(--violet-accent);
+      }
+    }
+
+    .subTitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.85);
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      margin-top: 24px;
+    }
+
+    .dateRange {
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 18px;
+      letter-spacing: 2px;
+      padding: 10px 28px;
+      background: rgba(139, 92, 246, 0.15);
+      border-radius: 24px;
+      display: inline-block;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+  }
+
+  .content {
+    background: #ffffff;
+    padding: 32px 28px;
+    position: relative;
+    z-index: 1;
+    border-radius: 20px 20px 0 0;
+    margin-top: 8px;
+  }
+
+  .rankingSection {
+    margin-bottom: 24px;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(139, 92, 246, 0.15);
+    }
+
+    .rankingHeader {
+      background: var(--violet-primary);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .rankingIcon {
+        font-size: 20px;
+        opacity: 0.9;
+      }
+
+      .rankingTitle {
+        font-size: 15px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: 0.5px;
+      }
+    }
+  }
+
+  .rankingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    thead {
+      background: rgba(139, 92, 246, 0.06);
+    }
+
+    th {
+      padding: 12px 8px;
+      font-weight: 600;
+      color: var(--violet-text);
+      border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 14px 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+      text-align: center;
+      color: var(--violet-text);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(139, 92, 246, 0.03);
+    }
+
+    tbody tr:hover {
+      background: rgba(139, 92, 246, 0.06);
+    }
+
+    .totalRow {
+      background: rgba(139, 92, 246, 0.08) !important;
+      font-weight: 600;
+
+      td {
+        border-top: 1px solid rgba(139, 92, 246, 0.2);
+        color: var(--violet-primary);
+      }
+    }
+
+    .employeeName {
+      font-weight: 500;
+      color: var(--violet-text);
+    }
+
+    .number {
+      font-family: 'Instrument Sans', monospace;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      color: var(--violet-text-muted);
+    }
+
+    .highlight {
+      color: var(--violet-primary);
+      font-weight: 600;
+    }
+
+    .rate {
+      font-weight: 500;
+      color: var(--violet-text-muted);
+    }
+  }
+
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.08);
+    }
+  }
+
+  .rank1 {
+    background: linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%);
+    color: var(--violet-primary);
+  }
+
+  .rank2 {
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--violet-text-muted);
+  }
+
+  .rank3 {
+    background: rgba(217, 70, 239, 0.12);
+    color: var(--violet-accent);
+  }
+
+  .rankOther {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--violet-text-muted);
+  }
+
+  .footerNote {
+    background: rgba(139, 92, 246, 0.06);
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin-top: 20px;
+    border-left: 3px solid var(--violet-primary);
+
+    .footerNoteTitle {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--violet-text);
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+
+    li {
+      font-size: 12px;
+      color: var(--violet-text-muted);
+      margin-bottom: 6px;
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.6;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 7px;
+        width: 5px;
+        height: 5px;
+        background: var(--violet-primary);
+        border-radius: 50%;
       }
     }
   }

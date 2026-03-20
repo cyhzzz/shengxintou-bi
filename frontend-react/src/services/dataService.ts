@@ -13,6 +13,11 @@ export interface FilterParams {
   start_date?: string;
   end_date?: string;
   date_range?: [string, string];
+  filters?: Record<string, unknown>;
+  creator_name?: string;
+  ad_strategies?: string[];
+  content_types?: string[];
+  account?: string;
 }
 
 // 分页参数

@@ -53,7 +53,15 @@ def get_xhs_notes_list_get():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     if start_date and end_date:
-        filters['date_range'] = [start_date, end_date]
+        filters['start_date'] = start_date
+        filters['end_date'] = end_date
+
+    # 发布时间范围
+    publish_start_date = request.args.get('publish_start_date')
+    publish_end_date = request.args.get('publish_end_date')
+    if publish_start_date and publish_end_date:
+        filters['publish_start_date'] = publish_start_date
+        filters['publish_end_date'] = publish_end_date
 
     # 创作者筛选
     creator = request.args.get('creator')
@@ -95,6 +103,18 @@ def _process_xhs_notes_list(data):
     print('=== [DEBUG] 小红书笔记列表 API ===')
     print(f'[DEBUG] 接收到的筛选条件: {filters}')
     print(f'[DEBUG] 分页参数: page={page}, page_size={page_size}')
+
+    # 兼容 start_date/end_date 格式（前端传递的参数名）
+    if 'start_date' in filters and 'end_date' in filters:
+        filters['date_range'] = [filters['start_date'], filters['end_date']]
+    elif 'date_range' not in filters:
+        filters['date_range'] = None
+
+    # 兼容 publish_start_date/publish_end_date 格式（前端传递的参数名）
+    if 'publish_start_date' in filters and 'publish_end_date' in filters:
+        filters['publish_date_range'] = [filters['publish_start_date'], filters['publish_end_date']]
+    elif 'publish_date_range' not in filters:
+        filters['publish_date_range'] = None
 
     try:
         # 构建基础查询（应用筛选条件）

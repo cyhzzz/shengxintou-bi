@@ -10,7 +10,7 @@ import { DataFreshnessIndicator } from '@/components/DataFreshness';
 import { DATA_TYPES, type DataType } from './constants';
 import styles from './index.module.scss';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const DataImportPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<DataType>('tencent_ads');
@@ -47,14 +47,28 @@ const DataImportPage: React.FC = () => {
       <Row gutter={24}>
         <Col xs={24} lg={10}>
           <Card className={styles.selectorCard}>
-            <Title level={4}>选择数据类型</Title>
+            <div className={styles.cardHeader}>
+              <Text type="secondary" className={styles.cardTitle}>
+                📁 选择数据类型
+              </Text>
+              <Text type="secondary" className={styles.cardDesc}>
+                选择要导入的数据类型
+              </Text>
+            </div>
             <DataTypeSelector selected={selectedType} onChange={setSelectedType} />
           </Card>
         </Col>
 
         <Col xs={24} lg={14}>
           <Card className={styles.uploadCard}>
-            <Title level={4}>上传文件 - {selectedTypeInfo?.label}</Title>
+            <div className={styles.cardHeader}>
+              <Text type="secondary" className={styles.cardTitle}>
+                📤 上传文件
+              </Text>
+              <Text type="secondary" className={styles.cardDesc}>
+                {selectedTypeInfo?.label} - 上传数据文件
+              </Text>
+            </div>
             <FileUploader dataType={selectedType} onImportSuccess={handleImportSuccess} />
           </Card>
         </Col>

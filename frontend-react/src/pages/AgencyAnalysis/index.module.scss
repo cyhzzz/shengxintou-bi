@@ -16,6 +16,22 @@
 
     .ant-statistic {
       min-height: 60px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ant-statistic-title {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+      white-space: nowrap;
+    }
+
+    .ant-statistic-content {
+      display: flex;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 4px;
     }
 
     .ant-statistic-content-value {
@@ -23,6 +39,20 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .ant-statistic-content-prefix {
+      margin-right: 2px;
+    }
+  }
+}
+
+.metricCard {
+  :global {
+    .ant-card-body {
+      padding: 16px 20px;
     }
   }
 }
@@ -31,20 +61,49 @@
   margin-bottom: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  // 隐藏默认标题头
+  :global {
+    .ant-card-head {
+      display: none;
+    }
+  }
 }
 
+.tableCard {
+  margin-top: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  // 隐藏默认标题头
+  :global {
+    .ant-card-head {
+      display: none;
+    }
+  }
+}
+
+// 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .cardTitle {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
+}
+
+.cardDesc {
+  font-size: 12px;
+  color: #bfbfbf !important;
 }
 
 .controlLabel {

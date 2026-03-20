@@ -2,7 +2,7 @@
  * 小红书笔记列表页面
  * 提供笔记搜索、筛选、分页和导出功能
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -14,12 +14,15 @@ import {
   DatePicker,
   Tag,
   Tooltip,
+  Modal,
+  Descriptions,
 } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
   DownloadOutlined,
   LinkOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { dataService } from '@/services/dataService';
@@ -67,6 +70,51 @@ const XhsNotesListPage: React.FC = () => {
   const [adStrategyOptions, setAdStrategyOptions] = useState<string[]>([]);
   const [accountOptions, setAccountOptions] = useState<string[]>([]);
 
+  // 详情弹窗状态
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<XhsNotesListItem | null>(null);
+
+  // 排序状态
+  const [sorter, setSorter] = useState<{ field?: string; order?: 'ascend' | 'descend' }>({});
+
+  // 前端排序后的数据
+  const sortedData = useMemo(() => {
+    if (!sorter.field || !sorter.order) {
+      return data;
+    }
+
+    return [...data].sort((a, b) => {
+      const aValue = a[sorter.field as keyof XhsNotesListItem];
+      const bValue = b[sorter.field as keyof XhsNotesListItem];
+
+      // 处理空值
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return sorter.order === 'ascend' ? 1 : -1;
+      if (bValue == null) return sorter.order === 'ascend' ? -1 : 1;
+
+      // 数值比较
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sorter.order === 'ascend' ? aValue - bValue : bValue - aValue;
+      }
+
+      // 字符串比较
+      const aStr = String(aValue);
+      const bStr = String(bValue);
+      const comparison = aStr.localeCompare(bStr);
+      return sorter.order === 'ascend' ? comparison : -comparison;
+    });
+  }, [data, sorter]);
+
+  // 使用 ref 来存储最新的筛选条件（用于导出）
+  const filtersRef = useRef({
+    dataDateRange: ['', ''] as [string, string],
+    publishDateRange: ['', ''] as [string, string],
+    selectedCreators: [] as string[],
+    selectedContentTypes: [] as string[],
+    selectedAdStrategies: [] as string[],
+    selectedAccount: '',
+  });
+
   // 加载枚举值（从后端API响应中获取）
   const loadEnums = useCallback(async () => {
     try {
@@ -102,6 +150,16 @@ const XhsNotesListPage: React.FC = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // 更新 filtersRef
+      filtersRef.current = {
+        dataDateRange,
+        publishDateRange,
+        selectedCreators,
+        selectedContentTypes,
+        selectedAdStrategies,
+        selectedAccount,
+      };
+
       // 构建筛选条件
       const filters: Record<string, unknown> = {};
 
@@ -138,12 +196,6 @@ const XhsNotesListPage: React.FC = () => {
       }
 
       // 后端期望的请求格式: { filters: {...}, page, page_size }
-      const requestBody = {
-        filters,
-        page,
-        page_size: pageSize,
-      };
-
       const response = await dataService.getXhsNotesList({
         filters,
         page,
@@ -213,12 +265,87 @@ const XhsNotesListPage: React.FC = () => {
     }
   };
 
+  // 获取筛选后的全部数据（用于导出）
+  const fetchAllDataForExport = useCallback(async (): Promise<XhsNotesListItem[]> => {
+    const filters = filtersRef.current;
+    const allItems: XhsNotesListItem[] = [];
+    const exportPageSize = 10000;
+    let currentPage = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const filterParams: Record<string, unknown> = {};
+
+      if (filters.dataDateRange[0] && filters.dataDateRange[1]) {
+        filterParams.start_date = filters.dataDateRange[0];
+        filterParams.end_date = filters.dataDateRange[1];
+      }
+
+      if (filters.publishDateRange[0] && filters.publishDateRange[1]) {
+        filterParams.publish_start_date = filters.publishDateRange[0];
+        filterParams.publish_end_date = filters.publishDateRange[1];
+      }
+
+      if (filters.selectedCreators.length > 0) {
+        filterParams.creators = filters.selectedCreators;
+      }
+
+      if (filters.selectedContentTypes.length > 0) {
+        filterParams.content_types = filters.selectedContentTypes;
+      }
+
+      if (filters.selectedAdStrategies.length > 0) {
+        filterParams.ad_strategies = filters.selectedAdStrategies;
+      }
+
+      if (filters.selectedAccount && filters.selectedAccount !== '全部') {
+        filterParams.account = filters.selectedAccount;
+      }
+
+      const response = await dataService.getXhsNotesList({
+        filters: filterParams,
+        page: currentPage,
+        page_size: exportPageSize,
+      });
+
+      if (response.success && response.data) {
+        const responseData = response.data as {
+          notes?: XhsNotesListItem[];
+          pagination?: { page: number; page_size: number; total: number; total_pages?: number };
+        };
+        const items = responseData.notes || [];
+        allItems.push(...items);
+        const returnedTotal = responseData.pagination?.total || 0;
+        if (allItems.length >= returnedTotal || items.length < exportPageSize) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return allItems;
+  }, []);
+
   // 导出CSV（包含所有24列）
-  const handleExport = () => {
-    if (!data.length) {
+  const handleExport = async () => {
+    if (total === 0) {
       message.warning('暂无数据可导出');
       return;
     }
+
+    const hideLoading = message.loading('正在导出，请稍候...', 0);
+
+    try {
+      // 获取筛选后的全部数据
+      const allData = await fetchAllDataForExport();
+
+      if (allData.length === 0) {
+        message.warning('暂无数据可导出');
+        return;
+      }
 
     const headers = [
       '笔记ID',
@@ -248,7 +375,7 @@ const XhsNotesListPage: React.FC = () => {
 
     const csvContent = [
       headers.join(','),
-      ...data.map((item) =>
+      ...allData.map((item) =>
         [
           item.note_id || '',
           `"${(item.note_title || '').replace(/"/g, '""')}"`,
@@ -286,7 +413,13 @@ const XhsNotesListPage: React.FC = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    message.success('导出成功');
+    message.success(`导出成功，共 ${allData.length} 条数据`);
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败，请重试');
+    } finally {
+      hideLoading();
+    }
   };
 
   // 表格列配置（24列，与旧版前端一致）
@@ -297,6 +430,7 @@ const XhsNotesListPage: React.FC = () => {
       key: 'note_id',
       width: 120,
       fixed: 'left' as const,
+      ellipsis: true,
       render: (text: string) => text || '-',
     },
     {
@@ -320,14 +454,9 @@ const XhsNotesListPage: React.FC = () => {
       title: '笔记类型',
       dataIndex: 'note_type',
       key: 'note_type',
-      width: 80,
-      render: (text: string) => text ? <Tag color={text === '视频' ? 'blue' : 'green'}>{text}</Tag> : '-',
-    },
-    {
-      title: '内容类型',
-      dataIndex: 'content_type',
-      key: 'content_type',
-      width: 80,
+      width: 90,
+      ellipsis: true,
+      sorter: true,
       render: (text: string) => text ? <Tag color={text === '视频' ? 'blue' : 'green'}>{text}</Tag> : '-',
     },
     {
@@ -336,6 +465,7 @@ const XhsNotesListPage: React.FC = () => {
       key: 'creator_name',
       width: 100,
       ellipsis: true,
+      sorter: true,
       render: (text: string, record: XhsNotesListItem) => text || record.producer || '-',
     },
     {
@@ -344,6 +474,7 @@ const XhsNotesListPage: React.FC = () => {
       key: 'ad_strategy',
       width: 120,
       ellipsis: true,
+      sorter: true,
       render: (text: string) => text || '-',
     },
     {
@@ -352,6 +483,7 @@ const XhsNotesListPage: React.FC = () => {
       key: 'publish_account',
       width: 100,
       ellipsis: true,
+      sorter: true,
       render: (text: string) => text || '-',
     },
     {
@@ -359,6 +491,8 @@ const XhsNotesListPage: React.FC = () => {
       dataIndex: 'publish_time',
       key: 'publish_time',
       width: 120,
+      ellipsis: true,
+      sorter: true,
       render: (text: string) => text || '-',
     },
     {
@@ -367,6 +501,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'impressions',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -375,6 +511,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'clicks',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -383,6 +521,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'click_rate',
       width: 90,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value ? `${value.toFixed(2)}%` : '-',
     },
     {
@@ -391,6 +531,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'interactions',
       width: 90,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -399,6 +541,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'cost',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value ? `¥${value.toFixed(2)}` : '-',
     },
     {
@@ -407,6 +551,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'ad_impressions',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -415,6 +561,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'ad_clicks',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -423,6 +571,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'ad_click_rate',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value ? `${value.toFixed(2)}%` : '-',
     },
     {
@@ -431,6 +581,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'ad_interactions',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -439,6 +591,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'private_messages',
       width: 100,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -447,6 +601,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'lead_users',
       width: 110,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -455,6 +611,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'customer_mouth_users',
       width: 130,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -463,6 +621,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'add_wechat_cost',
       width: 90,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value ? `¥${value.toFixed(2)}` : '-',
     },
     {
@@ -471,6 +631,8 @@ const XhsNotesListPage: React.FC = () => {
       key: 'opened_account_users',
       width: 90,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -479,15 +641,29 @@ const XhsNotesListPage: React.FC = () => {
       key: 'open_account_cost',
       width: 90,
       align: 'right' as const,
+      ellipsis: true,
+      sorter: true,
       render: (value: number) => value ? `¥${value.toFixed(2)}` : '-',
     },
     {
       title: '操作',
       key: 'actions',
-      width: 80,
+      width: 100,
       fixed: 'right' as const,
+      ellipsis: false,
       render: (_: unknown, record: XhsNotesListItem) => (
         <Space>
+          <Tooltip title="查看详情">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => {
+                setSelectedRecord(record);
+                setDetailModalVisible(true);
+              }}
+            />
+          </Tooltip>
           {record.note_url && (
             <Tooltip title="查看笔记">
               <Button
@@ -648,7 +824,7 @@ const XhsNotesListPage: React.FC = () => {
         </div>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={sortedData}
           rowKey="note_id"
           loading={loading}
           scroll={{ x: 2500 }}
@@ -661,12 +837,145 @@ const XhsNotesListPage: React.FC = () => {
             showTotal: (t) => `共 ${t.toLocaleString()} 条`,
             pageSizeOptions: ['10', '20', '50', '100'],
           }}
-          onChange={(pagination) => {
+          onChange={(pagination, _filters, sorterResult) => {
             setPage(pagination.current || 1);
             setPageSize(pagination.pageSize || 50);
+            // 处理排序 - Ant Design v5 sorterResult 直接是排序结果对象
+            if (sorterResult && typeof sorterResult === 'object' && 'columnKey' in sorterResult) {
+              const sorter = sorterResult as { columnKey?: string; field?: string; order?: 'ascend' | 'descend' };
+              const sortField = sorter.columnKey || sorter.field;
+              if (sortField && sorter.order) {
+                setSorter({ field: sortField, order: sorter.order });
+              } else {
+                setSorter({});
+              }
+            } else {
+              // 点击清除排序
+              setSorter({});
+            }
           }}
         />
       </Card>
+
+      {/* 详情弹窗 */}
+      <Modal
+        title="笔记详情"
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {selectedRecord && (
+          <Descriptions column={2} bordered size="small">
+            {/* 基本信息 */}
+            <Descriptions.Item label="笔记ID" span={2}>
+              {selectedRecord.note_id || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="笔记标题" span={2}>
+              {selectedRecord.note_title || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="笔记链接" span={2}>
+              {selectedRecord.note_url ? (
+                <a href={selectedRecord.note_url} target="_blank" rel="noopener noreferrer">
+                  {selectedRecord.note_url}
+                </a>
+              ) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="笔记类型">
+              {selectedRecord.note_type ? (
+                <Tag color={selectedRecord.note_type === '视频' ? 'blue' : 'green'}>
+                  {selectedRecord.note_type}
+                </Tag>
+              ) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="内容类型">
+              {selectedRecord.content_type ? (
+                <Tag color={selectedRecord.content_type === '视频' ? 'blue' : 'green'}>
+                  {selectedRecord.content_type}
+                </Tag>
+              ) : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="创作者">
+              {selectedRecord.creator_name || selectedRecord.producer || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="广告策略">
+              {selectedRecord.ad_strategy || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="笔记账号">
+              {selectedRecord.publish_account || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="发布时间">
+              {selectedRecord.publish_time || '-'}
+            </Descriptions.Item>
+
+            {/* 总量指标 */}
+            <Descriptions.Item label="总展现量">
+              {selectedRecord.impressions?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="总阅读量">
+              {selectedRecord.reads?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="总点击量">
+              {selectedRecord.clicks?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="总点击率">
+              {selectedRecord.click_rate ? `${selectedRecord.click_rate.toFixed(2)}%` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="总互动量">
+              {selectedRecord.interactions?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="消费金额">
+              {selectedRecord.cost != null ? `¥${selectedRecord.cost.toLocaleString()}` : '-'}
+            </Descriptions.Item>
+
+            {/* 推广数据 */}
+            <Descriptions.Item label="推广展现量">
+              {selectedRecord.ad_impressions?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="推广阅读量">
+              {selectedRecord.ad_reads?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="推广点击量">
+              {selectedRecord.ad_clicks?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="推广点击率">
+              {selectedRecord.ad_click_rate ? `${selectedRecord.ad_click_rate.toFixed(2)}%` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="推广互动量">
+              {selectedRecord.ad_interactions?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="私信进线人数">
+              {selectedRecord.private_messages?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+
+            {/* 转化数据 */}
+            <Descriptions.Item label="添加企微人数">
+              {selectedRecord.lead_users?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="企微成功添加人数">
+              {selectedRecord.customer_mouth_users?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="加微成本">
+              {selectedRecord.add_wechat_cost != null ? `¥${selectedRecord.add_wechat_cost.toFixed(2)}` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="开户人数">
+              {selectedRecord.opened_account_users?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="开户成本">
+              {selectedRecord.open_account_cost != null ? `¥${selectedRecord.open_account_cost.toFixed(2)}` : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="投放标签用户数">
+              {selectedRecord.ad_tag_users?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="资产用户数">
+              {selectedRecord.customer_assets_users?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="资产金额">
+              {selectedRecord.customer_assets_amount?.toLocaleString() ?? '-'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
     </div>
   );
 };

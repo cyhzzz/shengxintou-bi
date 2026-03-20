@@ -110,8 +110,7 @@ const ConversionFunnelPage: React.FC = () => {
     try {
       const filterParams = filters
         ? {
-            start_date: filters.startDate,
-            end_date: filters.endDate,
+            date_range: [filters.startDate, filters.endDate] as [string, string],
             platforms: filters.platforms,
             agencies: filters.agencies,
             business_models: filters.businessModels,
@@ -184,56 +183,60 @@ const ConversionFunnelPage: React.FC = () => {
           onReset={handleReset}
         />
 
-        {/* 核心指标卡片 */}
-        {coreMetrics && (
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            {!isEmployeeMode && (
-              <Col xs={12} sm={6}>
-                <Card size="small" className={styles.metricCard}>
-                  <Statistic
-                    title="投入金额"
-                    value={coreMetrics.cost}
-                    precision={2}
-                    prefix="¥"
-                    valueStyle={{ color: '#1890ff', fontSize: 20 }}
-                  />
-                </Card>
-              </Col>
-            )}
-            <Col xs={12} sm={isEmployeeMode ? 8 : 6}>
-              <Card size="small" className={styles.metricCard}>
-                <Statistic
-                  title="新增线索"
-                  value={coreMetrics.lead_users}
-                  valueStyle={{ color: '#1890ff', fontSize: 20 }}
-                />
-              </Card>
-            </Col>
-            <Col xs={12} sm={isEmployeeMode ? 8 : 6}>
-              <Card size="small" className={styles.metricCard}>
-                <Statistic
-                  title="新开客户数"
-                  value={coreMetrics.opened_account_users}
-                  valueStyle={{ color: '#1890ff', fontSize: 20 }}
-                />
-              </Card>
-            </Col>
-            <Col xs={12} sm={isEmployeeMode ? 8 : 6}>
-              <Card size="small" className={styles.metricCard}>
-                <Statistic
-                  title="新增有效户数"
-                  value={coreMetrics.valid_customer_users}
-                  valueStyle={{ color: '#52c41a', fontSize: 20 }}
-                />
-              </Card>
-            </Col>
-          </Row>
-        )}
+        {/* 核心指标卡片 - 始终显示（与旧版保持一致） */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={12} sm={6}>
+            <Card size="small" className={styles.metricCard}>
+              <Statistic
+                title="投入金额"
+                value={coreMetrics?.cost ?? 0}
+                precision={2}
+                prefix="¥"
+                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card size="small" className={styles.metricCard}>
+              <Statistic
+                title="新增线索"
+                value={coreMetrics?.lead_users ?? 0}
+                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card size="small" className={styles.metricCard}>
+              <Statistic
+                title="新开客户数"
+                value={coreMetrics?.opened_account_users ?? 0}
+                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card size="small" className={styles.metricCard}>
+              <Statistic
+                title="新增有效户数"
+                value={coreMetrics?.valid_customer_users ?? 0}
+                styles={{ content: { color: '#52c41a', fontSize: 20 } }}
+              />
+            </Card>
+          </Col>
+        </Row>
 
         {/* 漏斗图和转化率数据 */}
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={12}>
-            <Card title="转化率数据" className={styles.detailCard}>
+            <Card className={styles.detailCard}>
+              <div className={styles.cardHeader}>
+                <Text type="secondary" className={styles.cardTitle}>
+                  📊 转化率数据
+                </Text>
+                <Text type="secondary" className={styles.cardDesc}>
+                  各阶段转化情况
+                </Text>
+              </div>
               <div className={styles.funnelTable}>
                 {funnelData.map((stage, index) => {
                   const nextStage = funnelData[index + 1];
@@ -258,7 +261,7 @@ const ConversionFunnelPage: React.FC = () => {
                               '0%': '#1890ff',
                               '100%': '#096dd9',
                             }}
-                            trailColor="#f0f2f5"
+                            railColor="#f0f2f5"
                             size="small"
                           />
                         </div>
@@ -280,7 +283,7 @@ const ConversionFunnelPage: React.FC = () => {
             </Card>
           </Col>
           <Col xs={24} lg={12}>
-            <ChartCard title="转化漏斗" loading={loading} height={400}>
+            <ChartCard title="📈 转化漏斗" loading={loading} height={400} useCustomTitle>
               <FunnelChart data={funnelData.map(s => ({
                 name: s.step,
                 count: s.value,
@@ -292,11 +295,18 @@ const ConversionFunnelPage: React.FC = () => {
             {/* 合并转化率 */}
             {combinedRates && (
               <Card
-                title={<Text strong style={{ color: '#1890ff' }}>合并转化率</Text>}
-                className={styles.combinedRatesCard}
+                className={`${styles.combinedRatesCard} ${styles.withCustomHeader}`}
                 style={{ marginTop: 16 }}
                 size="small"
               >
+                <div className={styles.cardHeader}>
+                  <Text type="secondary" className={styles.cardTitle}>
+                    💼 合并转化率
+                  </Text>
+                  <Text type="secondary" className={styles.cardDesc}>
+                    全链路转化情况
+                  </Text>
+                </div>
                 <div className={styles.combinedRates}>
                   {'impressionToLeadRate' in combinedRates && (
                     <div className={styles.rateItem}>

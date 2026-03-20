@@ -278,6 +278,8 @@ export interface XhsNotesListItem {
   customer_assets_amount?: number;
   // 推广数据（投放）
   ad_impressions?: number;
+  ad_reads?: number;
+  ad_tag_users?: number;
   ad_clicks?: number;
   ad_interactions?: number;
   ad_click_rate?: number;
@@ -477,9 +479,9 @@ export interface EmployeeConversionTrend {
  * 员工转化率走势数据（与小红书报表格式一致）
  */
 export interface EmployeeConversionRateTrend {
-  weeks: string[];
+  periods: string[];  // 周度(YYYY-WW) 或 月度(YYYY-MM) 格式
   employees: string[];
-  series: number[][]; // 每个员工的周度转化率数据
+  series: number[][]; // 每个员工的转化率数据
 }
 
 /**

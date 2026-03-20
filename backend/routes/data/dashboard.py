@@ -592,7 +592,10 @@ def get_dashboard_core_metrics():
                                                     is_cost_metric=True),
                 'cost_per_lead': calc_wow(cost_per_lead,
                                            (prev_cost / prev_leads) if prev_leads > 0 else 0,
-                                           is_cost_metric=True)
+                                           is_cost_metric=True),
+                'cost_per_account': calc_wow(cost_per_customer,
+                                              (prev_cost / prev_opened) if prev_opened > 0 else 0,
+                                              is_cost_metric=True)
             }
         else:
             # "全部"模式：不计算环比，返回默认值
@@ -607,7 +610,8 @@ def get_dashboard_core_metrics():
                 'customer_contribution': {'value': 0, 'trend': 'up', 'color': 'green'},
                 'existing_customers_assets': {'value': 0, 'trend': 'up', 'color': 'green'},
                 'cost_per_valid_account': {'value': 0, 'trend': 'up', 'color': 'green'},
-                'cost_per_lead': {'value': 0, 'trend': 'up', 'color': 'green'}
+                'cost_per_lead': {'value': 0, 'trend': 'up', 'color': 'green'},
+                'cost_per_account': {'value': 0, 'trend': 'up', 'color': 'green'}
             }
 
         return jsonify({

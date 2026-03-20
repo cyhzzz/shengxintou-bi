@@ -17,15 +17,47 @@
   flex-direction: column;
 }
 
+// 卡片标题区域样式 - 与 Dashboard 保持一致
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
+}
+
+.cardDesc {
+  font-size: 12px;
+  color: #bfbfbf !important;
+}
+
 .panelHeader {
   padding: 16px 20px;
   border-bottom: 1px solid #e8e8e8;
 
+  // 使用新的标题样式
+  .cardHeader {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
   h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #303133;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8A8D99 !important;
   }
 }
 
@@ -117,12 +149,21 @@
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid #e8e8e8;
+
+  // 使用新的标题样式
+  .cardHeader {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
 }
 
 .previewTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
 }
 
 .previewActions {

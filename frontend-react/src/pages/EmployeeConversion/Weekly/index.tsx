@@ -2,7 +2,7 @@
  * 员工转化周报页面
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, DatePicker, Button, Select, Space, message } from 'antd';
+import { Card, DatePicker, Button, Select, Space, message, Typography } from 'antd';
 import { CopyOutlined, FileWordOutlined, FileExcelOutlined, PictureOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
@@ -10,6 +10,8 @@ import PosterExportButtons from './components/PosterExportButtons';
 import { postEmployeeConversionWeekly } from '@/types/api';
 import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
 import styles from './index.module.scss';
+
+const { Text } = Typography;
 
 const { RangePicker } = DatePicker;
 
@@ -223,12 +225,16 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       </Card>
 
       {/* 周报内容卡片 */}
-      <Card
-        className={styles.reportCard}
-        title="周报内容"
-        extra={
-          reportData && (
-            <Space>
+      <Card className={styles.reportCard}>
+        <div className={styles.cardHeader}>
+          <Text type="secondary" className={styles.cardTitle}>
+            📋 周报内容
+          </Text>
+          <Text type="secondary" className={styles.cardDesc}>
+            员工转化周报详情
+          </Text>
+          {reportData && (
+            <Space style={{ marginLeft: 'auto' }}>
               <Button icon={<CopyOutlined />} onClick={handleCopy}>
                 复制报告
               </Button>
@@ -239,9 +245,8 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
                 导出Excel
               </Button>
             </Space>
-          )
-        }
-      >
+          )}
+        </div>
         {/* 海报导出按钮 */}
         {reportData && (
           <PosterExportButtons

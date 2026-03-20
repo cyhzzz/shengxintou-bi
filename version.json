@@ -1,82 +1,72 @@
 {
-  "version": "0.9.4",
-  "release_date": "2026-03-10",
+  "version": "1.0.0",
+  "release_date": "2026-03-20",
   "changelog": [
-    "✨ 新增员工转化报表，支持多维度转化分析",
-    "✨ 转化漏斗新增服务人员维度，支持按服务人员分析转化情况",
-    "✨ 平台厂商聚合表新增用户贡献字段",
-    "🔧 修复员工转化报表部分前端样式问题",
-    "🔧 优化转化漏斗页面样式"
+    "✅ 完成前端架构重构：旧版原生JS迁移至React + TypeScript + Vite",
+    "✅ 新增WSGI中间件修复双重/api/路径问题",
+    "✅ Flask静态文件路由调整：正确服务/js/、/libs/、/assets/路径",
+    "✅ 修复旧版JS getAPIUrl双重前缀问题",
+    "✅ 便携版打包脚本全面优化：排除旧启动器、测试脚本、构建工具",
+    "🔧 修复前端TypeScript类型错误（若干strict检查问题）",
+    "🔧 修复运营分析页面大量possibly undefined错误"
   ],
   "major_changes": [
     {
-      "type": "feature",
-      "description": "员工转化报表",
+      "type": "architecture",
+      "description": "前端架构迁移完成",
       "details": {
-        "function": "新增员工转化报表，支持按服务人员维度分析转化漏斗",
-        "metrics": "线索数、开口数、有效线索数、开户数、有效户数等转化指标",
-        "dimensions": "支持按日期、服务人员、平台等多维度筛选分析"
-      }
-    },
-    {
-      "type": "feature",
-      "description": "转化漏斗服务人员维度",
-      "details": {
-        "new_dimension": "服务人员（添加员工姓名）维度",
-        "benefit": "支持按服务人员分析客户转化情况，便于绩效考核"
-      }
-    },
-    {
-      "type": "feature",
-      "description": "平台厂商聚合表新增字段",
-      "details": {
-        "new_field": "用户贡献（customer_contribution）字段",
-        "data_source": "backend_conversions 表的 customer_contribution 字段"
-      }
-    },
-    {
-      "type": "refactor",
-      "description": "字段重命名",
-      "details": {
-        "change": "click_users 重命名为 clicks",
-        "reason": "字段命名统一，保持一致性"
+        "from": "原生JavaScript + ECharts",
+        "to": "React 19 + TypeScript + Vite + Ant Design",
+        "status": "生产环境使用新前端"
       }
     },
     {
       "type": "bugfix",
-      "description": "样式修复",
+      "description": "Flask路由问题修复",
       "details": {
         "fixes": [
-          "员工转化报表部分前端样式问题",
-          "转化漏斗页面样式优化"
+          "WSGI中间件修复/api/api/双重前缀问题",
+          "新增/js/、/libs/、/assets/显式路由",
+          "旧版JS getAPIUrl函数修正"
         ]
+      }
+    },
+    {
+      "type": "refactor",
+      "description": "便携版打包脚本优化",
+      "details": {
+        "excluded": [
+          "旧启动器脚本(launcher_debug.py, launcher_new.py)",
+          "旧exe文件(省心投-开发版.exe等)",
+          "所有测试脚本",
+          "构建工具脚本",
+          "旧前端源码目录(frontend/)"
+        ],
+        "included": "新启动器省心投启动器.exe"
       }
     }
   ],
   "upgrade_notes": [
-    "✅ 新增员工转化报表，在菜单中可直接访问",
-    "✅ 转化漏斗新增服务人员筛选维度",
-    "✅ 数据库字段已更新，click_users 已重命名为 clicks",
-    "📋 用户贡献字段已添加到平台厂商聚合表"
+    "✅ 前端已迁移至React + TypeScript，技术栈全面升级",
+    "✅ 便携版启动器已重新构建",
+    "✅ 打包脚本已排除所有旧文件和测试脚本",
+    "📋 Vite构建产物位于frontend-react/dist/"
   ],
   "cloud_version_file": "version_cloud.json",
   "update_url": "",
   "support_contact": "产品经理 陈元昊",
   "technical_details": {
     "backend_changes": [
-      "backend/routes/data/ - 新增员工转化报表 API",
-      "backend/routes/data/employee_conversion_helpers.py - 员工转化数据处理",
-      "backend/scripts/aggregations/update_daily_metrics_unified.py - 新增用户贡献字段"
+      "app.py - WSGI中间件、静态文件路由、before_request处理"
     ],
     "frontend_changes": [
-      "frontend/js/reports/EmployeeConversionAnalysis.js - 员工转化报表",
-      "frontend/js/reports/EmployeeConversionWeekly.js - 员工转化周报表",
-      "frontend/js/reports/ConversionFunnelReport.js - 转化漏斗新增服务人员维度"
+      "frontend-react/ - React + TypeScript新前端",
+      "frontend-react/dist/ - Vite构建产物（生产使用）"
     ],
-    "database_changes": [
-      "daily_metrics_unified.opened_account_contribution - 新增用户贡献字段",
-      "字段重命名: click_users -> clicks"
+    "build_changes": [
+      "打包脚本新增启动器存在性检查",
+      "排除规则全面清理"
     ],
-    "completion_time": "2026-03-10"
+    "completion_time": "2026-03-20"
   }
 }

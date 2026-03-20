@@ -13,18 +13,66 @@
     <!-- 旧版 JS 加载器 - 从Flask后端(端口5000)加载旧前端JS文件 -->
     <script>
       (function() {
-        // 开发模式：Flask后端运行在 localhost:5000，提供旧前端静态文件
-        // 生产模式：同样由Flask服务器提供
-        var legacyBase = 'http://localhost:5000/js';
+        // 根据端口判断使用哪种路径
+        // Flask 生产模式 (5000): /static/js/...
+        // Vite 开发模式 (3000/5173): /js/...
+        var isFlaskProduction = window.location.port === '5000';
+        var legacyBase = isFlaskProduction ? '/static/js' : '/js';
+
+        // ECharts 延迟加载器（使用 Vite 的 ECharts 模块）
+        (function() {
+            var echartsLoaded = false;
+            var loadPromise = null;
+
+            window.loadECharts = function() {
+                if (echartsLoaded && window.echarts) {
+                    return Promise.resolve(window.echarts);
+                }
+
+                if (loadPromise) {
+                    return loadPromise;
+                }
+
+                // 优先尝试使用 Vite 预加载的 ECharts
+                loadPromise = new Promise(async (resolve, reject) => {
+                    try {
+                        // 动态导入 Vite 预处理的 echarts 模块
+                        const echarts = await import('/node_modules/.vite/deps/echarts.js');
+                        window.echarts = echarts;
+                        echartsLoaded = true;
+                        console.log('[legacy-loader] ECharts 已加载 (from Vite)');
+                        resolve(echarts);
+                    } catch (e) {
+                        console.warn('[legacy-loader] Vite ECharts 加载失败，尝试从 Flask 加载', e);
+                        // 备用：从 Flask 加载
+                        var script = document.createElement('script');
+                        script.src = (isFlaskProduction ? '/static' : '') + '/libs/echarts.min.js';
+                        script.onload = function() {
+                            echartsLoaded = true;
+                            console.log('[legacy-loader] ECharts 已加载 (from Flask)');
+                            resolve(window.echarts);
+                        };
+                        script.onerror = function() {
+                            reject(new Error('ECharts 加载失败'));
+                        };
+                        document.head.appendChild(script);
+                    }
+                });
+
+                return loadPromise;
+            };
+        })();
 
         // 核心工具文件（必须按顺序加载）
         var coreScripts = [
+          legacyBase + '/config.js',  // 全局配置（getAPIUrl等）
           legacyBase + '/utils/api.js',
           legacyBase + '/utils/EventManager.js',
           legacyBase + '/utils/MetadataManager.js',
           legacyBase + '/utils/chartHelper.js',
           legacyBase + '/utils/formatHelper.js',
           legacyBase + '/utils/dateHelper.js',
+          legacyBase + '/components/MultiSelectForm.js',  // 多选组件（混合模式跳过筛选器，但仍加载以防万一）
         ];
 
         // 报表类文件
@@ -67,6 +115,30 @@
         // 开始加载
         loadNext();
       })();
+
+      // 覆盖 getAPIUrl 函数，让旧版代码通过 Vite 代理发送请求
+      // 这必须在 config.js 加载后执行
+      window.addEventListener('DOMContentLoaded', function() {
+        // 原始 config.js 的逻辑是：/metadata -> http://127.0.0.1:5000/api/v1/metadata
+        // 我们需要让它通过 Vite 代理：/metadata -> http://localhost:3001/api/v1/metadata
+        window.getAPIUrl = function(endpoint) {
+          // 如果 endpoint 已经是完整 URL（包含 ://），直接返回
+          if (endpoint.includes('://')) {
+            return endpoint;
+          }
+          // 移除开头的斜杠
+          endpoint = endpoint.replace(/^\/+/, '');
+          // 如果已经是完整 API 路径，直接返回
+          if (endpoint.startsWith('api/v1/')) {
+            return window.location.origin + '/' + endpoint;
+          }
+          // 构建完整 URL（legacy 代码期望的格式）
+          // 原始逻辑：/metadata -> http://127.0.0.1:5000/api/v1/metadata
+          // 新逻辑：/metadata -> http://localhost:3001/api/v1/metadata
+          return window.location.origin + '/api/v1/' + endpoint;
+        };
+        console.log('[legacy-adapter] 已覆盖 getAPIUrl 函数:', window.getAPIUrl('/metadata'));
+      });
     </script>
   </head>
   <body>

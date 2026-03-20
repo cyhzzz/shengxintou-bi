@@ -41,13 +41,33 @@
 }
 
 .metricsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 20px;
+}
 
-  :global {
-    .ant-card {
-      border-radius: 8px;
-    }
-  }
+// 卡片标题区域样式 - 与 Dashboard 保持一致
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
+}
+
+.cardDesc {
+  font-size: 12px;
+  color: #bfbfbf !important;
 }
 
 .chartCard {
@@ -55,9 +75,10 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 
+  // 隐藏默认标题头
   :global {
-    h4 {
-      margin-bottom: 16px;
+    .ant-card-head {
+      display: none;
     }
   }
 }
@@ -66,6 +87,13 @@
   margin-top: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  // 隐藏默认标题头
+  :global {
+    .ant-card-head {
+      display: none;
+    }
+  }
 }
 
 .tableHeader {
@@ -84,6 +112,20 @@
   color: #666;
   font-size: 14px;
   margin-right: 16px;
+}
+
+// 排行榜卡片的 header 样式
+.tableCard .cardHeader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tableCard .cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .controlLabel {

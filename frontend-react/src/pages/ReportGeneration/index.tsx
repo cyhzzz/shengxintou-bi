@@ -336,7 +336,9 @@ const ReportGeneration: React.FC = () => {
       {/* 左侧控制面板 */}
       <div className={styles.controlPanel}>
         <div className={styles.panelHeader}>
-          <h3>报告配置</h3>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle}>⚙️ 报告配置</span>
+          </div>
         </div>
 
         <div className={styles.panelBody}>
@@ -421,7 +423,9 @@ const ReportGeneration: React.FC = () => {
       {/* 右侧预览画布 */}
       <div className={`${styles.previewPanel} ${isFullscreen ? styles.fullscreen : ''}`} ref={previewRef}>
         <div className={styles.previewHeader}>
-          <span className={styles.previewTitle}>报告预览</span>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle}>👁️ 报告预览</span>
+          </div>
           <div className={styles.previewActions}>
             <Button
               type="primary"
