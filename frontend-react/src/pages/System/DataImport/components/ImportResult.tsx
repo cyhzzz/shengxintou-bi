@@ -1,7 +1,6 @@
 /**
  * 导入结果展示组件
  */
-import React from 'react';
 import { Alert, Typography, Collapse, Tag } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import type { UploadResponse } from '@/types/api.schemas';
@@ -15,11 +14,11 @@ interface ImportResultProps {
 }
 
 const ImportResult: React.FC<ImportResultProps> = ({ result }) => {
-  const { success, message, data } = result;
+  const { success, data } = result;
 
   if (!data) return null;
 
-  const hasErrors = data.failed_count > 0;
+  const hasErrors = (data.failed_count ?? 0) > 0;
 
   return (
     <div className={styles.result}>
@@ -45,7 +44,7 @@ const ImportResult: React.FC<ImportResultProps> = ({ result }) => {
         style={{ marginBottom: 16 }}
       />
 
-      {hasErrors && data.errors.length > 0 && (
+      {hasErrors && data.errors && data.errors.length > 0 && (
         <Collapse className={styles.errorCollapse}>
           <Panel header={`错误详情 (${data.errors.length} 条)`} key="errors">
             <div className={styles.errorList}>

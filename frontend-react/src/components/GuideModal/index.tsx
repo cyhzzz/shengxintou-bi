@@ -78,7 +78,7 @@ const GuideModal: React.FC<GuideModalProps> = ({
     >
       {loading && (
         <div className={styles.loading}>
-          <Spin tip="加载中..." />
+          <Spin description="加载中..." />
         </div>
       )}
 

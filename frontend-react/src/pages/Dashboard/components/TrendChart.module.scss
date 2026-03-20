@@ -12,18 +12,48 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.chartTitleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
 .chartTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99;
   margin: 0;
+}
+
+.chartDesc {
+  font-size: 12px;
+  color: #bfbfbf;
 }
 
 .chartControls {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.metricGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metricGroupLabel {
+  font-size: 12px;
+  color: #8A8D99;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .controlGroup {
@@ -47,14 +77,25 @@
 }
 
 // 响应式
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
   .chartControls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .metricGroup {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .chartHeader {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
-  .controlGroup {
+  .metricGroup {
     width: 100%;
 
     :global(.ant-radio-group) {

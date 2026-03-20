@@ -3,7 +3,7 @@
  * 展示成本趋势数据，支持指标类型切换
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { Radio, Space, Card, Spin } from 'antd';
+import { Radio, Card, Spin } from 'antd';
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { TrendDataItem } from '@/types';
@@ -39,12 +39,28 @@ const METRIC_LABELS: Record<MetricType, string> = {
   cost_per_lead: '线索成本',
   cost_per_customer: '开户成本',
   cost_per_valid_account: '有效户成本',
-  investment: '阶段投入金额',
-  impressions: '总展示数',
-  clicks: '总点击数',
-  leads: '总线索数',
-  new_customers: '新开客户数',
+  investment: '阶段投入',
+  impressions: '展示数',
+  clicks: '点击数',
+  leads: '线索数',
+  new_customers: '新开客户',
 };
+
+// 指标分组配置
+const METRIC_GROUPS = [
+  {
+    label: '📊 前端投放',
+    metrics: ['investment', 'impressions', 'clicks', 'leads'] as MetricType[],
+  },
+  {
+    label: '💼 后端转化',
+    metrics: ['new_customers'] as MetricType[],
+  },
+  {
+    label: '⚡ 运营效率',
+    metrics: ['cost_per_lead', 'cost_per_customer', 'cost_per_valid_account'] as MetricType[],
+  },
+];
 
 // 是否为货币类型的指标
 const CURRENCY_METRICS: MetricType[] = [
@@ -124,7 +140,27 @@ const TrendChart: React.FC<TrendChartProps> = ({
           }),
           symbol: 'circle',
           symbolSize: 6,
+          itemStyle: {
+            color: 'rgb(24, 144, 255)',
+          },
           connectNulls: true, // 连接空值
+          lineStyle: {
+            color: 'rgb(24, 144, 255)',
+            width: 2,
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
+                { offset: 1, color: 'rgba(24, 144, 255, 0)' },
+              ],
+            },
+          },
         }))
       : [{
           name: METRIC_LABELS[localMetricType],
@@ -136,7 +172,27 @@ const TrendChart: React.FC<TrendChartProps> = ({
           }),
           symbol: 'circle',
           symbolSize: 6,
+          itemStyle: {
+            color: 'rgb(24, 144, 255)',
+          },
           connectNulls: true,
+          lineStyle: {
+            color: 'rgb(24, 144, 255)',
+            width: 2,
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
+                { offset: 1, color: 'rgba(24, 144, 255, 0)' },
+              ],
+            },
+          },
         }];
 
     return {
@@ -200,10 +256,10 @@ const TrendChart: React.FC<TrendChartProps> = ({
 
     return (
       <div className={styles.chartControls}>
-        <Space size="middle">
-          {/* 指标类型切换 */}
-          <div className={styles.controlGroup}>
-            <span className={styles.controlLabel}>指标:</span>
+        {/* 指标分组切换 */}
+        {METRIC_GROUPS.map((group) => (
+          <div key={group.label} className={styles.metricGroup}>
+            <span className={styles.metricGroupLabel}>{group.label}</span>
             <Radio.Group
               value={localMetricType}
               onChange={(e) => handleMetricTypeChange(e.target.value)}
@@ -211,34 +267,34 @@ const TrendChart: React.FC<TrendChartProps> = ({
               optionType="button"
               buttonStyle="solid"
             >
-              {Object.entries(METRIC_LABELS).map(([key, label]) => (
+              {group.metrics.map((metric) => (
+                <Radio.Button key={metric} value={metric}>
+                  {METRIC_LABELS[metric]}
+                </Radio.Button>
+              ))}
+            </Radio.Group>
+          </div>
+        ))}
+
+        {/* 粒度切换 */}
+        {onGranularityChange && (
+          <div className={styles.controlGroup}>
+            <span className={styles.controlLabel}>粒度:</span>
+            <Radio.Group
+              value={localGranularity}
+              onChange={(e) => handleGranularityChange(e.target.value)}
+              size="small"
+              optionType="button"
+              buttonStyle="solid"
+            >
+              {Object.entries(GRANULARITY_LABELS).map(([key, label]) => (
                 <Radio.Button key={key} value={key}>
                   {label}
                 </Radio.Button>
               ))}
             </Radio.Group>
           </div>
-
-          {/* 粒度切换 */}
-          {onGranularityChange && (
-            <div className={styles.controlGroup}>
-              <span className={styles.controlLabel}>粒度:</span>
-              <Radio.Group
-                value={localGranularity}
-                onChange={(e) => handleGranularityChange(e.target.value)}
-                size="small"
-                optionType="button"
-                buttonStyle="solid"
-              >
-                {Object.entries(GRANULARITY_LABELS).map(([key, label]) => (
-                  <Radio.Button key={key} value={key}>
-                    {label}
-                  </Radio.Button>
-                ))}
-              </Radio.Group>
-            </div>
-          )}
-        </Space>
+        )}
       </div>
     );
   };
@@ -251,7 +307,10 @@ const TrendChart: React.FC<TrendChartProps> = ({
       <Spin spinning={loading}>
         {/* 图表标题和控制栏 */}
         <div className={styles.chartHeader}>
-          <h3 className={styles.chartTitle}>{title}</h3>
+          <div className={styles.chartTitleGroup}>
+            <h3 className={styles.chartTitle}>📈 趋势分析</h3>
+            <span className={styles.chartDesc}>指标变化趋势</span>
+          </div>
           {renderControls()}
         </div>
 

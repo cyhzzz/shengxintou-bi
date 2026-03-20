@@ -6,14 +6,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   Table,
-  Row,
-  Col,
-  Statistic,
   Select,
   Button,
   Space,
   message,
   Spin,
+  Radio,
+  Typography,
 } from 'antd';
 import {
   UserOutlined,
@@ -24,6 +23,9 @@ import {
   SearchOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
+import MetricCard from '@/pages/Dashboard/components/MetricCard';
+
+const { Text } = Typography;
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
@@ -52,6 +54,8 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [leadType, setLeadType] = useState<string>('all');
+  // 员工转化率走势粒度
+  const [rateTrendGranularity, setRateTrendGranularity] = useState<'weekly' | 'monthly'>('weekly');
 
   // 筛选选项
   const [platformOptions, setPlatformOptions] = useState<string[]>([]);
@@ -61,6 +65,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   // 数据状态
   const [data, setData] = useState<EmployeeConversionAnalysisData | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // 员工转化率走势数据（独立状态，避免切换粒度时刷新整个页面）
+  const [employeeRateTrendData, setEmployeeRateTrendData] = useState<EmployeeConversionAnalysisData['employee_rate_trend'] | null>(null);
+  const [trendLoading, setTrendLoading] = useState(false);
 
   // 加载筛选选项
   const loadFilterOptions = useCallback(async () => {
@@ -91,12 +99,22 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 仅在组件挂载时执行一次
 
+  // 监听粒度变化，只刷新员工转化率走势数据
+  useEffect(() => {
+    // 跳过首次挂载（首次挂载由上面的 useEffect 处理）
+    if (data !== null) {
+      fetchEmployeeRateTrendOnly();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateTrendGranularity]);
+
   // 加载数据
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, unknown> = {
         lead_type: leadType,
+        granularity: rateTrendGranularity,
       };
 
       // 只有在有日期时才传递日期参数
@@ -117,6 +135,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
       if (response.success && response.data) {
         setData(response.data);
+        setEmployeeRateTrendData(response.data.employee_rate_trend);
       } else {
         message.error(response.message || '获取数据失败');
       }
@@ -126,7 +145,41 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, selectedPlatforms, selectedEmployees, leadType]);
+  }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity]);
+
+  // 仅获取员工转化率走势数据（用于粒度切换）
+  const fetchEmployeeRateTrendOnly = useCallback(async () => {
+    setTrendLoading(true);
+    try {
+      const params: Record<string, unknown> = {
+        lead_type: leadType,
+        granularity: rateTrendGranularity,
+      };
+
+      if (dateRange[0] && dateRange[1]) {
+        params.start_date = dateRange[0];
+        params.end_date = dateRange[1];
+      }
+
+      if (selectedPlatforms.length > 0) {
+        params.platforms = selectedPlatforms;
+      }
+      if (selectedEmployees.length > 0) {
+        params.employees = selectedEmployees;
+      }
+
+      const response: EmployeeConversionAnalysisResponse =
+        await postEmployeeConversionAnalysis(params);
+
+      if (response.success && response.data) {
+        setEmployeeRateTrendData(response.data.employee_rate_trend);
+      }
+    } catch (error) {
+      console.error('获取员工转化率走势数据失败:', error);
+    } finally {
+      setTrendLoading(false);
+    }
+  }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity]);
 
   // 处理查询
   const handleSearch = () => {
@@ -140,6 +193,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     setSelectedEmployees([]);
     setLeadType('all');
     setData(null);
+    setEmployeeRateTrendData(null);
     // 重置后重新加载数据（查询全部数据）
     setTimeout(() => {
       fetchData();
@@ -334,17 +388,21 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         bottom: '15%',
         containLabel: true,
       },
+      timeline: {
+        show: false,
+      },
     };
   }, [data?.conversion_trend]);
 
   // 员工转化率走势图配置
-  // 后端返回格式: { weeks: string[], employees: string[], series: number[][] }
+  // 后端返回格式: { periods: string[], employees: string[], series: number[][] }
+  // periods 格式: weekly="2025-03", monthly="2025-03"
   // 需要转换为图表需要的数组格式
   // 剔除总线索数低于50的员工
   const getEmployeeRateTrendData = () => {
-    if (!data?.employee_rate_trend?.weeks?.length) return [];
+    if (!employeeRateTrendData?.periods?.length) return [];
 
-    const { weeks, employees, series } = data.employee_rate_trend;
+    const { periods, employees, series } = employeeRateTrendData;
     const result: Array<{ date: string; value: number; category: string }> = [];
 
     // 从 ranking 数据中构建员工总线索数映射
@@ -366,14 +424,21 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       const empIdx = employees.indexOf(empName);
       if (empIdx === -1) return;
 
-      weeks.forEach((week, weekIdx) => {
-        // 格式化周标签：将 "2025-03" 转换为 "2025-第3周"
-        const [year, weekNum] = week.split('-');
-        const weekLabel = `${year}-第${weekNum}周`;
+      periods.forEach((period, periodIdx) => {
+        // 格式化周期标签
+        const [year, num] = period.split('-');
+        let periodLabel: string;
+        if (rateTrendGranularity === 'monthly') {
+          // 月度: "2025-03" -> "2025年03月"
+          periodLabel = `${year}年${num}月`;
+        } else {
+          // 周度: "2025-03" -> "2025-第3周"
+          periodLabel = `${year}-第${num}周`;
+        }
 
         result.push({
-          date: weekLabel,
-          value: series[empIdx]?.[weekIdx] ?? 0,
+          date: periodLabel,
+          value: series[empIdx]?.[periodIdx] ?? 0,
           category: empName,
         });
       });
@@ -462,8 +527,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         bottom: '15%',
         containLabel: true,
       },
+      timeline: {
+        show: false,
+      },
     };
-  }, [data?.employee_rate_trend, data?.ranking]);
+  }, [employeeRateTrendData, data?.ranking, rateTrendGranularity]);
 
   // 排行榜表格列配置
   const rankingColumns = [
@@ -642,60 +710,54 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* 核心指标卡片 */}
-      <Row gutter={16} className={styles.metricsRow}>
-        <Col xs={12} sm={8} md={6} lg={4}>
-          <Card>
-            <Statistic
-              title="总线索数"
-              value={data?.core_metrics?.total_leads || 0}
-              prefix={<UserOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={4}>
-          <Card>
-            <Statistic
-              title="开户数"
-              value={data?.core_metrics?.total_opened || 0}
-              prefix={<TeamOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={4}>
-          <Card>
-            <Statistic
-              title="平均开户率"
-              value={data?.core_metrics?.avg_opening_rate || 0}
-              suffix="%"
-              precision={2}
-              prefix={<RiseOutlined />}
-              valueStyle={{
-                color: (data?.core_metrics?.avg_opening_rate || 0) >= 10 ? '#52c41a' : '#666',
-              }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={6} lg={4}>
-          <Card>
-            <Statistic
-              title="总资产"
-              value={data?.core_metrics?.total_assets || 0}
-              prefix={<DollarOutlined />}
-              formatter={(value) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* 核心指标卡片 - 使用 MetricCard 保持与数据概览一致的风格 */}
+      <div className={styles.metricsRow}>
+        <MetricCard
+          title="总线索数"
+          value={data?.core_metrics?.total_leads || 0}
+          formatter="number"
+          icon={<UserOutlined style={{ color: '#f5222d' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="开户数"
+          value={data?.core_metrics?.total_opened || 0}
+          formatter="number"
+          icon={<TeamOutlined style={{ color: '#722ed1' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="平均开户率"
+          value={data?.core_metrics?.avg_opening_rate || 0}
+          formatter="percent"
+          icon={<RiseOutlined style={{ color: '#52c41a' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总资产"
+          value={data?.core_metrics?.total_assets || 0}
+          formatter="currency"
+          icon={<DollarOutlined style={{ color: '#fa8c16' }} />}
+          showWowChange={false}
+        />
+      </div>
 
       {loading ? (
-        <Spin spinning={loading} tip="加载中...">
+        <Spin spinning={loading} description="加载中...">
           <div style={{ height: 300 }} />
         </Spin>
       ) : (
         <>
           {/* 转化趋势图 */}
-          <Card className={styles.chartCard} title="整体转化走势（周度）">
+          <Card className={styles.chartCard}>
+            <div className={styles.cardHeader}>
+              <Text type="secondary" className={styles.cardTitle}>
+                📊 整体转化走势（周度）
+              </Text>
+              <Text type="secondary" className={styles.cardDesc}>
+                各周期转化数据趋势
+              </Text>
+            </div>
             {data?.conversion_trend?.weeks?.length ? (
               <EChartsComponent option={conversionTrendOption} height={300} />
             ) : (
@@ -706,8 +768,31 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           </Card>
 
           {/* 员工转化率走势图 */}
-          <Card className={styles.chartCard} title="员工开户转化率走势">
-            {data?.employee_rate_trend?.weeks?.length ? (
+          <Card className={styles.chartCard}>
+            <div className={styles.cardHeader}>
+              <Text type="secondary" className={styles.cardTitle}>
+                📈 员工开户转化率走势
+              </Text>
+              <Text type="secondary" className={styles.cardDesc}>
+                各员工转化率变化
+              </Text>
+              <Radio.Group
+                value={rateTrendGranularity}
+                onChange={(e) => setRateTrendGranularity(e.target.value)}
+                size="small"
+                optionType="button"
+                buttonStyle="solid"
+                style={{ marginLeft: 'auto' }}
+              >
+                <Radio.Button value="weekly">周</Radio.Button>
+                <Radio.Button value="monthly">月</Radio.Button>
+              </Radio.Group>
+            </div>
+            {trendLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
+                加载中...
+              </div>
+            ) : employeeRateTrendData?.periods?.length ? (
               <EChartsComponent option={employeeRateTrendOption} height={300} />
             ) : (
               <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
@@ -718,12 +803,14 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
           {/* 排行榜表格 */}
           <Card className={styles.tableCard}>
-            <div className={styles.tableHeader}>
-              <span className={styles.tableTitle}>员工转化排行榜</span>
-              <Space>
-                <span className={styles.statText}>
-                  共 {data?.ranking?.length || 0} 人
-                </span>
+            <div className={styles.cardHeader}>
+              <Text type="secondary" className={styles.cardTitle}>
+                🏆 员工转化排行榜
+              </Text>
+              <Text type="secondary" className={styles.cardDesc}>
+                共 {data?.ranking?.length || 0} 人
+              </Text>
+              <Space style={{ marginLeft: 'auto' }}>
                 <Button
                   icon={<DownloadOutlined />}
                   onClick={handleExport}

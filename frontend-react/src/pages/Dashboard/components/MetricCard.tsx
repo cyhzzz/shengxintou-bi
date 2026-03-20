@@ -29,6 +29,7 @@ export interface MetricCardProps {
   variant?: 'default' | 'asset';
   icon?: React.ReactNode;
   tooltip?: string;
+  showWowChange?: boolean; // 是否显示环比变化，默认 true
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({
@@ -42,6 +43,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
   variant = 'default',
   icon,
   tooltip,
+  showWowChange = true,
 }) => {
   const formatValue = (val?: number): string => {
     if (val === undefined || val === null) return '-';
@@ -84,6 +86,11 @@ const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const renderWowChange = () => {
+    // 如果不需要显示环比区域，直接返回 null
+    if (!showWowChange) {
+      return null;
+    }
+
     if (!wowChange || wowChange.value === undefined) {
       // 显示占位符，保持卡片高度一致
       return <div className={styles.wowChangePlaceholder}>—</div>;

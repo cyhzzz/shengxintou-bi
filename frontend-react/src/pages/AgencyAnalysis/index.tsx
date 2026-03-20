@@ -12,8 +12,9 @@
  * - 旧版类直接操作 DOM 容器渲染图表和表格
  */
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { Card, Row, Col, Statistic, Segmented, Space, message, Button, Tooltip, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Segmented, Space, Button, Tooltip, Spin, Table, Tag, Typography } from 'antd';
 import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
 import { FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
 import { useLegacyReport } from '@/hooks/useLegacyReport';
@@ -21,6 +22,8 @@ import { convertToLegacyFormat } from '@/utils/filterAdapter';
 import { getAgencyAnalysis } from '@/types/api';
 import type { AgencyAnalysisResponse } from '@/types/api.schemas';
 import styles from './index.module.scss';
+
+const { Text } = Typography;
 
 // 指标类型
 type MetricType = 'cost' | 'impressions' | 'clicks' | 'lead_users' | 'opened_account_users' | 'valid_customer_users';
@@ -114,7 +117,63 @@ const AgencyAnalysisPage: React.FC = () => {
           };
         }) as FlattenedSummaryItem[];
 
-        setSummary(flattenedSummary);
+        // 统计每个 (platform, business_model) 组合的明细行数量
+        const groupCounts = new Map<string, number>();
+        flattenedSummary.forEach(item => {
+          if (!item.is_subtotal && !item.is_total) {
+            const key = `${item.platform}|||${item.business_model}`;
+            groupCounts.set(key, (groupCounts.get(key) || 0) + 1);
+          }
+        });
+
+        // 过滤：只有明细行数量 > 1 的组才显示小计
+        const filteredSummary = flattenedSummary.filter(item => {
+          if (item.is_subtotal) {
+            const key = `${item.platform}|||${item.business_model}`;
+            const count = groupCounts.get(key) || 0;
+            return count > 1; // 只保留有多于1行的组的小计
+          }
+          return true;
+        });
+
+        // 排序：小计和合计在顶部，类似数据透视表
+        // 1. 合计在最顶部
+        // 2. 按平台分组，每组的平台小计在该组的第一行
+        const sortedSummary = filteredSummary.sort((a, b) => {
+          // 合计行优先
+          if (a.is_total && !b.is_total) return -1;
+          if (!a.is_total && b.is_total) return 1;
+
+          // 同为合计或同为非合计时，按平台分组
+          if (a.platform !== b.platform) {
+            // 平台顺序：腾讯 > 抖音 > 小红书 > 其他
+            const platformOrder: Record<string, number> = {
+              '腾讯': 0,
+              '抖音': 1,
+              '小红书': 2,
+            };
+            const orderA = platformOrder[a.platform] ?? 99;
+            const orderB = platformOrder[b.platform] ?? 99;
+            return orderA - orderB;
+          }
+
+          // 同一平台内：小计优先
+          if (a.is_subtotal && !b.is_subtotal) return -1;
+          if (!a.is_subtotal && b.is_subtotal) return 1;
+
+          // 小计之间按业务模式排序
+          if (a.is_subtotal && b.is_subtotal) {
+            return (a.business_model || '').localeCompare(b.business_model || '');
+          }
+
+          // 详细数据行：按业务模式 + 代理商排序
+          if (a.business_model !== b.business_model) {
+            return (a.business_model || '').localeCompare(b.business_model || '');
+          }
+          return (a.agency || '').localeCompare(b.agency || '');
+        });
+
+        setSummary(sortedSummary);
       }
     } catch (error) {
       console.error('获取汇总数据失败:', error);
@@ -202,6 +261,154 @@ const AgencyAnalysisPage: React.FC = () => {
     return { agencyCount: agencies.size, platformCount: platforms.size };
   }, [summary]);
 
+  // 表格列配置
+  const columns: ColumnsType<FlattenedSummaryItem> = useMemo(() => [
+    {
+      title: '平台',
+      dataIndex: 'platform',
+      key: 'platform',
+      width: 100,
+      fixed: 'left',
+      render: (value, record) => {
+        if (record.is_total) return <strong>全部</strong>;
+        if (record.is_subtotal) return <strong>{value}</strong>;
+        const colorMap: Record<string, string> = {
+          '腾讯': 'green',
+          '抖音': 'purple',
+          '小红书': 'red',
+        };
+        return <Tag color={colorMap[value] || 'default'}>{value}</Tag>;
+      },
+    },
+    {
+      title: '业务模式',
+      dataIndex: 'business_model',
+      key: 'business_model',
+      width: 100,
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return '-';
+        return value || '-';
+      },
+    },
+    {
+      title: '代理商',
+      dataIndex: 'agency',
+      key: 'agency',
+      width: 120,
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return '-';
+        return value || '未归因';
+      },
+    },
+    {
+      title: '花费',
+      dataIndex: 'cost',
+      key: 'cost',
+      width: 120,
+      align: 'right',
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return <strong>¥{Number(value || 0).toLocaleString()}</strong>;
+        return value ? `¥${Number(value).toLocaleString()}` : '-';
+      },
+    },
+    {
+      title: '曝光',
+      dataIndex: 'impressions',
+      key: 'impressions',
+      width: 100,
+      align: 'right',
+      render: (value) => value ? Number(value).toLocaleString() : '-',
+    },
+    {
+      title: '点击',
+      dataIndex: 'clicks',
+      key: 'clicks',
+      width: 80,
+      align: 'right',
+      render: (value) => value ? Number(value).toLocaleString() : '-',
+    },
+    {
+      title: '线索',
+      dataIndex: 'lead_users',
+      key: 'lead_users',
+      width: 80,
+      align: 'right',
+      render: (value) => value ? Number(value).toLocaleString() : '-',
+    },
+    {
+      title: '开户',
+      dataIndex: 'opened_account_users',
+      key: 'opened_account_users',
+      width: 80,
+      align: 'right',
+      render: (value) => value ? Number(value).toLocaleString() : '-',
+    },
+    {
+      title: '有效户',
+      dataIndex: 'valid_customer_users',
+      key: 'valid_customer_users',
+      width: 80,
+      align: 'right',
+      render: (value) => value ? Number(value).toLocaleString() : '-',
+    },
+    {
+      title: '新增资产',
+      dataIndex: 'opened_account_assets',
+      key: 'opened_account_assets',
+      width: 120,
+      align: 'right',
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return <strong>¥{Number(value || 0).toLocaleString()}</strong>;
+        return value ? `¥${Number(value).toLocaleString()}` : '-';
+      },
+    },
+    {
+      title: '服务存量资产',
+      dataIndex: 'existing_customer_assets',
+      key: 'existing_customer_assets',
+      width: 160,
+      align: 'right',
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return <strong>¥{Number(value || 0).toLocaleString()}</strong>;
+        return value ? `¥${Number(value).toLocaleString()}` : '-';
+      },
+    },
+    {
+      title: 'CTR',
+      key: 'ctr',
+      width: 80,
+      align: 'right',
+      render: (_, record) => {
+        if (record.is_total || record.is_subtotal) return '-';
+        const ctr = record.impressions > 0 ? (record.clicks / record.impressions * 100) : 0;
+        if (ctr === 0) return '-';
+        return `${ctr.toFixed(2)}%`;
+      },
+    },
+    {
+      title: '线索成本',
+      dataIndex: 'lead_cost',
+      key: 'lead_cost',
+      width: 100,
+      align: 'right',
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return '-';
+        return value ? `¥${Number(value).toFixed(2)}` : '-';
+      },
+    },
+    {
+      title: '开户成本',
+      dataIndex: 'account_cost',
+      key: 'account_cost',
+      width: 100,
+      align: 'right',
+      render: (value, record) => {
+        if (record.is_total || record.is_subtotal) return '-';
+        return value ? `¥${Number(value).toFixed(2)}` : '-';
+      },
+    },
+  ], []);
+
   return (
     <div className={styles.agencyAnalysisPage}>
       {/* Ant Design 筛选器 */}
@@ -214,9 +421,9 @@ const AgencyAnalysisPage: React.FC = () => {
       />
 
       {/* 汇总统计卡片 */}
-      <Row gutter={16} className={styles.summaryRow}>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
+      <Row gutter={[16, 16]} className={styles.summaryRow}>
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
             <Statistic
               title="总花费"
               value={totals.cost}
@@ -226,29 +433,29 @@ const AgencyAnalysisPage: React.FC = () => {
             />
           </Card>
         </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
             <Statistic title="总曝光" value={totals.impressions} prefix={<EyeOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
             <Statistic title="总点击" value={totals.clicks} prefix={<AimOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
-            <Statistic title="线索人数" value={totals.leadUsers} prefix={<UserOutlined />} />
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
+            <Statistic title="线索数" value={totals.leadUsers} prefix={<UserOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
-            <Statistic title="开户人数" value={totals.openedAccounts} prefix={<TeamOutlined />} />
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
+            <Statistic title="开户数" value={totals.openedAccounts} prefix={<TeamOutlined />} />
           </Card>
         </Col>
-        <Col xs={12} sm={8} md={4}>
-          <Card>
-            <Statistic title="有效户人数" value={totals.validCustomers} prefix={<TeamOutlined />} />
+        <Col xs={12} sm={8} md={4} lg={4}>
+          <Card className={styles.metricCard}>
+            <Statistic title="有效户数" value={totals.validCustomers} prefix={<TeamOutlined />} />
           </Card>
         </Col>
       </Row>
@@ -256,8 +463,13 @@ const AgencyAnalysisPage: React.FC = () => {
       {/* 日级趋势图容器 - 由旧版 JS 渲染 */}
       <Card className={styles.chartCard}>
         <div className={styles.cardHeader}>
-          <h3 className={styles.cardTitle}>日级趋势图</h3>
-          <Space size="middle">
+          <Text type="secondary" className={styles.cardTitle}>
+            📊 日级趋势图
+          </Text>
+          <Text type="secondary" className={styles.cardDesc}>
+            各指标每日变化趋势
+          </Text>
+          <Space size="middle" style={{ marginLeft: 'auto' }}>
             <span className={styles.controlLabel}>指标:</span>
             <Segmented
               value={metric}
@@ -281,30 +493,35 @@ const AgencyAnalysisPage: React.FC = () => {
         </Spin>
       </Card>
 
-      {/* 平台×代理商聚合数据表格容器 - 由旧版 JS 渲染 */}
+      {/* 平台×代理商聚合数据表格 - 使用 Ant Design Table */}
       <Card className={styles.tableCard}>
         <div className={styles.cardHeader}>
-          <h3 className={styles.cardTitle}>平台×代理商聚合数据</h3>
-          <Space>
-            <span>代理商数量: <strong>{stats.agencyCount}</strong></span>
-            <span style={{ margin: '0 8px', color: '#d9d9d9' }}>|</span>
-            <span>平台数量: <strong>{stats.platformCount}</strong></span>
-            <span style={{ margin: '0 8px', color: '#d9d9d9' }}>|</span>
-            <Tooltip title="导出为Excel格式">
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                onClick={exportData}
-                disabled={!report}
-              >
-                导出Excel
-              </Button>
-            </Tooltip>
-          </Space>
+          <Text type="secondary" className={styles.cardTitle}>
+            📈 平台×代理商聚合数据
+          </Text>
+          <Text type="secondary" className={styles.cardDesc}>
+            代理商数量: {stats.agencyCount} | 平台数量: {stats.platformCount}
+          </Text>
+          <Tooltip title="导出为Excel格式" style={{ marginLeft: 'auto' }}>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={exportData}
+              disabled={!report}
+            >
+              导出Excel
+            </Button>
+          </Tooltip>
         </div>
-        <Spin spinning={loading || legacyLoading}>
-          {/* 旧版表格容器 */}
-          <div id="agencyTable" className={styles.tableContainer} />
+        <Spin spinning={loading}>
+          <Table
+            columns={columns}
+            dataSource={summary}
+            rowKey={(record) => `${record.platform}-${record.business_model}-${record.agency}`}
+            scroll={{ x: 1200 }}
+            pagination={false}
+            size="small"
+          />
         </Spin>
       </Card>
     </div>

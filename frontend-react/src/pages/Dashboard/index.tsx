@@ -394,6 +394,11 @@ const DashboardPage: React.FC = () => {
               <MetricCard
                 title="单开户成本"
                 value={costPerAccount}
+                wowChange={wowChanges?.cost_per_account ? {
+                  value: wowChanges.cost_per_account.value,
+                  trend: wowChanges.cost_per_account.trend,
+                  color: wowChanges.cost_per_account.color,
+                } : undefined}
                 prefix="¥"
                 formatter="currency"
                 inverseTrend

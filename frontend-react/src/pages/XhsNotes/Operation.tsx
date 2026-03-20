@@ -2,33 +2,28 @@
  * 小红书运营分析页面
  * 分析笔记运营效果、创作者内容和转化数据
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   Table,
   Row,
   Col,
-  Statistic,
   Select,
   Button,
   Space,
   message,
   Spin,
   Typography,
+  Dropdown,
 } from 'antd';
+import type { MenuProps } from 'antd';
 import {
-  FileTextOutlined,
-  EyeOutlined,
-  HeartOutlined,
-  MessageOutlined,
-  UserAddOutlined,
-  AccountBookOutlined,
-  DollarOutlined,
-  RiseOutlined,
   DownloadOutlined,
   SearchOutlined,
   ReloadOutlined,
-  AimOutlined,
+  DownOutlined,
+  FileImageOutlined,
+  FilePdfOutlined,
 } from '@ant-design/icons';
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -42,19 +37,112 @@ import type {
   XhsTopNoteItem,
   XhsCreatorAnnualRankingItem,
   XhsAgencyDataItem,
-  XhsNoteConversionItem,
   XhsCreatorCreationItem,
   XhsCreatorInteractionItem,
   XhsEmployeeConversionItem,
 } from '@/types/api.schemas';
 import styles from './Operation.module.scss';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
-const { Link } = Typography;
+const { Link, Text } = Typography;
+
+// 精致卡片标题组件 - 参考数据概览页样式
+// plain=true 时仅返回文本，不包含cardHeader包装（用于Card组件的title prop）
+const CardTitle: React.FC<{ icon?: string; children: React.ReactNode; plain?: boolean }> = ({ icon, children, plain }) => {
+  if (plain) {
+    return (
+      <Text type="secondary" className={styles.cardTitle}>
+        {icon && <span style={{ marginRight: 8 }}>{icon}</span>}
+        {children}
+      </Text>
+    );
+  }
+  return (
+    <div className={styles.cardHeader}>
+      <Text type="secondary" className={styles.cardTitle}>
+        {icon && <span style={{ marginRight: 8 }}>{icon}</span>}
+        {children}
+      </Text>
+    </div>
+  );
+};
 
 const XhsNotesOperationPage: React.FC = () => {
+  // 页面内容ref - 用于导出
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  // 导出功能 - 导出整个报表为图片或PDF
+  const handleExportReport = async (type: 'image' | 'pdf') => {
+    if (!pageRef.current) {
+      message.error('无法获取页面内容');
+      return;
+    }
+
+    try {
+      message.loading({ content: '正在生成报表...', key: 'export' });
+
+      const element = pageRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#f5f5f5',
+      });
+
+      if (type === 'image') {
+        // 导出为图片
+        const link = document.createElement('a');
+        link.download = `小红书运营分析报表_${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        message.success({ content: '导出图片成功', key: 'export' });
+      } else {
+        // 导出为PDF
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4',
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+        const imgX = (pageWidth - imgWidth * ratio) / 2;
+        const imgY = 10;
+
+        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+        pdf.save(`小红书运营分析报表_${new Date().toISOString().split('T')[0]}.pdf`);
+        message.success({ content: '导出PDF成功', key: 'export' });
+      }
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error({ content: '导出失败，请重试', key: 'export' });
+    }
+  };
+
+  // 导出菜单配置
+  const exportMenuItems: MenuProps['items'] = [
+    {
+      key: 'image',
+      icon: <FileImageOutlined />,
+      label: '导出为图片 (PNG)',
+      onClick: () => handleExportReport('image'),
+    },
+    {
+      key: 'pdf',
+      icon: <FilePdfOutlined />,
+      label: '导出为 PDF',
+      onClick: () => handleExportReport('pdf'),
+    },
+  ];
+
   // 获取默认日期范围的辅助函数（基于数据可用日期）
   const getDefaultDateRangeFromData = (
-    dataStart: string | null,
+    _dataStart: string | null,
     dataEnd: string | null,
     fallbackDays: number = 30
   ): [string, string] => {
@@ -111,6 +199,10 @@ const XhsNotesOperationPage: React.FC = () => {
   const [data, setData] = useState<XhsOperationAnalysisData | null>(null);
   const [loading, setLoading] = useState(false);
   const [metadataLoaded, setMetadataLoaded] = useState(false);
+
+  // 独立模块加载状态 - 用于优秀笔记排行榜和创作者年度排行
+  const [topNotesLoading, setTopNotesLoading] = useState(false);
+  const [creatorAnnualLoading, setCreatorAnnualLoading] = useState(false);
 
   // 当前选中的图表Tab
   const [creationChartType, setCreationChartType] = useState<string>('impressions');
@@ -175,11 +267,11 @@ const XhsNotesOperationPage: React.FC = () => {
       };
 
       // 添加可选日期范围
-      if (topNotesDateRange[0] && topNotesDateRange[1]) {
-        filters.top_notes_date_range = topNotesDateRange;
+      if (topNotesDateRange?.[0] && topNotesDateRange?.[1]) {
+        filters.top_notes_date_range = topNotesDateRange as [string, string];
       }
-      if (creatorAnnualDateRange[0] && creatorAnnualDateRange[1]) {
-        filters.creator_annual_date_range = creatorAnnualDateRange;
+      if (creatorAnnualDateRange?.[0] && creatorAnnualDateRange?.[1]) {
+        filters.creator_annual_date_range = creatorAnnualDateRange as [string, string];
       }
 
       const response = await postXhsOperationAnalysis({ filters });
@@ -197,12 +289,48 @@ const XhsNotesOperationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, topNotesDateRange, creatorAnnualDateRange]);
+  }, [dateRange]);
 
   // 处理查询
   const handleSearch = () => {
     fetchData();
   };
+
+  // 独立获取笔记排行榜数据
+  const fetchTopNotesData = useCallback(async (notesDateRange: [string, string]) => {
+    setTopNotesLoading(true);
+    try {
+      const filters: Record<string, unknown> = {
+        top_notes_date_range: notesDateRange,
+      };
+      const response = await postXhsOperationAnalysis({ filters });
+      if (response.success && response.data) {
+        setData(prev => prev ? { ...prev, top_notes: response.data.top_notes } : response.data);
+      }
+    } catch (error) {
+      console.error('获取笔记排行榜数据失败:', error);
+    } finally {
+      setTopNotesLoading(false);
+    }
+  }, []);
+
+  // 独立获取创作者年度排行数据
+  const fetchCreatorAnnualData = useCallback(async (annualDateRange: [string, string]) => {
+    setCreatorAnnualLoading(true);
+    try {
+      const filters: Record<string, unknown> = {
+        creator_annual_date_range: annualDateRange,
+      };
+      const response = await postXhsOperationAnalysis({ filters });
+      if (response.success && response.data) {
+        setData(prev => prev ? { ...prev, creator_annual_ranking: response.data.creator_annual_ranking } : response.data);
+      }
+    } catch (error) {
+      console.error('获取创作者年度排行数据失败:', error);
+    } finally {
+      setCreatorAnnualLoading(false);
+    }
+  }, []);
 
   // 组件加载时自动获取数据（等待元数据加载完成）
   useEffect(() => {
@@ -221,7 +349,12 @@ const XhsNotesOperationPage: React.FC = () => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    if (type === 'days30') {
+    if (type === 'days7') {
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 7);
+      const expectedStart = startDate.toISOString().split('T')[0];
+      return range[0] === expectedStart && range[1] === todayStr;
+    } else if (type === 'days30') {
       const startDate = new Date(today);
       startDate.setDate(today.getDate() - 30);
       const expectedStart = startDate.toISOString().split('T')[0];
@@ -230,12 +363,18 @@ const XhsNotesOperationPage: React.FC = () => {
       const yearStart = new Date(today.getFullYear(), 0, 1);
       const expectedStart = yearStart.toISOString().split('T')[0];
       return range[0] === expectedStart && range[1] === todayStr;
+    } else if (type === 'all') {
+      // 全部选项：比较当前范围是否等于元数据全量范围
+      if (xhsDataDateRange?.start && xhsDataDateRange?.end) {
+        return range[0] === xhsDataDateRange.start && range[1] === xhsDataDateRange.end;
+      }
+      return false;
     }
     return false;
   };
 
-  // 快速选择日期
-  const handleQuickDateSelect = (type: 'topNotes' | 'creatorAnnual', option: 'days30' | 'ytd') => {
+  // 快速选择日期 - 独立筛选器
+  const handleQuickDateSelect = async (type: 'topNotes' | 'creatorAnnual', option: 'days30' | 'ytd') => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
@@ -244,17 +383,55 @@ const XhsNotesOperationPage: React.FC = () => {
       startDate.setDate(today.getDate() - 30);
       const startStr = startDate.toISOString().split('T')[0];
       if (type === 'topNotes') {
-        setTopNotesDateRange([startStr, todayStr]);
+        const newRange: [string, string] = [startStr, todayStr];
+        setTopNotesDateRange(newRange);
+        // 独立获取笔记排行榜数据
+        await fetchTopNotesData(newRange);
       } else {
-        setCreatorAnnualDateRange([startStr, todayStr]);
+        const newRange: [string, string] = [startStr, todayStr];
+        setCreatorAnnualDateRange(newRange);
+        // 独立获取创作者年度排行数据
+        await fetchCreatorAnnualData(newRange);
       }
     } else if (option === 'ytd') {
       const yearStart = new Date(today.getFullYear(), 0, 1);
       const startStr = yearStart.toISOString().split('T')[0];
       if (type === 'topNotes') {
-        setTopNotesDateRange([startStr, todayStr]);
+        const newRange: [string, string] = [startStr, todayStr];
+        setTopNotesDateRange(newRange);
+        // 独立获取笔记排行榜数据
+        await fetchTopNotesData(newRange);
       } else {
-        setCreatorAnnualDateRange([startStr, todayStr]);
+        const newRange: [string, string] = [startStr, todayStr];
+        setCreatorAnnualDateRange(newRange);
+        // 独立获取创作者年度排行数据
+        await fetchCreatorAnnualData(newRange);
+      }
+    }
+  };
+
+  // 顶部筛选器快速选择日期
+  const handleQuickDateSelectTop = (option: 'days7' | 'days30' | 'ytd' | 'all') => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (option === 'days7') {
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 7);
+      setDateRange([startDate.toISOString().split('T')[0], todayStr]);
+    } else if (option === 'days30') {
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 30);
+      setDateRange([startDate.toISOString().split('T')[0], todayStr]);
+    } else if (option === 'ytd') {
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      setDateRange([yearStart.toISOString().split('T')[0], todayStr]);
+    } else if (option === 'all') {
+      // 使用元数据全量范围
+      if (xhsDataDateRange?.start && xhsDataDateRange?.end) {
+        setDateRange([xhsDataDateRange.start, xhsDataDateRange.end]);
+      } else {
+        setDateRange([xhsDataDateRange?.start || todayStr, xhsDataDateRange?.end || todayStr]);
       }
     }
   };
@@ -367,18 +544,37 @@ const XhsNotesOperationPage: React.FC = () => {
     let csvContent = '';
     let filename = '';
 
+    const safeDateRange = dateRange ?? ['', ''];
+    const safeTopNotesRange = topNotesDateRange ?? ['', ''];
+
     switch (exportType) {
       case 'creator_content':
-        csvContent = exportCreatorContentData(data.creator_content_data);
-        filename = `创作者内容数据_${dateRange[0]}_${dateRange[1]}.csv`;
+        csvContent = exportCreatorContentData(data.creator_content_data ?? []);
+        filename = `创作者内容数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
+        break;
+      case 'creator_conversion':
+        csvContent = exportCreatorConversionData(data.creator_conversion_data ?? []);
+        filename = `创作者转化数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
+        break;
+      case 'creator_creation':
+        csvContent = exportCreatorCreationData(data.creator_creation_data ?? []);
+        filename = `创作者创作数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
+        break;
+      case 'creator_interaction':
+        csvContent = exportCreatorInteractionData(data.creator_interaction_data ?? []);
+        filename = `创作者互动数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
         break;
       case 'top_notes':
-        csvContent = exportTopNotesData(data.top_notes);
-        filename = `笔记排行榜_${topNotesDateRange[0] || dateRange[0]}_${topNotesDateRange[1] || dateRange[1]}.csv`;
+        csvContent = exportTopNotesData(data.top_notes ?? []);
+        filename = `笔记排行榜_${safeTopNotesRange[0] || safeDateRange[0]}_${safeTopNotesRange[1] || safeDateRange[1]}.csv`;
         break;
       case 'employee_conversion':
-        csvContent = exportEmployeeConversionData(data.employee_conversion_ranking);
-        filename = `员工转化排行_${dateRange[0]}_${dateRange[1]}.csv`;
+        csvContent = exportEmployeeConversionData(data.employee_conversion_ranking ?? []);
+        filename = `员工转化排行_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
+        break;
+      case 'agency_data':
+        csvContent = exportAgencyData(data.agency_data ?? []);
+        filename = `代理商数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
         break;
       default:
         return;
@@ -431,19 +627,76 @@ const XhsNotesOperationPage: React.FC = () => {
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
 
+  // 导出创作者转化数据
+  const exportCreatorConversionData = (items: XhsCreatorConversionItem[]) => {
+    const headers = ['生产者', '私信量', '加微数', '开口数', '有效线索', '开户数', '有效户'];
+    const rows = items.map(item => [
+      item.producer,
+      item.private_messages,
+      item.lead_users,
+      item.customer_mouth_users,
+      item.valid_lead_users,
+      item.opened_account_users,
+      item.valid_customer_users,
+    ]);
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  };
+
+  // 导出创作者创作数据
+  const exportCreatorCreationData = (items: XhsCreatorCreationItem[]) => {
+    const headers = ['生产者', '笔记数', '曝光量'];
+    const rows = items.map(item => [
+      item.producer,
+      item.note_count,
+      item.impressions,
+    ]);
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  };
+
+  // 导出创作者互动数据
+  const exportCreatorInteractionData = (items: XhsCreatorInteractionItem[]) => {
+    const headers = ['生产者', '点赞', '收藏', '评论', '分享', '总互动'];
+    const rows = items.map(item => [
+      item.producer,
+      item.likes,
+      item.favorites,
+      item.comments,
+      item.shares,
+      item.total_interactions,
+    ]);
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  };
+
   // 导出员工转化数据
   const exportEmployeeConversionData = (items: XhsEmployeeConversionItem[]) => {
-    const headers = ['员工姓名', '加微数', '企微添加数', '有效线索数', '开户数', '有效户数', '开户率', '有效户率', '总资产'];
+    const headers = ['员工姓名', '加微数', '有效线索数', '开户数', '有效户数', '开户率', '有效户率', '总资产'];
     const rows = items.map(item => [
       item.employee_name,
       item.lead_users,
-      item.wechat_adds,
       item.valid_lead_users,
       item.opened_account_users,
       item.valid_customer_users,
       `${item.opening_rate.toFixed(2)}%`,
       `${item.valid_customer_rate.toFixed(2)}%`,
       item.total_assets || 0,
+    ]);
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  };
+
+  // 导出代理商数据
+  const exportAgencyData = (items: XhsAgencyDataItem[]) => {
+    const headers = ['代理商', '消耗', '曝光量', '点击量', '加微数', '潜客数', '开口数', '有效线索', '开户数', '有效户'];
+    const rows = items.map(item => [
+      item.agency,
+      item.total_cost,
+      item.total_impressions,
+      item.total_clicks,
+      item.lead_users,
+      item.potential_customers,
+      item.customer_mouth_users,
+      item.valid_lead_users,
+      item.opened_account_users,
+      item.valid_customer_users,
     ]);
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
@@ -468,6 +721,9 @@ const XhsNotesOperationPage: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         showContent: true,
+      },
+      legend: {
+        show: false,
       },
       grid: {
         left: '3%',
@@ -499,48 +755,150 @@ const XhsNotesOperationPage: React.FC = () => {
     };
   }, [data?.creation_trend, creationChartType]);
 
-  // 转化趋势图表配置 - ECharts 分组柱状图
+  // 转化趋势图表配置 - ECharts 分组柱状图（原样复制旧版）
   const conversionTrendOption = useMemo((): EChartsOption => {
     if (!data?.conversion_trend?.weeks?.length) return {};
 
-    const types = ['加微数', '开口数', '有效线索', '开户数'];
-    const colors = ['#1890ff', '#52c41a', '#faad14', '#eb2f96'];
+    const types = ['加微数', '开口客户数', '有效线索数', '开户数'];
+    const colorSets = [
+      ['#6366f1', '#818cf8'],
+      ['#10b981', '#34d399'],
+      ['#f59e0b', '#fbbf24'],
+      ['#ec4899', '#f472b6'],
+    ];
 
     return {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const week = params[0]?.axisValue || '';
+          let result = `<div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #1a1a1a;">${week}</div>`;
+          params.forEach((p: any) => {
+            result += `<div style="margin: 5px 0;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${p.color}; margin-right: 8px;"></span>
+              <span style="color: #5a5c66;">${p.seriesName}:</span>
+              <span style="float: right; font-weight: 600; color: #1a1a1a;">${p.value} 个</span>
+            </div>`;
+          });
+          return result;
+        },
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderColor: '#e8e9eb',
+        borderWidth: 1,
+        padding: [12, 16],
+        textStyle: {
+          fontSize: 12,
+        },
+        extraCssText: 'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 6px;',
       },
       legend: {
-        bottom: 0,
         data: types,
+        bottom: '2%',
+        left: 'center',
+        itemWidth: 16,
+        itemHeight: 16,
+        itemGap: 24,
+        textStyle: {
+          fontSize: 13,
+          color: '#5a5c66',
+        },
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '15%',
+        bottom: '12%',
+        top: '8%',
         containLabel: true,
       },
       xAxis: {
         type: 'category',
         data: data.conversion_trend.weeks,
+        axisLabel: {
+          rotate: 30,
+          fontSize: 11,
+          color: '#8a8d99',
+          interval: 0,
+          margin: 12,
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#e8e9eb',
+          },
+        },
+        axisTick: {
+          show: false,
+        },
       },
       yAxis: {
         type: 'value',
+        name: '个数',
+        nameTextStyle: {
+          fontSize: 12,
+          color: '#8a8d99',
+          padding: [0, 0, 0, -8],
+        },
+        axisLabel: {
+          fontSize: 11,
+          color: '#8a8d99',
+          formatter: (value: number) => {
+            if (value >= 1000) {
+              return (value / 1000).toFixed(1) + 'k';
+            }
+            return value.toString();
+          },
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#e8e9eb',
+          },
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#f0f1f3',
+            type: 'dashed' as const,
+          },
+        },
       },
       series: types.map((type, index) => ({
         name: type,
         type: 'bar' as const,
         data: type === '加微数' ? data.conversion_trend?.lead_users :
-              type === '开口数' ? data.conversion_trend?.customer_mouth_users :
-              type === '有效线索' ? data.conversion_trend?.valid_lead_users :
+              type === '开口客户数' ? data.conversion_trend?.customer_mouth_users :
+              type === '有效线索数' ? data.conversion_trend?.valid_lead_users :
               data.conversion_trend?.opened_account_users || [],
-        itemStyle: { color: colors[index] },
+        itemStyle: {
+          color: {
+            type: 'linear' as const,
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: colorSets[index][0] },
+              { offset: 1, color: colorSets[index][1] },
+            ],
+          },
+          borderRadius: [4, 4, 0, 0],
+        },
+        barMaxWidth: 48,
+        emphasis: {
+          itemStyle: {
+            color: {
+              type: 'linear' as const,
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: colorSets[index][0] },
+                { offset: 1, color: colorSets[index][1] },
+              ],
+            },
+          },
+        },
       })),
+      animationDuration: 1000,
+      animationEasing: 'cubicOut' as const,
+      animationDelay: (idx: number) => idx * 50,
     };
   }, [data?.conversion_trend]);
 
-  // 创作量趋势图表配置 - ECharts 柱状图
+  // 创作量趋势图表配置 - ECharts 柱状图（原样复制旧版 XhsNotesOperationReport.js）
   const creationVolumeOption = useMemo((): EChartsOption => {
     if (!data?.creation_trend?.dates?.length) return {};
 
@@ -549,10 +907,14 @@ const XhsNotesOperationPage: React.FC = () => {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
       },
+      legend: {
+        show: false,
+      },
       grid: {
         left: '3%',
         right: '4%',
         bottom: '3%',
+        top: '3%',
         containLabel: true,
       },
       xAxis: {
@@ -575,25 +937,30 @@ const XhsNotesOperationPage: React.FC = () => {
     };
   }, [data?.creation_trend]);
 
-  // 互动量趋势图表配置 - ECharts 双轴折线图
+  // 互动量趋势图表配置 - ECharts 双Y轴折线图（原样复制旧版）
   const interactionTrendOption = useMemo((): EChartsOption => {
     if (!data?.creation_trend?.dates?.length) return {};
 
-    const colors = ['#52c41a', '#faad14'];
+    const formatNumber = (value: number): string => {
+      if (value >= 10000) {
+        return (value / 10000).toFixed(1) + '万';
+      }
+      return value.toString();
+    };
 
     return {
       tooltip: {
         trigger: 'axis',
-        showContent: true,
+        axisPointer: { type: 'cross' },
       },
       legend: {
-        bottom: 0,
-        data: ['曝光量', '互动量'],
+        show: false,
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '15%',
+        bottom: '3%',
+        top: '3%',
         containLabel: true,
       },
       xAxis: {
@@ -603,137 +970,304 @@ const XhsNotesOperationPage: React.FC = () => {
           rotate: data.creation_trend.dates.length > 30 ? 45 : 0,
         },
       },
-      yAxis: {
-        type: 'value',
-      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '曝光量',
+          position: 'left' as const,
+          axisLabel: {
+            formatter: formatNumber,
+          },
+        },
+        {
+          type: 'value',
+          name: '互动量',
+          position: 'right' as const,
+          axisLabel: {
+            formatter: formatNumber,
+          },
+        },
+      ],
       series: [
         {
           name: '曝光量',
           type: 'line',
-          smooth: true,
+          yAxisIndex: 0,
           data: data.creation_trend.impression_series,
-          symbol: 'circle',
-          symbolSize: 4,
-          itemStyle: { color: colors[0] },
-          lineStyle: { color: colors[0] },
-          areaStyle: { opacity: 0.3 },
+          smooth: true,
+          itemStyle: { color: '#52c41a' },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(82, 196, 26, 0.3)' },
+                { offset: 1, color: 'rgba(82, 196, 26, 0.05)' },
+              ],
+            },
+          },
         },
         {
           name: '互动量',
           type: 'line',
-          smooth: true,
+          yAxisIndex: 1,
           data: data.creation_trend.interaction_series,
-          symbol: 'circle',
-          symbolSize: 4,
-          itemStyle: { color: colors[1] },
-          lineStyle: { color: colors[1] },
-          areaStyle: { opacity: 0.3 },
+          smooth: true,
+          itemStyle: { color: '#faad14' },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(250, 173, 20, 0.3)' },
+                { offset: 1, color: 'rgba(250, 173, 20, 0.05)' },
+              ],
+            },
+          },
         },
       ],
     };
   }, [data?.creation_trend]);
 
-  // 创作者创作量图表配置 - ECharts 水平分组条形图
+  // 创作者创作量图表配置 - ECharts 横向双X轴柱状图（原样复制旧版）
   const creatorCreationOption = useMemo((): EChartsOption => {
     if (!data?.creator_creation_data?.length) return {};
 
-    const sortedData = [...data.creator_creation_data]
-      .sort((a, b) => b.note_count - a.note_count)
+    // 按生产者聚合数据
+    const aggregatedMap = new Map<string, { note_count: number; impressions: number }>();
+    data.creator_creation_data.forEach(item => {
+      const producer = item.producer || '未知';
+      const existing = aggregatedMap.get(producer);
+      if (existing) {
+        existing.note_count += item.note_count || 0;
+        existing.impressions += item.impressions || 0;
+      } else {
+        aggregatedMap.set(producer, {
+          note_count: item.note_count || 0,
+          impressions: item.impressions || 0,
+        });
+      }
+    });
+
+    const sortedData = Array.from(aggregatedMap.entries())
+      .map(([producer, values]) => ({ producer, ...values }))
+      .sort((a, b) => (b.note_count || 0) - (a.note_count || 0))
       .slice(0, 10)
       .reverse();
 
     const producers = sortedData.map(item => item.producer);
+    const noteCounts = sortedData.map(item => item.note_count);
+    const impressions = sortedData.map(item => item.impressions);
+
+    const formatNumber = (value: number): string => {
+      if (value >= 10000) {
+        return (value / 10000).toFixed(1) + '万';
+      }
+      return value.toString();
+    };
 
     return {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const idx = params[0]?.dataIndex ?? 0;
+          const creator = producers[idx] || '未知';
+          let result = `${creator}<br/>`;
+          params.forEach((p: any) => {
+            const value = p.value;
+            if (p.seriesName === '笔记发布量') {
+              result += `${p.marker} ${p.seriesName}: ${value} 篇<br/>`;
+            } else {
+              result += `${p.marker} ${p.seriesName}: ${formatNumber(value)}<br/>`;
+            }
+          });
+          return result;
+        },
       },
       legend: {
-        bottom: 0,
-        data: ['笔记数', '曝光量'],
+        show: false,
       },
       grid: {
         left: '3%',
-        right: '4%',
-        bottom: '15%',
+        right: '3%',
+        bottom: '3%',
+        top: '3%',
         containLabel: true,
       },
-      xAxis: {
-        type: 'value',
-      },
+      xAxis: [
+        {
+          type: 'value',
+          name: '笔记发布量',
+          position: 'top' as const,
+          axisLabel: {
+            formatter: '{value} 篇',
+          },
+        },
+        {
+          type: 'value',
+          name: '笔记曝光量',
+          position: 'bottom' as const,
+          axisLabel: {
+            formatter: formatNumber,
+          },
+        },
+      ],
       yAxis: {
         type: 'category',
         data: producers,
+        axisLabel: {
+          width: 100,
+          overflow: 'truncate' as const,
+        },
       },
       series: [
         {
-          name: '笔记数',
+          name: '笔记发布量',
           type: 'bar',
-          data: sortedData.map(item => item.note_count),
-          itemStyle: { color: '#1890ff' },
+          data: noteCounts,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          itemStyle: {
+            color: '#1890ff',
+          },
         },
         {
-          name: '曝光量',
+          name: '笔记曝光量',
           type: 'bar',
-          data: sortedData.map(item => item.impressions || 0),
-          itemStyle: { color: '#52c41a' },
+          data: impressions,
+          xAxisIndex: 1,
+          yAxisIndex: 0,
+          itemStyle: {
+            color: '#52c41a',
+          },
         },
       ],
     };
   }, [data?.creator_creation_data]);
 
-  // 创作者互动量图表配置 - ECharts 水平堆叠条形图
+  // 创作者互动量图表配置 - ECharts 横向堆叠条形图（原样复制旧版）
   const creatorInteractionOption = useMemo((): EChartsOption => {
     if (!data?.creator_interaction_data?.length) return {};
 
-    const sortedData = [...data.creator_interaction_data]
+    // 按生产者聚合数据
+    const aggregatedMap = new Map<string, { likes: number; favorites: number; comments: number; shares: number; total_interactions: number }>();
+    data.creator_interaction_data.forEach(item => {
+      const producer = item.producer || '未知';
+      const existing = aggregatedMap.get(producer);
+      if (existing) {
+        existing.likes += item.likes || 0;
+        existing.favorites += item.favorites || 0;
+        existing.comments += item.comments || 0;
+        existing.shares += item.shares || 0;
+        existing.total_interactions += item.total_interactions || 0;
+      } else {
+        aggregatedMap.set(producer, {
+          likes: item.likes || 0,
+          favorites: item.favorites || 0,
+          comments: item.comments || 0,
+          shares: item.shares || 0,
+          total_interactions: item.total_interactions || 0,
+        });
+      }
+    });
+
+    const sortedData = Array.from(aggregatedMap.entries())
+      .map(([producer, values]) => ({ producer, ...values }))
       .sort((a, b) => (b.total_interactions || 0) - (a.total_interactions || 0))
       .slice(0, 10)
       .reverse();
 
     const producers = sortedData.map(item => item.producer);
-    const types = ['点赞', '收藏', '评论', '分享'];
-    const colors = ['#ff4d4f', '#faad14', '#1890ff', '#52c41a'];
+    const likes = sortedData.map(item => item.likes);
+    const favorites = sortedData.map(item => item.favorites);
+    const comments = sortedData.map(item => item.comments);
+    const shares = sortedData.map(item => item.shares);
+
+    const formatNumber = (value: number): string => {
+      if (value >= 10000) {
+        return (value / 10000).toFixed(1) + '万';
+      }
+      return value.toString();
+    };
 
     return {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const idx = params[0]?.dataIndex ?? 0;
+          const creator = producers[idx] || '未知';
+          let result = `${creator}<br/>`;
+          params.forEach((p: any) => {
+            const value = p.value;
+            result += `${p.marker} ${p.seriesName}: ${formatNumber(value)}<br/>`;
+          });
+          const total = sortedData[idx]?.total_interactions || 0;
+          result += `总互动量: ${formatNumber(total)}`;
+          return result;
+        },
       },
       legend: {
+        data: ['点赞', '收藏', '评论', '分享'],
         bottom: 0,
-        data: types,
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '15%',
+        bottom: '10%',
+        top: '3%',
         containLabel: true,
       },
       xAxis: {
         type: 'value',
+        name: '互动量',
+        axisLabel: {
+          formatter: formatNumber,
+        },
       },
       yAxis: {
         type: 'category',
         data: producers,
+        axisLabel: {
+          width: 100,
+          overflow: 'truncate' as const,
+        },
       },
-      series: types.map((type, index) => ({
-        name: type,
-        type: 'bar' as const,
-        stack: 'total',
-        data: sortedData.map(item =>
-          type === '点赞' ? item.likes || 0 :
-          type === '收藏' ? item.favorites || 0 :
-          type === '评论' ? item.comments || 0 :
-          item.shares || 0
-        ),
-        itemStyle: { color: colors[index] },
-      })),
+      series: [
+        {
+          name: '点赞',
+          type: 'bar' as const,
+          stack: 'interaction',
+          data: likes,
+          itemStyle: { color: '#ff4d4f' },
+        },
+        {
+          name: '收藏',
+          type: 'bar' as const,
+          stack: 'interaction',
+          data: favorites,
+          itemStyle: { color: '#faad14' },
+        },
+        {
+          name: '评论',
+          type: 'bar' as const,
+          stack: 'interaction',
+          data: comments,
+          itemStyle: { color: '#1890ff' },
+        },
+        {
+          name: '分享',
+          type: 'bar' as const,
+          stack: 'interaction',
+          data: shares,
+          itemStyle: { color: '#52c41a' },
+        },
+      ],
     };
   }, [data?.creator_interaction_data]);
 
-  // 员工周转化率趋势图表配置 - ECharts 多折线图
+  // 员工周转化率趋势图表配置 - ECharts 多折线图（原样复制旧版）
   const employeeWeeklyRateOption = useMemo((): EChartsOption => {
     if (!data?.employee_weekly_conversion?.weeks?.length) return {};
 
@@ -753,43 +1287,83 @@ const XhsNotesOperationPage: React.FC = () => {
     return {
       tooltip: {
         trigger: 'axis',
+        axisPointer: { type: 'cross' },
         formatter: (params: any) => {
           if (!params || params.length === 0) return '';
           const title = params[0].axisValue;
-          const content = params.map((item: any) => {
-            const rateColor = getRateColor(item.value);
-            return `<div style="display: flex; justify-content: space-between; gap: 16px; padding: 2px 0;">
-              <span style="display: flex; align-items: center;">
-                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${item.color}; margin-right: 8px;"></span>
-                ${item.seriesName}
-              </span>
-              <span style="font-weight: 600; color: ${rateColor};">${item.value.toFixed(2)}%</span>
+          let result = `<div style="font-weight: 600; margin-bottom: 10px; font-size: 13px; color: #1a1a1a;">${title}</div>`;
+          params.forEach((p: any) => {
+            result += `<div style="margin: 5px 0;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${p.color}; margin-right: 8px;"></span>
+              <span style="color: #5a5c66;">${p.seriesName}:</span>
+              <span style="float: right; font-weight: 600; color: ${getRateColor(p.value)};">${p.value.toFixed(2)}%</span>
             </div>`;
-          }).join('');
-          return `<div style="padding: 8px 12px;">
-            <div style="font-weight: 600; margin-bottom: 8px;">${title}</div>
-            ${content}
-          </div>`;
+          });
+          return result;
         },
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderColor: '#e8e9eb',
+        borderWidth: 1,
+        padding: [12, 16],
+        extraCssText: 'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 6px;',
       },
       legend: {
-        bottom: 0,
         data: employees,
+        bottom: '2%',
+        left: 'center',
+        itemWidth: 14,
+        itemHeight: 14,
+        itemGap: 16,
+        textStyle: {
+          fontSize: 12,
+          color: '#5a5c66',
+        },
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '15%',
+        bottom: '12%',
+        top: '5%',
         containLabel: true,
       },
       xAxis: {
         type: 'category',
         data: weeks,
+        axisLabel: {
+          fontSize: 11,
+          color: '#8a8d99',
+          interval: 0,
+          margin: 12,
+          rotate: 30,
+        },
+        axisLine: {
+          lineStyle: { color: '#e8e9eb' },
+        },
+        axisTick: {
+          show: false,
+        },
       },
       yAxis: {
         type: 'value',
+        name: '转化率',
+        nameTextStyle: {
+          fontSize: 12,
+          color: '#8a8d99',
+          padding: [0, 0, 0, -8],
+        },
         axisLabel: {
+          fontSize: 11,
+          color: '#8a8d99',
           formatter: '{value}%',
+        },
+        axisLine: {
+          lineStyle: { color: '#e8e9eb' },
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#f0f1f3',
+            type: 'dashed' as const,
+          },
         },
       },
       series: employees.map((employee: string, empIndex: number) => ({
@@ -798,9 +1372,18 @@ const XhsNotesOperationPage: React.FC = () => {
         smooth: true,
         data: data.employee_weekly_conversion!.series[empIndex] || [],
         symbol: 'circle',
-        symbolSize: 4,
+        symbolSize: 6,
+        showSymbol: true,
         itemStyle: { color: colors[empIndex % colors.length] },
-        lineStyle: { color: colors[empIndex % colors.length] },
+        lineStyle: { width: 2.5, color: colors[empIndex % colors.length] },
+        emphasis: {
+          focus: 'series' as const,
+          itemStyle: {
+            borderColor: colors[empIndex % colors.length],
+            borderWidth: 2,
+            symbolSize: 8,
+          },
+        },
       })),
     };
   }, [data?.employee_weekly_conversion]);
@@ -808,17 +1391,32 @@ const XhsNotesOperationPage: React.FC = () => {
   // 创作者内容表格列配置
   const creatorContentColumns = [
     {
+      title: '排名',
+      key: 'rank',
+      width: 50,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
+    },
+    {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
-      width: 100,
-      fixed: 'left' as const,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '笔记数',
       dataIndex: 'note_count',
       key: 'note_count',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.note_count - b.note_count,
       render: (value: number) => value?.toLocaleString() || '-',
@@ -827,7 +1425,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '曝光量',
       dataIndex: 'total_impressions',
       key: 'total_impressions',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.total_impressions - b.total_impressions,
       render: (value: number) => value?.toLocaleString() || '-',
@@ -836,7 +1435,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '点击量',
       dataIndex: 'total_clicks',
       key: 'total_clicks',
-      width: 90,
+      width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -844,7 +1444,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '互动量',
       dataIndex: 'total_interactions',
       key: 'total_interactions',
-      width: 90,
+      width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -852,7 +1453,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '消耗',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.total_cost - b.total_cost,
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
@@ -861,7 +1463,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '平均点击率',
       dataIndex: 'avg_click_rate',
       key: 'avg_click_rate',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => <span className={value >= 5 ? styles.positive : ''}>{value?.toFixed(2)}%</span>,
     },
@@ -869,7 +1472,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '平均互动率',
       dataIndex: 'avg_interaction_rate',
       key: 'avg_interaction_rate',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => <span className={value >= 10 ? styles.positive : ''}>{value?.toFixed(2)}%</span>,
     },
@@ -878,17 +1482,32 @@ const XhsNotesOperationPage: React.FC = () => {
   // 创作者转化表格列配置
   const creatorConversionColumns = [
     {
+      title: '排名',
+      key: 'rank',
+      width: 50,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
+    },
+    {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
-      width: 100,
-      fixed: 'left' as const,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '私信量',
       dataIndex: 'private_messages',
       key: 'private_messages',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -897,6 +1516,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'lead_users',
       key: 'lead_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       sorter: (a: XhsCreatorConversionItem, b: XhsCreatorConversionItem) => a.lead_users - b.lead_users,
       render: (value: number) => value?.toLocaleString() || '-',
@@ -906,6 +1526,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'customer_mouth_users',
       key: 'customer_mouth_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -913,7 +1534,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '有效线索',
       dataIndex: 'valid_lead_users',
       key: 'valid_lead_users',
-      width: 90,
+      width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -922,6 +1544,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'opened_account_users',
       key: 'opened_account_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -930,6 +1553,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'valid_customer_users',
       key: 'valid_customer_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -940,7 +1564,7 @@ const XhsNotesOperationPage: React.FC = () => {
     {
       title: '排名',
       key: 'rank',
-      width: 60,
+      width: 50,
       align: 'center' as const,
       render: (_: unknown, __: XhsTopNoteItem, index: number) => (
         <span style={{
@@ -955,8 +1579,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '笔记标题',
       dataIndex: 'note_title',
       key: 'note_title',
-      width: 200,
-      fixed: 'left' as const,
+      width: 160,
       ellipsis: true,
       render: (text: string, record: XhsTopNoteItem) => (
         record.note_url ? (
@@ -970,26 +1593,28 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '发布时间',
       dataIndex: 'note_publish_time',
       key: 'note_publish_time',
-      width: 100,
+      width: 90,
       align: 'center' as const,
     },
     {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
-      width: 80,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '投放策略',
       dataIndex: 'ad_strategy',
       key: 'ad_strategy',
-      width: 100,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '消耗',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      width: 100,
+      width: 90,
       align: 'right' as const,
       sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => a.total_cost - b.total_cost,
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
@@ -998,7 +1623,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '曝光量',
       dataIndex: 'total_impressions',
       key: 'total_impressions',
-      width: 100,
+      width: 90,
       align: 'right' as const,
       sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => a.total_impressions - b.total_impressions,
       render: (value: number) => value?.toLocaleString() || '-',
@@ -1007,7 +1632,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '点击量',
       dataIndex: 'total_clicks',
       key: 'total_clicks',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1042,7 +1667,7 @@ const XhsNotesOperationPage: React.FC = () => {
     {
       title: '排名',
       key: 'rank',
-      width: 60,
+      width: 50,
       align: 'center' as const,
       render: (_: unknown, __: XhsCreatorAnnualRankingItem, index: number) => (
         <span style={{
@@ -1057,8 +1682,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
-      width: 100,
-      fixed: 'left' as const,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '笔记数',
@@ -1073,7 +1698,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '消耗',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      width: 100,
+      width: 90,
       align: 'right' as const,
       sorter: (a: XhsCreatorAnnualRankingItem, b: XhsCreatorAnnualRankingItem) => a.total_cost - b.total_cost,
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
@@ -1082,7 +1707,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '曝光量',
       dataIndex: 'total_impressions',
       key: 'total_impressions',
-      width: 100,
+      width: 90,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1090,7 +1715,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '点击量',
       dataIndex: 'total_clicks',
       key: 'total_clicks',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1123,17 +1748,32 @@ const XhsNotesOperationPage: React.FC = () => {
   // 代理商数据表格列配置
   const agencyDataColumns = [
     {
+      title: '排名',
+      key: 'rank',
+      width: 50,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
+    },
+    {
       title: '代理商',
       dataIndex: 'agency',
       key: 'agency',
       width: 100,
-      fixed: 'left' as const,
+      ellipsis: true,
     },
     {
       title: '消耗',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       sorter: (a: XhsAgencyDataItem, b: XhsAgencyDataItem) => a.total_cost - b.total_cost,
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
@@ -1142,7 +1782,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '曝光量',
       dataIndex: 'total_impressions',
       key: 'total_impressions',
-      width: 100,
+      width: 90,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1150,7 +1791,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '点击量',
       dataIndex: 'total_clicks',
       key: 'total_clicks',
-      width: 90,
+      width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1159,6 +1801,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'lead_users',
       key: 'lead_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1167,6 +1810,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'potential_customers',
       key: 'potential_customers',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1175,6 +1819,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'customer_mouth_users',
       key: 'customer_mouth_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1182,7 +1827,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '有效线索',
       dataIndex: 'valid_lead_users',
       key: 'valid_lead_users',
-      width: 90,
+      width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1191,6 +1837,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'opened_account_users',
       key: 'opened_account_users',
       width: 80,
+      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1199,85 +1846,7 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'valid_customer_users',
       key: 'valid_customer_users',
       width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-  ];
-
-  // 笔记转化排行表格列配置
-  const noteConversionColumns = [
-    {
-      title: '笔记标题',
-      dataIndex: 'note_title',
-      key: 'note_title',
-      width: 200,
-      fixed: 'left' as const,
       ellipsis: true,
-      render: (text: string, record: XhsNoteConversionItem) => (
-        record.note_url ? (
-          <Link href={record.note_url} target="_blank" className={styles.noteLink}>
-            {text}
-          </Link>
-        ) : text
-      ),
-    },
-    {
-      title: '生产者',
-      dataIndex: 'producer',
-      key: 'producer',
-      width: 80,
-    },
-    {
-      title: '投放策略',
-      dataIndex: 'ad_strategy',
-      key: 'ad_strategy',
-      width: 100,
-    },
-    {
-      title: '消耗',
-      dataIndex: 'total_cost',
-      key: 'total_cost',
-      width: 100,
-      align: 'right' as const,
-      render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
-    },
-    {
-      title: '曝光量',
-      dataIndex: 'total_impressions',
-      key: 'total_impressions',
-      width: 100,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '点击量',
-      dataIndex: 'total_clicks',
-      key: 'total_clicks',
-      width: 90,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '私信量',
-      dataIndex: 'total_private_messages',
-      key: 'total_private_messages',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '加微数',
-      dataIndex: 'lead_users',
-      key: 'lead_users',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '开户数',
-      dataIndex: 'opened_account_users',
-      key: 'opened_account_users',
-      width: 80,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1288,39 +1857,38 @@ const XhsNotesOperationPage: React.FC = () => {
     {
       title: '排名',
       key: 'rank',
-      width: 60,
+      width: 50,
       align: 'center' as const,
-      render: (_: unknown, __: unknown, index: number) => index + 1,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
     },
     {
       title: '员工姓名',
       dataIndex: 'employee_name',
       key: 'employee_name',
-      width: 100,
-      fixed: 'left' as const,
+      width: 90,
+      ellipsis: true,
     },
     {
       title: '加微数',
       dataIndex: 'lead_users',
       key: 'lead_users',
-      width: 80,
+      width: 70,
       align: 'right' as const,
       sorter: (a: XhsEmployeeConversionItem, b: XhsEmployeeConversionItem) => a.lead_users - b.lead_users,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '企微添加',
-      dataIndex: 'wechat_adds',
-      key: 'wechat_adds',
-      width: 80,
-      align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
       title: '有效线索',
       dataIndex: 'valid_lead_users',
       key: 'valid_lead_users',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1328,7 +1896,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '开户数',
       dataIndex: 'opened_account_users',
       key: 'opened_account_users',
-      width: 80,
+      width: 70,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1336,7 +1904,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '有效户',
       dataIndex: 'valid_customer_users',
       key: 'valid_customer_users',
-      width: 80,
+      width: 70,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1344,7 +1912,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '开户率',
       dataIndex: 'opening_rate',
       key: 'opening_rate',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       render: (value: number) => (
         <span className={value >= 10 ? styles.positive : ''}>
@@ -1356,7 +1924,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '有效户率',
       dataIndex: 'valid_customer_rate',
       key: 'valid_customer_rate',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       render: (value: number) => (
         <span className={value >= 30 ? styles.positive : ''}>
@@ -1368,7 +1936,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '总资产',
       dataIndex: 'total_assets',
       key: 'total_assets',
-      width: 120,
+      width: 100,
       align: 'right' as const,
       sorter: (a: XhsEmployeeConversionItem, b: XhsEmployeeConversionItem) => (a.total_assets || 0) - (b.total_assets || 0),
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
@@ -1378,10 +1946,25 @@ const XhsNotesOperationPage: React.FC = () => {
   // 创作者创作数据表格列配置
   const creatorCreationColumns = [
     {
+      title: '排名',
+      key: 'rank',
+      width: 50,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
+    },
+    {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
       width: 100,
+      ellipsis: true,
     },
     {
       title: '笔记数',
@@ -1405,16 +1988,31 @@ const XhsNotesOperationPage: React.FC = () => {
   // 创作者互动数据表格列配置
   const creatorInteractionColumns = [
     {
+      title: '排名',
+      key: 'rank',
+      width: 50,
+      align: 'center' as const,
+      render: (_: unknown, __: unknown, index: number) => (
+        <span style={{
+          fontWeight: index < 3 ? 'bold' : 'normal',
+          color: index < 3 ? '#1890ff' : 'inherit',
+        }}>
+          {index + 1}
+        </span>
+      ),
+    },
+    {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
       width: 100,
+      ellipsis: true,
     },
     {
       title: '点赞',
       dataIndex: 'likes',
       key: 'likes',
-      width: 80,
+      width: 70,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1446,7 +2044,7 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '总互动',
       dataIndex: 'total_interactions',
       key: 'total_interactions',
-      width: 90,
+      width: 80,
       align: 'right' as const,
       sorter: (a: XhsCreatorInteractionItem, b: XhsCreatorInteractionItem) => a.total_interactions - b.total_interactions,
       render: (value: number) => value?.toLocaleString() || '-',
@@ -1454,39 +2052,52 @@ const XhsNotesOperationPage: React.FC = () => {
   ];
 
   return (
-    <div className={styles.operationPage}>
+    <div className={styles.operationPage} ref={pageRef}>
       {/* 筛选器 */}
       <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
           {/* 主日期范围 */}
           <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>主日期范围:</span>
+            <span className={styles.filterLabel}>日期范围:</span>
             <DateRangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates)}
             />
-          </div>
-
-          {/* 笔记排行榜日期范围 */}
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>笔记排行榜:</span>
-            <DateRangePicker
-              value={topNotesDateRange}
-              onChange={(dates) => setTopNotesDateRange(dates)}
-            />
-          </div>
-
-          {/* 创作者年度日期范围 */}
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>创作者年度:</span>
-            <DateRangePicker
-              value={creatorAnnualDateRange}
-              onChange={(dates) => setCreatorAnnualDateRange(dates)}
-            />
+            <Space size={4} style={{ marginLeft: 8 }}>
+              <Button
+                type={isDateRangeActive(dateRange, 'days7') ? 'primary' : 'default'}
+                onClick={() => handleQuickDateSelectTop('days7')}
+              >
+                近7天
+              </Button>
+              <Button
+                type={isDateRangeActive(dateRange, 'days30') ? 'primary' : 'default'}
+                onClick={() => handleQuickDateSelectTop('days30')}
+              >
+                近30天
+              </Button>
+              <Button
+                type={isDateRangeActive(dateRange, 'ytd') ? 'primary' : 'default'}
+                onClick={() => handleQuickDateSelectTop('ytd')}
+              >
+                今年以来
+              </Button>
+              <Button
+                type={isDateRangeActive(dateRange, 'all') ? 'primary' : 'default'}
+                onClick={() => handleQuickDateSelectTop('all')}
+              >
+                全部
+              </Button>
+            </Space>
           </div>
 
           {/* 操作按钮 */}
           <div className={styles.filterActions}>
+            <Dropdown menu={{ items: exportMenuItems }} trigger={['click']}>
+              <Button icon={<DownloadOutlined />}>
+                导出报表 <DownOutlined />
+              </Button>
+            </Dropdown>
             <Button
               type="primary"
               icon={<SearchOutlined />}
@@ -1632,80 +2243,216 @@ const XhsNotesOperationPage: React.FC = () => {
       ) : (
         <>
           {/* 创作者内容与转化数据 */}
-          <div className={styles.rowTwoCols}>
-            <Card className={styles.sectionCard} title="创作者内容数据">
+          <div className={styles.twoColGrid}>
+            <Card
+              className={styles.sectionCard}
+              title={<CardTitle icon="📝" plain>创作者内容数据</CardTitle>}
+              extra={
+                <Space>
+                  <span className={styles.statText}>
+                    共 {data?.creator_content_data?.length || 0} 条
+                  </span>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    size="small"
+                    onClick={() => handleExport('creator_content')}
+                    disabled={!data?.creator_content_data?.length}
+                  >
+                    导出CSV
+                  </Button>
+                </Space>
+              }
+            >
               <Table
                 columns={creatorContentColumns}
                 dataSource={data?.creator_content_data || []}
                 rowKey="producer"
-                scroll={{ x: 800 }}
                 size="small"
-                pagination={false}
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
               />
-              <div style={{ marginTop: 16, textAlign: 'right' }}>
-                <Button
-                  icon={<DownloadOutlined />}
-                  size="small"
-                  onClick={() => handleExport('creator_content')}
-                  disabled={!data?.creator_content_data?.length}
-                >
-                  导出CSV
-                </Button>
-              </div>
             </Card>
 
-            <Card className={styles.sectionCard} title="创作者转化数据">
+            <Card
+              className={styles.sectionCard}
+              title={<CardTitle icon="📊" plain>创作者转化数据</CardTitle>}
+              extra={
+                <Space>
+                  <span className={styles.statText}>
+                    共 {data?.creator_conversion_data?.length || 0} 条
+                  </span>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    size="small"
+                    onClick={() => handleExport('creator_conversion')}
+                    disabled={!data?.creator_conversion_data?.length}
+                  >
+                    导出CSV
+                  </Button>
+                </Space>
+              }
+            >
               <Table
                 columns={creatorConversionColumns}
                 dataSource={data?.creator_conversion_data || []}
                 rowKey="producer"
-                scroll={{ x: 700 }}
                 size="small"
-                pagination={false}
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
               />
             </Card>
           </div>
 
-          {/* 创作趋势图 */}
-          <Card className={styles.chartCard} title="创作趋势">
-            <div style={{ marginBottom: 16 }}>
-              <Select
-                value={creationChartType}
-                onChange={setCreationChartType}
-                style={{ width: 120 }}
-                options={[
-                  { label: '笔记数', value: 'notes' },
-                  { label: '曝光量', value: 'impressions' },
-                  { label: '互动量', value: 'interactions' },
-                  { label: '消耗', value: 'cost' },
-                ]}
+          {/* 创作者创作与互动数据 - 表格区域 */}
+          <div className={styles.twoColGrid}>
+            <Card
+              className={styles.sectionCard}
+              title={<CardTitle icon="✍️" plain>创作者创作数据</CardTitle>}
+              extra={
+                <Space>
+                  <span className={styles.statText}>
+                    共 {data?.creator_creation_data?.length || 0} 条
+                  </span>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    size="small"
+                    onClick={() => handleExport('creator_creation')}
+                    disabled={!data?.creator_creation_data?.length}
+                  >
+                    导出CSV
+                  </Button>
+                </Space>
+              }
+            >
+              <Table
+                columns={creatorCreationColumns}
+                dataSource={data?.creator_creation_data || []}
+                rowKey="producer"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
               />
-            </div>
-            {data?.creation_trend?.dates?.length ? (
-              <EChartsComponent option={creationTrendOption} height={300} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                暂无数据，请选择日期范围后点击查询
+            </Card>
+
+            <Card
+              className={styles.sectionCard}
+              title={<CardTitle icon="💬" plain>创作者互动数据</CardTitle>}
+              extra={
+                <Space>
+                  <span className={styles.statText}>
+                    共 {data?.creator_interaction_data?.length || 0} 条
+                  </span>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    size="small"
+                    onClick={() => handleExport('creator_interaction')}
+                    disabled={!data?.creator_interaction_data?.length}
+                  >
+                    导出CSV
+                  </Button>
+                </Space>
+              }
+            >
+              <Table
+                columns={creatorInteractionColumns}
+                dataSource={data?.creator_interaction_data || []}
+                rowKey="producer"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+              />
+            </Card>
+          </div>
+
+          {/* 内容运营数据 - 2x2图表网格 */}
+          <Card className={styles.chartCard}>
+            <CardTitle icon="📈">内容运营数据</CardTitle>
+            <div className={styles.contentChartGrid}>
+              <div>
+                <h4 className={styles.sectionTitle}>创作量趋势</h4>
+                <div className={styles.chartContainer}>
+                  {data?.creation_trend?.dates?.length ? (
+                    <EChartsComponent option={creationVolumeOption} height={280} />
+                  ) : (
+                    <div className={styles.chartEmpty}>暂无数据</div>
+                  )}
+                </div>
               </div>
-            )}
+              <div>
+                <h4 className={styles.sectionTitle}>互动量趋势</h4>
+                <div className={styles.chartContainer}>
+                  {data?.creation_trend?.dates?.length ? (
+                    <EChartsComponent option={interactionTrendOption} height={280} />
+                  ) : (
+                    <div className={styles.chartEmpty}>暂无数据</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className={styles.contentChartGrid} style={{ marginTop: 20 }}>
+              <div>
+                <h4 className={styles.sectionTitle}>笔记创作量</h4>
+                <div className={styles.chartContainer}>
+                  {data?.creator_creation_data?.length ? (
+                    <EChartsComponent option={creatorCreationOption} height={280} />
+                  ) : (
+                    <div className={styles.chartEmpty}>暂无数据</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <h4 className={styles.sectionTitle}>笔记互动量</h4>
+                <div className={styles.chartContainer}>
+                  {data?.creator_interaction_data?.length ? (
+                    <EChartsComponent option={creatorInteractionOption} height={280} />
+                  ) : (
+                    <div className={styles.chartEmpty}>暂无数据</div>
+                  )}
+                </div>
+              </div>
+            </div>
           </Card>
 
-          {/* 笔记排行榜 */}
+          {/* 笔记排行榜 - 独立筛选器 */}
           <Card
             className={styles.tableCard}
             title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <span>优秀笔记排行榜</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <Text type="secondary" className={styles.cardTitle}>优秀笔记排行榜</Text>
+                <DateRangePicker
+                  value={topNotesDateRange}
+                  onChange={(dates) => {
+                    if (dates && dates[0] && dates[1]) {
+                      setTopNotesDateRange(dates);
+                      fetchTopNotesData(dates);
+                    }
+                  }}
+                  style={{ width: 240, height: 32 }}
+                />
                 <Space size={4}>
                   <Button
-                    size="small"
                     type={isDateRangeActive(topNotesDateRange, 'days30') ? 'primary' : 'default'}
                     onClick={() => handleQuickDateSelect('topNotes', 'days30')}
                   >
                     近30天
                   </Button>
                   <Button
-                    size="small"
                     type={isDateRangeActive(topNotesDateRange, 'ytd') ? 'primary' : 'default'}
                     onClick={() => handleQuickDateSelect('topNotes', 'ytd')}
                   >
@@ -1730,37 +2477,47 @@ const XhsNotesOperationPage: React.FC = () => {
               </Space>
             }
           >
-            <Table
-              columns={topNotesColumns}
-              dataSource={data?.top_notes || []}
-              rowKey="note_id"
-              scroll={{ x: 1000 }}
-              size="small"
-              pagination={{
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 条`,
-                pageSizeOptions: ['10', '20', '50', '100'],
-              }}
-            />
+            <Spin spinning={topNotesLoading}>
+              <Table
+                columns={topNotesColumns}
+                dataSource={data?.top_notes || []}
+                rowKey="note_id"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+              />
+            </Spin>
           </Card>
 
-          {/* 创作者年度排行 */}
+          {/* 创作者年度排行 - 独立筛选器 */}
           <Card
             className={styles.tableCard}
             title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <span>创作者年度排行</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                <Text type="secondary" className={styles.cardTitle}>创作者年度排行</Text>
+                <DateRangePicker
+                  value={creatorAnnualDateRange}
+                  onChange={(dates) => {
+                    if (dates && dates[0] && dates[1]) {
+                      setCreatorAnnualDateRange(dates);
+                      fetchCreatorAnnualData(dates);
+                    }
+                  }}
+                  style={{ width: 240, height: 32 }}
+                />
                 <Space size={4}>
                   <Button
-                    size="small"
                     type={isDateRangeActive(creatorAnnualDateRange, 'days30') ? 'primary' : 'default'}
                     onClick={() => handleQuickDateSelect('creatorAnnual', 'days30')}
                   >
                     近30天
                   </Button>
                   <Button
-                    size="small"
                     type={isDateRangeActive(creatorAnnualDateRange, 'ytd') ? 'primary' : 'default'}
                     onClick={() => handleQuickDateSelect('creatorAnnual', 'ytd')}
                   >
@@ -1770,139 +2527,87 @@ const XhsNotesOperationPage: React.FC = () => {
               </div>
             }
           >
-            <Table
-              columns={creatorAnnualColumns}
-              dataSource={data?.creator_annual_ranking || []}
-              rowKey="producer"
-              scroll={{ x: 800 }}
-              size="small"
-              pagination={false}
-            />
+            <Spin spinning={creatorAnnualLoading}>
+              <Table
+                columns={creatorAnnualColumns}
+                dataSource={data?.creator_annual_ranking || []}
+                rowKey="producer"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+              />
+            </Spin>
           </Card>
 
           {/* 代理商数据 */}
-          <Card className={styles.tableCard} title="代理商数据">
+          <Card
+            className={styles.tableCard}
+            title={<CardTitle icon="🏢" plain>代理商数据</CardTitle>}
+            extra={
+              <Space>
+                <span className={styles.statText}>
+                  共 {data?.agency_data?.length || 0} 条
+                </span>
+                <Button
+                  icon={<DownloadOutlined />}
+                  size="small"
+                  onClick={() => handleExport('agency_data')}
+                  disabled={!data?.agency_data?.length}
+                >
+                  导出CSV
+                </Button>
+              </Space>
+            }
+          >
             <Table
               columns={agencyDataColumns}
               dataSource={data?.agency_data || []}
               rowKey="agency"
-              scroll={{ x: 900 }}
-              size="small"
-              pagination={false}
-            />
-          </Card>
-
-          {/* 转化趋势图 */}
-          <Card className={styles.chartCard} title="转化趋势">
-            {data?.conversion_trend?.weeks?.length ? (
-              <EChartsComponent option={conversionTrendOption} height={300} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                暂无数据
-              </div>
-            )}
-          </Card>
-
-          {/* 笔记转化排行 */}
-          <Card className={styles.tableCard} title="笔记转化排行">
-            <Table
-              columns={noteConversionColumns}
-              dataSource={data?.note_conversion_ranking || []}
-              rowKey="note_id"
-              scroll={{ x: 1000 }}
               size="small"
               pagination={{
+                defaultPageSize: 10,
                 showSizeChanger: true,
                 showTotal: (total) => `共 ${total} 条`,
-                pageSizeOptions: ['10', '20', '50'],
+                pageSizeOptions: ['10', '20', '50', '100'],
               }}
+              scroll={{ y: 400 }}
             />
           </Card>
 
-          {/* 内容运营数据 - 图表区域 */}
+          {/* 转化运营数据 - 左右等分图表布局 + 员工转化排行表格 */}
           <Card className={styles.chartCard}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>内容运营数据</h3>
-            </div>
+            <CardTitle icon="📊">转化运营数据</CardTitle>
             <div className={styles.chartGrid}>
-              <div>
-                <h4 className={styles.sectionTitle}>创作量趋势</h4>
+              <div className={styles.chartGridItem}>
+                <h4 className={styles.sectionTitle}>整体转化走势（周度）</h4>
                 <div className={styles.chartContainer}>
-                  {data?.creation_trend?.dates?.length ? (
-                    <EChartsComponent option={creationVolumeOption} height={280} />
+                  {data?.conversion_trend?.weeks?.length ? (
+                    <EChartsComponent option={conversionTrendOption} height={280} />
                   ) : (
                     <div className={styles.chartEmpty}>暂无数据</div>
                   )}
                 </div>
               </div>
-              <div>
-                <h4 className={styles.sectionTitle}>互动量趋势</h4>
+              <div className={styles.chartGridItem}>
+                <h4 className={styles.sectionTitle}>小助手开户转化率走势（周度）</h4>
                 <div className={styles.chartContainer}>
-                  {data?.creation_trend?.dates?.length ? (
-                    <EChartsComponent option={interactionTrendOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className={styles.chartGrid} style={{ marginTop: 24 }}>
-              <div>
-                <h4 className={styles.sectionTitle}>笔记创作量</h4>
-                <div className={styles.chartContainer}>
-                  {data?.creator_creation_data?.length ? (
-                    <EChartsComponent option={creatorCreationOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <h4 className={styles.sectionTitle}>笔记互动量</h4>
-                <div className={styles.chartContainer}>
-                  {data?.creator_interaction_data?.length ? (
-                    <EChartsComponent option={creatorInteractionOption} height={280} />
+                  {data?.employee_weekly_conversion?.weeks?.length ? (
+                    <EChartsComponent option={employeeWeeklyRateOption} height={280} />
                   ) : (
                     <div className={styles.chartEmpty}>暂无数据</div>
                   )}
                 </div>
               </div>
             </div>
-          </Card>
 
-          {/* 创作者创作与互动数据 - 表格区域 */}
-          <div className={styles.rowTwoCols}>
-            <Card className={styles.sectionCard} title="创作者创作数据">
-              <Table
-                columns={creatorCreationColumns}
-                dataSource={data?.creator_creation_data || []}
-                rowKey="producer"
-                scroll={{ x: 300 }}
-                size="small"
-                pagination={false}
-              />
-            </Card>
-
-            <Card className={styles.sectionCard} title="创作者互动数据">
-              <Table
-                columns={creatorInteractionColumns}
-                dataSource={data?.creator_interaction_data || []}
-                rowKey="producer"
-                scroll={{ x: 500 }}
-                size="small"
-                pagination={false}
-              />
-            </Card>
-          </div>
-
-          {/* 员工转化排行 */}
-          <Card className={styles.tableCard}>
-            <div className={styles.tableHeader}>
-              <span className={styles.tableTitle}>员工转化排行</span>
-              <Space>
-                <span className={styles.statText}>
-                  共 {data?.employee_conversion_ranking?.length || 0} 人
-                </span>
+            {/* 员工转化量排行榜 - 在图表下方 */}
+            <div className={styles.tableSection}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h4 className={styles.sectionTitle}>员工转化量排行榜</h4>
                 <Button
                   icon={<DownloadOutlined />}
                   size="small"
@@ -1911,32 +2616,22 @@ const XhsNotesOperationPage: React.FC = () => {
                 >
                   导出CSV
                 </Button>
-              </Space>
+              </div>
+              <Table
+                columns={employeeConversionColumns}
+                dataSource={data?.employee_conversion_ranking || []}
+                rowKey="employee_name"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+              />
             </div>
-            <Table
-              columns={employeeConversionColumns}
-              dataSource={data?.employee_conversion_ranking || []}
-              rowKey="employee_name"
-              scroll={{ x: 900 }}
-              size="small"
-              pagination={{
-                showSizeChanger: true,
-                showTotal: (total) => `共 ${total} 条`,
-                pageSizeOptions: ['10', '20', '50', '100'],
-              }}
-            />
           </Card>
 
-          {/* 员工周转化率趋势图 */}
-          <Card className={styles.chartCard} title="员工周转化率趋势">
-            {data?.employee_weekly_conversion?.weeks?.length ? (
-              <EChartsComponent option={employeeWeeklyRateOption} height={320} />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#999' }}>
-                暂无数据
-              </div>
-            )}
-          </Card>
         </>
       )}
     </div>

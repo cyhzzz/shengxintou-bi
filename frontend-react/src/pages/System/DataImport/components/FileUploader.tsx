@@ -1,13 +1,15 @@
 /**
  * 文件上传组件
  */
-import React, { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, message, Progress, Switch, Space, Spin } from 'antd';
 import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
-import type { UploadProps } from 'antd';
-import type { DataType, UploadResponse } from '@/types/api.schemas';
+import type { UploadResponse } from '@/types/api.schemas';
 import ImportResult from './ImportResult';
 import styles from './FileUploader.module.scss';
+
+// 数据类型
+type DataType = 'tencent_ads' | 'douyin_ads' | 'xiaohongshu_ads' | 'xhs_notes' | 'backend_conversion';
 
 const { Dragger } = Upload;
 
@@ -47,7 +49,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 轮询任务状态
   const pollTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
@@ -192,7 +194,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
   };
 
   // 组件卸载时清理轮询
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);

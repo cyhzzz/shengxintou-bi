@@ -83,15 +83,6 @@ const LIGHT_THEME = {
       },
     },
   },
-  // 时间轴
-  timeline: {
-    lineStyle: {
-      color: '#eee',
-    },
-    label: {
-      color: '#333',
-    },
-  },
 };
 
 // 暗色主题配置
@@ -157,15 +148,6 @@ const DARK_THEME = {
       },
     },
   },
-  // 时间轴
-  timeline: {
-    lineStyle: {
-      color: '#444',
-    },
-    label: {
-      color: '#fff',
-    },
-  },
 };
 
 /**
@@ -181,13 +163,14 @@ export function mergeChartTheme(
   const merged: Record<string, unknown> = { ...option };
 
   Object.keys(themeConfig).forEach((key) => {
-    if (merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key])) {
+    const themeVal = themeConfig[key as keyof typeof themeConfig];
+    if (merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key]) && typeof themeVal === 'object') {
       merged[key] = {
-        ...themeConfig[key as keyof typeof themeConfig],
+        ...themeVal,
         ...(merged[key] as Record<string, unknown>),
       };
     } else if (!merged[key]) {
-      merged[key] = themeConfig[key as keyof typeof themeConfig];
+      merged[key] = themeVal;
     }
   });
 

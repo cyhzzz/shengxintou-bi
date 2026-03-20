@@ -68,12 +68,12 @@ class HttpClient {
     return fullUrl;
   }
 
-  // 通用请求方法
-  async request<T>(url: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
+  // 通用请求方法（接收已构建好的完整 URL）
+  async request<T>(fullUrl: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
     const { timeout = API_TIMEOUT, ...fetchConfig } = config;
 
     // 应用请求拦截器
-    let processedUrl = url;
+    let processedUrl = fullUrl;
     let processedConfig = fetchConfig;
     for (const interceptor of this.requestInterceptors) {
       const result = interceptor(processedUrl, processedConfig);
@@ -83,7 +83,7 @@ class HttpClient {
 
     try {
       const response = await this.withTimeout(
-        fetch(this.buildUrl(processedUrl), {
+        fetch(processedUrl, {
           ...processedConfig,
           headers: {
             'Content-Type': 'application/json',
@@ -138,7 +138,8 @@ class HttpClient {
 
   // POST 请求
   async post<T>(url: string, data?: unknown, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return this.request<T>(url, {
+    const fullUrl = this.buildUrl(url);
+    return this.request<T>(fullUrl, {
       ...config,
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -147,7 +148,8 @@ class HttpClient {
 
   // PUT 请求
   async put<T>(url: string, data?: unknown, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return this.request<T>(url, {
+    const fullUrl = this.buildUrl(url);
+    return this.request<T>(fullUrl, {
       ...config,
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
@@ -156,16 +158,18 @@ class HttpClient {
 
   // DELETE 请求
   async delete<T>(url: string, config?: RequestConfig): Promise<ApiResponse<T>> {
-    return this.request<T>(url, { ...config, method: 'DELETE' });
+    const fullUrl = this.buildUrl(url);
+    return this.request<T>(fullUrl, { ...config, method: 'DELETE' });
   }
 
   // 文件上传
   async upload<T>(url: string, formData: FormData, config?: RequestConfig): Promise<ApiResponse<T>> {
     const { timeout = API_TIMEOUT } = config || {};
+    const fullUrl = this.buildUrl(url);
 
     try {
       const response = await this.withTimeout(
-        fetch(this.buildUrl(url), {
+        fetch(fullUrl, {
           method: 'POST',
           body: formData,
           // 不设置 Content-Type，让浏览器自动设置 multipart/form-data 边界

@@ -24,8 +24,11 @@ const WeeklyReportPreview: React.FC<WeeklyReportPreviewProps> = ({ content, load
     return (
       <Empty
         className={styles.emptyContainer}
-        image="📄"
-        description='点击"生成周报"按钮开始生成周报'
+        description={
+          <span style={{ color: '#999', fontSize: 14 }}>
+            点击"生成周报"按钮开始生成周报
+          </span>
+        }
       />
     );
   }

@@ -31,4 +31,34 @@
 
 .reportCard {
   margin-top: 20px;
+
+  // 隐藏默认标题头
+  :global {
+    .ant-card-head {
+      display: none;
+    }
+  }
+}
+
+// 卡片标题区域样式 - 与 Dashboard 保持一致
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #8A8D99 !important;
+}
+
+.cardDesc {
+  font-size: 12px;
+  color: #bfbfbf !important;
 }

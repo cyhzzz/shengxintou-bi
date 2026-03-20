@@ -12,7 +12,7 @@ import {
 import styles from './ChartCard.module.scss';
 
 interface ChartCardProps {
-  title: string;
+  title: string | React.ReactNode;
   children?: React.ReactNode;
   loading?: boolean;
   empty?: boolean;
@@ -23,6 +23,8 @@ interface ChartCardProps {
   extra?: React.ReactNode;
   height?: number | string;
   className?: string;
+  /** 使用自定义标题样式（如 Dashboard 的 groupHeader 风格） */
+  useCustomTitle?: boolean;
 }
 
 const ChartCard: React.FC<ChartCardProps> = ({
@@ -37,6 +39,7 @@ const ChartCard: React.FC<ChartCardProps> = ({
   extra,
   height = 300,
   className,
+  useCustomTitle = false,
 }) => {
   // 工具栏操作
   const toolbar = (
@@ -75,10 +78,22 @@ const ChartCard: React.FC<ChartCardProps> = ({
     </Space>
   );
 
+  // 自定义标题渲染
+  const renderTitle = () => {
+    if (useCustomTitle && typeof title === 'string') {
+      return (
+        <div className={styles.customTitle}>
+          <span className={styles.customTitleText}>{title}</span>
+        </div>
+      );
+    }
+    return title;
+  };
+
   return (
     <Card
-      className={`${styles.chartCard} ${className || ''}`}
-      title={title}
+      className={`${styles.chartCard} ${useCustomTitle ? styles.withCustomTitle : ''} ${className || ''}`}
+      title={renderTitle()}
       extra={toolbar}
     >
       <div className={styles.chartContainer} style={{ height }}>

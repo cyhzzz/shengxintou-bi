@@ -228,35 +228,53 @@ const LeadsDetailPage: React.FC = () => {
   // 获取筛选后的全部数据（用于导出）
   const fetchAllDataForExport = useCallback(async (): Promise<LeadsDetailItem[]> => {
     const filters = filtersRef.current;
-    const params: Record<string, unknown> = {
-      page: 1,
-      page_size: 10000, // 获取全部数据
-    };
+    const allItems: LeadsDetailItem[] = [];
+    const pageSize = 10000;
+    let currentPage = 1;
+    let hasMore = true;
 
-    if (filters.dateRange[0]) {
-      params.start_date = filters.dateRange[0];
-    }
-    if (filters.dateRange[1]) {
-      params.end_date = filters.dateRange[1];
-    }
-    if (filters.platform) {
-      params.platforms = filters.platform;
-    }
-    if (filters.employeeName) {
-      params.employee_name = filters.employeeName;
-    }
-    if (filters.isOpenedAccount === 'true') {
-      params.is_opened_account = true;
-    } else if (filters.isOpenedAccount === 'false') {
-      params.is_opened_account = false;
+    while (hasMore) {
+      const params: Record<string, unknown> = {
+        page: currentPage,
+        page_size: pageSize,
+      };
+
+      if (filters.dateRange[0]) {
+        params.start_date = filters.dateRange[0];
+      }
+      if (filters.dateRange[1]) {
+        params.end_date = filters.dateRange[1];
+      }
+      if (filters.platform) {
+        params.platforms = filters.platform;
+      }
+      if (filters.employeeName) {
+        params.employee_name = filters.employeeName;
+      }
+      if (filters.isOpenedAccount === 'true') {
+        params.is_opened_account = true;
+      } else if (filters.isOpenedAccount === 'false') {
+        params.is_opened_account = false;
+      }
+
+      const response: LeadsDetailResponse = await getLeadsDetail(params);
+
+      if (response.success && response.data) {
+        const items = response.data.items || [];
+        allItems.push(...items);
+        const returnedTotal = response.data.total || 0;
+        // 如果已经获取了所有数据，或者返回的数据少于 page_size，说明是最后一页
+        if (allItems.length >= returnedTotal || items.length < pageSize) {
+          hasMore = false;
+        } else {
+          currentPage++;
+        }
+      } else {
+        hasMore = false;
+      }
     }
 
-    const response: LeadsDetailResponse = await getLeadsDetail(params);
-
-    if (response.success && response.data) {
-      return response.data.items || [];
-    }
-    return [];
+    return allItems;
   }, []);
 
   // 导出数据
