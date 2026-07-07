@@ -1,255 +1,130 @@
-# -*- coding: utf-8 -*-
-"""
-趋势数据接口 - 日级/周级/月级趋势分析
-"""
-
+﻿# -*- coding: utf-8 -*-
+"""趋势数据接口（v2 - 查 agg_vendor_daily）"""
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_, Integer, case
-from backend.models import (
-    DailyMetricsUnified,
-    AccountAgencyMapping,
-    AgencyAbbreviationMapping,
-    DailyNotesMetricsUnified,
-    XhsNoteInfo,
-    BackendConversions
-)
+from sqlalchemy import func, and_
+from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from datetime import datetime, date, timedelta
 
-# 创建Blueprint
 bp = Blueprint('trend', __name__)
+
 
 @bp.route('/trend', methods=['POST'])
 @handle_exceptions
 def get_trend():
-    """
-    获取趋势数据
-    支持日级、周级、月级聚合
-    ---
-    tags:
-      - Trend
-    description: |
-      获取趋势数据，支持日级、周级、月级聚合。
-
-      **支持的粒度**：
-      - daily: 按日期分组，返回格式 YYYY-MM-DD
-      - weekly: 按ISO周分组，返回格式 YYYY-WWW (如 2025-W01)
-      - monthly: 按年月分组，返回格式 YYYY-MM
-
-      **支持的指标**：
-      - cost: 花费
-      - impressions: 曝光量
-      - clicks: 点击量
-      - leads / lead_users: 线索人数
-      - new_accounts / opened_account_users: 开户人数
-      - valid_customer_users: 有效户人数
-
-      **返回格式**：
-      - dates: 周期标签数组
-      - series: 指标数据数组，每个指标一个对象
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            filters:
-              type: object
-              properties:
-                date_range:
-                  type: array
-                  items:
-                    type: string
-                    format: date
-                  description: 日期范围 [开始日期, 结束日期]
-                  example: ["2025-01-01", "2025-01-31"]
-                platforms:
-                  type: array
-                  items:
-                    type: string
-                    enum: ["腾讯", "抖音", "小红书"]
-                  description: 平台筛选
-                agencies:
-                  type: array
-                  items:
-                    type: string
-                  description: 代理商筛选
-                business_models:
-                  type: array
-                  items:
-                    type: string
-                    enum: ["直播", "信息流", "搜索"]
-                  description: 业务模式筛选
-            metrics:
-              type: array
-              items:
-                type: string
-                enum: ["cost", "impressions", "clicks", "leads", "lead_users", "new_accounts", "opened_account_users", "valid_customer_users"]
-              description: 要查询的指标列表
-              default: ["cost", "leads"]
-              example: ["cost", "impressions", "clicks", "leads"]
-            granularity:
-              type: string
-              enum: ["daily", "weekly", "monthly"]
-              description: 聚合粒度
-              default: "daily"
-              example: "daily"
-    responses:
-      200:
-        description: 成功响应
-        schema:
-          type: object
-          properties:
-            success:
-              type: boolean
-              example: true
-            data:
-              type: object
-              properties:
-                dates:
-                  type: array
-                  items:
-                    type: string
-                  example: ["2025-01-01", "2025-01-02", "2025-01-03"]
-                series:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                        example: "cost"
-                      data:
-                        type: array
-                        items:
-                          type: number
-                        example: [1000.00, 1200.00, 1500.00]
-      500:
-        description: 服务器错误
-    """
-    from backend.database import db
-
-    data = request.get_json()
-    filters = data.get('filters', {})
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
     metrics = data.get('metrics', ['cost', 'leads'])
-    granularity = data.get('granularity', 'daily')  # daily, weekly, monthly
+    granularity = data.get('granularity', 'daily')
 
-    try:
-        # 根据请求的指标添加聚合列
-        select_columns = []
-        group_by_columns = []
+    start_date = filters.get('start_date') or (filters.get('date_range', [None, None])[0] if filters.get('date_range') else None)
+    end_date = filters.get('end_date') or (filters.get('date_range', [None, None])[1] if filters.get('date_range') else None)
 
-        # 根据粒度选择分组列
-        if granularity == 'daily':
-            # 日级：按日期分组
-            select_columns.append(DailyMetricsUnified.date.label('period'))
-            group_by_columns.append(DailyMetricsUnified.date)
-        elif granularity == 'weekly':
-            # 周级：按ISO周分组 (年份+周数)，使用SQLite兼容的字符串拼接
-            # 使用op方法确保生成SQLite的||操作符而非concat函数
-            week_expr = func.strftime('%Y', DailyMetricsUnified.date).op('||')('-W').op('||')(func.strftime('%W', DailyMetricsUnified.date))
-            select_columns.append(week_expr.label('period'))
-            group_by_columns.append(week_expr)
-        elif granularity == 'monthly':
-            # 月级：按年月分组
-            select_columns.append(
-                func.strftime('%Y-%m', DailyMetricsUnified.date).label('period')
-            )
-            group_by_columns.append(
-                func.strftime('%Y-%m', DailyMetricsUnified.date)
-            )
+    if granularity == 'weekly':
+        period = func.strftime('%Y-%W', AggVendorDaily.日期).label('period')
+    elif granularity == 'monthly':
+        period = func.strftime('%Y-%m', AggVendorDaily.日期).label('period')
+    else:
+        period = AggVendorDaily.日期.label('period')
 
-        # 添加指标聚合列
-        for metric in metrics:
-            if metric == 'cost':
-                select_columns.append(func.sum(DailyMetricsUnified.cost).label('cost'))
-            elif metric == 'impressions':
-                select_columns.append(func.sum(DailyMetricsUnified.impressions).label('impressions'))
-            elif metric == 'clicks':
-                select_columns.append(func.sum(DailyMetricsUnified.clicks).label('clicks'))
-            elif metric == 'leads' or metric == 'lead_users':
-                select_columns.append(func.sum(DailyMetricsUnified.lead_users).label('lead_users'))
-            elif metric == 'new_accounts' or metric == 'opened_account_users':
-                select_columns.append(func.sum(DailyMetricsUnified.opened_account_users).label('opened_account_users'))
-            elif metric == 'valid_customer_users':
-                select_columns.append(func.sum(DailyMetricsUnified.valid_customer_users).label('valid_customer_users'))
+    metric_map = {
+        'cost': AggVendorDaily.花费,
+        'impressions': AggVendorDaily.展示量,
+        'clicks': AggVendorDaily.点击量,
+        'leads': AggVendorDaily.线索数,
+        'lead_users': AggVendorDaily.线索数,
+        'new_accounts': AggVendorDaily.开户人数,
+        'opened_account_users': AggVendorDaily.开户人数,
+        'valid_customer_users': AggVendorDaily.有效户人数,
+    }
+    sel = [period]
+    for m in metrics:
+        col = metric_map.get(m)
+        if col is not None:
+            sel.append(func.coalesce(func.sum(col), 0).label(m))
 
-        query = db.session.query(*select_columns)
-
-        # 应用筛选条件
-        if 'date_range' in filters and filters['date_range']:
-            query = query.filter(
-                and_(
-                    DailyMetricsUnified.date >= filters['date_range'][0],
-                    DailyMetricsUnified.date <= filters['date_range'][1]
-                )
-            )
-
-        if 'platforms' in filters and filters['platforms']:
-            query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-        if 'agencies' in filters and filters['agencies']:
-            query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-        if 'business_models' in filters and filters['business_models']:
-            query = query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-        # 按粒度分组
-        for group_col in group_by_columns:
-            query = query.group_by(group_col)
-
-        # 排序
-        query = query.order_by(group_by_columns[0])
-
-        results = query.all()
-
-        # 转换结果
-        output = {
-            'dates': [],
-            'series': []
-        }
-
-        # 提取周期标签
-        for row in results:
-            output['dates'].append(str(row.period))
-
-        # 构建series
-        for metric in metrics:
-            series_data = []
-
-            for row in results:
-                if metric == 'cost' and hasattr(row, 'cost'):
-                    series_data.append(float(row.cost) if row.cost else 0)
-                elif metric == 'impressions' and hasattr(row, 'impressions'):
-                    series_data.append(int(row.impressions) if row.impressions else 0)
-                elif metric == 'clicks' and hasattr(row, 'clicks'):
-                    series_data.append(int(row.clicks) if row.clicks else 0)
-                elif (metric == 'leads' or metric == 'lead_users') and hasattr(row, 'lead_users'):
-                    series_data.append(int(row.lead_users) if row.lead_users else 0)
-                elif (metric == 'new_accounts' or metric == 'opened_account_users') and hasattr(row, 'opened_account_users'):
-                    series_data.append(int(row.opened_account_users) if row.opened_account_users else 0)
-                elif metric == 'valid_customer_users' and hasattr(row, 'valid_customer_users'):
-                    series_data.append(int(row.valid_customer_users) if row.valid_customer_users else 0)
+    q = db.session.query(*sel)
+    if start_date and end_date:
+        q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if filters.get('platforms'):
+        q = q.filter(AggVendorDaily.平台.in_([str(p) for p in filters['platforms']]))
+    if filters.get('agencies'):
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in filters['agencies']]))
+    if filters.get('business_models'):
+        q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in filters['business_models']]))
+    if granularity == 'daily':
+        q = q.group_by(AggVendorDaily.日期).order_by(AggVendorDaily.日期)
+    else:
+        q = q.group_by('period').order_by('period')
+    rows = q.all()
+    dates = [str(r.period) for r in rows]
+    series = []
+    for m in metrics:
+        data_pts = []
+        for r in rows:
+            v = getattr(r, m, 0) or 0
+            try:
+                if m == 'cost':
+                    data_pts.append(round(float(v), 2))
                 else:
-                    series_data.append(0)
+                    data_pts.append(int(v))
+            except (TypeError, ValueError):
+                data_pts.append(0)
+        series.append({'name': m, 'data': data_pts})
+    return jsonify({'success': True, 'data': {'dates': dates, 'series': series}})
 
-            output['series'].append({
-                'name': metric,
-                'data': series_data
-            })
 
-        return jsonify({
-            'success': True,
-            'data': output
+@bp.route('/trend/daily', methods=['GET'])
+@handle_exceptions
+def get_trend_daily():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    platforms = [p for p in (request.args.get('platforms') or '').split(',') if p]
+    agencies = [a for a in (request.args.get('agencies') or '').split(',') if a]
+    business_models = [b for b in (request.args.get('business_models') or '').split(',') if b]
+    q = db.session.query(
+        AggVendorDaily.日期.label('date'),
+        AggVendorDaily.平台.label('platform'),
+        AggVendorDaily.厂商.label('agency'),
+        AggVendorDaily.业务模式.label('business_model'),
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
+        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened_account_users'),
+        func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid_customer_users'),
+    )
+    if start_date and end_date:
+        q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms:
+        q = q.filter(AggVendorDaily.平台.in_(platforms))
+    if agencies:
+        q = q.filter(AggVendorDaily.厂商.in_(agencies))
+    if business_models:
+        q = q.filter(AggVendorDaily.业务模式.in_(business_models))
+    q = q.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.厂商, AggVendorDaily.业务模式).order_by(AggVendorDaily.日期)
+    rows = q.all()
+
+    def f(v):
+        try: return float(v or 0)
+        except: return 0
+    def i(v):
+        try: return int(v or 0)
+        except: return 0
+    series = []
+    for r in rows:
+        series.append({
+            'date': str(r.date),
+            'platform': r.platform,
+            'business_model': r.business_model,
+            'agency': r.agency,
+            'metrics': {
+                'cost': round(f(r.cost), 2),
+                'impressions': i(r.impressions),
+                'clicks': i(r.clicks),
+                'lead_users': i(r.leads),
+                'opened_account_users': i(r.opened_account_users),
+                'valid_customer_users': i(r.valid_customer_users),
+            }
         })
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'查询失败: {str(e)}'
-        }), 500
-
-
-
+    return jsonify({'success': True, 'dates': sorted(set([r['date'] for r in series])), 'series': series})

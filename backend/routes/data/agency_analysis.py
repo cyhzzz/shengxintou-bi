@@ -1,407 +1,149 @@
-# -*- coding: utf-8 -*-
-"""
-代理商分析接口 - 代理商投放数据分析和趋势
-"""
-
+﻿# -*- coding: utf-8 -*-
+"""代理商分析接口（v2 - 查 agg_vendor_daily）"""
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_, Integer, case, literal
-from backend.models import (
-    DailyMetricsUnified,
-    AccountAgencyMapping,
-    AgencyAbbreviationMapping,
-    DailyNotesMetricsUnified,
-    XhsNoteInfo,
-    BackendConversions
-)
+from sqlalchemy import func, and_
+from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from datetime import datetime, date, timedelta
 
-# 创建Blueprint
 bp = Blueprint('agency_analysis', __name__)
+
 
 @bp.route('/agency-analysis', methods=['GET'])
 @handle_exceptions
 def get_agency_analysis():
-    """
-    代理商投放分析
-    获取平台×业务模式×代理商的多维度投放数据分析
-    ---
-    tags:
-      - Agency Analysis
-    description: |
-      获取平台×业务模式×代理商的多维度投放数据分析。
-
-      **返回数据包括**：
-      - summary: 汇总数据（平台×业务模式×代理商明细 + 平台小计 + 全部合计）
-      - trend: 日级趋势数据
-
-      **计算指标**：
-      - lead_cost: 单线索成本 = 花费 / 线索人数
-      - account_cost: 单开户成本 = 花费 / 开户人数
-
-      **支持筛选**：
-      - start_date/end_date: 日期范围
-      - platforms: 平台筛选
-      - agencies: 代理商筛选
-      - business_models: 业务模式筛选
-    parameters:
-      - name: start_date
-        in: query
-        schema:
-          type: string
-          format: date
-      - name: end_date
-        in: query
-        schema:
-          type: string
-          format: date
-      - name: platforms
-        in: query
-        style: form
-        explode: true
-        schema:
-          type: array
-          items:
-            type: string
-      - name: business_models
-        in: query
-        style: form
-        explode: true
-        schema:
-          type: array
-          items:
-            type: string
-                    enum: ["直播", "信息流", "搜索"]
-                  description: 业务模式筛选
-    responses:
-      200:
-        description: 成功响应
-        schema:
-          type: object
-          properties:
-            summary:
-              type: array
-              items:
-                type: object
-                properties:
-                  platform:
-                    type: string
-                  business_model:
-                    type: string
-                  agency:
-                    type: string
-                  is_subtotal:
-                    type: boolean
-                  is_total:
-                    type: boolean
-                  metrics:
-                    type: object
-                    properties:
-                      cost:
-                        type: number
-                      impressions:
-                        type: integer
-                      clicks:
-                        type: integer
-                      lead_users:
-                        type: integer
-                      opened_account_users:
-                        type: integer
-                      valid_customer_users:
-                        type: integer
-                      lead_cost:
-                        type: number
-                      account_cost:
-                        type: number
-            trend:
-              type: object
-              properties:
-                dates:
-                  type: array
-                  items:
-                    type: string
-                series:
-                  type: array
-                  items:
-                    type: object
-      500:
-        description: 服务器错误
-    """
-    from backend.database import db
-
-    # 从查询参数获取筛选条件
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-    platforms = request.args.get('platforms', '').split(',') if request.args.get('platforms') else []
-    agencies = request.args.get('agencies', '').split(',') if request.args.get('agencies') else []
-    business_models = request.args.get('business_models', '').split(',') if request.args.get('business_models') else []
+    platforms = [p for p in (request.args.get('platforms') or '').split(',') if p]
+    agencies = [a for a in (request.args.get('agencies') or '').split(',') if a]
+    business_models = [b for b in (request.args.get('business_models') or '').split(',') if b]
 
-    # 构建 filters 对象
-    filters = {}
+    q = db.session.query(
+        AggVendorDaily.平台,
+        AggVendorDaily.业务模式,
+        AggVendorDaily.厂商,
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
+        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
+        func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
+        func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
+        func.coalesce(func.sum(AggVendorDaily.存量客户资产), 0).label('existing_assets'),
+    )
     if start_date and end_date:
-        filters['date_range'] = [start_date, end_date]
-    if platforms and platforms[0]:
-        filters['platforms'] = platforms
-    if agencies and agencies[0]:
-        filters['agencies'] = agencies
-    if business_models and business_models[0]:
-        filters['business_models'] = business_models
+        q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms: q = q.filter(AggVendorDaily.平台.in_(platforms))
+    if agencies: q = q.filter(AggVendorDaily.厂商.in_(agencies))
+    if business_models: q = q.filter(AggVendorDaily.业务模式.in_(business_models))
+    q = q.group_by(AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商)
+    rows = q.all()
 
-    try:
-        # 1. 获取平台×业务模式×代理商汇总数据
-        summary_query = db.session.query(
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.business_model,
-            DailyMetricsUnified.agency,
-            func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
-            func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
-            func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users'),
-            func.sum(DailyMetricsUnified.opened_account_assets).label('total_opened_account_assets'),
-            func.sum(DailyMetricsUnified.existing_customer_assets).label('total_existing_customer_assets')
-        )
+    def f(v):
+        try: return float(v or 0)
+        except: return 0.0
+    def i(v):
+        try: return int(v or 0)
+        except: return 0
 
-        # 应用筛选条件
-        if 'date_range' in filters and filters['date_range']:
-            summary_query = summary_query.filter(
-                and_(
-                    DailyMetricsUnified.date >= filters['date_range'][0],
-                    DailyMetricsUnified.date <= filters['date_range'][1]
-                )
-            )
-
-        if 'platforms' in filters and filters['platforms']:
-            summary_query = summary_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-        if 'agencies' in filters and filters['agencies']:
-            summary_query = summary_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-        if 'business_models' in filters and filters['business_models']:
-            summary_query = summary_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-        # 分组
-        summary_query = summary_query.group_by(
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.business_model,
-            DailyMetricsUnified.agency
-        )
-
-        summary_results = summary_query.all()
-
-        # 转换汇总数据
-        summary_data = []
-        platform_subtotals = {}  # 平台小计
-        grand_total = {  # 全部合计
-            'cost': 0,
-            'impressions': 0,
-            'clicks': 0,
-            'lead_users': 0,
-            'opened_account_users': 0,
-            'valid_customer_users': 0,
-            'opened_account_assets': 0,
-            'existing_customer_assets': 0
-        }
-
-        for row in summary_results:
-            cost = float(row.total_cost) if row.total_cost else 0
-            impressions = int(row.total_impressions) if row.total_impressions else 0
-            clicks = int(row.total_clicks) if row.total_clicks else 0
-            lead_users = int(row.total_lead_users) if row.total_lead_users else 0
-            opened_account_users = int(row.total_opened_account_users) if row.total_opened_account_users else 0
-            valid_customer_users = int(row.total_valid_customer_users) if row.total_valid_customer_users else 0
-            opened_account_assets = float(row.total_opened_account_assets) if row.total_opened_account_assets else 0
-            existing_customer_assets = float(row.total_existing_customer_assets) if row.total_existing_customer_assets else 0
-
-            # 计算成本指标
-            lead_cost = cost / lead_users if lead_users > 0 else 0
-            account_cost = cost / opened_account_users if opened_account_users > 0 else 0
-
-            item = {
-                'platform': row.platform,
-                'business_model': row.business_model,
-                'agency': row.agency,
-                'metrics': {
-                    'cost': cost,
-                    'impressions': impressions,
-                    'clicks': clicks,
-                    'lead_users': lead_users,
-                    'opened_account_users': opened_account_users,
-                    'valid_customer_users': valid_customer_users,
-                    'opened_account_assets': opened_account_assets,
-                    'existing_customer_assets': existing_customer_assets,
-                    'lead_cost': round(lead_cost, 2),
-                    'account_cost': round(account_cost, 2)
-                }
-            }
-            summary_data.append(item)
-
-            # 累加平台小计
-            platform = row.platform
-            if platform not in platform_subtotals:
-                platform_subtotals[platform] = {
-                    'cost': 0,
-                    'impressions': 0,
-                    'clicks': 0,
-                    'lead_users': 0,
-                    'opened_account_users': 0,
-                    'valid_customer_users': 0,
-                    'opened_account_assets': 0,
-                    'existing_customer_assets': 0
-                }
-            platform_subtotals[platform]['cost'] += cost
-            platform_subtotals[platform]['impressions'] += impressions
-            platform_subtotals[platform]['clicks'] += clicks
-            platform_subtotals[platform]['lead_users'] += lead_users
-            platform_subtotals[platform]['opened_account_users'] += opened_account_users
-            platform_subtotals[platform]['valid_customer_users'] += valid_customer_users
-            platform_subtotals[platform]['opened_account_assets'] += opened_account_assets
-            platform_subtotals[platform]['existing_customer_assets'] += existing_customer_assets
-
-            # 累加全部合计
-            grand_total['cost'] += cost
-            grand_total['impressions'] += impressions
-            grand_total['clicks'] += clicks
-            grand_total['lead_users'] += lead_users
-            grand_total['opened_account_users'] += opened_account_users
-            grand_total['valid_customer_users'] += valid_customer_users
-            grand_total['opened_account_assets'] += opened_account_assets
-            grand_total['existing_customer_assets'] += existing_customer_assets
-
-        # 生成平台小计行
-        platform_subtotal_rows = []
-        for platform, metrics in platform_subtotals.items():
-            lead_cost = metrics['cost'] / metrics['lead_users'] if metrics['lead_users'] > 0 else 0
-            account_cost = metrics['cost'] / metrics['opened_account_users'] if metrics['opened_account_users'] > 0 else 0
-
-            platform_subtotal_rows.append({
-                'platform': platform,
-                'business_model': '',
-                'agency': '[小计]',
-                'is_subtotal': True,
-                'metrics': {
-                    'cost': metrics['cost'],
-                    'impressions': metrics['impressions'],
-                    'clicks': metrics['clicks'],
-                    'lead_users': metrics['lead_users'],
-                    'opened_account_users': metrics['opened_account_users'],
-                    'valid_customer_users': metrics['valid_customer_users'],
-                    'opened_account_assets': metrics['opened_account_assets'],
-                    'existing_customer_assets': metrics['existing_customer_assets'],
-                    'lead_cost': round(lead_cost, 2),
-                    'account_cost': round(account_cost, 2)
-                }
-            })
-
-        # 生成全部合计行
-        total_lead_cost = grand_total['cost'] / grand_total['lead_users'] if grand_total['lead_users'] > 0 else 0
-        total_account_cost = grand_total['cost'] / grand_total['opened_account_users'] if grand_total['opened_account_users'] > 0 else 0
-
-        grand_total_row = {
-            'platform': '',
-            'business_model': '',
-            'agency': '[合计]',
-            'is_total': True,
+    summary = []
+    for r in rows:
+        cost, leads, opened = f(r.cost), i(r.leads), i(r.opened)
+        summary.append({
+            'platform': r.平台,
+            'business_model': r.业务模式,
+            'agency': r.厂商,
             'metrics': {
-                'cost': grand_total['cost'],
-                'impressions': grand_total['impressions'],
-                'clicks': grand_total['clicks'],
-                'lead_users': grand_total['lead_users'],
-                'opened_account_users': grand_total['opened_account_users'],
-                'valid_customer_users': grand_total['valid_customer_users'],
-                'opened_account_assets': grand_total['opened_account_assets'],
-                'existing_customer_assets': grand_total['existing_customer_assets'],
-                'lead_cost': round(total_lead_cost, 2),
-                'account_cost': round(total_account_cost, 2)
-            }
-        }
-
-        # 合并数据：明细 + 平台小计 + 全部合计
-        final_summary = summary_data + platform_subtotal_rows + [grand_total_row]
-
-        # 2. 获取按日期的趋势数据
-        trend_query = db.session.query(
-            DailyMetricsUnified.date,
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.business_model,
-            DailyMetricsUnified.agency,
-            func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
-            func.sum(DailyMetricsUnified.lead_users).label('total_lead_users'),
-            func.sum(DailyMetricsUnified.opened_account_users).label('total_opened_account_users'),
-            func.sum(DailyMetricsUnified.valid_customer_users).label('total_valid_customer_users')
-        )
-
-        # 应用相同的筛选条件
-        if 'date_range' in filters and filters['date_range']:
-            trend_query = trend_query.filter(
-                and_(
-                    DailyMetricsUnified.date >= filters['date_range'][0],
-                    DailyMetricsUnified.date <= filters['date_range'][1]
-                )
-            )
-
-        if 'platforms' in filters and filters['platforms']:
-            trend_query = trend_query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-        if 'agencies' in filters and filters['agencies']:
-            trend_query = trend_query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-        if 'business_models' in filters and filters['business_models']:
-            trend_query = trend_query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-        # 分组
-        trend_query = trend_query.group_by(
-            DailyMetricsUnified.date,
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.business_model,
-            DailyMetricsUnified.agency
-        )
-        trend_query = trend_query.order_by(DailyMetricsUnified.date)
-
-        trend_results = trend_query.all()
-
-        # 转换趋势数据为前端期望的格式
-        series_data = []
-        for row in trend_results:
-            series_data.append({
-                'date': row.date.strftime('%Y-%m-%d'),
-                'platform': row.platform,
-                'business_model': row.business_model,
-                'agency': row.agency,
-                'metrics': {
-                    'cost': float(row.total_cost) if row.total_cost else 0,
-                    'impressions': int(row.total_impressions) if row.total_impressions else 0,
-                    'clicks': int(row.total_clicks) if row.total_clicks else 0,
-                    'lead_users': int(row.total_lead_users) if row.total_lead_users else 0,
-                    'opened_account_users': int(row.total_opened_account_users) if row.total_opened_account_users else 0,
-                    'valid_customer_users': int(row.total_valid_customer_users) if row.total_valid_customer_users else 0
-                }
-            })
-
-        # 获取所有唯一日期
-        dates = sorted(list(set([row.date.strftime('%Y-%m-%d') for row in trend_results])))
-
-        return jsonify({
-            'success': True,
-            'data': {
-                'summary': final_summary,
-                'trend': {
-                    'dates': dates,
-                    'series': series_data
-                }
+                'cost': round(cost, 2),
+                'impressions': i(r.impressions),
+                'clicks': i(r.clicks),
+                'lead_users': leads,
+                'opened_account_users': opened,
+                'valid_customer_users': i(r.valid),
+                'opened_account_assets': round(f(r.assets), 2),
+                'existing_customer_assets': round(f(r.existing_assets), 2),
+                'lead_cost': round(cost / leads, 2) if leads > 0 else 0,
+                'account_cost': round(cost / opened, 2) if opened > 0 else 0,
             }
         })
 
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'error': f'查询失败: {str(e)}',
-            'traceback': traceback.format_exc()
-        }), 500
+    plat_sub = {}
+    for item in summary:
+        p = item['platform']
+        if p not in plat_sub:
+            plat_sub[p] = {'platform': p, 'business_model': '', 'agency': '[{} 小计]'.format(p),
+                            'is_subtotal': True, 'metrics': {'cost': 0, 'impressions': 0, 'clicks': 0,
+                            'lead_users': 0, 'opened_account_users': 0, 'valid_customer_users': 0,
+                            'opened_account_assets': 0, 'existing_customer_assets': 0}}
+        m = plat_sub[p]['metrics']
+        for k in ['cost', 'impressions', 'clicks', 'lead_users', 'opened_account_users',
+                  'valid_customer_users', 'opened_account_assets', 'existing_customer_assets']:
+            m[k] += item['metrics'][k]
 
+    grand = {'cost': 0, 'impressions': 0, 'clicks': 0, 'leads': 0, 'opened': 0, 'valid': 0, 'assets': 0, 'existing_assets': 0}
+    for item in summary:
+        m = item['metrics']
+        grand['cost'] += m['cost']
+        grand['impressions'] += m['impressions']
+        grand['clicks'] += m['clicks']
+        grand['leads'] += m['lead_users']
+        grand['opened'] += m['opened_account_users']
+        grand['valid'] += m['valid_customer_users']
+        grand['assets'] += m['opened_account_assets']
+        grand['existing_assets'] += m['existing_customer_assets']
 
+    grand_row = {
+        'platform': '', 'business_model': '', 'agency': '[合计]',
+        'is_total': True,
+        'metrics': {
+            'cost': round(grand['cost'], 2),
+            'impressions': grand['impressions'],
+            'clicks': grand['clicks'],
+            'lead_users': grand['leads'],
+            'opened_account_users': grand['opened'],
+            'valid_customer_users': grand['valid'],
+            'opened_account_assets': round(grand['assets'], 2),
+            'existing_customer_assets': round(grand['existing_assets'], 2),
+            'lead_cost': round(grand['cost'] / grand['leads'], 2) if grand['leads'] > 0 else 0,
+            'account_cost': round(grand['cost'] / grand['opened'], 2) if grand['opened'] > 0 else 0,
+        }
+    }
+    final_summary = summary + list(plat_sub.values()) + [grand_row]
 
+    tq = db.session.query(
+        AggVendorDaily.日期,
+        AggVendorDaily.平台,
+        AggVendorDaily.业务模式,
+        AggVendorDaily.厂商,
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
+        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
+        func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
+    )
+    if start_date and end_date:
+        tq = tq.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms: tq = tq.filter(AggVendorDaily.平台.in_(platforms))
+    if agencies: tq = tq.filter(AggVendorDaily.厂商.in_(agencies))
+    if business_models: tq = tq.filter(AggVendorDaily.业务模式.in_(business_models))
+    tq = tq.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商).order_by(AggVendorDaily.日期)
+    trend_rows = tq.all()
+    series = []
+    for r in trend_rows:
+        series.append({
+            'date': str(r.日期),
+            'platform': r.平台,
+            'business_model': r.业务模式,
+            'agency': r.厂商,
+            'metrics': {
+                'cost': round(f(r.cost), 2),
+                'impressions': i(r.impressions),
+                'clicks': i(r.clicks),
+                'lead_users': i(r.leads),
+                'opened_account_users': i(r.opened),
+                'valid_customer_users': i(r.valid),
+            }
+        })
+    dates = sorted(set([r['date'] for r in series]))
+    return jsonify({'success': True, 'data': {'summary': final_summary, 'trend': {'dates': dates, 'series': series}}})

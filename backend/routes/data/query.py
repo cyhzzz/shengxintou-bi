@@ -1,739 +1,150 @@
-# -*- coding: utf-8 -*-
-"""
-数据查询API接口 - 通用查询、汇总、转化数据测试
-"""
-
+﻿# -*- coding: utf-8 -*-
+"""通用查询接口（v2 - 查 agg_vendor_daily + fact_conv_content）"""
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_, Integer, case, literal
-from backend.models import (
-    DailyMetricsUnified,
-    AccountAgencyMapping,
-    AgencyAbbreviationMapping,
-    DailyNotesMetricsUnified,
-    XhsNoteInfo,
-    BackendConversions
-)
+from sqlalchemy import func, and_
+from backend.models_v2 import AggVendorDaily, FactConvContent
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from datetime import datetime, date, timedelta
 
-# 创建Blueprint
 bp = Blueprint('query', __name__)
 
-@bp.route('/query', methods=['POST'])
-@handle_exceptions
-def query_data():
-    """
-    通用数据查询接口
-    支持多维度聚合查询
-    ---
-    tags:
-      - Query
-    summary: 通用数据查询
-    description: 支持按日期、平台、代理商、业务模式等多维度聚合查询广告投放数据
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            dimensions:
-              type: array
-              items:
-                type: string
-                enum: [date, platform, agency, business_model]
-              description: 聚合维度
-              example: ["date", "platform", "agency"]
-            metrics:
-              type: array
-              items:
-                type: string
-                enum: [cost, impressions, clicks, leads, new_accounts, customer_assets, customer_contribution]
-              description: 查询指标
-              example: ["cost", "impressions", "clicks", "leads"]
-            filters:
-              type: object
-              properties:
-                date_range:
-                  type: array
-                  items:
-                    type: string
-                    format: date
-                  description: 日期范围 [开始日期, 结束日期]
-                  example: ["2025-01-01", "2025-01-31"]
-                platforms:
-                  type: array
-                  items:
-                    type: string
-                    enum: [腾讯, 抖音, 小红书]
-                  description: 平台筛选
-                agencies:
-                  type: array
-                  items:
-                    type: string
-                  description: 代理商筛选
-                business_models:
-                  type: array
-                  items:
-                    type: string
-                    enum: [直播, 信息流, 搜索]
-                  description: 业务模式筛选
-            granularity:
-              type: string
-              enum: [daily, summary]
-              default: daily
-              description: 查询粒度，daily为日级明细，summary为汇总
-            limit:
-              type: integer
-              default: 1000
-              description: 返回记录数限制
-    responses:
-      200:
-        description: 查询成功
-        schema:
-          type: object
-          properties:
-            success:
-              type: boolean
-              example: true
-            data:
-              type: array
-              items:
-                type: object
-                properties:
-                  date:
-                    type: string
-                    format: date
-                  platform:
-                    type: string
-                  agency:
-                    type: string
-                  business_model:
-                    type: string
-                  metrics:
-                    type: object
-                    properties:
-                      cost:
-                        type: number
-                      impressions:
-                        type: integer
-                      clicks:
-                        type: integer
-                      leads:
-                        type: integer
-            total:
-              type: integer
-              description: 返回记录总数
-      400:
-        description: 请求参数错误
-      500:
-        description: 服务器错误
-    """
-    from backend.database import db
 
-    # 获取请求参数
-    data = request.get_json()
+def _f(v):
+    try: return float(v) if v is not None else 0.0
+    except: return 0.0
 
-    if not data:
-        return jsonify({'error': '请求体不能为空'}), 400
-
-    dimensions = data.get('dimensions', [])
-    metrics = data.get('metrics', ['cost', 'impressions', 'clicks', 'leads', 'new_accounts'])
-    filters = data.get('filters', {})
-    granularity = data.get('granularity', 'daily')
-    limit = data.get('limit', 1000)
-
-    # 检查是否请求资产和客户贡献指标
-    needs_conversion_data = 'customer_assets' in metrics or 'customer_contribution' in metrics
-
-    # 添加调试日志
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f'[query_data] 请求的metrics: {metrics}')
-    logger.info(f'[query_data] needs_conversion_data: {needs_conversion_data}')
-
-    # 构建基础查询
-    query = db.session.query(
-        DailyMetricsUnified
-    )
-
-    # 应用筛选条件
-    if 'date_range' in filters and filters['date_range']:
-        start_date = filters['date_range'][0]
-        end_date = filters['date_range'][1]
-        query = query.filter(
-            and_(
-                DailyMetricsUnified.date >= start_date,
-                DailyMetricsUnified.date <= end_date
-            )
-        )
-
-    if 'platforms' in filters and filters['platforms']:
-        query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-    if 'agencies' in filters and filters['agencies']:
-        query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-    if 'business_models' in filters and filters['business_models']:
-        query = query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-    # 根据粒度聚合
-    if granularity == 'summary':
-        # 汇总查询：按维度聚合
-        group_by_columns = []
-
-        if 'platform' in dimensions:
-            group_by_columns.append(DailyMetricsUnified.platform)
-        if 'agency' in dimensions:
-            group_by_columns.append(DailyMetricsUnified.agency)
-        if 'business_model' in dimensions:
-            group_by_columns.append(DailyMetricsUnified.business_model)
-
-        # 构建聚合选择
-        aggregations = []
-        if 'platform' in dimensions:
-            aggregations.append(DailyMetricsUnified.platform)
-        if 'agency' in dimensions:
-            aggregations.append(DailyMetricsUnified.agency)
-        if 'business_model' in dimensions:
-            aggregations.append(DailyMetricsUnified.business_model)
-
-        # 添加指标聚合
-        for metric in metrics:
-            if hasattr(DailyMetricsUnified, metric):
-                aggregations.append(func.sum(getattr(DailyMetricsUnified, metric)).label(metric))
-
-        # 重建查询
-        query = db.session.query(*aggregations)
-
-        # 重新应用筛选条件（因为重建了查询）
-        if 'date_range' in filters and filters['date_range']:
-            start_date = filters['date_range'][0]
-            end_date = filters['date_range'][1]
-            query = query.filter(
-                and_(
-                    DailyMetricsUnified.date >= start_date,
-                    DailyMetricsUnified.date <= end_date
-                )
-            )
-
-        if 'platforms' in filters and filters['platforms']:
-            query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
-
-        if 'agencies' in filters and filters['agencies']:
-            query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
-
-        if 'business_models' in filters and filters['business_models']:
-            query = query.filter(DailyMetricsUnified.business_model.in_(filters['business_models']))
-
-        # 分组（如果有维度）
-        if group_by_columns:
-            query = query.group_by(*group_by_columns)
-
-    # 执行查询
-    try:
-        results = query.limit(limit).all()
-
-        # 查询客户资产和客户贡献（总是查询，支持前端显示）
-        conversion_metrics = {}
-
-        logger.info(f'[query_data] 开始查询客户资产和客户贡献数据...')
-
-        try:
-            # SQLite使用||操作符连接字符串
-            # 构建用户唯一标识符用于去重
-            user_identifier_expr = (
-                BackendConversions.platform_source + '|' +
-                func.coalesce(BackendConversions.wechat_nickname, '') + '|' +
-                func.coalesce(BackendConversions.capital_account, '') + '|' +
-                func.coalesce(BackendConversions.platform_user_id, '')
-            ).label('user_identifier')
-
-            # 构建转化数据查询 - 分别统计新开客户和存量客户
-            # 新开客户（is_opened_account=1）
-            new_customers_query = db.session.query(
-                func.sum(BackendConversions.assets).label('total_assets'),
-                func.sum(BackendConversions.customer_contribution).label('total_contribution'),
-                func.count(func.distinct(user_identifier_expr)).label('unique_users')
-            ).filter(
-                BackendConversions.lead_date.isnot(None),
-                BackendConversions.is_opened_account == True
-            )
-
-            # 存量客户（is_opened_account=0）
-            existing_customers_query = db.session.query(
-                func.sum(BackendConversions.assets).label('total_assets'),
-                func.count(func.distinct(user_identifier_expr)).label('unique_users')
-            ).filter(
-                BackendConversions.lead_date.isnot(None),
-                BackendConversions.is_opened_account == False,
-                BackendConversions.assets.isnot(None),
-                BackendConversions.assets > 0
-            )
-
-            logger.info(f'[query_data] 转化基础查询构建完成，开始应用筛选条件...')
-
-            # 应用日期筛选条件
-            if 'date_range' in filters and filters['date_range']:
-                start_date = filters['date_range'][0]
-                end_date = filters['date_range'][1]
-                new_customers_query = new_customers_query.filter(
-                    and_(
-                        BackendConversions.lead_date >= start_date,
-                        BackendConversions.lead_date <= end_date
-                    )
-                )
-                existing_customers_query = existing_customers_query.filter(
-                    and_(
-                        BackendConversions.lead_date >= start_date,
-                        BackendConversions.lead_date <= end_date
-                    )
-                )
-                logger.info(f'[query_data] 应用日期筛选: {start_date} 到 {end_date}')
-
-            # 应用平台筛选条件
-            if 'platforms' in filters and filters['platforms']:
-                new_customers_query = new_customers_query.filter(
-                    BackendConversions.platform_source.in_(filters['platforms'])
-                )
-                existing_customers_query = existing_customers_query.filter(
-                    BackendConversions.platform_source.in_(filters['platforms'])
-                )
-                logger.info(f'[query_data] 应用平台筛选: {filters["platforms"]}')
-
-            # 应用代理商筛选条件
-            if 'agencies' in filters and filters['agencies']:
-                new_customers_query = new_customers_query.filter(
-                    BackendConversions.agency.in_(filters['agencies'])
-                )
-                existing_customers_query = existing_customers_query.filter(
-                    BackendConversions.agency.in_(filters['agencies'])
-                )
-                logger.info(f'[query_data] 应用代理商筛选: {filters["agencies"]}')
-
-            logger.info(f'[query_data] 筛选条件应用完成')
-
-        except Exception as e:
-            logger.error(f'[query_data] 构建转化查询时出错: {str(e)}')
-            import traceback
-            logger.error(f'[query_data] 错误堆栈: {traceback.format_exc()}')
-            raise
-
-        # 执行查询
-        try:
-            logger.info(f'[query_data] 准备执行新开客户数据查询...')
-            new_customers_result = new_customers_query.first()
-            logger.info(f'[query_data] 新开客户查询完成')
-
-            logger.info(f'[query_data] 准备执行存量客户数据查询...')
-            existing_customers_result = existing_customers_query.first()
-            logger.info(f'[query_data] 存量客户查询完成')
-        except Exception as e:
-            logger.error(f'[query_data] 执行转化数据查询时出错: {str(e)}')
-            import traceback
-            logger.error(f'[query_data] 错误堆栈: {traceback.format_exc()}')
-            raise
-
-        # 处理新开客户数据
-        if new_customers_result:
-            conversion_metrics = {
-                'customer_assets': float(new_customers_result.total_assets) if new_customers_result.total_assets else 0,
-                'customer_contribution': float(new_customers_result.total_contribution) if new_customers_result.total_contribution else 0,
-                'unique_users': int(new_customers_result.unique_users) if new_customers_result.unique_users else 0
-            }
-            logger.info(f'[query_data] ✓ 新开客户数据查询成功: customer_assets={conversion_metrics["customer_assets"]}, customer_contribution={conversion_metrics["customer_contribution"]}')
-        else:
-            logger.warning('[query_data] ✗ 新开客户数据查询结果为空，已设置为0')
-            conversion_metrics = {
-                'customer_assets': 0,
-                'customer_contribution': 0,
-                'unique_users': 0
-            }
-
-        # 处理存量客户资产数据
-        if existing_customers_result:
-            conversion_metrics['existing_customers_assets'] = float(existing_customers_result.total_assets) if existing_customers_result.total_assets else 0
-            conversion_metrics['existing_customers_users'] = int(existing_customers_result.unique_users) if existing_customers_result.unique_users else 0
-            logger.info(f'[query_data] ✓ 存量客户资产查询成功: existing_customers_assets={conversion_metrics["existing_customers_assets"]}, existing_customers_users={conversion_metrics["existing_customers_users"]}')
-        else:
-            conversion_metrics['existing_customers_assets'] = 0
-            conversion_metrics['existing_customers_users'] = 0
-            logger.warning('[query_data] ✗ 存量客户资产查询结果为空，已设置为0')
-
-        # 转换结果为JSON
-        output = []
-        for row in results:
-            item = {}
-
-            if granularity == 'daily':
-                # 日级数据
-                item = {
-                    'date': row.date.strftime('%Y-%m-%d') if row.date else None,
-                    'platform': row.platform,
-                    'account_id': row.account_id,
-                    'account_name': row.account_name,
-                    'agency': row.agency,
-                    'business_model': row.business_model,
-                    'metrics': {
-                        'cost': float(row.cost) if row.cost else 0,
-                        'impressions': int(row.impressions) if row.impressions else 0,
-                        'clicks': int(row.clicks) if row.clicks else 0,
-                        'leads': int(row.lead_users) if row.lead_users else 0,
-                        'new_accounts': int(row.opened_account_users) if row.opened_account_users else 0
-                    }
-                }
-            elif granularity == 'summary':
-                # 汇总数据
-                item = {}
-
-                # 添加维度字段（如果有）
-                if 'platform' in dimensions:
-                    item['platform'] = row.platform
-                if 'agency' in dimensions:
-                    item['agency'] = row.agency
-                if 'business_model' in dimensions:
-                    item['business_model'] = row.business_model
-
-                # 添加指标
-                item['metrics'] = {}
-                for metric in metrics:
-                    if hasattr(row, metric):
-                        val = getattr(row, metric)
-                        item['metrics'][metric] = float(val) if val else 0
-
-                # 如果是汇总且无维度（单一结果行），添加客户资产、客户贡献和存量客户资产
-                if not dimensions:
-                    item['metrics']['customer_assets'] = conversion_metrics.get('customer_assets', 0)
-                    item['metrics']['customer_contribution'] = conversion_metrics.get('customer_contribution', 0)
-                    item['metrics']['existing_customers_assets'] = conversion_metrics.get('existing_customers_assets', 0)
-                    logger.info(f'[query_data] ✓ 已添加客户资产、贡献和存量资产到metrics: customer_assets={item["metrics"]["customer_assets"]}, customer_contribution={item["metrics"]["customer_contribution"]}, existing_customers_assets={item["metrics"]["existing_customers_assets"]}')
-
-            output.append(item)
-
-        # 添加调试日志
-        if needs_conversion_data:
-            logger.info(f'[query_data] 返回数据 (包含转化指标): total={len(output)}, first_item_metrics={output[0]["metrics"] if output else "N/A"}')
-
-        return jsonify({
-            'success': True,
-            'data': output,
-            'total': len(output),
-            'query': data  # 返回查询参数用于调试
-        })
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'查询失败: {str(e)}'
-        }), 500
-
-
-
-@bp.route('/test/conversion-data', methods=['GET'])
-@handle_exceptions
-def test_conversion_data():
-    """
-    测试接口：查询客户资产和客户贡献数据
-    返回原始数据用于调试
-    """
-    from backend.database import db
-    from sqlalchemy import func
-
-    try:
-        # 查询总资产和总贡献（SQLite使用||连接字符串）
-        result = db.session.query(
-            func.sum(BackendConversions.assets).label('total_assets'),
-            func.sum(BackendConversions.customer_contribution).label('total_contribution'),
-            func.count(func.distinct(
-                BackendConversions.platform_source + '|' +
-                func.coalesce(BackendConversions.wechat_nickname, '') + '|' +
-                func.coalesce(BackendConversions.capital_account, '') + '|' +
-                func.coalesce(BackendConversions.platform_user_id, '')
-            )).label('unique_users'),
-            func.count().label('total_records')
-        ).first()
-
-        # 查询有资产的记录数（SQLite使用||连接字符串）
-        with_assets = db.session.query(
-            func.count(func.distinct(
-                BackendConversions.platform_source + '|' +
-                func.coalesce(BackendConversions.wechat_nickname, '') + '|' +
-                func.coalesce(BackendConversions.capital_account, '') + '|' +
-                func.coalesce(BackendConversions.platform_user_id, '')
-            )).label('unique_users')
-        ).filter(
-            BackendConversions.assets.isnot(None),
-            BackendConversions.assets > 0
-        ).scalar()
-
-        # 查询有贡献的记录数（SQLite使用||连接字符串）
-        with_contribution = db.session.query(
-            func.count(func.distinct(
-                BackendConversions.platform_source + '|' +
-                func.coalesce(BackendConversions.wechat_nickname, '') + '|' +
-                func.coalesce(BackendConversions.capital_account, '') + '|' +
-                func.coalesce(BackendConversions.platform_user_id, '')
-            )).label('unique_users')
-        ).filter(
-            BackendConversions.customer_contribution.isnot(None),
-            BackendConversions.customer_contribution > 0
-        ).scalar()
-
-        # 返回结果
-        return jsonify({
-            'success': True,
-            'data': {
-                'total_assets': float(result.total_assets) if result.total_assets else 0,
-                'total_contribution': float(result.total_contribution) if result.total_contribution else 0,
-                'unique_users_with_assets': int(with_assets) if with_assets else 0,
-                'unique_users_with_contribution': int(with_contribution) if with_contribution else 0,
-                'total_records': int(result.total_records) if result.total_records else 0,
-                'unique_users_total': int(result.unique_users) if result.unique_users else 0
-            }
-        })
-
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
+def _i(v):
+    try: return int(v) if v is not None else 0
+    except: return 0
 
 
 @bp.route('/summary', methods=['POST'])
 @handle_exceptions
 def get_summary():
-    """
-    获取汇总数据
-    按平台、代理商、业务模式汇总
-    ---
-    tags:
-      - Query
-    summary: 汇总数据查询
-    description: 按平台、代理商、业务模式维度汇总广告投放数据
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          properties:
-            filters:
-              type: object
-              properties:
-                date_range:
-                  type: array
-                  items:
-                    type: string
-                    format: date
-                  description: 日期范围 [开始日期, 结束日期]
-                  example: ["2025-01-01", "2025-01-31"]
-                platforms:
-                  type: array
-                  items:
-                    type: string
-                    enum: [腾讯, 抖音, 小红书]
-                  description: 平台筛选
-                agencies:
-                  type: array
-                  items:
-                    type: string
-                  description: 代理商筛选
-    responses:
-      200:
-        description: 查询成功
-        schema:
-          type: object
-          properties:
-            data:
-              type: array
-              items:
-                type: object
-                properties:
-                  platform:
-                    type: string
-                    description: 平台名称
-                  agency:
-                    type: string
-                    description: 代理商名称
-                  business_model:
-                    type: string
-                    description: 业务模式
-                  metrics:
-                    type: object
-                    properties:
-                      cost:
-                        type: number
-                        description: 总花费
-                      impressions:
-                        type: integer
-                        description: 总曝光量
-                      clicks:
-                        type: integer
-                        description: 总点击量
-                      leads:
-                        type: integer
-                        description: 总线索数
-                      new_accounts:
-                        type: integer
-                        description: 总开户数
-            total:
-              type: integer
-              description: 返回记录数
-      400:
-        description: 请求参数错误
-      500:
-        description: 服务器错误
-    """
-    from backend.database import db
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    start_date = filters.get('start_date') or (filters.get('date_range', [None, None])[0] if filters.get('date_range') else None)
+    end_date = filters.get('end_date') or (filters.get('date_range', [None, None])[1] if filters.get('date_range') else None)
+    platforms = filters.get('platforms') or []
+    agencies = filters.get('agencies') or []
+    business_models = filters.get('business_models') or []
+    q = db.session.query(
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
+        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
+        func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
+        func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
+        func.coalesce(func.sum(AggVendorDaily.客户创收), 0).label('contribution'),
+    )
+    if start_date and end_date:
+        q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms:
+        q = q.filter(AggVendorDaily.平台.in_([str(p) for p in platforms]))
+    if agencies:
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in agencies]))
+    if business_models:
+        q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in business_models]))
+    r = q.first()
+    summary = {
+        'total_cost': round(_f(r.cost), 2),
+        'total_impressions': _i(r.impressions),
+        'total_clicks': _i(r.clicks),
+        'total_leads': _i(r.leads),
+        'total_new_accounts': _i(r.opened),
+        'total_valid_customers': _i(r.valid),
+        'customer_assets': round(_f(r.assets), 2),
+        'customer_contribution': round(_f(r.contribution), 2),
+        'cost_per_lead': round(_f(r.cost) / _i(r.leads), 2) if _i(r.leads) > 0 else 0,
+        'cost_per_account': round(_f(r.cost) / _i(r.opened), 2) if _i(r.opened) > 0 else 0,
+        'cost_per_valid_account': round(_f(r.cost) / _i(r.valid), 2) if _i(r.valid) > 0 else 0,
+    }
+    return jsonify({'success': True, 'data': summary})
 
-    data = request.get_json()
-    filters = data.get('filters', {})
 
-    try:
-        # 构建查询
-        query = db.session.query(
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.agency,
-            DailyMetricsUnified.business_model,
-            func.sum(DailyMetricsUnified.cost).label('total_cost'),
-            func.sum(DailyMetricsUnified.impressions).label('total_impressions'),
-            func.sum(DailyMetricsUnified.clicks).label('total_clicks'),
-            func.sum(DailyMetricsUnified.lead_users).label('total_leads'),
-            func.sum(DailyMetricsUnified.opened_account_users).label('total_new_accounts')
-        )
+@bp.route('/query', methods=['POST'])
+@handle_exceptions
+def query_data():
+    data = request.get_json() or {}
+    dimensions = data.get('dimensions', ['date'])
+    metrics_req = data.get('metrics', ['cost', 'leads'])
+    filters = data.get('filters') or {}
+    limit = int(data.get('limit', 1000))
 
-        # 应用筛选条件
-        if 'date_range' in filters and filters['date_range']:
-            query = query.filter(
-                and_(
-                    DailyMetricsUnified.date >= filters['date_range'][0],
-                    DailyMetricsUnified.date <= filters['date_range'][1]
-                )
-            )
+    start_date = filters.get('start_date') or (filters.get('date_range', [None, None])[0] if filters.get('date_range') else None)
+    end_date = filters.get('end_date') or (filters.get('date_range', [None, None])[1] if filters.get('date_range') else None)
 
-        if 'platforms' in filters and filters['platforms']:
-            query = query.filter(DailyMetricsUnified.platform.in_(filters['platforms']))
+    sel, grp = [], []
+    for d in dimensions:
+        if d == 'date':
+            sel.append(AggVendorDaily.日期.label('date'))
+            grp.append(AggVendorDaily.日期)
+        elif d == 'platform':
+            sel.append(AggVendorDaily.平台.label('platform'))
+            grp.append(AggVendorDaily.平台)
+        elif d == 'agency':
+            sel.append(AggVendorDaily.厂商.label('agency'))
+            grp.append(AggVendorDaily.厂商)
+        elif d == 'business_model':
+            sel.append(AggVendorDaily.业务模式.label('business_model'))
+            grp.append(AggVendorDaily.业务模式)
 
-        if 'agencies' in filters and filters['agencies']:
-            query = query.filter(DailyMetricsUnified.agency.in_(filters['agencies']))
+    metric_map = {
+        'cost': AggVendorDaily.花费,
+        'impressions': AggVendorDaily.展示量,
+        'clicks': AggVendorDaily.点击量,
+        'leads': AggVendorDaily.线索数,
+        'new_accounts': AggVendorDaily.开户人数,
+        'valid_customers': AggVendorDaily.有效户人数,
+        'customer_assets': AggVendorDaily.客户资产,
+        'customer_contribution': AggVendorDaily.客户创收,
+    }
+    for m in metrics_req:
+        col = metric_map.get(m)
+        if col is not None:
+            sel.append(func.coalesce(func.sum(col), 0).label(m))
 
-        # 分组
-        query = query.group_by(
-            DailyMetricsUnified.platform,
-            DailyMetricsUnified.agency,
-            DailyMetricsUnified.business_model
-        )
+    q = db.session.query(*sel)
+    if start_date and end_date:
+        q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if filters.get('platforms'):
+        q = q.filter(AggVendorDaily.平台.in_([str(p) for p in filters['platforms']]))
+    if filters.get('agencies'):
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in filters['agencies']]))
+    if filters.get('business_models'):
+        q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in filters['business_models']]))
+    for g in grp:
+        q = q.group_by(g)
+    q = q.order_by(*grp).limit(limit)
+    rows = q.all()
 
-        results = query.all()
-
-        # 转换结果
-        output = []
-        for row in results:
-            output.append({
-                'platform': row.platform,
-                'agency': row.agency,
-                'business_model': row.business_model,
-                'metrics': {
-                    'cost': float(row.total_cost) if row.total_cost else 0,
-                    'impressions': int(row.total_impressions) if row.total_impressions else 0,
-                    'clicks': int(row.total_clicks) if row.total_clicks else 0,
-                    'leads': int(row.total_leads) if row.total_leads else 0,
-                    'new_accounts': int(row.total_new_accounts) if row.total_new_accounts else 0
-                }
-            })
-
-        return jsonify({
-            'data': output,
-            'total': len(output)
-        })
-
-    except Exception as e:
-        return jsonify({
-            'error': f'查询失败: {str(e)}'
-        }), 500
+    output = []
+    for row in rows:
+        item = {d: getattr(row, d, None) for d in dimensions}
+        item['metrics'] = {}
+        for m in metrics_req:
+            v = getattr(row, m, 0)
+            try:
+                if m in ('cost', 'customer_assets', 'customer_contribution'):
+                    item['metrics'][m] = float(v) if v else 0
+                else:
+                    item['metrics'][m] = int(v) if v else 0
+            except Exception:
+                item['metrics'][m] = 0
+        output.append(item)
+    return jsonify({'success': True, 'data': output, 'total': len(output)})
 
 
 @bp.route('/employees', methods=['GET'])
 @handle_exceptions
 def get_employees():
-    """
-    获取服务人员列表
-
-    从 backend_conversions 表中获取所有唯一的员工号和姓名
-    ---
-    tags:
-      - Query
-    summary: 获取服务人员列表
-    description: 从后端转化数据表中获取所有唯一的服务人员（员工号和姓名），用于员工转化报表的筛选
-    produces:
-      - application/json
-    responses:
-      200:
-        description: 查询成功
-        schema:
-          type: object
-          properties:
-            success:
-              type: boolean
-              example: true
-            data:
-              type: array
-              items:
-                type: object
-                properties:
-                  employee_no:
-                    type: string
-                    description: 员工号
-                    example: "E001"
-                  employee_name:
-                    type: string
-                    description: 员工姓名
-                    example: "张三"
-      500:
-        description: 服务器错误
-        schema:
-          type: object
-          properties:
-            success:
-              type: boolean
-              example: false
-            error:
-              type: string
-              description: 错误信息
-    """
-    try:
-        employees = db.session.query(
-            BackendConversions.add_employee_no,
-            BackendConversions.add_employee_name
-        ).filter(
-            BackendConversions.add_employee_no.isnot(None),
-            BackendConversions.add_employee_no != ''
-        ).distinct().order_by(BackendConversions.add_employee_name).all()
-
-        result = [
-            {
-                'employee_no': e.add_employee_no,
-                'employee_name': e.add_employee_name or ''
-            }
-            for e in employees
-        ]
-
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
-
-
+    rows = db.session.query(
+        FactConvContent.添加员工号,
+        FactConvContent.添加员工姓名
+    ).filter(
+        FactConvContent.添加员工姓名.isnot(None),
+        FactConvContent.添加员工姓名 != ''
+    ).distinct().order_by(FactConvContent.添加员工姓名).all()
+    result = [{'employee_no': str(e.添加员工号 or ''), 'employee_name': e.添加员工姓名 or ''} for e in rows]
+    return jsonify({'success': True, 'data': result})

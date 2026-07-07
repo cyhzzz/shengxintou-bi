@@ -1,0 +1,17 @@
+# 省心投 BI - 后端依赖
+# 由 WorkBuddy 根据源码反推生成。环境：Python 3.13（项目原定 3.9，3.13 实测可用）。
+# 安装：.venv\Scripts\pip install -r requirements.txt
+Flask==3.1.3
+flask-cors==6.0.5
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.1.0
+SQLAlchemy==2.0.51
+python-dotenv==1.2.2
+pandas==3.0.3
+numpy==2.5.1
+openpyxl==3.1.5
+requests==2.34.2
+webdavclient3==3.14.7
+lxml==6.1.1
+# 可选：Swagger/OpenAPI 文档（app.py 已对缺失做兼容，装了才有 /apidocs）
+# flasgger
