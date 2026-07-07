@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 小红书笔记列表页面
  * 提供笔记搜索、筛选、分页和导出功能
  */
@@ -825,7 +825,7 @@ const XhsNotesListPage: React.FC = () => {
         <Table
           columns={columns}
           dataSource={sortedData}
-          rowKey="note_id"
+          rowKey={(record, idx) => record?.note_id ? `xhs-${record.note_id}-${idx}` : `xhs-idx-${idx}`}
           loading={loading}
           scroll={{ x: 2500 }}
           pagination={{
