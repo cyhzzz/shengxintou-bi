@@ -296,7 +296,7 @@ const DatabaseBackupPage: React.FC = () => {
         <Alert
           style={{ marginTop: 24 }}
           type="info"
-          message="使用说明"
+          title="使用说明"
           description={
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               <li>

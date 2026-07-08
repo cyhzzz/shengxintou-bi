@@ -825,7 +825,7 @@ const XhsNotesListPage: React.FC = () => {
         <Table
           columns={columns}
           dataSource={sortedData}
-          rowKey={(record, idx) => record?.note_id ? `xhs-${record.note_id}-${idx}` : `xhs-idx-${idx}`}
+          rowKey={(record) => record?.id ?? record?.note_id ?? Math.random().toString(36).slice(2)}
           loading={loading}
           scroll={{ x: 2500 }}
           pagination={{

@@ -37,7 +37,7 @@ const DataImportPage: React.FC = () => {
       </Card>
 
       <Alert
-        message="导入须知"
+        title="导入须知"
         description="请确保上传的文件格式正确，第一行为表头。点击数据类型卡片右上角的 ? 图标可查看详细导入指南。大数据量导入可能需要较长时间，请耐心等待。"
         type="info"
         showIcon

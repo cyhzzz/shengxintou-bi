@@ -85,7 +85,7 @@ const GuideModal: React.FC<GuideModalProps> = ({
       {error && (
         <Alert
           type="error"
-          message="文档加载失败"
+          title="文档加载失败"
           description={error}
           showIcon
         />
