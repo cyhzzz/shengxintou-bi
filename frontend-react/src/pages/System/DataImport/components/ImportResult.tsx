@@ -23,7 +23,7 @@ const ImportResult: React.FC<ImportResultProps> = ({ result }) => {
   return (
     <div className={styles.result}>
       <Alert
-        message={success ? '导入完成' : '导入失败'}
+        title={success ? '导入完成' : '导入失败'}
         description={
           <div className={styles.summary}>
             <div className={styles.statRow}>

@@ -48,6 +48,7 @@ def _process(params):
     notes = []
     for r in rows:
         notes.append({
+            'id': r.id,
             'note_id': r.笔记ID,
             'note_title': r.笔记标题,
             'note_type': r.笔记类型,
