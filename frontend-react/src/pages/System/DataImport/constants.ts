@@ -1,59 +1,82 @@
 /**
- * 数据导入相关常量和类型定义
+ * 数据导入相关常量和类型定义（v2 - 6 个新 type，原样导入）
+ *
+ * 新类型 → 新表（原样导入，无中间计算）：
+ *   account_mapping       → dim_account + dim_vendor
+ *   conversion_content    → fact_conv_content
+ *   conversion_appmarket  → fact_conv_appmarket
+ *   vendor_daily          → agg_vendor_daily
+ *   xhs_note              → agg_xhs_note
+ *   channel_open          → agg_daily_channel_open
  */
 
 // 数据类型
 export type DataType =
-  | 'tencent_ads'
-  | 'douyin_ads'
-  | 'xiaohongshu_ads'
-  | 'xhs_notes_list'
-  | 'xhs_notes_daily'
-  | 'xhs_notes_content_daily'
-  | 'backend_conversion';
+  | 'account_mapping'
+  | 'conversion_content'
+  | 'conversion_appmarket'
+  | 'vendor_daily'
+  | 'xhs_note'
+  | 'channel_open';
 
 // 数据类型配置
 export interface DataTypeConfig {
   type: DataType;
   label: string;
   description: string;
+  targetTables: string[];
+  guideFile: string;
+  icon: string;
 }
 
 // 数据类型列表
 export const DATA_TYPES: DataTypeConfig[] = [
   {
-    type: 'tencent_ads',
-    label: '腾讯广告',
-    description: '腾讯广告投放数据',
+    type: 'account_mapping',
+    label: '投放账号映射',
+    description: '账号 → 代理商/业务模式映射（合并写入 dim_account + dim_vendor）',
+    targetTables: ['dim_account', 'dim_vendor'],
+    guideFile: 'account_mapping_guide.md',
+    icon: '🗂️',
   },
   {
-    type: 'douyin_ads',
-    label: '抖音广告',
-    description: '抖音广告投放数据',
+    type: 'conversion_content',
+    label: '内容平台加微链路',
+    description: '抖音/腾讯/小红书/快手加微链路明细（1 行 = 1 企微）',
+    targetTables: ['fact_conv_content'],
+    guideFile: 'conversion_content_guide.md',
+    icon: '🔗',
   },
   {
-    type: 'xiaohongshu_ads',
-    label: '小红书广告',
-    description: '小红书广告投放数据',
+    type: 'conversion_appmarket',
+    label: '应用市场下载链路',
+    description: '小米/华为/OPPO/VIVO/荣耀/苹果 下载→开户归因明细',
+    targetTables: ['fact_conv_appmarket'],
+    guideFile: 'conversion_appmarket_guide.md',
+    icon: '📱',
   },
   {
-    type: 'xhs_notes_list',
-    label: '小红书笔记列表',
-    description: '笔记基础信息列表',
+    type: 'vendor_daily',
+    label: '厂商广告投放分析',
+    description: '日×平台×厂商×业务模式 统一漏斗超集',
+    targetTables: ['agg_vendor_daily'],
+    guideFile: 'vendor_daily_guide.md',
+    icon: '📊',
   },
   {
-    type: 'xhs_notes_daily',
-    label: '小红书笔记投放',
-    description: '笔记日级投放数据',
+    type: 'xhs_note',
+    label: '小红书笔记',
+    description: '笔记级 + 笔记聚合（自动丢弃 Unnamed: 24 脏列）',
+    targetTables: ['agg_xhs_note'],
+    guideFile: 'xhs_note_guide.md',
+    icon: '📕',
   },
   {
-    type: 'xhs_notes_content_daily',
-    label: '小红书笔记运营',
-    description: '笔记日级运营数据',
-  },
-  {
-    type: 'backend_conversion',
-    label: '后端转化',
-    description: '后端转化明细数据',
+    type: 'channel_open',
+    label: '开户渠道分析',
+    description: '非广告渠道开户日聚合（互联网引流/合作机构/员工开户/自然流入）',
+    targetTables: ['agg_daily_channel_open'],
+    guideFile: 'channel_open_guide.md',
+    icon: '🏦',
   },
 ];

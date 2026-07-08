@@ -82,3 +82,15 @@ htmlcov/
 ../../开发日志/
 ../../构建脚本/
 ../../.claude/
+
+# data source xlsx (not in repo)
+数据源/
+# workbuddy memory
+.workbuddy/
+# playwright cli cache
+.playwright-cli/
+# claude scratch
+CLAUDE.md
+# transient webdav tmp
+database/tmp_*.db.gz
+
