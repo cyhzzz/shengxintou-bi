@@ -1,5 +1,5 @@
-﻿# -*- coding: utf-8 -*-
-"""通用查询接口（v2 - 查 agg_vendor_daily + fact_conv_content）"""
+# -*- coding: utf-8 -*-
+"""通用查询接口（v2.1 - 顶层加 meta 标注 sums/derived 边界）"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily, FactConvContent
@@ -16,6 +16,13 @@ def _f(v):
 def _i(v):
     try: return int(v) if v is not None else 0
     except: return 0
+
+
+_META_QUERY = {
+    'version': 'v2.1',
+    'source_tables': ['agg_vendor_daily'],
+    'note': 'SUM 走 SQL 聚合，div/mul 派生字段保兼容供旧前端；新前端应基于 sums 自计算',
+}
 
 
 @bp.route('/summary', methods=['POST'])
@@ -47,20 +54,32 @@ def get_summary():
     if business_models:
         q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in business_models]))
     r = q.first()
+    cost = _f(r.cost); impr = _i(r.impressions); clk = _i(r.clicks)
+    leads = _i(r.leads); opened = _i(r.opened); valid = _i(r.valid)
+    assets = _f(r.assets); contrib = _f(r.contribution)
     summary = {
-        'total_cost': round(_f(r.cost), 2),
-        'total_impressions': _i(r.impressions),
-        'total_clicks': _i(r.clicks),
-        'total_leads': _i(r.leads),
-        'total_new_accounts': _i(r.opened),
-        'total_valid_customers': _i(r.valid),
-        'customer_assets': round(_f(r.assets), 2),
-        'customer_contribution': round(_f(r.contribution), 2),
-        'cost_per_lead': round(_f(r.cost) / _i(r.leads), 2) if _i(r.leads) > 0 else 0,
-        'cost_per_account': round(_f(r.cost) / _i(r.opened), 2) if _i(r.opened) > 0 else 0,
-        'cost_per_valid_account': round(_f(r.cost) / _i(r.valid), 2) if _i(r.valid) > 0 else 0,
+        'total_cost': round(cost, 2),
+        'total_impressions': impr,
+        'total_clicks': clk,
+        'total_leads': leads,
+        'total_new_accounts': opened,
+        'total_valid_customers': valid,
+        'customer_assets': round(assets, 2),
+        'customer_contribution': round(contrib, 2),
+        # 派生（保兼容）— 新前端应用 sums 自计算
+        'cost_per_lead': round(cost / leads, 2) if leads > 0 else 0,
+        'cost_per_account': round(cost / opened, 2) if opened > 0 else 0,
+        'cost_per_valid_account': round(cost / valid, 2) if valid > 0 else 0,
     }
-    return jsonify({'success': True, 'data': summary})
+    return jsonify({
+        'success': True,
+        'data': summary,
+        'meta': {
+            **_META_QUERY,
+            'raw_sums_keys': list(k for k in summary.keys() if k not in ('cost_per_lead', 'cost_per_account', 'cost_per_valid_account')),
+            'derived_keys': ['cost_per_lead', 'cost_per_account', 'cost_per_valid_account'],
+        }
+    })
 
 
 @bp.route('/query', methods=['POST'])
@@ -133,7 +152,12 @@ def query_data():
             except Exception:
                 item['metrics'][m] = 0
         output.append(item)
-    return jsonify({'success': True, 'data': output, 'total': len(output)})
+    return jsonify({
+        'success': True,
+        'data': output,
+        'total': len(output),
+        'meta': {**_META_QUERY, 'raw_sums_keys': metrics_req, 'derived_keys': []},
+    })
 
 
 @bp.route('/employees', methods=['GET'])
@@ -147,4 +171,4 @@ def get_employees():
         FactConvContent.添加员工姓名 != ''
     ).distinct().order_by(FactConvContent.添加员工姓名).all()
     result = [{'employee_no': str(e.添加员工号 or ''), 'employee_name': e.添加员工姓名 or ''} for e in rows]
-    return jsonify({'success': True, 'data': result})
+    return jsonify({'success': True, 'data': result, 'meta': {**_META_QUERY, 'source_table': 'fact_conv_content'}})

@@ -1,5 +1,11 @@
-﻿# -*- coding: utf-8 -*-
-"""成本分析 + 转化漏斗（v2）"""
+# -*- coding: utf-8 -*-
+"""成本分析 + 转化漏斗（v2.1）
+
+每个 item 内：
+- metrics：来自 SQL SUM 的 sums（cost/impressions/clicks/leads/new_accounts）
+- cost_metrics：派生（保兼容）；新前端应基于 metrics 自计算
+- summary：totals + 派生 avg_cost_per_*
+"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily, FactConvContent
@@ -7,6 +13,12 @@ from backend.database import db
 from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('cost_analysis', __name__)
+
+_META = {
+    'version': 'v2.1',
+    'source_tables': ['agg_vendor_daily', 'fact_conv_content'],
+    'note': 'metrics/totals 是 SQL SUM 聚合；cost_metrics/avg_cost_* 是派生',
+}
 
 
 @bp.route('/cost-analysis', methods=['POST'])
@@ -47,22 +59,22 @@ def get_cost_analysis():
 
     output = []
     for r in rows:
-        cost, impressions, clicks, leads, opened = f(r.cost), i(r.impressions), i(r.clicks), i(r.leads), i(r.opened)
+        cost, impr, clk, ld, op = f(r.cost), i(r.impressions), i(r.clicks), i(r.leads), i(r.opened)
         output.append({
             'platform': r.平台,
             'agency': r.厂商,
             'metrics': {
                 'cost': round(cost, 2),
-                'impressions': impressions,
-                'clicks': clicks,
-                'leads': leads,
-                'new_accounts': opened,
+                'impressions': impr,
+                'clicks': clk,
+                'leads': ld,
+                'new_accounts': op,
             },
             'cost_metrics': {
-                'cost_per_lead': round(cost / leads, 2) if leads > 0 else 0,
-                'cost_per_account': round(cost / opened, 2) if opened > 0 else 0,
-                'cost_per_click': round(cost / clicks, 2) if clicks > 0 else 0,
-                'cpm': round(cost / impressions * 1000, 2) if impressions > 0 else 0,
+                'cost_per_lead': round(cost / ld, 2) if ld > 0 else 0,
+                'cost_per_account': round(cost / op, 2) if op > 0 else 0,
+                'cost_per_click': round(cost / clk, 2) if clk > 0 else 0,
+                'cpm': round(cost / impr * 1000, 2) if impr > 0 else 0,
             }
         })
     tc = sum(item['metrics']['cost'] for item in output)
@@ -77,7 +89,8 @@ def get_cost_analysis():
             'total_accounts': ta,
             'avg_cost_per_lead': round(tc / tl, 2) if tl > 0 else 0,
             'avg_cost_per_account': round(tc / ta, 2) if ta > 0 else 0,
-        }
+        },
+        'meta': {**_META, 'raw_sums_keys': ['metrics.cost', 'metrics.impressions', 'metrics.clicks', 'metrics.leads', 'metrics.new_accounts'], 'derived_keys': ['cost_metrics.cost_per_lead', 'cost_metrics.cost_per_account', 'cost_metrics.cost_per_click', 'cost_metrics.cpm']},
     })
 
 
@@ -117,11 +130,9 @@ def get_conversion_funnel():
         if platforms:
             fq = fq.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
         r = fq.first()
-        leads = int(r.leads or 0)
-        mouth = int(r.mouth or 0)
-        valid_lead = int(r.valid_lead or 0)
-        opened = int(r.opened or 0)
-        valid = int(r.valid or 0)
+        leads = int(r.leads or 0); mouth = int(r.mouth or 0); valid_lead = int(r.valid_lead or 0)
+        opened = int(r.opened or 0); valid = int(r.valid or 0)
+        # funnel 同时含 sums (value) 与派生 rate，前端可用 sums 自算 rate
         funnel = [
             {'step': '客户线索', 'value': leads, 'rate': 100.0},
             {'step': '客户开口', 'value': mouth, 'rate': round(mouth / leads * 100, 2) if leads > 0 else 0},
@@ -130,7 +141,10 @@ def get_conversion_funnel():
             {'step': '有效户', 'value': valid, 'rate': round(valid / opened * 100, 2) if opened > 0 else 0},
         ]
         core = {'cost': 0, 'lead_users': leads, 'opened_account_users': opened, 'valid_customer_users': valid}
-        return jsonify({'success': True, 'data': {'funnel': funnel, 'core_metrics': core, 'is_employee_mode': True}})
+        return jsonify({'success': True, 'data': {'funnel': funnel, 'core_metrics': core, 'is_employee_mode': True},
+                        'meta': {**_META, 'funnel_source': 'fact_conv_content',
+                                 'raw_sums_keys': ['cost', 'lead_users', 'opened_account_users', 'valid_customer_users'],
+                                 'derived_keys': ['funnel[].rate']}})
 
     vq = db.session.query(
         func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
@@ -179,4 +193,7 @@ def get_conversion_funnel():
         {'step': '有效户', 'value': valid, 'rate': round(valid / opened * 100, 2) if opened > 0 else 0},
     ]
     core = {'cost': round(cost, 2), 'lead_users': leads, 'opened_account_users': opened, 'valid_customer_users': valid}
-    return jsonify({'success': True, 'data': {'funnel': funnel, 'core_metrics': core, 'is_employee_mode': False}})
+    return jsonify({'success': True, 'data': {'funnel': funnel, 'core_metrics': core, 'is_employee_mode': False},
+                    'meta': {**_META, 'funnel_source': 'agg_vendor_daily + fact_conv_content',
+                             'raw_sums_keys': ['cost', 'lead_users', 'opened_account_users', 'valid_customer_users'],
+                             'derived_keys': ['funnel[].rate']}})

@@ -59,6 +59,7 @@ interface FlattenedSummaryItem {
 
 const AgencyAnalysisPage: React.FC = () => {
   const [summary, setSummary] = useState<FlattenedSummaryItem[]>([]);
+  const [meta, setMeta] = useState<{ agency_count: number; platform_count: number }>({ agency_count: 0, platform_count: 0 });
   const [loading, setLoading] = useState(false);
   const [metric, setMetric] = useState<MetricType>('cost');
 
@@ -174,6 +175,7 @@ const AgencyAnalysisPage: React.FC = () => {
         });
 
         setSummary(sortedSummary);
+        setMeta(response.data.meta || { agency_count: 0, platform_count: 0 });
       }
     } catch (error) {
       console.error('获取汇总数据失败:', error);
@@ -216,50 +218,9 @@ const AgencyAnalysisPage: React.FC = () => {
     }
   }, [report, refresh, fetchSummaryData, resetAll]);
 
-  // 计算汇总数据
-  const totals = useMemo(() => {
-    let totalCost = 0;
-    let totalImpressions = 0;
-    let totalClicks = 0;
-    let totalLeadUsers = 0;
-    let totalOpenedAccountUsers = 0;
-    let totalValidCustomerUsers = 0;
-
-    summary.forEach(item => {
-      if (item.is_subtotal || item.is_total) return;
-      totalCost += item.cost || 0;
-      totalImpressions += item.impressions || 0;
-      totalClicks += item.clicks || 0;
-      totalLeadUsers += item.lead_users || 0;
-      totalOpenedAccountUsers += item.opened_account_users || 0;
-      totalValidCustomerUsers += item.valid_customer_users || 0;
-    });
-
-    return {
-      cost: totalCost,
-      impressions: totalImpressions,
-      clicks: totalClicks,
-      leadUsers: totalLeadUsers,
-      openedAccounts: totalOpenedAccountUsers,
-      validCustomers: totalValidCustomerUsers,
-    };
-  }, [summary]);
-
-  // 统计数据
-  const stats = useMemo(() => {
-    const agencies = new Set<string>();
-    const platforms = new Set<string>();
-
-    summary.forEach(item => {
-      if (item.is_subtotal || item.is_total) return;
-      if (item.platform) platforms.add(item.platform);
-      if (item.agency && item.agency !== '未归因' && item.agency !== '[小计]' && item.agency !== '[合计]') {
-        agencies.add(item.agency);
-      }
-    });
-
-    return { agencyCount: agencies.size, platformCount: platforms.size };
-  }, [summary]);
+  // 合计与统计从后端直接取（不再在前端 forEach 重计）
+  const totals = summary.find(x => x.is_total) || { cost: 0, impressions: 0, clicks: 0, lead_users: 0, opened_account_users: 0, valid_customer_users: 0 };
+  const stats = { agencyCount: meta.agency_count, platformCount: meta.platform_count };
 
   // 表格列配置
   const columns: ColumnsType<FlattenedSummaryItem> = useMemo(() => [
@@ -445,17 +406,17 @@ const AgencyAnalysisPage: React.FC = () => {
         </Col>
         <Col xs={12} sm={8} md={4} lg={4}>
           <Card className={styles.metricCard}>
-            <Statistic title="线索数" value={totals.leadUsers} prefix={<UserOutlined />} />
+            <Statistic title="线索数" value={totals.lead_users} prefix={<UserOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={4} lg={4}>
           <Card className={styles.metricCard}>
-            <Statistic title="开户数" value={totals.openedAccounts} prefix={<TeamOutlined />} />
+            <Statistic title="开户数" value={totals.opened_account_users} prefix={<TeamOutlined />} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={4} lg={4}>
           <Card className={styles.metricCard}>
-            <Statistic title="有效户数" value={totals.validCustomers} prefix={<TeamOutlined />} />
+            <Statistic title="有效户数" value={totals.valid_customer_users} prefix={<TeamOutlined />} />
           </Card>
         </Col>
       </Row>

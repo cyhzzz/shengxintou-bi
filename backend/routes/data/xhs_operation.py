@@ -1,5 +1,9 @@
-﻿# -*- coding: utf-8 -*-
-"""小红书运营分析接口（v2 - 查 agg_xhs_note + fact_conv_content）"""
+# -*- coding: utf-8 -*-
+"""小红书运营分析接口（v2.1 - meta + sums 边界）
+
+core_metrics 同时包含 SQL SUM 聚合（cost/leads/opened/...）与 div 派生
+（cost_per_*），新前端应用 sums 自计算。
+"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggXhsNote, FactConvContent
@@ -8,6 +12,12 @@ from backend.utils.decorators import handle_exceptions
 from collections import defaultdict
 
 bp = Blueprint('xhs_operation', __name__)
+
+_META = {
+    'version': 'v2.1',
+    'source_tables': ['agg_xhs_note', 'fact_conv_content'],
+    'note': 'core_metrics 含 SQL SUM 聚合 + div 派生，新前端应用 sums 自计算',
+}
 
 
 @bp.route('/xhs-notes-operation-analysis', methods=['POST'])
@@ -45,6 +55,7 @@ def get_xhs_notes_operation_analysis():
     def _pct(a, b):
         return round(a / b * 100, 2) if b > 0 else 0
 
+    # SQL SUM 聚合（前端 sums）+ 派生（保兼容）
     core_metrics = {
         'new_notes_count': len(set([n.笔记ID for n in notes if n.笔记ID])),
         'ad_notes_count': len(notes),
@@ -100,37 +111,48 @@ def get_xhs_notes_operation_analysis():
         'impression_series': [by_month[m]['impressions'] for m in sorted_months],
         'interaction_series': [by_month[m]['interactions'] for m in sorted_months],
         'cost_series': [round(by_month[m]['cost'], 2) for m in sorted_months],
+        'click_series': [],
+        'interaction_rate_series': [_pct(by_month[m]['interactions'], by_month[m]['impressions']) for m in sorted_months],
+        'cost_per_mille_series': [round(by_month[m]['cost'] / by_month[m]['impressions'] * 1000, 2) if by_month[m]['impressions'] > 0 else 0 for m in sorted_months],
     }
 
-    top_notes = sorted(
-        [{'note_id': n.笔记ID, 'note_title': n.笔记标题 or '', 'producer': n.创作者 or '',
-          'ad_strategy': n.广告策略 or '', 'note_url': n.笔记链接 or '',
-          'note_publish_time': n.发布时间 or '', 'total_cost': round(f(n.消费金额), 2),
-          'total_impressions': i(n.总展现量), 'total_clicks': i(n.点击量),
-          'total_private_messages': i(n.私信进线人数), 'lead_users': i(n.添加企微人数),
-          'opened_account_users': i(n.开户人数)} for n in notes if n.笔记ID],
-        key=lambda x: x['lead_users'], reverse=True
-    )[:10]
+    top_notes = []
+    for n in sorted(notes, key=lambda x: f(x.消费金额), reverse=True)[:20]:
+        cost_v = f(n.消费金额)
+        top_notes.append({
+            'note_id': n.笔记ID, 'note_title': n.笔记标题 or '', 'producer': n.创作者 or '',
+            'interaction_count': i(n.总互动量), 'lead_users': i(n.添加企微人数),
+            'cost': round(cost_v, 2), 'cost_per_interaction': round(cost_v / i(n.总互动量), 2) if i(n.总互动量) > 0 else 0,
+        })
 
-    creator_annual = sorted(
-        [{'producer': k, 'note_count': v['note_count'],
-          'total_cost': round(v['total_cost'], 2),
-          'total_impressions': v['total_impressions'],
-          'total_clicks': v['total_clicks'],
-          'total_private_messages': sum(i(n.私信进线人数) for n in notes if (n.创作者 or '未知') == k),
-          'lead_users': creator_conversion[k]['lead_users'],
-          'opened_account_users': creator_conversion[k]['opened_account_users']} for k, v in creator_content.items()],
-        key=lambda x: x['opened_account_users'], reverse=True
-    )[:20]
+    creator_annual = []
+    by_creator = defaultdict(lambda: {'cost': 0.0, 'lead_users': 0, 'opened': 0, 'interactions': 0})
+    for n in notes:
+        c = n.创作者 or '未知'
+        by_creator[c]['cost'] += f(n.消费金额)
+        by_creator[c]['lead_users'] += i(n.添加企微人数)
+        by_creator[c]['opened'] += i(n.开户人数)
+        by_creator[c]['interactions'] += i(n.总互动量)
+    for c, v in by_creator.items():
+        creator_annual.append({
+            'producer': c,
+            'total_cost': round(v['cost'], 2),
+            'total_interactions': v['interactions'],
+            'lead_users': v['lead_users'],
+            'opened_account_users': v['opened'],
+            'total_score': v['lead_users'] * 10 + v['opened'] * 100 + v['interactions'] * 0.01,
+        })
+    creator_annual.sort(key=lambda x: x['total_score'], reverse=True)
+    creator_annual = creator_annual[:50]
 
     agency_q = db.session.query(
         FactConvContent.广告代理商,
         func.count(FactConvContent.id).label('leads'),
-        func.coalesce(func.sum(FactConvContent.是否开户), 0).label('opened'),
-        func.coalesce(func.sum(FactConvContent.是否为有效户), 0).label('valid'),
         func.coalesce(func.sum(FactConvContent.是否客户开口), 0).label('mouth'),
         func.coalesce(func.sum(FactConvContent.是否有效线索), 0).label('valid_lead'),
-    )
+        func.coalesce(func.sum(FactConvContent.是否开户), 0).label('opened'),
+        func.coalesce(func.sum(FactConvContent.是否为有效户), 0).label('valid'),
+    ).filter(FactConvContent.广告代理商.isnot(None), FactConvContent.广告代理商 != '')
     if publish_start and publish_end:
         agency_q = agency_q.filter(and_(FactConvContent.线索日期 >= publish_start, FactConvContent.线索日期 <= publish_end))
     agency_q = agency_q.group_by(FactConvContent.广告代理商)
@@ -139,12 +161,9 @@ def get_xhs_notes_operation_analysis():
         agency_list.append({
             'agency': r.广告代理商 or '未归因',
             'total_cost': 0, 'total_impressions': 0, 'total_clicks': 0,
-            'lead_users': i(r.leads),
-            'potential_customers': i(r.mouth),
-            'customer_mouth_users': i(r.mouth),
-            'valid_lead_users': i(r.valid_lead),
-            'opened_account_users': i(r.opened),
-            'valid_customer_users': i(r.valid),
+            'lead_users': i(r.leads), 'potential_customers': i(r.mouth),
+            'customer_mouth_users': i(r.mouth), 'valid_lead_users': i(r.valid_lead),
+            'opened_account_users': i(r.opened), 'valid_customer_users': i(r.valid),
         })
 
     conv_trend_dates = sorted(by_month.keys())
@@ -223,5 +242,8 @@ def get_xhs_notes_operation_analysis():
             'creator_interaction_data': creator_interaction_data,
             'employee_conversion_ranking': emp_ranking,
             'employee_weekly_conversion': employee_weekly_conversion,
-        }
+        },
+        'meta': {**_META,
+                 'raw_sums_keys': ['core_metrics.total_cost', 'core_metrics.total_impressions', 'core_metrics.total_clicks', 'core_metrics.total_interactions', 'core_metrics.total_private_messages', 'core_metrics.total_lead_users', 'core_metrics.total_opened_accounts'],
+                 'derived_keys': ['core_metrics.impression_click_rate', 'core_metrics.click_interaction_rate', 'core_metrics.click_lead_rate', 'core_metrics.cost_per_private_message', 'core_metrics.cost_per_lead_user', 'core_metrics.cost_per_opened_account', 'core_metrics.lead_to_wechat_rate', 'core_metrics.wechat_to_account_rate', 'core_metrics.cost_per_mille', 'core_metrics.cost_per_click']},
     })
