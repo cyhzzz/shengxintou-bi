@@ -13,6 +13,8 @@ import AccountManagementPage from '@/pages/System/AccountManagement';
 import AbbreviationManagementPage from '@/pages/System/AbbreviationManagement';
 import DatabaseBackupPage from '@/pages/System/DatabaseBackup';
 import ReportGenerationPage from '@/pages/ReportGeneration';
+import AppMarketReportPage from '@/pages/Reports/AppMarket';
+import OmniChannelReportPage from '@/pages/Reports/OmniChannel';
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +41,14 @@ export const router = createBrowserRouter([
         ],
       },
       { path: 'report-generation', element: <ReportGenerationPage /> },
+
+      {
+        path: 'reports',
+        children: [
+          { path: 'app-market', element: <AppMarketReportPage /> },
+          { path: 'omni-channel', element: <OmniChannelReportPage /> },
+        ],
+      },
       {
         path: 'system',
         children: [

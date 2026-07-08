@@ -125,3 +125,68 @@ export const dataService = {
     return http.get('/version/local');
   },
 };
+
+// 应用市场专项报表（v2.1）
+export interface AppMarketFunnelStep {
+  step: string;
+  count: number;
+  rate: number;
+  step_rate?: number;
+}
+export interface AppMarketSummary {
+  total_counts: Record<string, number>;
+  total_funnel: AppMarketFunnelStep[];
+  by_month_market: Array<{ month: string; app_market: string; counts: Record<string, number>; final_open_rate: number; final_valid_rate: number }>;
+  by_market: Array<{ app_market: string; counts: Record<string, number>; funnel: AppMarketFunnelStep[] }>;
+  by_channel_type: Array<{ channel_type: string; app_market: string; counts: Record<string, number> }>;
+}
+
+export const dataServiceReports = {
+  getAppMarketSummary: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
+    return http.post('/reports/app-market/summary', { filters });
+  },
+  getAppMarketFunnel: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
+    return http.post('/reports/app-market/funnel', { filters });
+  },
+  getAppMarketDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number }) => {
+    return http.post('/reports/app-market/detail', params);
+  },
+  getAppMarketFilterOptions: async () => {
+    return http.get('/reports/app-market/filter-options');
+  },
+};
+
+
+// 全渠道获客情况报表 v2.1
+export interface OmniChannelSummary {
+  by_category: Array<{ channel_category: string; opens: number; valid: number; valid_rate: number }>;
+  content_by_platform: Array<{ platform: string; leads: number; mouth: number; valid_lead: number; opens: number; valid: number; open_rate: number; valid_rate: number }>;
+  appmarket_by_market: Array<{ app_market: string; downloads: number; activates: number; opens: number; valid: number; activate_rate: number; open_rate: number; valid_rate: number }>;
+  nonad_by_channel: Array<{ channel_category: string; channel_name: string; opens: number; valid: number; valid_rate: number }>;
+  total_cost: number; total_opens: number; total_valid: number;
+}
+export interface OmniChannelFilterOptions {
+  channel_categories: string[];
+  content_platforms: string[];
+  app_markets: string[];
+}
+export const dataServiceOmniChannel = {
+  getOmniChannelSummary: async (params: { filters?: Record<string, unknown> } = {}) => {
+    return http.post('/reports/omni-channel/summary', params);
+  },
+  getOmniChannelMonthlyTrend: async (params: { filters?: Record<string, unknown> } = {}) => {
+    return http.post('/reports/omni-channel/monthly-trend', params);
+  },
+  getOmniChannelContentDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
+    return http.post('/reports/omni-channel/content-detail', params);
+  },
+  getOmniChannelAppMarketDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
+    return http.post('/reports/omni-channel/appmarket-detail', params);
+  },
+  getOmniChannelNonAdDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
+    return http.post('/reports/omni-channel/nonad-detail', params);
+  },
+  getOmniChannelFilterOptions: async () => {
+    return http.get('/reports/omni-channel/filter-options');
+  },
+};

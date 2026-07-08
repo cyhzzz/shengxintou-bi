@@ -18,6 +18,8 @@ import {
   TagOutlined,
   SyncOutlined,
   FilePdfOutlined,
+  MobileOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import type { MenuProps } from 'antd';
@@ -64,11 +66,20 @@ const menuItems: MenuProps['items'] = [
       { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
     ],
   },
+  {
+    key: 'reports',
+    icon: <AppstoreOutlined />,
+    label: '专项报表',
+    children: [
+      { key: '/reports/app-market', label: '应用市场获客漏斗', icon: <MobileOutlined /> },
+      { key: '/reports/omni-channel', label: '全渠道获客情况', icon: <AppstoreOutlined /> },
+    ],
+  },
   { type: 'divider' },
   {
     key: '/report-generation',
     icon: <FilePdfOutlined />,
-    label: '报告生成',
+    label: '周报生成',
   },
   {
     key: 'system',
