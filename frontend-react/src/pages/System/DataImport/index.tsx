@@ -13,7 +13,7 @@ import styles from './index.module.scss';
 const { Title, Text } = Typography;
 
 const DataImportPage: React.FC = () => {
-  const [selectedType, setSelectedType] = useState<DataType>('tencent_ads');
+  const [selectedType, setSelectedType] = useState<DataType>('vendor_daily');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const selectedTypeInfo = DATA_TYPES.find((t) => t.type === selectedType);

@@ -1,5 +1,5 @@
 /**
- * 数据类型选择器组件
+ * 数据类型选择器组件（v2 - 6 个新 type）
  * 卡片网格布局，每个卡片带角标指南图标
  */
 import React, { useState } from 'react';
@@ -7,28 +7,6 @@ import { QuestionCircleOutlined } from '@ant-design/icons';
 import { DATA_TYPES, type DataType } from '../constants';
 import { GuideModal } from '@/components';
 import styles from './DataTypeSelector.module.scss';
-
-// 数据类型到指南文件的映射
-const GUIDE_FILE_MAP: Record<DataType, string> = {
-  tencent_ads: 'tencent_ads_guide.md',
-  douyin_ads: 'douyin_ads_guide.md',
-  xiaohongshu_ads: 'xiaohongshu_ads_guide.md',
-  xhs_notes_list: 'xhs_notes_list_guide.md',
-  xhs_notes_daily: 'xhs_notes_daily_guide.md',
-  xhs_notes_content_daily: 'xhs_notes_content_guide.md',
-  backend_conversion: 'backend_conversion_guide.md',
-};
-
-// 数据类型到图标的映射
-const TYPE_ICONS: Record<DataType, string> = {
-  tencent_ads: '🅰️',
-  douyin_ads: '🎵',
-  xiaohongshu_ads: '📕',
-  xhs_notes_list: '📝',
-  xhs_notes_daily: '📊',
-  xhs_notes_content_daily: '📈',
-  backend_conversion: '🔄',
-};
 
 interface DataTypeSelectorProps {
   selected: DataType;
@@ -40,8 +18,8 @@ const DataTypeSelector: React.FC<DataTypeSelectorProps> = ({ selected, onChange 
   const [currentGuideFile, setCurrentGuideFile] = useState<string>('');
 
   const handleGuideClick = (e: React.MouseEvent, type: DataType) => {
-    e.stopPropagation(); // 阻止事件冒泡到卡片
-    setCurrentGuideFile(GUIDE_FILE_MAP[type]);
+    e.stopPropagation();
+    setCurrentGuideFile(DATA_TYPES.find((t) => t.type === type)?.guideFile ?? '');
     setGuideModalOpen(true);
   };
 
@@ -65,9 +43,12 @@ const DataTypeSelector: React.FC<DataTypeSelectorProps> = ({ selected, onChange 
             >
               <QuestionCircleOutlined />
             </button>
-            <div className={styles.cardIcon}>{TYPE_ICONS[type.type]}</div>
+            <div className={styles.cardIcon}>{type.icon}</div>
             <h4 className={styles.cardTitle}>{type.label}</h4>
             <p className={styles.cardDesc}>{type.description}</p>
+            <p className={styles.cardTables}>
+              <code>{type.targetTables.join(' + ')}</code>
+            </p>
           </div>
         ))}
       </div>

@@ -281,7 +281,7 @@ def health_check():
     })
 
 # 注册API路由
-from backend.routes import metadata, upload, config, aggregation, feishu_sync, webdav_backup, xhs_note_info, version
+from backend.routes import metadata, upload, config, webdav_backup, version
 
 # Import weekly_reports module
 from backend.routes import weekly_reports
@@ -325,11 +325,7 @@ app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
 
 # 其他Blueprint
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
-app.register_blueprint(config.bp)
-app.register_blueprint(aggregation.bp, url_prefix=API_PREFIX)
-app.register_blueprint(feishu_sync.bp, url_prefix='/api/v1/feishu')
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
-app.register_blueprint(xhs_note_info.bp, url_prefix=API_PREFIX + '/xhs-note-info')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 
