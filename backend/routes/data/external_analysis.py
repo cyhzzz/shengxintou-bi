@@ -1,5 +1,9 @@
-﻿# -*- coding: utf-8 -*-
-"""外部数据分析接口（v2 - 查 agg_vendor_daily）"""
+# -*- coding: utf-8 -*-
+"""外部数据分析接口（v2.1 - meta + sums 形态）
+
+- platform_comparison 每项 metrics：原 sums（SUM/count）+ 3 个派生 rate/cost
+- 派生字段保留（保兼容），新前端应用 sums 自计算
+"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily
@@ -7,6 +11,12 @@ from backend.database import db
 from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('external_analysis', __name__)
+
+_META = {
+    'version': 'v2.1',
+    'source_table': 'agg_vendor_daily',
+    'note': 'metrics 是 SQL SUM 聚合；ctr/lead_rate/account_rate/cost_per_* 是派生',
+}
 
 
 @bp.route('/external-data-analysis', methods=['POST'])
@@ -61,15 +71,20 @@ def get_external_data_analysis():
         plat[p]['opened'] += i(r.opened)
     platform_comparison = []
     for p, v in plat.items():
+        # sums（SUM/COUNT）+ 派生（前端 fallback）
         ctr = v['clicks'] / v['impressions'] * 100 if v['impressions'] > 0 else 0
         lead_rate = v['leads'] / v['clicks'] * 100 if v['clicks'] > 0 else 0
         account_rate = v['opened'] / v['leads'] * 100 if v['leads'] > 0 else 0
         platform_comparison.append({
             'platform': p,
-            'metrics': {**v, 'ctr': round(ctr, 2), 'lead_rate': round(lead_rate, 2),
-                        'account_rate': round(account_rate, 2),
-                        'cost_per_lead': round(v['cost'] / v['leads'], 2) if v['leads'] > 0 else 0,
-                        'cost_per_account': round(v['cost'] / v['opened'], 2) if v['opened'] > 0 else 0}
+            'metrics': {
+                **v,
+                'ctr': round(ctr, 2),
+                'lead_rate': round(lead_rate, 2),
+                'account_rate': round(account_rate, 2),
+                'cost_per_lead': round(v['cost'] / v['leads'], 2) if v['leads'] > 0 else 0,
+                'cost_per_account': round(v['cost'] / v['opened'], 2) if v['opened'] > 0 else 0,
+            }
         })
 
     agency_stats = {}
@@ -145,4 +160,7 @@ def get_external_data_analysis():
         'roi_analysis': roi_analysis,
         'trend_insights': trend_insights,
         'performance_matrix': perf,
+        'meta': {**_META,
+                 'raw_sums_keys': ['cost', 'impressions', 'clicks', 'leads', 'opened'],
+                 'derived_keys': ['ctr', 'lead_rate', 'account_rate', 'cost_per_lead', 'cost_per_account']},
     })

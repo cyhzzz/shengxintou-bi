@@ -146,4 +146,8 @@ def get_agency_analysis():
             }
         })
     dates = sorted(set([r['date'] for r in series]))
-    return jsonify({'success': True, 'data': {'summary': final_summary, 'trend': {'dates': dates, 'series': series}}})
+    _meta = {
+        'agency_count': len(set([r.厂商 for r in rows if r.厂商])),
+        'platform_count': len(set([r.平台 for r in rows if r.平台])),
+    }
+    return jsonify({'success': True, 'data': {'summary': final_summary, 'meta': _meta, 'trend': {'dates': dates, 'series': series}}})
