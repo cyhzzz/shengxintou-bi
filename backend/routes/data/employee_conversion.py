@@ -101,3 +101,78 @@ def get_filter_options():
             ]
         }
     })
+
+
+@bp.route('/employee-conversion/analysis-channel-overview', methods=['POST'])
+@handle_exceptions
+def get_employee_analysis_channel_overview():
+    """v3.1: 员工转化 Analysis 顶部核心指标同时接入 agg_daily_channel_open
+
+    按用户口径（v3.1 §四）：员工口径走 fact_conv_content（明细/员工维度）；
+    渠道口径走 agg_daily_channel_open（独立数据源）。
+    前端在核心指标旁展示两个口径并列，避免错位。
+    """
+    from backend.models_v2 import AggDailyChannelOpen, FactConvContent
+    from backend.database import db
+    from sqlalchemy import func, and_, or_
+    data = request.get_json() or {}
+    sd = data.get('start_date')
+    ed = data.get('end_date')
+    employees = data.get('employees') or []
+    lead_type = data.get('lead_type', 'all')
+
+    # 员工明细口径（fact_conv_content）
+    detail_q = db.session.query(
+        func.count(FactConvContent.id).label('leads'),
+        func.coalesce(func.sum(FactConvContent.是否客户开口), 0).label('mouth'),
+        func.coalesce(func.sum(FactConvContent.是否有效线索), 0).label('valid_lead'),
+        func.coalesce(func.sum(FactConvContent.是否开户), 0).label('opened'),
+        func.coalesce(func.sum(FactConvContent.是否为有效户), 0).label('valid'),
+        func.coalesce(func.sum(FactConvContent.资产), 0).label('assets'),
+    ).filter(and_(FactConvContent.添加员工姓名.isnot(None), FactConvContent.添加员工姓名 != ''))
+    if sd and ed:
+        detail_q = detail_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if employees:
+        detail_q = detail_q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
+    if lead_type == 'existing':
+        detail_q = detail_q.filter(FactConvContent.是否为存量客户 == 1)
+    elif lead_type == 'new':
+        detail_q = detail_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    dr = detail_q.first()
+
+    # 渠道口径（agg_daily_channel_open，全量）
+    chan_q = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
+        func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposit'),
+        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
+    )
+    if sd and ed:
+        chan_q = chan_q.filter(and_(AggDailyChannelOpen.时间区间 >= sd, AggDailyChannelOpen.时间区间 <= ed))
+    cr = chan_q.first()
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'detail_caliber': {
+                'source': 'fact_conv_content',
+                'scope': '员工级（添加员工姓名 非空）',
+                'leads': int(dr.leads or 0),
+                'mouth': int(dr.mouth or 0),
+                'valid_lead': int(dr.valid_lead or 0),
+                'opened': int(dr.opened or 0),
+                'valid': int(dr.valid or 0),
+                'assets': round(float(dr.assets or 0), 2),
+            },
+            'channel_caliber': {
+                'source': 'agg_daily_channel_open',
+                'scope': '渠道级（4 大类全量，含合作/员工/自然/互联网引流）',
+                'opens': int(cr.opens or 0),
+                'deposit': int(cr.deposit or 0),
+                'valid': int(cr.valid or 0),
+            },
+            'note': '两个口径数字不一致是正常的（按用户口径"独立数据源"），仅作参考并列展示。',
+        },
+    })
+
+
+

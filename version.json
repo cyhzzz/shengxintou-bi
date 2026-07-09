@@ -1,90 +1,104 @@
 {
-  "version": "1.0.0",
-  "release_date": "2026-03-20",
+  "version": "3.1.0",
+  "release_date": "2026-07-09",
   "changelog": [
-    "✅ 完成前端架构重构：旧版原生JS迁移至React + TypeScript + Vite",
-    "✅ 新增WSGI中间件修复双重/api/路径问题",
-    "✅ Flask静态文件路由调整：正确服务/js/、/libs/、/assets/路径",
-    "✅ 修复旧版JS getAPIUrl双重前缀问题",
-    "✅ 便携版打包脚本全面优化：排除旧启动器、测试脚本、构建工具",
-    "🔧 修复前端TypeScript类型错误（若干strict检查问题）",
-    "🔧 修复运营分析页面大量possibly undefined错误",
-    "🔧 修复数据聚合逻辑：转化数据business_model推断使用customer_source",
-    "🔧 修复厂商分析页指标卡片重复计算问题（跳过小计/合计行）",
-    "🔧 修复员工转化分析核心指标被错误过滤问题（顶部卡片不过滤）"
+    "✅ v3.1 报表重梳：顶级菜单重构（全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 线索明细 / 厂商分析 / 小红书 / 应用市场 / 员工转化 / 直播获客 / 报告生成 / 系统配置）",
+    "✅ 应用市场专项：新增 4 个子页（漏斗 / 对比 / 明细 / 创意），独立数据源 fact_conv_appmarket",
+    "✅ 双转化漏斗：POST /conversion-funnel/split 返回 content（7 阶段）+ appmarket（8 阶段）两套独立漏斗",
+    "✅ 全渠道获客报表：reports/omni-channel（概览 / 日趋势 / 按渠道 / 筛选）独立查 agg_vendor_daily",
+    "✅ 员工转化双源：detail（fact_conv_content）+ analysis-channel-overview（agg_daily_channel_open，独立口径）",
+    "✅ 直播获客占位页（/live/funnel），v3.2 接入规范文档待补",
+    "✅ 数据新鲜度：/data-freshness 返回 5 张新表（vendor_daily / xhs_note / fact_conv_content / fact_conv_appmarket / agg_daily_channel_open）",
+    "🧹 清理历史包袱：删除旧版原生 JS 前端(frontend/)、v2/v3 迁移脚本(backend/migrations)、遗留重构/验证文档(docs/*_GUIDE.md)、根目录调试脚本(check_*/debug_*/verify_*)",
+    "🧹 旧上传类型(tencent_ads / douyin_ads / xiaohongshu_ads / backend_conversion / xhs_*) 返回 410 Gone，不再复活",
+    "🔧 前端字段适配：dataService 端点路径零变动，内部改查 v2 新表，前端零改动对接"
   ],
   "major_changes": [
     {
-      "type": "architecture",
-      "description": "前端架构迁移完成",
+      "type": "feature",
+      "description": "v3.1 报表重梳",
       "details": {
-        "from": "原生JavaScript + ECharts",
-        "to": "React 19 + TypeScript + Vite + Ant Design",
-        "status": "生产环境使用新前端"
-      }
-    },
-    {
-      "type": "bugfix",
-      "description": "Flask路由问题修复",
-      "details": {
-        "fixes": [
-          "WSGI中间件修复/api/api/双重前缀问题",
-          "新增/js/、/libs/、/assets/显式路由",
-          "旧版JS getAPIUrl函数修正"
-        ]
-      }
-    },
-    {
-      "type": "bugfix",
-      "description": "数据聚合和报表数据一致性修复",
-      "details": {
-        "fixes": [
-          "转化数据business_model推断使用customer_source（正确）",
-          "厂商分析页指标卡片跳过小计/合计行（避免重复计算）",
-          "员工转化分析核心指标改为从平台概览计算（不过滤）"
-        ]
-      }
-    },
-    {
-      "type": "refactor",
-      "description": "便携版打包脚本优化",
-      "details": {
-        "excluded": [
-          "旧启动器脚本(launcher_debug.py, launcher_new.py)",
-          "旧exe文件(省心投-开发版.exe等)",
-          "所有测试脚本",
-          "构建工具脚本",
-          "旧前端源码目录(frontend/)"
+        "menus": [
+          "全渠道获客",
+          "互联网渠道数据概览",
+          "转化漏斗（双漏斗）",
+          "线索明细",
+          "厂商分析",
+          "小红书（笔记列表 / 运营分析）",
+          "应用市场（漏斗 / 对比 / 明细 / 创意）",
+          "员工转化（分析 / 周报）",
+          "直播获客（占位）",
+          "报告生成",
+          "系统配置（数据导入 / 账号管理 / 缩写管理 / 数据库备份）"
         ],
-        "included": "新启动器省心投启动器.exe"
+        "app_market_pages": ["Funnel", "Comparison", "Detail", "Creative"],
+        "dual_funnel": true,
+        "omni_channel_report": true
+      }
+    },
+    {
+      "type": "cleanup",
+      "description": "历史代码清理",
+      "details": {
+        "removed": [
+          "frontend/ 旧原生 JS 前端",
+          "backend/migrations/* 旧迁移脚本",
+          "docs/plans/* 旧规划文档",
+          "docs/*_GUIDE.md 遗留重构/验证文档",
+          "根目录 check_*/debug_*/verify_* 调试脚本",
+          "logs/frontend-shots/* 旧截图"
+        ]
+      }
+    },
+    {
+      "type": "architecture",
+      "description": "v2 库表重构（随 v2.1 落地，v3.1 延续）",
+      "details": {
+        "tables": 9,
+        "layers": ["DIM 维度层", "DWD 明细层", "DWS 聚合层"],
+        "new_tables": [
+          "dim_account",
+          "dim_vendor",
+          "dim_channel_category",
+          "dim_channel",
+          "fact_conv_content",
+          "fact_conv_appmarket",
+          "agg_vendor_daily",
+          "agg_xhs_note",
+          "agg_daily_channel_open"
+        ],
+        "strategy": "仅做数据存储 + 可视化呈现，mapping/清洗/预计算由上游 ETL 完成"
       }
     }
   ],
   "upgrade_notes": [
-    "✅ 前端已迁移至React + TypeScript，技术栈全面升级",
-    "✅ 便携版启动器已重新构建",
-    "✅ 打包脚本已排除所有旧文件和测试脚本",
-    "📋 Vite构建产物位于frontend-react/dist/"
+    "✅ v3.1 报表重梳已落地，菜单与报表结构较 v2.1 有调整",
+    "✅ 应用市场获客已独立成报表模块，与内容平台漏斗分离",
+    "✅ 启动器 省心投启动器.exe 随版本发布，双击即可在便携环境运行",
+    "📋 前端开发：npm run dev（:3000，代理 /api → :5000）；生产构建 npm run build → frontend-react/dist/",
+    "📋 后端开发：DEV_MODE=1 python app.py（:5000）"
   ],
   "cloud_version_file": "version_cloud.json",
   "update_url": "",
   "support_contact": "产品经理 陈元昊",
   "technical_details": {
     "backend_changes": [
-      "app.py - WSGI中间件、静态文件路由、before_request处理",
-      "backend/routes/data/employee_conversion.py - 核心指标计算改为从平台概览获取",
-      "backend/routes/data/employee_conversion_helpers.py - get_qualified_employees函数",
-      "backend/scripts/aggregations/update_daily_metrics_unified.py - business_model推断逻辑"
+      "backend/models_v2.py - 9 张新表 ORM（列名 1:1 含中文）",
+      "backend/processors/v2/raw_import.py - v2 原样导入（pandas to_sql，无业务计算）",
+      "backend/routes/data/* - 13 个查询蓝图全部改查新表",
+      "backend/routes/reports/* - v3.1 新增 omni_channel / app_market 报表蓝图",
+      "backend/routes/upload.py - 仅识别 6 个新数据类型，旧类型返回 410 Gone"
     ],
     "frontend_changes": [
-      "frontend-react/ - React + TypeScript新前端",
-      "frontend-react/dist/ - Vite构建产物（生产使用）",
-      "frontend/js/reports/AgencyAnalysisReport.js - 跳过小计合计行"
+      "frontend-react/ - React 19 + TypeScript + Vite + Ant Design",
+      "pages/Reports/AppMarket/* - 应用市场 4 子页",
+      "pages/Live/Funnel.tsx - 直播获客占位页",
+      "services/dataService.ts - 端点路径零变动，字段适配新表"
     ],
     "build_changes": [
-      "打包脚本新增启动器存在性检查",
-      "排除规则全面清理"
+      "省心投启动器.spec / 省心投-开发版_new.spec - PyInstaller 打包配置",
+      "便携版启动器已重新构建并随仓库发布"
     ],
-    "completion_time": "2026-03-20"
+    "completion_time": "2026-07-09"
   }
 }

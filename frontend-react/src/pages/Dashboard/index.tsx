@@ -10,6 +10,8 @@
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import { Row, Col, Spin, Tooltip, Card, Typography } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { DataFreshnessIndicator } from '@/components/DataFreshness';
 import {
   DollarOutlined,
   EyeOutlined,
@@ -53,6 +55,8 @@ const DashboardPage: React.FC = () => {
   const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_per_lead');
   // 趋势图粒度状态
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const navigate = useNavigate();
+  const freshnessRef = React.useRef<any>(null);
 
   // 使用自定义 Hooks
   const {
@@ -211,6 +215,16 @@ const DashboardPage: React.FC = () => {
           onSearch={handleSearch}
           onReset={handleReset}
         />
+
+        {/* v3.1 §七.2: Dashboard 顶部紧凑版数据新鲜度 */}
+        <div style={{ marginBottom: 16 }}>
+          <DataFreshnessIndicator
+            ref={freshnessRef}
+            compact
+            showActions
+            onUpdateClick={() => navigate('/system/data-import')}
+          />
+        </div>
 
         {/* 前端投放指标卡片 */}
         <Card className={styles.metricsGroupCard} size="small">

@@ -48,11 +48,12 @@ const statusConfig = {
   },
 };
 
-// 分组标签
+// 分组标签（v3.1 与后端 v2 表 key 对齐）
 const groupLabels: Record<string, string> = {
-  account_ads: '账号数据',
-  xhs_notes: '笔记数据',
-  backend_conversions: '转化数据',
+  channel_ads: '广告投放汇总',
+  content: '内容平台',
+  app_market: '应用市场',
+  omni: '全渠道开户',
 };
 
 export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, DataFreshnessIndicatorProps>(
@@ -129,7 +130,7 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
     if (!data) return null;
 
     const sortedData = Object.values(data).sort((a, b) => a.order - b.order);
-    const groups = ['account_ads', 'xhs_notes', 'backend_conversions'];
+    const groups = ['channel_ads', 'content', 'app_market', 'omni'];
 
     return groups.map((groupKey) => {
       const groupItems = sortedData.filter((item) => item.group === groupKey);

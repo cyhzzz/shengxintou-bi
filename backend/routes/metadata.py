@@ -72,20 +72,25 @@ def get_metadata():
 
 
 def get_data_status():
-    from backend.models_v2 import AggVendorDaily, AggXhsNote, FactConvContent, FactConvAppmarket
+    from backend.models_v2 import (AggVendorDaily, AggXhsNote, FactConvContent,
+                                   FactConvAppmarket, AggDailyChannelOpen)
     from backend.database import db
     today = date.today()
 
-    sources = {
-        'vendor_daily': {'model': AggVendorDaily, 'date_field': AggVendorDaily.日期, 'name': '厂商日聚合'},
-        'xhs_note': {'model': AggXhsNote, 'date_field': AggXhsNote.发布时间, 'name': '小红书笔记聚合'},
-        'fact_conv_content': {'model': FactConvContent, 'date_field': FactConvContent.线索日期, 'name': '内容平台转化'},
-        'fact_conv_appmarket': {'model': FactConvAppmarket, 'date_field': FactConvAppmarket.下载日期, 'name': '应用市场转化'},
-    }
+    # group 字段供前端 DataFreshness 按分组渲染
+    sources = [
+        {'key': 'vendor_daily',          'model': AggVendorDaily,          'date_field': AggVendorDaily.日期,           'name': '厂商日聚合',     'group': 'channel_ads',  'order': 1},
+        {'key': 'xhs_note',              'model': AggXhsNote,              'date_field': AggXhsNote.发布时间,     'name': '小红书笔记聚合', 'group': 'content',     'order': 2},
+        {'key': 'fact_conv_content',     'model': FactConvContent,         'date_field': FactConvContent.线索日期,   'name': '内容平台转化',     'group': 'content',     'order': 3},
+        {'key': 'fact_conv_appmarket',   'model': FactConvAppmarket,       'date_field': FactConvAppmarket.下载日期,  'name': '应用市场转化',     'group': 'app_market',  'order': 4},
+        {'key': 'agg_daily_channel_open','model': AggDailyChannelOpen,     'date_field': AggDailyChannelOpen.时间区间, 'name': '全渠道开户汇总',   'group': 'omni',        'order': 5},
+    ]
     results = {}
-    for k, cfg in sources.items():
+    for cfg in sources:
+        k = cfg['key']
         try:
             latest = db.session.query(func.max(cfg['date_field'])).scalar()
+            base = {'name': cfg['name'], 'group': cfg['group'], 'order': cfg['order']}
             if latest:
                 latest_str = str(latest)[:10]
                 try:
@@ -94,11 +99,11 @@ def get_data_status():
                 except Exception:
                     days = 0
                 status = 'normal' if days <= 5 else ('warning' if days <= 14 else 'critical')
-                results[k] = {'name': cfg['name'], 'latest_date': latest_str, 'days_ago': days, 'status': status}
+                results[k] = {**base, 'latest_date': latest_str, 'days_ago': days, 'status': status}
             else:
-                results[k] = {'name': cfg['name'], 'latest_date': None, 'status': 'no_data'}
+                results[k] = {**base, 'latest_date': None, 'status': 'no_data'}
         except Exception as e:
-            results[k] = {'name': cfg['name'], 'status': 'error', 'error': str(e)}
+            results[k] = {'name': cfg['name'], 'group': cfg['group'], 'order': cfg['order'], 'status': 'error', 'error': str(e)}
     return results
 
 
