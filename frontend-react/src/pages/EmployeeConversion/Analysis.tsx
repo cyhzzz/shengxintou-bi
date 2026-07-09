@@ -29,6 +29,7 @@ const { Text } = Typography;
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
+import { http } from '@/services/http';
 import {
   postEmployeeConversionAnalysis,
   getEmployeeConversionFilterOptions,
@@ -70,6 +71,9 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const [employeeRateTrendData, setEmployeeRateTrendData] = useState<EmployeeConversionAnalysisData['employee_rate_trend'] | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
 
+  // v3.1 §四: 渠道口径（agg_daily_channel_open，独立数据源）
+  const [channelOverview, setChannelOverview] = useState<any>(null);
+
   // 加载筛选选项
   const loadFilterOptions = useCallback(async () => {
     setOptionsLoading(true);
@@ -93,9 +97,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     loadFilterOptions();
   }, [loadFilterOptions]);
 
-  // 初始加载数据（默认查询全部数据，不限制日期）
+  // 初始加载数据（默认查询全部数据，不限制日期）+ 渠道口径
   useEffect(() => {
     fetchData();
+    fetchChannelOverview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 仅在组件挂载时执行一次
 
@@ -181,9 +186,24 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     }
   }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity]);
 
+  // v3.1 §四: 同时拉取渠道口径（agg_daily_channel_open，独立数据源）
+  const fetchChannelOverview = useCallback(async () => {
+    try {
+      const params: Record<string, unknown> = { lead_type: leadType };
+      if (dateRange[0] && dateRange[1]) {
+        params.start_date = dateRange[0];
+        params.end_date = dateRange[1];
+      }
+      if (selectedEmployees.length > 0) params.employees = selectedEmployees;
+      const res: any = await http.post('/employee-conversion/analysis-channel-overview', params);
+      if (res?.success) setChannelOverview(res.data);
+    } catch { /* ignore */ }
+  }, [dateRange, selectedEmployees, leadType]);
+
   // 处理查询
   const handleSearch = () => {
     fetchData();
+    fetchChannelOverview();
   };
 
   // 处理重置
@@ -197,6 +217,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     // 重置后重新加载数据（查询全部数据）
     setTimeout(() => {
       fetchData();
+      fetchChannelOverview();
     }, 0);
   };
 
@@ -739,6 +760,28 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           showWowChange={false}
         />
       </div>
+
+      {/* v3.1 §四: 数据双口径对照 (员工明细口径 vs 渠道口径) */}
+      <Card className={styles.chartCard} size='small' style={{ marginTop: 16 }}>
+        <div className={styles.cardHeader}>
+          <Text type='secondary' className={styles.cardTitle}>
+            📊 数据双口径对照
+          </Text>
+          <Text type='secondary' className={styles.cardDesc}>
+            员工明细 (fact_conv_content) vs 渠道口径 (agg_daily_channel_open，独立数据源)
+          </Text>
+        </div>
+        <div className={styles.metricsRow}>
+          <MetricCard title='员工明细·线索' value={channelOverview?.detail_caliber?.leads || 0} formatter='number' icon={<UserOutlined style={{ color: '#1890ff' }} />} showWowChange={false} />
+          <MetricCard title='员工明细·开户' value={channelOverview?.detail_caliber?.opened || 0} formatter='number' icon={<TeamOutlined style={{ color: '#13c2c2' }} />} showWowChange={false} />
+          <MetricCard title='员工明细·有效户' value={channelOverview?.detail_caliber?.valid || 0} formatter='number' icon={<RiseOutlined style={{ color: '#52c41a' }} />} showWowChange={false} />
+          <MetricCard title='渠道口径·总开户' value={channelOverview?.channel_caliber?.opens || 0} formatter='number' icon={<DollarOutlined style={{ color: '#fa8c16' }} />} showWowChange={false} />
+          <MetricCard title='渠道口径·总有效户' value={channelOverview?.channel_caliber?.valid || 0} formatter='number' icon={<RiseOutlined style={{ color: '#722ed1' }} />} showWowChange={false} />
+        </div>
+        <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+          {channelOverview?.note || '两个口径数字不一致是正常的（按用户口径"独立数据源"），仅作参考并列展示。'}
+        </div>
+      </Card>
 
       {loading ? (
         <Spin spinning={loading} description="加载中...">

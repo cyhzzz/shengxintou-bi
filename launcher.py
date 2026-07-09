@@ -1,11 +1,11 @@
 """
-省心投 BI - 启动器（便携版）
-使用便携Python环境启动Flask后端，服务前端-react/dist 构建产物
+省心投 BI - 启动器（便携版 / dev fallback）
+使用便捷可用的 Python 启动 Flask 后端，服务 frontend-react/dist 构建产物
 
-v3.0 基于 launcher_new.py 改造：
-- 移除 React 开发服务器（便携版只服务生产构建）
-- Flask 直接服务 frontend-react/dist（端口5000）
-- 保留端口检测、进程清理、信号处理等健壮特性
+v3.1 重构：dev fallback 模式：
+- 优先使用便携 Python（python-3.9-embed/）
+- 否则 fallback 到 .venv/Scripts/python.exe（开发模式）
+- 否则 fallback 到系统 PATH 的 python
 """
 import sys
 import os
@@ -14,11 +14,10 @@ import time as time_module
 import webbrowser
 import signal
 import socket
+import shutil
 import atexit
 from pathlib import Path
 
-# Windows 特有导入（便携Python环境下不使用ctypes，避免DLL加载问题）
-# creationflags通过环境变量传递，不依赖ctypes
 
 class Launcher:
     FLASK_PORT = 5000
@@ -38,10 +37,36 @@ class Launcher:
         else:
             self.portable_python = self.portable_python_dir / "bin" / "python3"
 
+        # Python 解析：便携 embed > .venv > 系统 PATH
+        self.python_exe, self.python_mode = self._resolve_python()
+
         self.server_process = None
 
         atexit.register(self.cleanup_on_exit)
         self._setup_signal_handlers()
+
+    def _resolve_python(self):
+        """返回 (Path, mode)；mode: portable/venv/system/missing"""
+        candidates = []
+        if os.name == 'nt':
+            candidates.append(self.portable_python)
+            candidates.append(self.base_dir / ".venv" / "Scripts" / "python.exe")
+            candidates.append(self.base_dir / "venv" / "Scripts" / "python.exe")
+        else:
+            candidates.append(self.portable_python)
+            candidates.append(self.base_dir / ".venv" / "bin" / "python3")
+            candidates.append(self.base_dir / "venv" / "bin" / "python3")
+
+        for cand in candidates:
+            if cand and cand.exists():
+                mode = 'portable' if cand == self.portable_python else 'venv'
+                return cand, mode
+
+        path_py = shutil.which('python') or shutil.which('python3')
+        if path_py:
+            return Path(path_py), 'system'
+
+        return self.portable_python, 'missing'
 
     def _setup_signal_handlers(self):
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -140,12 +165,20 @@ class Launcher:
         return True
 
     def check_environment(self):
-        print(f"[检查] Python环境: {self.portable_python_dir}")
-        print(f"[检查] 依赖目录: {self.lib_dir}")
+        mode_label = {
+            'portable': '便携 Python (python-3.9-embed)',
+            'venv': '开发 .venv',
+            'system': '系统 PATH Python',
+            'missing': '未找到',
+        }.get(self.python_mode, self.python_mode)
+        print(f"[检查] Python 解释器: {self.python_exe}")
+        print(f"[检查] Python 模式: {mode_label}")
+        print(f"[检查] 依赖目录: {self.lib_dir}{' (便携 lib)' if self.lib_dir.exists() else ' (缺失，使用 Python 自带 site-packages)'}")
         print(f"[检查] 应用目录: {self.base_dir}")
 
-        if not self.portable_python.exists():
-            print("[错误] 便携Python不存在")
+        if self.python_mode == 'missing':
+            print("[错误] 未找到可用的 Python 解释器")
+            print("[提示] 请准备 python-3.9-embed/、.venv/ 或安装 Python 到 PATH")
             return False
 
         if not (self.base_dir / "app.py").exists():
@@ -163,17 +196,18 @@ class Launcher:
         """启动Flask后端服务器（生产模式，服务frontend-react/dist）"""
         try:
             env = os.environ.copy()
-            env["PYTHONPATH"] = str(self.portable_python_dir) + os.pathsep + str(self.lib_dir) + os.pathsep + str(self.base_dir)
-            env["PYTHONHOME"] = str(self.portable_python_dir)
-            env["DEV_MODE"] = "1"  # 开发模式，使用标准Flask服务器
+            env["PYTHONPATH"] = str(self.python_exe.parent) + os.pathsep + str(self.lib_dir) + os.pathsep + str(self.base_dir)
+            env["PYTHONHOME"] = str(self.python_exe.parent) if self.python_mode == 'portable' else ""
+            env["DEV_MODE"] = "1"  # 启动器场景下使用标准 Flask 服务器（自带 webview 嵌入式窗口已废弃）
 
             os.chdir(self.base_dir)
 
-            print(f"[后端] 正在启动Flask服务器...")
+            print(f"[后端] 正在启动 Flask 服务器 (Python: {self.python_mode})...")
+            print(f"[后端] 命令: {self.python_exe} app.py")
 
             # 不使用 PIPE，让输出直接到控制台窗口
             self.server_process = subprocess.Popen(
-                [str(self.portable_python), "app.py"],
+                [str(self.python_exe), "app.py"],
                 env=env
             )
 
@@ -204,7 +238,7 @@ class Launcher:
 
     def run(self):
         print("=" * 60)
-        print("省心投 BI - 启动器 (便携版) v3.0")
+        print("省心投 BI - 启动器 (v3.1)")
         print("=" * 60)
         print()
 
@@ -258,6 +292,7 @@ class Launcher:
         if self.is_port_in_use(self.FLASK_PORT):
             print(f"[警告] 端口 {self.FLASK_PORT} 仍被占用，尝试强制清理...")
             self.cleanup_port(self.FLASK_PORT, "Flask残留进程")
+
 
 if __name__ == "__main__":
     launcher = Launcher()

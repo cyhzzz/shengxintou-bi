@@ -1,409 +1,236 @@
-/**
- * 转化漏斗页面
- * 展示从曝光到开户的转化漏斗分析
- * 支持5层漏斗(服务人员模式)和7层漏斗(广告投放模式)
+﻿/**
+ * 转化漏斗页面（v3.1 §三 重构）
  *
- * 使用 Ant Design 标准样式和配色
+ * 数据源（双漏斗，per 渠道类别拆分）:
+ * - 内容平台漏斗: agg_vendor_daily(平台∈内容平台) + fact_conv_content
+ *   阶段: 广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 成功开户 → 有效户
+ * - 应用市场漏斗: fact_conv_appmarket
+ *   阶段: 激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户
+ *
+ * 端点: POST /api/v1/conversion-funnel/split  →  {funnels: {content, appmarket}}
+ *
+ * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
-import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Spin, message, Select, Space, Statistic, Progress, Typography, Divider, Tag } from 'antd';
-import { FilterBar, ChartCard, FunnelChart } from '@/components';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Row, Col, Card, Spin, message, Tabs, Statistic, Tag, Space, Empty } from 'antd';
+import { FunnelChart } from '@/components';
 import { dataService } from '@/services';
 import styles from './ConversionFunnel.module.scss';
 
-const { Option } = Select;
-const { Text } = Typography;
-
-// 漏斗阶段数据类型
 interface FunnelStage {
   step: string;
   value: number;
   rate: number;
 }
 
-// 核心指标数据类型
-interface CoreMetrics {
-  cost: number;
-  lead_users: number;
-  opened_account_users: number;
-  valid_customer_users: number;
-}
-
-// API响应数据类型
-interface ConversionFunnelData {
-  funnel: FunnelStage[];
-  core_metrics: CoreMetrics;
-  is_employee_mode: boolean;
-}
-
-// 平台转化数据
-interface PlatformConversion {
-  platform: string;
-  impressions: number;
-  clicks: number;
-  leads: number;
-  customers: number;
-  opened_accounts: number;
-  valid_customers: number;
-}
-
 const ConversionFunnelPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
-  const [coreMetrics, setCoreMetrics] = useState<CoreMetrics | null>(null);
-  const [isEmployeeMode, setIsEmployeeMode] = useState(false);
-  const [platformData, setPlatformData] = useState<PlatformConversion[]>([]);
-  const [dimension, setDimension] = useState<'platform' | 'agency' | 'business_model'>('platform');
+  const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
+  const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
 
-  // 计算合并转化率
-  const getCombinedRates = () => {
-    if (!funnelData || funnelData.length === 0) return null;
+  const [dateRange, setDateRange] = useState<[string, string]>(() => {
+    const today = new Date();
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    return [fmt(sixMonthsAgo), fmt(today)];
+  });
+  const [platforms, setPlatforms] = useState<string[]>([]);
 
-    // 通过阶段名称查找数据，避免索引偏移问题
-    const findStageValue = (names: string[]): number => {
-      for (const name of names) {
-        const stage = funnelData.find(s =>
-          s.step === name || s.step.includes(name)
-        );
-        if (stage) return stage.value;
-      }
-      return 0;
-    };
-
-    if (isEmployeeMode) {
-      // 服务人员模式（5层漏斗）
-      const leadUsers = findStageValue(['客户线索', '线索']);       // 客户线索
-      const openedUsers = findStageValue(['成功开户', '开户']);     // 成功开户
-      const validUsers = findStageValue(['有效户']);      // 有效户
-
-      return {
-        leadToOpenRate: leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0,
-        openToValidRate: openedUsers > 0 ? (validUsers / openedUsers * 100) : 0,
-        overallRate: leadUsers > 0 ? (validUsers / leadUsers * 100) : 0,
-      };
-    } else {
-      // 广告投放模式（7层漏斗）
-      const impressions = findStageValue(['广告曝光', '曝光']);     // 广告曝光
-      const leadUsers = findStageValue(['客户线索', '线索']);       // 客户线索
-      const openedUsers = findStageValue(['成功开户', '开户']);     // 成功开户
-      const validUsers = findStageValue(['有效户']);      // 有效户
-
-      return {
-        impressionToLeadRate: impressions > 0 ? (leadUsers / impressions * 100) : 0,
-        leadToOpenRate: leadUsers > 0 ? (openedUsers / leadUsers * 100) : 0,
-        openToValidRate: openedUsers > 0 ? (validUsers / openedUsers * 100) : 0,
-        overallRate: impressions > 0 ? (validUsers / impressions * 100) : 0,
-      };
-    }
-  };
-
-  // 加载数据
-  const loadData = async (filters?: {
-    startDate: string;
-    endDate: string;
-    platforms: string[];
-    agencies: string[];
-    businessModels: string[];
-    employees: string[];
-  }) => {
+  const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
     setLoading(true);
     try {
-      const filterParams = filters
-        ? {
-            date_range: [filters.startDate, filters.endDate] as [string, string],
-            platforms: filters.platforms,
-            agencies: filters.agencies,
-            business_models: filters.businessModels,
-            employees: filters.employees,
-          }
-        : undefined;
-
-      const response = await dataService.getConversionFunnel(filterParams);
-
+      const sd = override?.startDate ?? dateRange[0];
+      const ed = override?.endDate ?? dateRange[1];
+      const pls = override?.platforms ?? platforms;
+      const response: any = await dataService.getConversionFunnelSplit({
+        start_date: sd,
+        end_date: ed,
+        platforms: pls.length ? pls : undefined,
+      } as any);
       if (response.success && response.data) {
-        const data = response.data as ConversionFunnelData;
-
-        // 设置漏斗数据
-        setFunnelData(data.funnel || []);
-
-        // 设置核心指标
-        setCoreMetrics(data.core_metrics || null);
-
-        // 设置模式标识
-        setIsEmployeeMode(data.is_employee_mode || false);
-
-        // 设置平台数据 (API 可能返回 by_platform 字段)
-        const responseData = response.data as typeof response.data & {
-          by_platform?: PlatformConversion[];
-        };
-        if (responseData.by_platform) {
-          setPlatformData(responseData.by_platform);
-        }
+        const funnels = response.data.funnels || {};
+        setContentStages(funnels.content?.stages || []);
+        setAppmarketStages(funnels.appmarket?.stages || []);
+      } else {
+        message.error(response.message || '加载转化漏斗失败');
       }
     } catch (error) {
-      message.error('加载数据失败');
+      message.error('加载转化漏斗异常');
     } finally {
       setLoading(false);
     }
   };
 
-  // 初始加载
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  // 筛选器查询
-  const handleSearch = (filters: Parameters<typeof loadData>[0]) => {
-    loadData(filters);
+  const handleSearch = (searchFilters: {
+    startDate: string; endDate: string; platforms: string[];
+    agencies: string[]; businessModels: string[];
+  }) => {
+    setDateRange([searchFilters.startDate, searchFilters.endDate]);
+    setPlatforms(searchFilters.platforms);
+    loadData({ startDate: searchFilters.startDate, endDate: searchFilters.endDate, platforms: searchFilters.platforms });
   };
 
-  // 筛选器重置
-  const handleReset = () => {
-    loadData();
-  };
+  // 转换 stages 给 FunnelChart 组件 (期望 {name, count, rate})
+  const contentFunnelData = useMemo(() => {
+    return contentStages.map((s) => ({
+      name: s.step,
+      count: s.value,
+      rate: s.rate,
+      conversionRate: s.rate,
+    }));
+  }, [contentStages]);
 
-  // 格式化金额
-  const formatCost = (value: number) => {
-    return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  const appmarketFunnelData = useMemo(() => {
+    return appmarketStages.map((s) => ({
+      name: s.step,
+      count: s.value,
+      rate: s.rate,
+      conversionRate: s.rate,
+    }));
+  }, [appmarketStages]);
 
-  // 获取合并转化率数据
-  const combinedRates = getCombinedRates();
+  // 内容平台核心指标
+  const contentMetrics = useMemo(() => {
+    if (!contentStages.length) return null;
+    const find = (name: string) => contentStages.find((s) => s.step === name)?.value || 0;
+    return {
+      impressions: find('广告曝光'),
+      clicks: find('客户点击'),
+      impressions: find('广告曝光'),
+      clicks: find('客户点击'),
+      leads: find('客户线索'),
+      mouth: find('客户开口'),
+      validLead: find('有效线索'),
+      opened: find('成功开户'),
+      valid: find('有效户'),
+    };
+  }, [contentStages]);
+
+  const appmarketMetrics = useMemo(() => {
+    if (!appmarketStages.length) return null;
+    const find = (name: string) => appmarketStages.find((s) => s.step === name)?.value || 0;
+    return {
+      activate: find('激活APP'),
+      opened: find('开户成功'),
+      deposit: find('入金'),
+      valid: find('有效户'),
+    };
+  }, [appmarketStages]);
 
   return (
-    <div className={styles.conversionFunnelPage}>
+    <div className={styles.page}>
       <Spin spinning={loading}>
-        {/* 筛选器 */}
-        <FilterBar
-          showPlatform
-          showAgency
-          showBusinessModel
-          showEmployee
-          onSearch={handleSearch}
-          onReset={handleReset}
+        {/* v3.1: Tab 切换两套独立漏斗 */}
+        <Tabs
+          defaultActiveKey="content"
+          items={[
+            {
+              key: 'content',
+              label: <span><Tag color="blue">内容平台漏斗</Tag> (小红书/腾讯/抖音/快手)</span>,
+              children: (
+                <Row gutter={[16, 16]}>
+                  {/* 核心指标 */}
+                  {contentMetrics && (
+                    <Col span={24}>
+                      <Card size="small" title="内容平台核心指标">
+                        <Row gutter={16}>
+                          <Col span={4}><Statistic title="广告曝光" value={contentMetrics.impressions} valueStyle={{ color: '#999' }} /></Col>
+                          <Col span={4}><Statistic title="客户点击" value={contentMetrics.clicks} valueStyle={{ color: '#999' }} /></Col>
+                          <Col span={4}><Statistic title="客户线索" value={contentMetrics.leads} /></Col>
+                          <Col span={4}><Statistic title="客户开口" value={contentMetrics.mouth} /></Col>
+                          <Col span={4}><Statistic title="有效户" value={contentMetrics.valid} valueStyle={{ color: '#52c41a' }} /></Col>
+                        </Row>
+                      </Card>
+                    </Col>
+                  )}
+                  {/* 漏斗图 */}
+                  <Col span={14}>
+                    <Card title="7 阶段转化漏斗" size="small">
+                      {contentStages.length ? (
+                        <FunnelChart data={contentFunnelData} height={500} />
+                      ) : (
+                        <Empty description="无数据" />
+                      )}
+                    </Card>
+                  </Col>
+                  {/* 阶段明细 */}
+                  <Col span={10}>
+                    <Card title="阶段转化详情" size="small">
+                      <div className={styles.stageList}>
+                        {contentStages.map((s, idx) => (
+                          <div key={s.step} className={styles.stageItem}>
+                            <Tag color="blue">{idx + 1}. {s.step}</Tag>
+                            <span className={styles.stageValue}>{s.value.toLocaleString()}</span>
+                            <Tag color={s.rate > 50 ? 'green' : s.rate > 10 ? 'gold' : 'default'}>
+                              累计 {s.rate.toFixed(2)}%
+                            </Tag>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+              ),
+            },
+            {
+              key: 'appmarket',
+              label: <span><Tag color="purple">应用市场漏斗</Tag> (小米/华为/OPPO/VIVO/荣耀/苹果)</span>,
+              children: (
+                <Row gutter={[16, 16]}>
+                  {appmarketMetrics && (
+                    <Col span={24}>
+                      <Card size="small" title="应用市场核心指标">
+                        <Row gutter={16}>
+                          <Col span={6}><Statistic title="激活APP" value={appmarketMetrics.activate} valueStyle={{ color: '#1890ff' }} /></Col>
+                          <Col span={6}><Statistic title="开户成功" value={appmarketMetrics.opened} valueStyle={{ color: '#fa8c16' }} /></Col>
+                          <Col span={6}><Statistic title="入金" value={appmarketMetrics.deposit} valueStyle={{ color: '#722ed1' }} /></Col>
+                          <Col span={6}><Statistic title="有效户" value={appmarketMetrics.valid} valueStyle={{ color: '#52c41a' }} /></Col>
+                        </Row>
+                      </Card>
+                    </Col>
+                  )}
+                  <Col span={14}>
+                    <Card title="8 阶段转化漏斗" size="small">
+                      {appmarketStages.length ? (
+                        <FunnelChart data={appmarketFunnelData} height={500} />
+                      ) : (
+                        <Empty description="无数据" />
+                      )}
+                    </Card>
+                  </Col>
+                  <Col span={10}>
+                    <Card title="阶段转化详情" size="small">
+                      <div className={styles.stageList}>
+                        {appmarketStages.map((s, idx) => (
+                          <div key={s.step} className={styles.stageItem}>
+                            <Tag color="purple">{idx + 1}. {s.step}</Tag>
+                            <span className={styles.stageValue}>{s.value.toLocaleString()}</span>
+                            <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
+                              累计 {s.rate.toFixed(2)}%
+                            </Tag>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+              ),
+            },
+          ]}
         />
 
-        {/* 核心指标卡片 - 始终显示（与旧版保持一致） */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={6}>
-            <Card size="small" className={styles.metricCard}>
-              <Statistic
-                title="投入金额"
-                value={coreMetrics?.cost ?? 0}
-                precision={2}
-                prefix="¥"
-                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" className={styles.metricCard}>
-              <Statistic
-                title="新增线索"
-                value={coreMetrics?.lead_users ?? 0}
-                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" className={styles.metricCard}>
-              <Statistic
-                title="新开客户数"
-                value={coreMetrics?.opened_account_users ?? 0}
-                styles={{ content: { color: '#1890ff', fontSize: 20 } }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" className={styles.metricCard}>
-              <Statistic
-                title="新增有效户数"
-                value={coreMetrics?.valid_customer_users ?? 0}
-                styles={{ content: { color: '#52c41a', fontSize: 20 } }}
-              />
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 漏斗图和转化率数据 */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={12}>
-            <Card className={styles.detailCard}>
-              <div className={styles.cardHeader}>
-                <Text type="secondary" className={styles.cardTitle}>
-                  📊 转化率数据
-                </Text>
-                <Text type="secondary" className={styles.cardDesc}>
-                  各阶段转化情况
-                </Text>
-              </div>
-              <div className={styles.funnelTable}>
-                {funnelData.map((stage, index) => {
-                  const nextStage = funnelData[index + 1];
-                  const nextStepRate = nextStage && stage.value > 0
-                    ? (nextStage.value / stage.value * 100)
-                    : null;
-
-                  return (
-                    <div key={stage.step} className={styles.funnelStageItem}>
-                      <div className={styles.funnelRow}>
-                        <div className={styles.stageInfo}>
-                          <Tag color="blue">{stage.step}</Tag>
-                          <Text strong className={styles.stageRate}>
-                            {(stage.rate || 0).toFixed(2)}%
-                          </Text>
-                        </div>
-                        <div className={styles.progressSection}>
-                          <Progress
-                            percent={Math.min(stage.rate || 0, 100)}
-                            showInfo={false}
-                            strokeColor={{
-                              '0%': '#1890ff',
-                              '100%': '#096dd9',
-                            }}
-                            railColor="#f0f2f5"
-                            size="small"
-                          />
-                        </div>
-                        <Text type="secondary" className={styles.stageCount}>
-                          {stage.value.toLocaleString()} 人
-                        </Text>
-                      </div>
-                      {nextStepRate !== null && (
-                        <div className={styles.nextStepRate}>
-                          <Text type="secondary">
-                            ↓ 至 {nextStage.step}: <Text strong>{nextStepRate.toFixed(2)}%</Text>
-                          </Text>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <ChartCard title="📈 转化漏斗" loading={loading} height={400} useCustomTitle>
-              <FunnelChart data={funnelData.map(s => ({
-                name: s.step,
-                count: s.value,
-                rate: s.rate,
-                conversionRate: s.rate
-              }))} height={380} />
-            </ChartCard>
-
-            {/* 合并转化率 */}
-            {combinedRates && (
-              <Card
-                className={`${styles.combinedRatesCard} ${styles.withCustomHeader}`}
-                style={{ marginTop: 16 }}
-                size="small"
-              >
-                <div className={styles.cardHeader}>
-                  <Text type="secondary" className={styles.cardTitle}>
-                    💼 合并转化率
-                  </Text>
-                  <Text type="secondary" className={styles.cardDesc}>
-                    全链路转化情况
-                  </Text>
-                </div>
-                <div className={styles.combinedRates}>
-                  {'impressionToLeadRate' in combinedRates && (
-                    <div className={styles.rateItem}>
-                      <Text type="secondary">曝光-线索率</Text>
-                      <Text strong style={{ color: '#1890ff' }}>
-                        {combinedRates.impressionToLeadRate?.toFixed(2)}%
-                      </Text>
-                    </div>
-                  )}
-                  <div className={styles.rateItem}>
-                    <Text type="secondary">线索-开户率</Text>
-                    <Text strong style={{ color: '#1890ff' }}>
-                      {combinedRates.leadToOpenRate.toFixed(2)}%
-                    </Text>
-                  </div>
-                  <div className={styles.rateItem}>
-                    <Text type="secondary">开户-有效户率</Text>
-                    <Text strong style={{ color: '#1890ff' }}>
-                      {combinedRates.openToValidRate.toFixed(2)}%
-                    </Text>
-                  </div>
-                  <Divider style={{ margin: '8px 0' }} />
-                  <div className={styles.rateItem}>
-                    <Text type="secondary">全链路转化率</Text>
-                    <Text strong style={{ color: '#52c41a', fontSize: 16 }}>
-                      {combinedRates.overallRate.toFixed(2)}%
-                    </Text>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </Col>
-        </Row>
-
-        {/* 平台对比表格 */}
-        {platformData.length > 0 && (
-          <Row gutter={[16, 16]} className={styles.tableRow}>
-            <Col span={24}>
-              <Card
-                title={
-                  <Space>
-                    <span>平台转化对比</span>
-                    <Select
-                      value={dimension}
-                      onChange={setDimension}
-                      style={{ width: 120 }}
-                      size="small"
-                    >
-                      <Option value="platform">按平台</Option>
-                      <Option value="agency">按代理商</Option>
-                      <Option value="business_model">按业务模式</Option>
-                    </Select>
-                  </Space>
-                }
-              >
-                <div className={styles.platformTable}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>平台</th>
-                        <th>曝光</th>
-                        <th>点击</th>
-                        <th>线索</th>
-                        <th>开户</th>
-                        <th>有效户</th>
-                        <th>点击率</th>
-                        <th>转化率</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {platformData.map(record => {
-                        const clickRate = record.impressions > 0
-                          ? ((record.clicks / record.impressions) * 100).toFixed(2)
-                          : '0.00';
-                        const convRate = record.leads > 0
-                          ? ((record.opened_accounts / record.leads) * 100).toFixed(2)
-                          : '0.00';
-                        return (
-                          <tr key={record.platform}>
-                            <td>{record.platform}</td>
-                            <td>{record.impressions?.toLocaleString() || '-'}</td>
-                            <td>{record.clicks?.toLocaleString() || '-'}</td>
-                            <td>{record.leads?.toLocaleString() || '-'}</td>
-                            <td>{record.opened_accounts?.toLocaleString() || '-'}</td>
-                            <td>{record.valid_customers?.toLocaleString() || '-'}</td>
-                            <td>{clickRate}%</td>
-                            <td>{convRate}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        )}
+        <Card size="small" style={{ marginTop: 16 }} type="inner">
+          <Space direction="vertical" size={0}>
+            <span style={{ color: '#999', fontSize: 12 }}>
+              数据源: 内容平台 = agg_vendor_daily(平台∈内容平台) + fact_conv_content / 应用市场 = fact_conv_appmarket
+            </span>
+            <span style={{ color: '#999', fontSize: 12 }}>
+              v3.1 双漏斗独立，按渠道类别拆分。占比由前端按响应数据实时算 (value/previous)。
+            </span>
+          </Space>
+        </Card>
       </Spin>
     </div>
   );

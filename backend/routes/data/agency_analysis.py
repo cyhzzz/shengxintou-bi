@@ -9,14 +9,23 @@ from backend.utils.decorators import handle_exceptions
 bp = Blueprint('agency_analysis', __name__)
 
 
-@bp.route('/agency-analysis', methods=['GET'])
+@bp.route('/agency-analysis', methods=['GET', 'POST'])
 @handle_exceptions
 def get_agency_analysis():
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    platforms = [p for p in (request.args.get('platforms') or '').split(',') if p]
-    agencies = [a for a in (request.args.get('agencies') or '').split(',') if a]
-    business_models = [b for b in (request.args.get('business_models') or '').split(',') if b]
+    if request.method == 'POST':
+        body = request.get_json() or {}
+        f = body.get('filters') or {}
+        start_date = f.get('start_date')
+        end_date = f.get('end_date')
+        platforms = f.get('platforms') or []
+        agencies = f.get('agencies') or []
+        business_models = f.get('business_models') or []
+    else:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        platforms = [p for p in (request.args.get('platforms') or '').split(',') if p]
+        agencies = [a for a in (request.args.get('agencies') or '').split(',') if a]
+        business_models = [b for b in (request.args.get('business_models') or '').split(',') if b]
 
     q = db.session.query(
         AggVendorDaily.平台,

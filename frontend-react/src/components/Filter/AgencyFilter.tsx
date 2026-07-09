@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 代理商筛选器组件
  * 多选代理商筛选
  */
@@ -21,7 +21,7 @@ const AgencyFilter: React.FC<AgencyFilterProps> = ({
   placeholder = '选择代理商',
 }) => {
   const { selectedAgencies, setAgencies } = useFilterStore();
-  const [agencyOptions, setAgencyOptions] = useState<string[]>([]);
+  const [agencyOptions, setAgencyOptions] = useState<{value: string; label: string}[]>([]);
 
   // 加载代理商列表
   useEffect(() => {
