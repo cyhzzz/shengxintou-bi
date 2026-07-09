@@ -1,6 +1,6 @@
 /**
  * 漏斗图组件
- * 基于 @ant-design/charts 封装
+ * 基于 ECharts 封装
  * 用于转化漏斗展示
  *
  * 特性：
@@ -8,7 +8,8 @@
  * 2. 显示阶段名称和人数标签
  */
 import React, { useMemo } from 'react';
-import { Funnel } from '@ant-design/charts';
+import type { DefaultLabelFormatterCallbackParams, EChartsOption, TooltipComponentFormatterCallbackParams } from 'echarts';
+import EChartsComponent from './ECharts';
 import styles from './FunnelChart.module.scss';
 
 interface FunnelStage {
@@ -24,10 +25,31 @@ interface FunnelChartProps {
   showConversionRate?: boolean;
 }
 
+interface FunnelParamData {
+  name: string;
+  rawValue: number;
+  rate?: number;
+}
+
+const toNumber = (value: unknown) => Number(value || 0);
+
+const readFunnelParam = (params: TooltipComponentFormatterCallbackParams | DefaultLabelFormatterCallbackParams): FunnelParamData => {
+  const item = Array.isArray(params) ? params[0] : params;
+  const data = (item?.data || {}) as { rawValue?: unknown; rate?: unknown };
+  const rate = typeof data.rate === 'number' ? data.rate : undefined;
+  return {
+    name: String(item?.name || ''),
+    rawValue: toNumber(data.rawValue ?? item?.value),
+    rate,
+  };
+};
+
 const FunnelChart: React.FC<FunnelChartProps> = ({
   data,
   height = 400,
 }) => {
+  const formatNumber = (value: number) => Number(value || 0).toLocaleString();
+
   // 使用对数缩放处理数据，使漏斗宽度更平滑
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -47,12 +69,12 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
         : 0;
 
       return {
-        stage: item.name,
+        name: item.name,
         // 使用对数缩放后的值作为显示值
         value: scaledValue,
         // 保留原始值用于显示
-        originalValue: item.count,
-        rate: item.rate,
+        rawValue: item.count,
+        rate: item.rate ?? item.conversionRate,
         conversionRate: item.conversionRate,
       };
     });
@@ -69,56 +91,45 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
     '#ff7a45',
   ], []);
 
-  const config = useMemo(() => ({
-    data: chartData,
-    xField: 'stage',
-    yField: 'value',
-    // 颜色配置
-    colorField: 'stage',
+  const option: EChartsOption = useMemo(() => ({
     color: colors,
-    // 标签配置 - 显示阶段名称和人数
-    // G2 5.x / Ant Design Charts 2.x 使用 label 对象配置标签
-    label: {
-      text: (datum: any) => {
-        const count = datum.originalValue ?? datum.value ?? 0;
-        return `${datum.stage}\n${count.toLocaleString()} 人`;
-      },
-      position: 'inside',
-      fill: '#fff',
-      fontSize: 12,
-      fontWeight: 500,
-      textAlign: 'center',
-      textBaseline: 'middle',
-    },
-    // 样式配置
-    style: {
-      stroke: '#fff',
-      lineWidth: 2,
-    },
-    // 提示信息
     tooltip: {
-      title: (datum: any) => datum.stage,
-      items: [
-        {
-          field: 'originalValue',
-          name: '人数',
-          valueFormatter: (v: number) => v?.toLocaleString() + ' 人',
-        },
-        {
-          field: 'rate',
-          name: '转化率',
-          valueFormatter: (v: number) => (v !== undefined ? v.toFixed(2) + '%' : '-'),
-        },
-      ],
-    },
-    // 图例
-    legend: false,
-    // 动画
-    animate: {
-      enter: {
-        type: 'fadeIn',
+      trigger: 'item',
+      formatter: (params: TooltipComponentFormatterCallbackParams) => {
+        const { name, rawValue, rate } = readFunnelParam(params);
+        return [
+          name,
+          `人数：${formatNumber(rawValue)} 人`,
+          `转化率：${typeof rate === 'number' ? `${rate.toFixed(2)}%` : '-'}`,
+        ].join('<br/>');
       },
     },
+    series: [{
+      name: '转化漏斗',
+      type: 'funnel',
+      left: '8%',
+      top: 24,
+      width: '84%',
+      height: '86%',
+      minSize: '12%',
+      maxSize: '100%',
+      sort: 'none',
+      gap: 4,
+      label: {
+        show: true,
+        position: 'inside',
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 600,
+        formatter: (params: DefaultLabelFormatterCallbackParams) => {
+          const { name, rawValue } = readFunnelParam(params);
+          return `${name}\n${formatNumber(rawValue)} 人`;
+        },
+      },
+      labelLine: { show: false },
+      itemStyle: { borderColor: '#fff', borderWidth: 2 },
+      data: chartData,
+    }],
   }), [chartData, colors]);
 
   // 如果没有数据，显示占位
@@ -140,7 +151,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
 
   return (
     <div className={styles.funnelChart} style={{ height }}>
-      <Funnel {...config} />
+      <EChartsComponent option={option} height={height} />
     </div>
   );
 };

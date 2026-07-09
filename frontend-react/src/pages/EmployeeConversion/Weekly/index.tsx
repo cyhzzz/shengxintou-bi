@@ -7,7 +7,7 @@ import { CopyOutlined, FileWordOutlined, FileExcelOutlined, PictureOutlined } fr
 import dayjs from 'dayjs';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
 import PosterExportButtons from './components/PosterExportButtons';
-import { postEmployeeConversionWeekly } from '@/types/api';
+import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
 import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
 import styles from './index.module.scss';
 
@@ -29,6 +29,11 @@ const TOP_COUNT_OPTIONS = [
   { label: 'TOP 20', value: 20 },
 ];
 
+interface WeeklyDefaultDateOptions {
+  default_week_start?: string;
+  default_week_end?: string;
+}
+
 const EmployeeConversionWeeklyPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
   const [platforms, setPlatforms] = useState<string[]>(['小红书', '腾讯', '抖音']);
@@ -37,21 +42,20 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
   const [reportData, setReportData] = useState<EmployeeConversionWeeklyData | null>(null);
   const [reportContent, setReportContent] = useState<string>('');
 
-  // 设置默认日期范围（上周一到上周日）
+  // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
   useEffect(() => {
-    const today = new Date();
-    const dayOfWeek = today.getDay() || 7; // 周日为7
-
-    // 上周日
-    const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - dayOfWeek);
-
-    // 上周一
-    const lastMonday = new Date(lastSunday);
-    lastMonday.setDate(lastSunday.getDate() - 6);
-
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
-    setDateRange([formatDate(lastMonday), formatDate(lastSunday)]);
+    getEmployeeConversionFilterOptions()
+      .then((res) => {
+        const defaultDates = res?.data as WeeklyDefaultDateOptions | undefined;
+        const start = defaultDates?.default_week_start;
+        const end = defaultDates?.default_week_end;
+        if (start && end) {
+          setDateRange([start, end]);
+        } else {
+          setDateRange(['2026-01-01', '2026-06-30']);
+        }
+      })
+      .catch(() => setDateRange(['2026-01-01', '2026-06-30']));
   }, []);
 
   // 生成周报
@@ -291,13 +295,16 @@ function formatReportContent(data: EmployeeConversionWeeklyData, startDate: stri
   // 各平台概览
   for (const platform of Object.keys(overview)) {
     const platformData = overview[platform] || {};
+    const totalLeads = platformData.total_leads ?? platformData.leads ?? 0;
+    const openedCount = platformData.opened_count ?? platformData.opened ?? 0;
+    const openingRate = platformData.opening_rate ?? platformData.rate ?? 0;
     content += `
 ┌───────────────────────────────────────────────────────────┐
 │ 【${platform}平台概览】
 ├───────────────────────────────────────────────────────────┤
-│ 线索量：${formatNum(platformData.leads)} 条
-│ 开户量：${formatNum(platformData.opened)} 户
-│ 开户率：${(platformData.rate || 0).toFixed(2)}%
+│ 线索量：${formatNum(totalLeads)} 条
+│ 开户量：${formatNum(openedCount)} 户
+│ 开户率：${Number(openingRate || 0).toFixed(2)}%
 └───────────────────────────────────────────────────────────┘
 
 `;

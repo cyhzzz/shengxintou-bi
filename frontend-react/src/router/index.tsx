@@ -22,6 +22,7 @@ import AppMarketCreativePage from '@/pages/Reports/AppMarket/Creative';
 
 // 直播 v3.1 占位 (v3.1 §八)
 import LiveFunnelPage from '@/pages/Live/Funnel';
+import AnchorClusterPage from '@/pages/AnchorCluster';
 
 // React.lazy 包装用于运营分析 + 报告生成 等大页面，按需加载 (v3.1 §四)
 const LazyXhsNotesOperation = lazy(() => import('@/pages/XhsNotes/Operation').then((m) => ({ default: m.default })));
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <MainLayout />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { index: true, element: <Navigate to="/omni-channel" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
 
       // v3.1 顶级菜单
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
 
       { path: 'conversion-funnel', element: <ConversionFunnelPage /> },
       { path: 'leads-detail', element: <LeadsDetailPage /> },
+      { path: 'anchor-clusters', element: <AnchorClusterPage /> },
       { path: 'agency-analysis', element: <AgencyAnalysisPage /> },
       {
         path: 'xhs-notes',

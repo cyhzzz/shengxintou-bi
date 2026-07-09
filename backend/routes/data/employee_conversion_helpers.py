@@ -4,6 +4,7 @@ from sqlalchemy import func, case, and_, or_
 from backend.models_v2 import FactConvContent
 from backend.database import db
 import logging
+from datetime import date, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,22 @@ def get_weekly_report_data(platforms, start_date=None, end_date=None):
 def get_employee_list():
     qualified = get_qualified_employees(min_leads=5)
     return sorted(qualified)
+
+
+def get_latest_data_week_range():
+    latest = db.session.query(func.max(FactConvContent.线索日期)).scalar()
+    if not latest:
+        today = date.today()
+        start = today - timedelta(days=today.weekday())
+    else:
+        latest_date = datetime.strptime(str(latest)[:10], '%Y-%m-%d').date()
+        start = latest_date - timedelta(days=latest_date.weekday())
+    end = start + timedelta(days=6)
+    return {
+        'latest_date': str(latest)[:10] if latest else '',
+        'default_week_start': start.isoformat(),
+        'default_week_end': end.isoformat(),
+    }
 
 
 def get_platform_overview(platforms, start_date=None, end_date=None):
