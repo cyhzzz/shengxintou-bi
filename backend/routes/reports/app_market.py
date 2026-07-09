@@ -9,7 +9,7 @@
 所有端点返 SUM 聚合（counts） + 派生（conversion_rate），前端可自行用 sums 重算。
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case, or_
 from backend.models_v2 import FactConvAppmarket
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -214,7 +214,7 @@ def app_market_detail():
     })
 
 
-@bp.route('/filter-options', methods=['GET'])
+@bp.route('/filter-options', methods=['GET', 'POST'])
 @handle_exceptions
 def app_market_filter_options():
     markets = [r[0] for r in db.session.query(FactConvAppmarket.应用市场).distinct().all() if r[0]]
@@ -227,4 +227,87 @@ def app_market_filter_options():
             'channel_types': sorted(types),
         },
         'meta': _META,
+    })
+
+
+
+@bp.route('/creative', methods=['POST'])
+@handle_exceptions
+def app_market_creative():
+    # 广告创意效果 (Bug 3 修复)
+    # 按 广告计划ID + 投放账号 聚合 fact_conv_appmarket 漏斗计数
+    # 当 广告计划ID 为 NULL/0 时 fallback 投放账号
+    # 返回 TopN 创意计划的开户/入金/有效户数据
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    top_n = int(data.get('top_n', 50))
+
+    funnels = [
+        ('是否激活APP', '激活APP'),
+        ('是否开户成功', '开户成功'),
+        ('是否入金', '入金'),
+        ('是否有效户', '有效户'),
+    ]
+
+    # CASE WHEN 广告计划ID IS NULL OR 广告计划ID = 0 THEN COALESCE(投放账号, '未归因') ELSE 广告计划ID END
+    plan_expr = case(
+        (or_(FactConvAppmarket.广告计划ID.is_(None), FactConvAppmarket.广告计划ID == 0),
+         func.coalesce(FactConvAppmarket.投放账号, '未归因')),
+        else_=FactConvAppmarket.广告计划ID
+    ).label('plan_key')
+
+    q = db.session.query(
+        plan_expr,
+        func.coalesce(func.sum(case((FactConvAppmarket.广告计划ID.isnot(None), 1), else_=0)), 0).label('has_plan_id'),
+        FactConvAppmarket.投放账号,
+        FactConvAppmarket.应用市场,
+        FactConvAppmarket.渠道类型,
+        *[func.coalesce(func.sum(getattr(FactConvAppmarket, col)), 0).label(alias) for col, alias in funnels]
+    )
+    q = _apply_filters(q, filters)
+    q = q.group_by(plan_expr, FactConvAppmarket.投放账号, FactConvAppmarket.应用市场, FactConvAppmarket.渠道类型)
+    rows = q.all()
+
+    items = []
+    for r in rows:
+        activate = int(r.激活APP or 0)
+        opened = int(r.开户成功 or 0)
+        deposit = int(r.入金 or 0)
+        valid = int(r.有效户 or 0)
+        items.append({
+            'plan_id': str(r.plan_key) if r.plan_key is not None else '未归因',
+            'plan_label': str(r.plan_key) if r.has_plan_id and r.plan_key is not None else (r.投放账号 or '未归因'),
+            '投放账号': r.投放账号 or '-',
+            '应用市场': r.应用市场 or '未归因',
+            '渠道类型': r.渠道类型 or '未归因',
+            '激活APP': activate,
+            '开户成功': opened,
+            '入金': deposit,
+            '有效户': valid,
+            '激活_开户率': round(opened / activate * 100, 2) if activate > 0 else 0,
+            '激活_有效率': round(valid / activate * 100, 2) if activate > 0 else 0,
+            '开户_有效率': round(valid / opened * 100, 2) if opened > 0 else 0,
+        })
+
+    items.sort(key=lambda x: (x['开户成功'], x['激活APP']), reverse=True)
+    top_items = items[:top_n]
+
+    totals = {
+        'total_plans': len(items),
+        'top_plans': len(top_items),
+        'total_activate': sum(i['激活APP'] for i in items),
+        'total_open': sum(i['开户成功'] for i in items),
+        'total_deposit': sum(i['入金'] for i in items),
+        'total_valid': sum(i['有效户'] for i in items),
+    }
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'items': top_items,
+            'totals': totals,
+            'top_n': top_n,
+            'all_count': len(items),
+        },
+        'meta': {**_META, 'version': 'v3.1-creative', 'group_by': '广告计划ID+投放账号'},
     })

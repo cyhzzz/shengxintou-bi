@@ -48,9 +48,13 @@ const menuItems: MenuProps['items'] = [
     label: '转化漏斗',
   },
   {
-    key: '/leads-detail',
+    key: 'leads-detail-group',
     icon: <UnorderedListOutlined />,
     label: '线索明细',
+    children: [
+      { key: '/leads-detail', label: '线索明细', icon: <UnorderedListOutlined /> },
+      { key: '/anchor-clusters', label: '主播聚类', icon: <UserOutlined /> },
+    ],
   },
   {
     key: '/agency-analysis',

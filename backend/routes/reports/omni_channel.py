@@ -158,9 +158,10 @@ def omni_channel_summary():
 @bp.route('/daily-trend', methods=['POST'])
 @handle_exceptions
 def omni_channel_daily_trend():
-    u"""4 类渠道日趋势（返回长格式：每行 = 一个 (日期, 渠道类别) 的 3 个指标）
+    u"""渠道日趋势（返回长格式：每行 = 一个 (日期, 渠道类别, 渠道名称) 的 3 个指标）
 
-    前端在客户端按统计维度（开户/入金/有效户）和时间维度（日/周/月）运行时分组、汇总、画图。
+    含 渠道名称（二级渠道），前端可按一级渠道类别聚合，也可下钻到二级渠道。
+    前端在客户端按统计维度（开户/入金/有效户）运行时分组、汇总、画图。
     """
     data = request.get_json() or {}
     filters = data.get('filters') or {}
@@ -170,13 +171,18 @@ def omni_channel_daily_trend():
     q = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
         AggDailyChannelOpen.渠道类别.label('channel_category'),
+        AggDailyChannelOpen.渠道名称.label('channel_name'),
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
         func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposit'),
         func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
     )
     if cond is not None:
         q = q.filter(cond)
-    q = q.group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道类别)
+    q = q.group_by(
+        AggDailyChannelOpen.时间区间,
+        AggDailyChannelOpen.渠道类别,
+        AggDailyChannelOpen.渠道名称,
+    )
     rows = q.all()
 
     trend = []
@@ -187,11 +193,12 @@ def omni_channel_daily_trend():
         trend.append({
             'date': d,
             'channel_category': r.channel_category,
+            'channel_name': r.channel_name or '未归因',
             'opens': _i(r.opens),
             'deposit': _i(r.deposit),
             'valid': _i(r.valid),
         })
-    trend.sort(key=lambda x: (x['date'], x['channel_category']))
+    trend.sort(key=lambda x: (x['date'], x['channel_category'], x['channel_name']))
 
     return jsonify({
         'success': True,
