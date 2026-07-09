@@ -158,6 +158,9 @@ export const dataServiceReports = {
   getAppMarketFilterOptions: async () => {
     return http.get('/reports/app-market/filter-options');
   },
+  getAppMarketCreative: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
+    return http.post('/reports/app-market/creative', params);
+  },
 };
 
 
@@ -186,10 +189,10 @@ export interface OmniChannelSummary {
 // daily-trend: 每个日期一条，4 大类各一字段
 export interface OmniChannelDailyTrendRow {
   date: string;
-  互联网引流: number;
-  合作机构: number;
-  员工开户: number;
-  自然流入: number;
+  channel_category: string;
+  opens: number;
+  deposit: number;
+  valid: number;
 }
 export interface OmniChannelDailyTrend {
   daily_trend: OmniChannelDailyTrendRow[];
@@ -202,6 +205,13 @@ export interface OmniChannelFilterOptions {
   channel_categories: string[];
   sub_channels: string[];
 }
+// 主播聚类 (Bug 6): 按 客户来源 中的 [平台引流-主播名] 聚类
+export const dataServiceLeadsAnchor = {
+  getAnchorClusters: async (params: { filters?: Record<string, unknown>; top_n?: number } = {}) => {
+    return http.post('/leads-detail/anchor-clusters', params);
+  },
+};
+
 export const dataServiceOmniChannel = {
   getOmniChannelSummary: async (params: { filters?: Record<string, unknown> } = {}) => {
     return http.post('/reports/omni-channel/summary', params);
@@ -216,6 +226,7 @@ export const dataServiceOmniChannel = {
     return http.get('/reports/omni-channel/filter-options');
   },
 };
+
 
 
 

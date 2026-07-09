@@ -14,18 +14,6 @@ import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
 
-const FUNNEL_STAGES = [
-  { key: '激活APP', label: '激活APP', fromCol: 'downloads' },
-  { key: '开户注册', label: '开户注册' },
-  { key: '注册身份证', label: '注册身份证' },
-  { key: '注册银行卡', label: '注册银行卡' },
-  { key: '提交开户', label: '提交开户' },
-  { key: '开户成功', label: '开户成功' },
-  { key: '新开户', label: '新开户' },
-  { key: '入金', label: '入金' },
-  { key: '有效户', label: '有效户' },
-];
-
 const AppMarketFunnelPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
   const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
@@ -67,11 +55,19 @@ const AppMarketFunnelPage: React.FC = () => {
 
   // 漏斗图
   const funnelChartOption: EChartsOption = useMemo(() => {
-    const sorted = [...funnel].sort((a, b) => (b.count || 0) - (a.count || 0));
+    const sorted = [...funnel]
+      .sort((a, b) => (b.count || 0) - (a.count || 0))
+      .map((item) => ({
+        name: item.step,
+        value: Number(item.count || 0),
+        rate: Number(item.rate || 0),
+        stepRate: Number(item.step_rate || 0),
+      }));
+    const formatValue = (value: unknown) => Number(value || 0).toLocaleString();
     return {
       tooltip: {
         trigger: 'item',
-        formatter: (p: any) => `${p.name}<br/>人数: ${p.value.toLocaleString()}<br/>转化率: ${p.percent}%`,
+        formatter: (p: any) => `${p.name}<br/>人数: ${formatValue(p.value)}<br/>环节转化率: ${p.data?.rate ?? 0}%<br/>累计转化率: ${p.data?.stepRate ?? 0}%`,
       },
       series: [{
         name: '应用市场漏斗',
@@ -82,7 +78,7 @@ const AppMarketFunnelPage: React.FC = () => {
         maxSize: '100%',
         sort: 'descending',
         gap: 2,
-        label: { show: true, position: 'inside', formatter: (p: any) => `${p.name}\n${p.value.toLocaleString()}` },
+        label: { show: true, position: 'inside', formatter: (p: any) => `${p.name}\n${formatValue(p.value)}` },
         labelLine: { length: 10, lineStyle: { width: 1 } },
         itemStyle: { borderColor: '#fff', borderWidth: 1 },
         data: sorted,

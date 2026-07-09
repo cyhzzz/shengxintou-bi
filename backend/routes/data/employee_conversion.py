@@ -5,7 +5,7 @@ import logging
 from backend.routes.data.employee_conversion_helpers import (
     get_employee_conversion_ranking, get_weekly_trend_data,
     get_employee_rate_trend, get_weekly_report_data,
-    get_employee_list, get_platform_overview
+    get_employee_list, get_platform_overview, get_latest_data_week_range
 )
 from backend.utils.decorators import handle_exceptions
 
@@ -52,8 +52,8 @@ def get_analysis_data():
         'data': {
             'core_metrics': core,
             'platform_overview': [{'platform': p, **v} for p, v in overview.items()],
-            'conversion_trend': trend,
-            'employee_rate_trend': rate_trend,
+            'conversion_trend': {'weeks': trend},
+            'employee_rate_trend': {'periods': rate_trend},
             'ranking': ranking,
         }
     })
@@ -89,6 +89,7 @@ def get_employees():
 @bp.route('/employee-conversion/filter-options', methods=['GET'])
 @handle_exceptions
 def get_filter_options():
+    default_range = get_latest_data_week_range()
     return jsonify({
         'success': True,
         'data': {
@@ -98,7 +99,8 @@ def get_filter_options():
                 {'value': 'all', 'label': '全部线索'},
                 {'value': 'existing', 'label': '存量线索'},
                 {'value': 'new', 'label': '新增线索'},
-            ]
+            ],
+            **default_range,
         }
     })
 

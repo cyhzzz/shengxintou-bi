@@ -111,3 +111,146 @@ def get_filter_options():
             'employees': [{'value': e, 'label': e} for e in employees],
         }
     })
+
+
+@bp.route('/leads-detail/anchor-clusters', methods=['POST'])
+@handle_exceptions
+def get_anchor_clusters():
+    """Bug 6: 主播聚类
+
+    解析 客户来源 字段，识别 [平台]引流-[主播名字] 模式，按 (平台, 主播) 聚合。
+    例: 视频号引流-姚立琦 -> (视频号, 姚立琦)
+        抖音引流-赵茜 -> (抖音, 赵茜)
+        财联社引流-谭记恩 -> (财联社, 谭记恩)
+        广告投放-新客权益 -> (广告投放, 新客权益) (非引流类，跳过)
+
+    返回: 每个主播的线索数 / 开口 / 开户 / 有效户 / 总资产
+    """
+    import re
+    from sqlalchemy import case
+
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    top_n = int(data.get('top_n', 50))
+
+    sd = filters.get('start_date')
+    ed = filters.get('end_date')
+    platforms_filter = filters.get('platforms') or []
+    agencies_filter = filters.get('agencies') or []
+
+    # 主播聚类正则: (平台)引流-(主播名)
+    # 复合来源如 "视频号引流-姚立琦,视频号引流-蒋亦凡" 需按分隔符拆成多个主播归因。
+    base_q = db.session.query(
+        FactConvContent.客户来源,
+        FactConvContent.平台来源,
+        func.count(FactConvContent.id).label('leads'),
+        func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
+        func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
+        func.coalesce(func.sum(case((FactConvContent.是否开户 == 1, 1), else_=0)), 0).label('opened'),
+        func.coalesce(func.sum(case((FactConvContent.是否为有效户 == 1, 1), else_=0)), 0).label('valid'),
+        func.coalesce(func.sum(FactConvContent.资产), 0).label('assets'),
+    ).filter(
+        and_(
+            FactConvContent.客户来源.isnot(None),
+            FactConvContent.客户来源 != '',
+        )
+    )
+    if sd and ed:
+        base_q = base_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms_filter:
+        base_q = base_q.filter(FactConvContent.平台来源.in_(platforms_filter))
+    if agencies_filter:
+        base_q = base_q.filter(FactConvContent.广告代理商.in_(agencies_filter))
+
+    base_q = base_q.group_by(FactConvContent.客户来源, FactConvContent.平台来源)
+    rows = base_q.all()
+
+    # 在 Python 端按 (platform, anchor) 聚类
+    PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
+    SPLIT_PATTERN = re.compile(r"[,，;；、]+")
+
+    agg_map = {}
+    for r in rows:
+        src = (r.客户来源 or "").strip()
+        matches = []
+        for part in SPLIT_PATTERN.split(src):
+            segment = part.strip()
+            if not segment:
+                continue
+            m = PATTERN.match(segment)
+            if not m:
+                continue
+            anchor_platform = m.group(1)
+            anchor_name = m.group(2).strip()
+            if not anchor_name:
+                continue
+            matches.append((anchor_platform, anchor_name, segment))
+
+        # 同一个原始来源里若重复出现同一主播，只归因一次。
+        for anchor_platform, anchor_name, segment in sorted(set(matches)):
+            key = f"{anchor_platform}|||{anchor_name}"
+            if key not in agg_map:
+                agg_map[key] = {
+                    'platform': anchor_platform,
+                    'anchor': anchor_name,
+                    'leads': 0,
+                    'mouth': 0,
+                    'valid_lead': 0,
+                    'opened': 0,
+                    'valid': 0,
+                    'assets': 0.0,
+                    'raw_sources': set(),
+                }
+            a = agg_map[key]
+            a['leads'] += int(r.leads or 0)
+            a['mouth'] += int(r.mouth or 0)
+            a['valid_lead'] += int(r.valid_lead or 0)
+            a['opened'] += int(r.opened or 0)
+            a['valid'] += int(r.valid or 0)
+            a['assets'] += float(r.assets or 0)
+            a['raw_sources'].add(segment)
+
+    items = []
+    for a in agg_map.values():
+        leads = a['leads']
+        opened = a['opened']
+        valid = a['valid']
+        items.append({
+            'platform': a['platform'],
+            'anchor': a['anchor'],
+            'leads': leads,
+            'mouth': a['mouth'],
+            'valid_lead': a['valid_lead'],
+            'opened': opened,
+            'valid': valid,
+            'assets': round(a['assets'], 2),
+            'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
+            'valid_rate': round(valid / leads * 100, 2) if leads > 0 else 0,
+            'sources': sorted(a['raw_sources']),
+        })
+    items.sort(key=lambda x: (x['leads'], x['opened']), reverse=True)
+
+    totals = {
+        'total_anchors': len(items),
+        'total_leads': sum(i['leads'] for i in items),
+        'total_opened': sum(i['opened'] for i in items),
+        'total_valid': sum(i['valid'] for i in items),
+        'total_assets': round(sum(i['assets'] for i in items), 2),
+    }
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'items': items[:top_n],
+            'totals': totals,
+            'top_n': top_n,
+            'all_count': len(items),
+            'platforms': sorted(set(i['platform'] for i in items)),
+        },
+        'meta': {
+            'version': 'v3.1-anchor-cluster',
+            'source': 'fact_conv_content.客户来源',
+            'pattern': '^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$',
+            'note': '按 客户来源 中"平台引流-主播"模式聚合；复合来源会拆分并分别归因给每个主播',
+        },
+    })
