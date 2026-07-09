@@ -1,2 +1,1 @@
-"""数据处理器包 - v2.1 仅保留 v2 原样导入处理器"""
-from .base_processor import DataProcessor  # noqa: F401
+﻿"""数据处理器包 - v3.1 仅保留 v2 原样导入（base_processor v1 已废弃，见 backend/processors/v2/raw_import.py）"""

@@ -1,12 +1,28 @@
-.page { padding: 16px; }
+﻿.page { padding: 16px; }
 .filterCard { margin-bottom: 16px; }
 .label { color: #555; font-size: 13px; }
-.statRow { margin-bottom: 16px; }
-.funnelCard { min-height: 320px; }
-.funnelList { display: flex; flex-direction: column; gap: 12px; }
-.funnelRow { display: grid; grid-template-columns: 96px 1fr 100px 110px; align-items: center; gap: 12px; padding: 4px 0; }
-.funnelLabel { color: #333; font-size: 13px; }
-.funnelBarWrap { min-width: 0; }
-.funnelCount { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: #262626; }
-.funnelRate { text-align: right; color: #888; font-size: 12px; font-variant-numeric: tabular-nums; }
-.funnelStepRate { color: #bbb; margin-left: 4px; }
+.funnelList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.funnelItem {
+  display: grid;
+  grid-template-columns: 100px 100px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #fafafa;
+}
+.funnelStep { font-weight: 500; }
+.funnelCount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #1890ff;
+  font-size: 16px;
+}
+.funnelRates {
+  display: flex;
+  gap: 4px;
+}

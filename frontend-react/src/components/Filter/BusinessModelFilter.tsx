@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 业务模式筛选器组件
  * 多选业务模式筛选
  */
@@ -21,7 +21,7 @@ const BusinessModelFilter: React.FC<BusinessModelFilterProps> = ({
   placeholder = '选择业务模式',
 }) => {
   const { selectedBusinessModels, setBusinessModels } = useFilterStore();
-  const [businessModelOptions, setBusinessModelOptions] = useState<string[]>([]);
+  const [businessModelOptions, setBusinessModelOptions] = useState<{value: string; label: string}[]>([]);
 
   // 加载业务模式列表
   useEffect(() => {

@@ -1,42 +1,40 @@
 # 省心投 BI
 
-> **版本**: v0.9.1
-> **更新日期**: 2026-02-13
-> **项目类型**: 广告投放数据分析平台
+> **版本**: v3.1.0
+> **更新日期**: 2026-07-09
+> **项目类型**: 券商互联网广告投放数据分析平台
 
 ---
 
 ## 📋 项目简介
 
-省心投 BI 是一个轻量级互联网广告投放分析平台，提供多平台广告数据聚合、分析和可视化功能。
+省心投 BI 是面向券商财富业务互联网拓客的数据分析平台，覆盖**内容平台**（抖音 / 腾讯 / 小红书 / 快手）与**应用市场**（小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果，鸿蒙 / iOS 待上线）两大类渠道，提供从广告投放、线索获取、私域转化到开户成功的全链路数据分析与可视化。
 
 ### 核心特性
 
-- **多平台数据整合**: 支持腾讯广告、抖音广告、小红书广告三大平台
-- **账号代理商映射**: 手动管理各平台账号与代理商、业务模式的映射关系
-- **日级趋势分析**: 按日期、平台、代理商、业务模式等多维度分析投放数据
-- **灵活筛选**: 支持按平台、业务模式、代理商、日期范围筛选数据
-- **独立筛选器**: 每个报表有独立的筛选器，互不干扰
-- **模块化后端**: v0.9.1版本完成数据接口模块化重构，提升可维护性
+- **双链路漏斗**: 内容平台「广告 → 企微 → 私域 → 开户」与 应用市场「广告 → APP 下载 → 开户链路 → 开户成功」两套独立漏斗
+- **应用市场专项**: 独立报表模块（漏斗 / 对比 / 明细 / 创意），数据源与内容平台分离
+- **全渠道获客报表**: 跨平台、跨厂商、跨业务模式的统一投放与转化概览
+- **维度 / 明细 / 聚合三层模型**: 9 张新表（DIM + DWD + DWS），原样入库、查询展示，不做二次 mapping
+- **小红书笔记分析**: 笔记列表与运营分析
+- **员工转化**: 自有员工开户与企微转化双口径分析
+- **数据新鲜度**: 各数据源更新时间一屏可查
 
 ### 技术栈
 
 **后端**:
-- Python 3.8+
-- Flask 3.x (Web框架)
-- SQLAlchemy 2.x (ORM)
-- SQLite / MySQL / PostgreSQL (数据库)
-- Pandas (数据处理)
+- Python 3.9+（开发环境 3.13 可用）
+- Flask（Web 框架）+ SQLAlchemy（ORM）
+- SQLite（默认）/ 可切换 MySQL / PostgreSQL
+- Pandas（数据导入）
 
 **前端**:
-- 原生 JavaScript (ES6+)
-- ECharts 5.x (数据可视化)
-- CSS3 + CSS Variables
-- 组件化架构
+- React 19 + TypeScript
+- Vite（构建 / 开发服务器）
+- Ant Design（组件库）
+- ECharts（数据可视化）
 
-**性能优化** (Phase 1-2 已完成):
-- 后端: SQLite WAL模式、13个数据库索引、查询速度提升50%+
-- 前端: ECharts延迟加载、异步瀑布流、初始加载减少30-40%
+**架构原则**: 本平台**只做数据存储 + 可视化呈现**。原始数据的清洗、规范化、字段补全、漏斗预计算均由上游 ETL 完成，下游仅原样入库 + 查询 + 展示。
 
 ---
 
@@ -44,127 +42,110 @@
 
 ### 环境要求
 
-- Python 3.8 或更高版本
-- 现代浏览器 (Chrome, Firefox, Edge, Safari, etc.)
-- 约 100MB 可用磁盘空间
+- Python 3.9 或更高版本
+- Node.js 18+（前端开发）
+- 现代浏览器（Chrome / Edge / Firefox / Safari）
 
-### 安装步骤
+### 源码方式运行
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/cyhzzz/shengxintou-bi.git
-   cd shengxintou-bi/开发代码
+   git clone git@github.com:cyhzzz/shengxintou-bi.git
+   cd shengxintou-bi
    ```
 
-2. **安装依赖** (如需单独安装)
+2. **安装后端依赖**
    ```bash
+   python -m venv .venv
+   .venv\Scripts\activate        # Windows
    pip install -r requirements.txt
    ```
 
-3. **配置环境** (可选)
+3. **配置环境**
    ```bash
-   # 复制配置文件
    cp .env.example .env
-
-   # 编辑配置
-   # 设置数据库路径、API密钥等
+   # 编辑 .env：设置数据库连接、坚果云 WebDAV 备份、飞书同步等
    ```
 
-4. **初始化数据库**
+4. **启动后端**（默认 :5000）
    ```bash
-   python init_db.py
+   # 开发模式（标准 Flask，跳过 pywebview 桌面壳）
+   DEV_MODE=1 python app.py
    ```
 
-5. **启动应用**
+5. **启动前端**（默认 :3000，自动代理 /api → :5000）
    ```bash
-   # Linux/MacOS
-   python app.py
-
-   # Windows
-   python app.py
-   或双击 `省心投启动器.exe`
+   cd frontend-react
+   npm install
+   npm run dev
    ```
 
 6. **访问应用**
    ```
-   打开浏览器访问: http://127.0.0.1:5000
+   浏览器打开: http://127.0.0.1:3000
    ```
 
 ### 便携版启动（推荐）
 
-双击 `省心投启动器.exe` 即可自动：
-- 检查Python环境
-- 启动Flask服务器
-- 打开浏览器
+双击 `省心投启动器.exe` 即可在便携环境中一键启动（内置 Python 与依赖，无需安装环境）：
+- 检查运行环境
+- 启动 Flask 服务器
+- 自动打开浏览器
 
-**无需安装Python环境**
+生产构建（生成 `frontend-react/dist/`，由 Flask 托管）：
+```bash
+cd frontend-react && npm run build
+```
 
 ---
 
 ## 📂 项目结构
 
 ```
-开发代码/
-├── app.py                  # Flask 应用入口
-├── config.py               # 配置文件
-├── launcher.py             # 启动器源码
-├── version.json             # 版本信息
-├── favicon.ico            # 网站图标
-├── 使用说明.txt            # 用户使用指南
+省心投BI/
+├── app.py                  # Flask 应用入口（DEV_MODE 切换桌面壳）
+├── config.py               # 配置（API 前缀 / 飞书 / WebDAV / 数据库路径）
+├── version.json            # 版本信息
+├── 省心投启动器.exe         # 便携版启动器（随版本发布）
+├── 省心投启动器.spec        # PyInstaller 打包配置
 │
-├── 【后端代码】
 ├── backend/                # 后端代码
-│   ├── __init__.py        # 后端初始化
-│   ├── database.py          # 数据库配置
-│   ├── models.py            # 数据库模型（15张表）
-│   ├── routes/              # API 路由
-│   │   ├── data/          # 数据查询接口
-│   │   │   ├── __init__.py
-│   │   │   ├── query.py (490行)
-│   │   │   ├── dashboard.py (465行)
-│   │   │   ├── trend.py (162行)
-│   │   │   ├── agency_analysis.py (268行)
-│   │   │   ├── xhs_notes.py (414行)
-│   │   │   ├── cost_analysis.py (309行)
-│   │   │   ├── external_analysis.py (357行)
-│   │   │   ├── leads.py (341行)
-│   │   │   ├── account_mapping.py (316行)
-│   │   │   └── abbreviation_mapping.py (240行)
-│   │   └── upload.py        # 文件上传接口
-│   ├── scripts/              # 数据处理脚本
-│   │   └── aggregations/  # 数据聚合脚本
+│   ├── models.py           # 系统表 ORM（导入日志 / 配置 / 周报）
+│   ├── models_v2.py        # ✅ 9 张新表 ORM（DIM/DWD/DWS，列名含中文）
+│   ├── database.py         # SQLAlchemy 单例
+│   ├── processors/v2/      # v2 原样导入（pandas to_sql，无业务计算）
+│   ├── routes/
+│   │   ├── data/           # 13 个查询蓝图（全部查新表）
+│   │   ├── reports/        # v3.1 新增：omni_channel / app_market 报表
+│   │   ├── upload.py       # 上传入口（仅识别 6 个新数据类型）
+│   │   ├── metadata.py     # 元数据 + 数据新鲜度
+│   │   ├── webdav_backup.py# 坚果云备份
+│   │   └── weekly_reports.py
+│   └── utils/
 │
-├── 【前端代码】
-├── frontend/              # 前端代码
-│   ├── index.html         # 主页面
-│   ├── css/              # 样式文件
-│   │   ├── variables.css    # CSS变量
-│   │   ├── layout.css       # 布局样式
-│   │   └── components.css  # 统一组件系统
-│   ├── js/               # JavaScript 文件
-│   │   ├── main.js          # 应用入口
-│   │   ├── utils/           # 工具函数
-│   │   ├── components/       # UI组件
-│   │   └── reports/          # 报表组件
+├── frontend-react/         # 前端代码（React 19 + TS + Vite + AntD）
+│   ├── src/pages/          # 顶级页面
+│   ├── src/components/     # 图表 / 筛选 / 数据新鲜度 等组件
+│   ├── src/services/       # HTTP 客户端 / dataService / 上传
+│   ├── src/stores/         # zustand 全局状态
+│   └── src/router/         # 路由（含旧路径 redirect）
 │
-├── 【数据目录】
-│   ├── database/             # SQLite数据库文件
-│   └── uploads/              # 文件上传目录
-│
-└── 【其他】
-    ├── docs/                # 技术文档
-    ├── icon/                # 图标资源
-    └── logs/                # 日志文件
+├── docs/                   # 技术文档（库表重构设计 / v3.1 报表重梳设计 等）
+├── scripts/                # 数据处理 / ETL 脚本
+├── tests/                  # 测试
+├── database/               # SQLite 数据库文件（不入库，本地数据）
+├── uploads/                # 用户上传目录（不入库）
+├── logs/                   # 日志目录（不入库）
+└── 数据源/                 # 原始 Excel 数据源（不入库）
 ```
 
 ### 核心文档
 
 | 文档 | 说明 |
 |------|------|
-| [CLAUDE.md](.claude/rules/) | AI开发指南和项目规则 |
-| [数据库架构文档](开发代码/docs/数据库架构文档.md) | 完整数据库表结构（15张表）|
-| [前端设计规范](.claude/rules/frontend-design/) | 前端组件和样式规范 |
-| [API接口规则](.claude/rules/api-rules.md) | 后端API设计规范 |
+| [AGENTS.md](AGENTS.md) | AI 开发指南与项目规则（战略方向 / 架构 / 命令） |
+| [docs/库表重构设计_v2.md](docs/库表重构设计_v2.md) | v2 九表库表设计（DIM/DWD/DWS） |
+| [docs/v3.1_报表重梳设计.md](docs/v3.1_报表重梳设计.md) | v3.1 报表菜单与页面重梳设计 |
 
 ---
 
@@ -174,22 +155,25 @@
 
 | 菜单项 | 功能说明 | 状态 |
 |---------|---------|------|
-| 数据概览 | 整体数据概览，展示核心指标和趋势 | ✅ |
-| 厂商分析 | 代理商投放和转化数据分析 | ✅ |
-| 小红书报表 | 笔记列表、运营分析、创作分析 | ✅ |
-| 线索明细 | 所有客户线索到转化的数据明细 | ✅ |
-| 转化漏斗 | 从转化率角度针对性查看和分析 | ✅ |
-| 报告生成 | 生成符合格式的可视化周报、月报 | 🚧 |
-| 配置管理 | 数据导入、账号管理等配置功能 | ✅ |
+| 全渠道获客 | 跨平台 / 厂商 / 业务模式统一概览 | ✅ |
+| 互联网渠道数据概览 | 各渠道投放与转化日级概览 | ✅ |
+| 转化漏斗 | 双漏斗：内容平台 + 应用市场 | ✅ |
+| 线索明细 | 客户线索到转化明细（fact_conv_content） | ✅ |
+| 厂商分析 | 代理商投放与转化分析（agg_vendor_daily） | ✅ |
+| 小红书 | 笔记列表 / 运营分析（agg_xhs_note） | ✅ |
+| 应用市场 | 漏斗 / 对比 / 明细 / 创意（fact_conv_appmarket） | ✅ |
+| 员工转化 | 分析 / 周报（双源） | ✅ |
+| 直播获客 | 占位页（v3.2 接入） | 🚧 |
+| 报告生成 | 可视化周报 / 月报 | ✅ |
+| 系统配置 | 数据导入 / 账号管理 / 缩写管理 / 数据库备份 | ✅ |
 
 ### 数据平台支持
 
-| 平台 | 支持功能 |
-|------|----------|
-| **腾讯广告** | 日级花费、曝光、点击数据导入与分析 |
-| **抖音广告** | 日级消耗、展示数、点击数、转化数据导入与分析 |
-| **小红书广告** | 广告数据、笔记投放、运营数据导入与分析 |
-| **后端转化** | 线索、开户、资产等转化数据导入与分析 |
+| 类别 | 渠道 |
+|------|------|
+| **内容平台** | 抖音、腾讯、小红书、快手（加微链路：广告 → 企微 → 私域 → 开户） |
+| **应用市场** | 小米、华为、OPPO、VIVO、荣耀、苹果（下载链路：广告 → APP 下载 → 开户 → 开户成功） |
+| **其他渠道** | 员工开户、合作机构、自然流入（见 agg_daily_channel_open） |
 
 ---
 
@@ -197,48 +181,27 @@
 
 ### 本地开发
 
-1. **克隆代码**
-   ```bash
-   git clone https://github.com/cyhzzz/shengxintou-bi.git
-   cd shengxintou-bi/开发代码
-   ```
+```bash
+# 后端（另开终端）
+DEV_MODE=1 python app.py            # http://127.0.0.1:5000
 
-2. **安装依赖**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 前端（另开终端）
+cd frontend-react && npm run dev    # http://127.0.0.1:3000
+```
 
-3. **启动开发服务器**
-   ```bash
-   # 设置开发模式
-   export DEV_MODE=1
+### 代码规范与架构
 
-   # 启动服务器
-   python app.py
-
-   # 访问 http://127.0.0.1:5000
-   ```
-
-### 代码规范
-
-遵循以下规范进行开发：
-
-- **后端开发**: [.claude/rules/backend-standards.md](.claude/rules/backend-standards.md)
-- **前端开发**: [.claude/rules/frontend-design/](.claude/rules/frontend-design/)
-- **API设计**: [.claude/rules/api-rules.md](.claude/rules/api-rules.md)
-- **数据处理**: [.claude/rules/data-rules.md](.claude/rules/data-rules.md)
+- **后端分层**: M（models_v2 新表 ORM）/ Q（routes/data、routes/reports 查询蓝图）/ V（前端）
+- **战略方向**: 只做存储 + 可视化，mapping / 清洗 / 预计算交给上游 ETL；新数据类型走 v2 原样导入
+- **端点兼容**: v2 重构后 13 个查询端点路径零变动，内部改查新表，前端零改动对接
+- **前端类型**: `src/types/api.ts` 由 orval 基于 openapi 生成，勿手改（`npm run generate:api`）
 
 ### Git 工作流
 
 ```bash
-# 创建功能分支
 git checkout -b feature/new-feature
-
-# 提交更改
 git add .
 git commit -m "feat: 添加新功能描述"
-
-# 推送到远程
 git push origin feature/new-feature
 ```
 
@@ -248,22 +211,20 @@ git push origin feature/new-feature
 
 ### 当前版本
 
-**v0.9.1** (2026-02-13)
-- 🎉 **后端架构重构**: data.py拆分为18个模块文件
-  - 单文件行数从3996行降至平均232行
-  - 26个API接口100%保留功能
-  - 100%向后兼容，无需修改前端代码
-- 📦 新增文档：拆分报告、使用指南、验证指南
-- ⚡ 性能优化：模块化加载，减少代码冲突
+**v3.1.0** (2026-07-09)
+- 🎉 **报表重梳**: 顶级菜单重构，应用市场独立成模块，新增全渠道获客报表
+- 🎯 **双转化漏斗**: 内容平台（7 阶段）+ 应用市场（8 阶段）分离呈现
+- 🧹 **清理历史包袱**: 删除旧原生 JS 前端、旧迁移脚本、遗留文档与调试脚本
+- 📦 便携版启动器随版本发布
 
 ### 历史版本
 
 | 版本 | 日期 | 说明 |
 |-------|------|------|
-| v0.9.0 | 2026-02-05 | 首个完整版本，制作exe启动器 |
-| v0.8.0 | - | 早期版本 |
-
-查看完整版本历史：[版本输出/](版本输出/)
+| v2.1 | 2026-07 | 应用市场专项 + 全渠道获客报表 + AgencyAnalysis 去重 + AntD 弃用清理 |
+| v2.0 | 2026-07 | 库表重构：9 张新表 + 全路由改写 + 前端字段适配 |
+| v1.0 | 2026-03 | 前端架构迁移至 React + TypeScript + Vite |
+| v0.9.1 | 2026-02 | 后端模块化重构（data.py 拆分） |
 
 ---
 
@@ -279,42 +240,31 @@ git push origin feature/new-feature
 - 手动访问 http://127.0.0.1:5000
 - 检查服务器是否正常启动
 
-**Q**: 端口5000被占用？
-- 关闭占用端口的程序
-- 按 `Ctrl+C` 停止服务器后重新启动
+**Q**: 端口 5000 被占用？
+- 关闭占用端口的程序后重新启动
 
-### 数据导入
+### 数据相关
 
-**Q**: 导入数据后报表不显示？
-- 确认数据导入成功
-- 刷新浏览器页面 (Ctrl+F5)
-- 检查浏览器控制台是否有错误
-
-**Q**: 筛选器不生效？
-- 点击"查询"按钮执行筛选
-- 检查筛选条件是否正确
-
-### 数据库
+**Q**: 数据库文件在哪？
+- `database/shengxintou.db`（本地数据，**不入库**）
 
 **Q**: 如何备份数据？
-- 数据库文件: `database/shengxintou.db`
-- 直接复制该文件即可
+- 系统配置 → 数据库备份，推送到坚果云 WebDAV；或直接复制 `.db` 文件
 
 **Q**: 如何重置数据库？
-- 删除数据库文件，重启应用会自动创建
+- 删除数据库文件，重启应用会自动创建空库（需重新导入数据）
 
 ---
 
 ## 📞 技术支持
 
-- **文档**: [CLAUDE.md](.claude/rules/) - 开发指南和项目规则
+- **文档**: [AGENTS.md](AGENTS.md) - 开发指南和项目规则
 - **问题反馈**: GitHub Issues
 - **联系方式**: 产品经理 陈元昊
 
 ### 相关链接
 
 - **项目地址**: https://github.com/cyhzzz/shengxintou-bi
-- **省心投BI系列**: 其他相关项目
 
 ---
 
@@ -324,5 +274,5 @@ git push origin feature/new-feature
 
 ---
 
-**最后更新**: 2026-02-13
-**维护者**: Claude AI
+**最后更新**: 2026-07-09
+**维护者**: 产品经理 陈元昊

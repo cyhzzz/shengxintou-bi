@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 数据 API 服务
  * 提供数据查询相关接口
  */
@@ -82,9 +82,13 @@ export const dataService = {
     return http.get('/agency-analysis', params);
   },
 
-  // 获取转化漏斗数据
+  // 获取转化漏斗数据（v2.1 单端点，保留兼容）
   getConversionFunnel: async (filters?: FilterParams): Promise<ApiResponse<ConversionFunnelData>> => {
     return http.post('/conversion-funnel', { filters });
+  },
+  // 获取转化漏斗拆分数据（v3.1 §三: 内容平台 + 应用市场 双漏斗）
+  getConversionFunnelSplit: async (filters?: FilterParams) => {
+    return http.post('/conversion-funnel/split', { filters });
   },
 
   // 获取线索明细
@@ -157,36 +161,61 @@ export const dataServiceReports = {
 };
 
 
-// 全渠道获客情况报表 v2.1
+// 全渠道获客情况报表 v3.1（v3.1 §二.5 重构：单一独立数据源 agg_daily_channel_open）
+export interface OmniChannelCategoryRow {
+  channel_category: string;
+  opens: number;
+  deposit: number;
+  valid: number;
+  valid_rate: number;
+  deposit_rate: number;
+}
+export interface OmniChannelSubchannelRow extends OmniChannelCategoryRow {
+  channel_name: string;
+}
+export interface OmniChannelTotals {
+  opens: number;
+  deposit: number;
+  valid: number;
+}
 export interface OmniChannelSummary {
-  by_category: Array<{ channel_category: string; opens: number; valid: number; valid_rate: number }>;
-  content_by_platform: Array<{ platform: string; leads: number; mouth: number; valid_lead: number; opens: number; valid: number; open_rate: number; valid_rate: number }>;
-  appmarket_by_market: Array<{ app_market: string; downloads: number; activates: number; opens: number; valid: number; activate_rate: number; open_rate: number; valid_rate: number }>;
-  nonad_by_channel: Array<{ channel_category: string; channel_name: string; opens: number; valid: number; valid_rate: number }>;
-  total_cost: number; total_opens: number; total_valid: number;
+  totals: OmniChannelTotals;
+  by_category: OmniChannelCategoryRow[];
+  by_subchannel: OmniChannelSubchannelRow[];
+}
+// daily-trend: 每个日期一条，4 大类各一字段
+export interface OmniChannelDailyTrendRow {
+  date: string;
+  互联网引流: number;
+  合作机构: number;
+  员工开户: number;
+  自然流入: number;
+}
+export interface OmniChannelDailyTrend {
+  daily_trend: OmniChannelDailyTrendRow[];
+}
+export interface OmniChannelByChannel {
+  items: OmniChannelSubchannelRow[];
+  channel_category: string;
 }
 export interface OmniChannelFilterOptions {
   channel_categories: string[];
-  content_platforms: string[];
-  app_markets: string[];
+  sub_channels: string[];
 }
 export const dataServiceOmniChannel = {
   getOmniChannelSummary: async (params: { filters?: Record<string, unknown> } = {}) => {
     return http.post('/reports/omni-channel/summary', params);
   },
-  getOmniChannelMonthlyTrend: async (params: { filters?: Record<string, unknown> } = {}) => {
-    return http.post('/reports/omni-channel/monthly-trend', params);
+  getOmniChannelDailyTrend: async (params: { filters?: Record<string, unknown> } = {}) => {
+    return http.post('/reports/omni-channel/daily-trend', params);
   },
-  getOmniChannelContentDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
-    return http.post('/reports/omni-channel/content-detail', params);
-  },
-  getOmniChannelAppMarketDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
-    return http.post('/reports/omni-channel/appmarket-detail', params);
-  },
-  getOmniChannelNonAdDetail: async (params: { filters?: Record<string, unknown>; page?: number; page_size?: number } = {}) => {
-    return http.post('/reports/omni-channel/nonad-detail', params);
+  getOmniChannelByChannel: async (params: { filters?: Record<string, unknown>; channel_category?: string } = {}) => {
+    return http.post('/reports/omni-channel/by-channel', params);
   },
   getOmniChannelFilterOptions: async () => {
     return http.get('/reports/omni-channel/filter-options');
   },
 };
+
+
+

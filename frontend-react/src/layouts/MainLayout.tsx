@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Layout, Menu } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -20,6 +20,8 @@ import {
   FilePdfOutlined,
   MobileOutlined,
   AppstoreOutlined,
+  GlobalOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import type { MenuProps } from 'antd';
@@ -28,10 +30,17 @@ import styles from './MainLayout.module.scss';
 const { Sider, Header, Content } = Layout;
 
 const menuItems: MenuProps['items'] = [
+  // v3.1 §二.5: 全渠道获客放最上面（顶级 1）
+  {
+    key: '/omni-channel',
+    icon: <GlobalOutlined />,
+    label: '全渠道获客',
+  },
+  // v3.1 §二: 互联网渠道数据概览（口径限定互联网渠道：内容平台+应用市场）
   {
     key: '/dashboard',
     icon: <DashboardOutlined />,
-    label: '数据概览',
+    label: '互联网渠道数据概览',
   },
   {
     key: '/conversion-funnel',
@@ -57,6 +66,18 @@ const menuItems: MenuProps['items'] = [
       { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
     ],
   },
+  // v3.1 §六: 应用市场升顶级
+  {
+    key: 'app-market',
+    icon: <MobileOutlined />,
+    label: '应用市场',
+    children: [
+      { key: '/app-market/funnel', label: '获客漏斗', icon: <FunnelPlotOutlined /> },
+      { key: '/app-market/comparison', label: '市场对比', icon: <AppstoreOutlined /> },
+      { key: '/app-market/detail', label: '明细查询', icon: <UnorderedListOutlined /> },
+      { key: '/app-market/creative', label: '创意效果', icon: <FileTextOutlined /> },
+    ],
+  },
   {
     key: 'employee-conversion',
     icon: <TeamOutlined />,
@@ -66,20 +87,20 @@ const menuItems: MenuProps['items'] = [
       { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
     ],
   },
+  // v3.1 §八: 直播占位
   {
-    key: 'reports',
-    icon: <AppstoreOutlined />,
-    label: '专项报表',
+    key: 'live',
+    icon: <VideoCameraOutlined />,
+    label: '直播获客',
     children: [
-      { key: '/reports/app-market', label: '应用市场获客漏斗', icon: <MobileOutlined /> },
-      { key: '/reports/omni-channel', label: '全渠道获客情况', icon: <AppstoreOutlined /> },
+      { key: '/live/funnel', label: '直播漏斗', icon: <FunnelPlotOutlined /> },
     ],
   },
   { type: 'divider' },
   {
     key: '/report-generation',
     icon: <FilePdfOutlined />,
-    label: '周报生成',
+    label: '报告生成',
   },
   {
     key: 'system',
@@ -136,7 +157,7 @@ export default function MainLayout() {
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
-        width={200}
+        width={210}
         className={styles.sider}
       >
         {/* Sidebar Logo - Matching original frontend */}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 平台筛选器组件
  * 多选平台筛选
  */
@@ -21,7 +21,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
   placeholder = '选择平台',
 }) => {
   const { selectedPlatforms, setPlatforms } = useFilterStore();
-  const [platformOptions, setPlatformOptions] = useState<string[]>([]);
+  const [platformOptions, setPlatformOptions] = useState<{value: string; label: string}[]>([]);
 
   // 加载平台列表
   useEffect(() => {
