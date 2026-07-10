@@ -7,9 +7,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Select, DatePicker, Space, Spin, Tag, Button } from 'antd';
 import { BankOutlined, CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import EChartsComponent from '@/components/Chart/ECharts';
+import { FunnelChart } from '@/components/Chart';
+import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
-import type { EChartsOption } from 'echarts';
+
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
 
@@ -53,39 +54,6 @@ const AppMarketFunnelPage: React.FC = () => {
   const openCount = total['开户成功'] || 0;
   const depositCount = total['入金'] || 0;
   const overallRate = downloads > 0 ? (validCount / downloads * 100) : 0;
-
-  // 漏斗图
-  const funnelChartOption: EChartsOption = useMemo(() => {
-    const sorted = [...funnel]
-      .sort((a, b) => (b.count || 0) - (a.count || 0))
-      .map((item) => ({
-        name: item.step,
-        value: Number(item.count || 0),
-        rate: Number(item.rate || 0),
-        stepRate: Number(item.step_rate || 0),
-      }));
-    const formatValue = (value: unknown) => Number(value || 0).toLocaleString();
-    return {
-      tooltip: {
-        trigger: 'item',
-        formatter: (p: any) => `${p.name}<br/>人数: ${formatValue(p.value)}<br/>环节转化率: ${p.data?.rate ?? 0}%<br/>累计转化率: ${p.data?.stepRate ?? 0}%`,
-      },
-      series: [{
-        name: '应用市场漏斗',
-        type: 'funnel',
-        left: '10%',
-        width: '80%',
-        minSize: '0%',
-        maxSize: '100%',
-        sort: 'descending',
-        gap: 2,
-        label: { show: true, position: 'inside', formatter: (p: any) => `${p.name}\n${formatValue(p.value)}` },
-        labelLine: { length: 10, lineStyle: { width: 1 } },
-        itemStyle: { borderColor: '#fff', borderWidth: 1 },
-        data: sorted,
-      }],
-    };
-  }, [funnel]);
 
   return (
     <div className={styles.page}>
@@ -144,7 +112,7 @@ const AppMarketFunnelPage: React.FC = () => {
         <Row gutter={16}>
           <Col span={14}>
             <Card title='9 阶段漏斗图' size='small'>
-              <EChartsComponent option={funnelChartOption} height={460} />
+              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={460} />
             </Card>
           </Col>
           <Col span={10}>
@@ -172,6 +140,15 @@ const AppMarketFunnelPage: React.FC = () => {
             </Card>
           </Col>
         </Row>
+
+        <ReportFooter
+          sources={[
+            { label: '数据源', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
+            { label: '端点', value: 'POST /api/v1/reports/app-market/summary' },
+            { label: '漏斗顶端', value: '激活APP人数（衡量获客容量）' },
+          ]}
+          notes={'总体转化率 = 有效户 / 激活APP；阶段转化率 = 当前阶段 / 上一阶段，由后端返回的 step_rate / rate 字段提供。'}
+        />
       </Spin>
     </div>
   );

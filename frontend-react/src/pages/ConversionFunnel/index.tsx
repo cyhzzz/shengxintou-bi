@@ -15,6 +15,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty } from 'antd';
 import { AimOutlined, BankOutlined, CheckCircleOutlined, EyeOutlined, MessageOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components';
+import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
 import styles from './ConversionFunnel.module.scss';
@@ -263,16 +264,14 @@ const ConversionFunnelPage: React.FC = () => {
           ]}
         />
 
-        <Card size="small" style={{ marginTop: 16 }} type="inner">
-          <Space direction="vertical" size={0}>
-            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-              数据源: 内容平台 = agg_vendor_daily(平台∈内容平台) + fact_conv_content / 应用市场 = fact_conv_appmarket
-            </span>
-            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-              v3.1 双漏斗独立，按渠道类别拆分。占比由前端按响应数据实时算 (value/previous)。
-            </span>
-          </Space>
-        </Card>
+        <ReportFooter
+          sources={[
+            { label: '内容平台漏斗', value: 'agg_vendor_daily(平台∈内容平台) + fact_conv_content（7 阶段：广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 成功开户 → 有效户）' },
+            { label: '应用市场漏斗', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
+            { label: '端点', value: 'POST /api/v1/conversion-funnel/split' },
+          ]}
+          notes={'双漏斗互为独立数据源，按渠道类别拆分。占比由前端按响应数据实时算 (value/previous)。v3.1 默认走 split，旧 is_employee_mode 单端点已弃用 (v3.2 删除)。'}
+        />
       </Spin>
     </div>
   );

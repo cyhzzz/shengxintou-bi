@@ -32,6 +32,7 @@ import { BankOutlined, CheckCircleOutlined, ReloadOutlined, TeamOutlined, Trophy
 import dayjs, { Dayjs } from 'dayjs';
 import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
+import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -392,10 +393,6 @@ const OmniChannelPage: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={load}>
             刷新
           </Button>
-          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-            数据源：agg_daily_channel_open · 总 {totals.opens.toLocaleString()} 开户 /{' '}
-            {totals.deposit.toLocaleString()} 入金 / {totals.valid.toLocaleString()} 有效户
-          </span>
         </Space>
       </Card>
 
@@ -427,39 +424,16 @@ const OmniChannelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title="4 类渠道开户 TOP"
+            title={
+              topCategory?.channel_category
+                ? `${topCategory.channel_category} · 占比 ${topCategory.share ?? 0}%`
+                : 'TOP 渠道类别'
+            }
             value={topCategory?.opens ?? 0}
             suffix="人"
             valueColor="var(--chart-color-2)"
             icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
             showWowChange={false}
-            description={
-              topCategory?.channel_category ? (
-                <span>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background:
-                        CATEGORY_COLORS[topCategory.channel_category] ||
-                        'var(--chart-color-2)',
-                      marginRight: 6,
-                    }}
-                  />
-                  <strong>{topCategory.channel_category}</strong>
-                  <span style={{ marginLeft: 8, color: 'var(--color-text-tertiary)' }}>
-                    占比{' '}
-                    <strong style={{ color: 'var(--chart-color-2)' }}>
-                      {topCategory.share ?? 0}%
-                    </strong>
-                  </span>
-                </span>
-              ) : (
-                <span style={{ color: 'var(--color-text-tertiary)' }}>暂无数据</span>
-              )
-            }
           />
         </MetricSection>
 
@@ -511,6 +485,15 @@ const OmniChannelPage: React.FC = () => {
         <Card title="4 大类 · 子渠道明细" size="small">
           <Tabs items={tabItems} />
         </Card>
+
+        <ReportFooter
+          sources={[
+            { label: '数据源', value: 'agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket / agg_vendor_daily 独立）' },
+            { label: '总开户/入金/有效户', value: `总 ${totals.opens.toLocaleString()} 开户 / ${totals.deposit.toLocaleString()} 入金 / ${totals.valid.toLocaleString()} 有效户` },
+            { label: '主端点', value: 'POST /api/v1/reports/omni-channel/{summary, daily-trend, by-channel, filter-options}' },
+          ]}
+          notes={'顶部 TOP 渠道类别占比由后端按开户成功人数 SUM 降序算出（现阶段坚持严格只查 agg_daily_channel_open，不与其他表混查）。'}
+        />
       </Spin>
     </div>
   );

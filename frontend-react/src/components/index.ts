@@ -23,3 +23,6 @@ export * from './Filter';
 export * from './Chart';
 // 统一指标卡片
 export * from './MetricCard';
+
+// 报表底部弱化区（数据源 / 口径 / 备注统一脚注）
+export * from './ReportFooter';
