@@ -50,8 +50,8 @@ const AgencyFilter: React.FC<AgencyFilterProps> = ({
       maxTagCount="responsive"
     >
       {agencyOptions.map((agency) => (
-        <Option key={agency} value={agency}>
-          {agency}
+        <Option key={agency.value} value={agency.value}>
+          {agency.label}
         </Option>
       ))}
     </Select>

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """小红书运营分析接口（v2.1 - meta + sums 边界）
 
 core_metrics 同时包含 SQL SUM 聚合（cost/leads/opened/...）与 div 派生
@@ -26,15 +26,44 @@ def get_xhs_notes_operation_analysis():
     data = request.get_json() or {}
     filters = data.get('filters') or {}
     date_range = filters.get('date_range') or []
+    # v3.1 §XhsNotes Operation 拆分：三段日期各自独立作用于子查询
+    top_notes_date_range = filters.get('top_notes_date_range') or []
+    creator_annual_date_range = filters.get('creator_annual_date_range') or []
 
     publish_start = date_range[0] if len(date_range) >= 1 else None
     publish_end = date_range[1] if len(date_range) >= 2 else None
+    tn_start = top_notes_date_range[0] if len(top_notes_date_range) >= 1 else None
+    tn_end = top_notes_date_range[1] if len(top_notes_date_range) >= 2 else None
+    ca_start = creator_annual_date_range[0] if len(creator_annual_date_range) >= 1 else None
+    ca_end = creator_annual_date_range[1] if len(creator_annual_date_range) >= 2 else None
 
     base = db.session.query(AggXhsNote)
     if publish_start and publish_end:
         base = base.filter(and_(AggXhsNote.发布时间 >= publish_start,
                                 AggXhsNote.发布时间 <= publish_end + ' 23:59:59'))
     notes = base.all()
+
+    # 独立子集：TOP 笔记（按 top_notes_date_range 过滤）
+    if tn_start or tn_end:
+        top_notes_q = db.session.query(AggXhsNote)
+        if tn_start:
+            top_notes_q = top_notes_q.filter(AggXhsNote.发布时间 >= tn_start)
+        if tn_end:
+            top_notes_q = top_notes_q.filter(AggXhsNote.发布时间 <= tn_end + ' 23:59:59')
+        top_notes_subset = top_notes_q.all()
+    else:
+        top_notes_subset = notes
+
+    # 独立子集：创作者年度排行（按 creator_annual_date_range 过滤）
+    if ca_start or ca_end:
+        ca_q = db.session.query(AggXhsNote)
+        if ca_start:
+            ca_q = ca_q.filter(AggXhsNote.发布时间 >= ca_start)
+        if ca_end:
+            ca_q = ca_q.filter(AggXhsNote.发布时间 <= ca_end + ' 23:59:59')
+        creator_annual_subset = ca_q.all()
+    else:
+        creator_annual_subset = notes
 
     def f(v):
         try: return float(v or 0)
@@ -117,7 +146,7 @@ def get_xhs_notes_operation_analysis():
     }
 
     top_notes = []
-    for n in sorted(notes, key=lambda x: f(x.消费金额), reverse=True)[:20]:
+    for n in sorted(top_notes_subset, key=lambda x: f(x.消费金额), reverse=True)[:20]:
         cost_v = f(n.消费金额)
         top_notes.append({
             'note_id': n.笔记ID, 'note_title': n.笔记标题 or '', 'producer': n.创作者 or '',
@@ -127,7 +156,7 @@ def get_xhs_notes_operation_analysis():
 
     creator_annual = []
     by_creator = defaultdict(lambda: {'cost': 0.0, 'lead_users': 0, 'opened': 0, 'interactions': 0})
-    for n in notes:
+    for n in creator_annual_subset:
         c = n.创作者 or '未知'
         by_creator[c]['cost'] += f(n.消费金额)
         by_creator[c]['lead_users'] += i(n.添加企微人数)

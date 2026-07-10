@@ -50,8 +50,8 @@ const BusinessModelFilter: React.FC<BusinessModelFilterProps> = ({
       maxTagCount="responsive"
     >
       {businessModelOptions.map((model) => (
-        <Option key={model} value={model}>
-          {model}
+        <Option key={model.value} value={model.value}>
+          {model.label}
         </Option>
       ))}
     </Select>

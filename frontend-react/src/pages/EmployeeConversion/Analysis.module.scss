@@ -1,142 +1,103 @@
 /**
  * 员工转化分析页面样式
  */
+@use '../../styles/mixins' as *;
+
 .employeeConversionPage {
   padding: 0;
 }
 
 .filterCard {
-  margin-bottom: 16px;
-
-  :global {
-    .ant-card-body {
-      padding: 12px 16px;
-    }
-  }
+  margin-bottom: var(--spacer-16);
 }
 
 .filterRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
+  @include filter-bar;
 }
 
 .filterGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @include filter-group;
 }
 
 .filterLabel {
-  font-size: 14px;
-  color: #666;
-  white-space: nowrap;
+  @include filter-label;
 }
 
 .filterActions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
+  @include filter-actions;
 }
 
 .metricsRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--spacer-16);
+  margin-bottom: var(--spacer-20);
 }
 
-// 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .cardDesc {
-  font-size: 12px;
-  color: #bfbfbf !important;
+  @include card-section-desc;
 }
 
 .chartCard {
-  margin-top: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-
-  // 隐藏默认标题头
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-  }
+  margin-top: var(--spacer-20);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .tableCard {
-  margin-top: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-
-  // 隐藏默认标题头
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-  }
+  margin-top: var(--spacer-20);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .tableHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--spacer-16);
 }
 
 .tableTitle {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
 }
 
 .statText {
-  color: #666;
-  font-size: 14px;
-  margin-right: 16px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-right: var(--spacer-16);
 }
 
-// 排行榜卡片的 header 样式
 .tableCard .cardHeader {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .tableCard .cardTitle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .controlLabel {
-  font-size: 14px;
-  color: #666;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
 }
 
 .positive {
-  color: #52c41a;
+  color: var(--color-success);
 }
 
 .negative {
-  color: #f5222d;
+  color: var(--color-error);
 }

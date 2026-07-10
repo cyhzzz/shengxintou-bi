@@ -1,0 +1,52 @@
+@use '../../styles/mixins' as *;
+
+.page { padding: 0; }
+
+.filterCard {
+  margin-bottom: var(--spacer-16);
+  @include card-base;
+}
+
+.label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.tip {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.stageList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-12);
+}
+
+.stageItem {
+  padding: var(--spacer-12) var(--spacer-16);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stageRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-base);
+}
+
+.stageValue {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.stageRateLabel {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}

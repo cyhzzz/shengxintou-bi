@@ -50,8 +50,8 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
       maxTagCount="responsive"
     >
       {platformOptions.map((platform) => (
-        <Option key={platform} value={platform}>
-          {platform}
+        <Option key={platform.value} value={platform.value}>
+          {platform.label}
         </Option>
       ))}
     </Select>

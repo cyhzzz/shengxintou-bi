@@ -4,7 +4,7 @@
 }
 
 .sider {
-  background: #fff !important;
+  background: var(--bg-content);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
   position: relative;
   z-index: 10;
@@ -12,37 +12,21 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-
-  // 覆盖 Ant Design 折叠按钮样式
-  :global {
-    .ant-layout-sider-trigger {
-      background: #fafafa !important;
-      border-top: 1px solid #f0f0f0;
-      color: #666;
-      transition: all 0.2s ease;
-
-      &:hover {
-        background: #f5f5f5 !important;
-        color: #1890ff;
-      }
-    }
-  }
 }
 
-// Sidebar header with logo - matching original frontend
 .sidebarHeader {
-  height: 48px;
-  padding: 0 16px;
+  height: var(--spacer-48);
+  padding: 0 var(--spacer-16);
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-content);
 }
 
 .logoContainer {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .logoIcon {
@@ -55,27 +39,27 @@
   width: auto;
 }
 
-// Legacy logo class (for backwards compatibility)
 .logo {
-  height: 48px;
+  height: var(--spacer-48);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1890ff;
-  border-bottom: 1px solid #f0f0f0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-brand);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .menu {
-  border-right: none !important;
-  flex: 1;
+  border-right: none;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: var(--spacer-16);
 
-  // 美化滚动条
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
 
   &::-webkit-scrollbar-track {
@@ -83,21 +67,21 @@
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #d9d9d9;
-    border-radius: 3px;
+    background: var(--border-strong);
+    border-radius: var(--radius-sm);
 
     &:hover {
-      background: #bfbfbf;
+      background: var(--color-text-tertiary);
     }
   }
 }
 
 .header {
-  background: #fff !important;
-  padding: 0 24px !important;
-  height: 48px !important;
-  line-height: 48px !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  background: var(--bg-content);
+  padding: 0 var(--spacer-24);
+  height: var(--header-height);
+  line-height: var(--header-height);
+  box-shadow: var(--shadow-card);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -114,67 +98,86 @@
 .breadcrumb {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .brand {
-  color: #1890ff;
-  font-weight: 500;
+  color: var(--color-brand);
+  font-weight: var(--font-weight-medium);
 }
 
 .separator {
-  color: #d9d9d9;
+  color: var(--border-strong);
 }
 
 .current {
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-content);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
 }
 
 .helpBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  border-radius: 4px;
+  padding: var(--spacer-8);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--transition-normal);
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.04);
+    background-color: var(--bg-hover);
   }
 }
 
 .content {
-  margin: 16px;
-  padding: 24px;
-  background: #fff;
-  border-radius: 8px;
+  margin: var(--spacer-16);
+  padding: var(--spacer-24);
+  background: var(--bg-content);
+  border-radius: var(--radius-lg);
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
 
-  // 美化滚动条
   &::-webkit-scrollbar {
-    width: 8px;
+    width: var(--spacer-8);
   }
 
   &::-webkit-scrollbar-track {
-    background: #f0f0f0;
-    border-radius: 4px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #d9d9d9;
-    border-radius: 4px;
+    background: var(--border-strong);
+    border-radius: var(--radius-sm);
 
     &:hover {
-      background: #bfbfbf;
+      background: var(--color-text-tertiary);
     }
   }
 }

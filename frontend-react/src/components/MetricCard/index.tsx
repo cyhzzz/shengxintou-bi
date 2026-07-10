@@ -1,6 +1,6 @@
-/**
- * 指标卡片组件
- * 展示核心指标数值及环比变化
+﻿/**
+ * 统一指标卡片组件
+ * 从 Dashboard 指标卡片抽象而来，供各报表头部数据卡片复用。
  */
 import React from 'react';
 import { Card, Tooltip } from 'antd';
@@ -25,14 +25,26 @@ export interface MetricCardProps {
   prefix?: string;
   suffix?: string;
   formatter?: 'number' | 'currency' | 'percent';
-  inverseTrend?: boolean; // 成本类指标，下降为正向
+  inverseTrend?: boolean;
   variant?: 'default' | 'asset';
   icon?: React.ReactNode;
   tooltip?: string;
-  showWowChange?: boolean; // 是否显示环比变化，默认 true
+  showWowChange?: boolean;
+  valueColor?: string;
+  description?: React.ReactNode;
+  className?: string;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({
+export interface MetricSectionProps {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  gridClassName?: string;
+  minCardWidth?: string;
+}
+
+export const MetricCard: React.FC<MetricCardProps> = ({
   title,
   value,
   wowChange,
@@ -44,6 +56,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
   icon,
   tooltip,
   showWowChange = true,
+  valueColor,
+  description,
+  className,
 }) => {
   const formatValue = (val?: number): string => {
     if (val === undefined || val === null) return '-';
@@ -76,8 +91,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   const getTrendColor = (color?: WowChangeColor) => {
-    // 对于成本类指标（inverseTrend=true），颜色逻辑反转
-    // 成本下降是好事，应该显示绿色
     const isPositive = color === 'green';
     if (inverseTrend) {
       return isPositive ? 'var(--color-error)' : 'var(--color-success)';
@@ -85,14 +98,16 @@ const MetricCard: React.FC<MetricCardProps> = ({
     return isPositive ? 'var(--color-success)' : 'var(--color-error)';
   };
 
-  const renderWowChange = () => {
-    // 如果不需要显示环比区域，直接返回 null
+  const renderFooter = () => {
+    if (description) {
+      return <div className={styles.metricDescription}>{description}</div>;
+    }
+
     if (!showWowChange) {
       return null;
     }
 
     if (!wowChange || wowChange.value === undefined) {
-      // 显示占位符，保持卡片高度一致
       return <div className={styles.wowChangePlaceholder}>—</div>;
     }
 
@@ -119,11 +134,14 @@ const MetricCard: React.FC<MetricCardProps> = ({
     title
   );
 
+  const cardClassName = [
+    styles.metricCard,
+    styles[`metricCard--${variant}`],
+    className,
+  ].filter(Boolean).join(' ');
+
   return (
-    <Card
-      className={`${styles.metricCard} ${styles[`metricCard--${variant}`]}`}
-      hoverable
-    >
+    <Card className={cardClassName} hoverable>
       <div className={styles.metricContent}>
         <div className={styles.metricTitle}>
           {icon && <span className={styles.metricIcon}>{icon}</span>}
@@ -131,10 +149,41 @@ const MetricCard: React.FC<MetricCardProps> = ({
         </div>
         <div className={styles.metricValue}>
           {prefix && <span className={styles.metricPrefix}>{prefix}</span>}
-          <span className={styles.metricNumber}>{formatValue(value)}</span>
+          <span className={styles.metricNumber} style={valueColor ? { color: valueColor } : undefined}>
+            {formatValue(value)}
+          </span>
           {suffix && <span className={styles.metricSuffix}>{suffix}</span>}
         </div>
-        {renderWowChange()}
+        {renderFooter()}
+      </div>
+    </Card>
+  );
+};
+
+export const MetricSection: React.FC<MetricSectionProps> = ({
+  title,
+  description,
+  children,
+  className,
+  gridClassName,
+  minCardWidth = '180px',
+}) => {
+  const sectionClassName = [styles.metricSection, className].filter(Boolean).join(' ');
+  const gridClassNames = [styles.metricGrid, gridClassName].filter(Boolean).join(' ');
+
+  return (
+    <Card className={sectionClassName} size="small">
+      {(title || description) && (
+        <div className={styles.sectionHeader}>
+          {title && <div className={styles.sectionTitle}>{title}</div>}
+          {description && <div className={styles.sectionDesc}>{description}</div>}
+        </div>
+      )}
+      <div
+        className={gridClassNames}
+        style={{ '--metric-card-min-width': minCardWidth } as React.CSSProperties}
+      >
+        {children}
       </div>
     </Card>
   );

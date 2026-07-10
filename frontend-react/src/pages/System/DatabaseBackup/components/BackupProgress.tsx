@@ -51,7 +51,7 @@ const BackupProgress: React.FC<BackupProgressProps> = ({
       <Space style={{ marginTop: 12 }}>
         <span>状态: <strong>{getStatusText()}</strong></span>
         <span>进度: <strong>{progress}%</strong></span>
-        {message && <span style={{ color: '#666' }}>{message}</span>}
+        {message && <span style={{ color: 'var(--color-text-secondary)' }}>{message}</span>}
       </Space>
     </div>
   );

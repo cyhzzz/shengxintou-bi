@@ -4,10 +4,11 @@
  * 漏斗: 下载 → 激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Select, DatePicker, Space, Spin, Statistic, Tag, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Select, DatePicker, Space, Spin, Tag, Button } from 'antd';
+import { BankOutlined, CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import EChartsComponent from '@/components/Chart/ECharts';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -101,13 +102,44 @@ const AppMarketFunnelPage: React.FC = () => {
       </Card>
       <Spin spinning={loading}>
         {/* 5 阶段卡片 */}
-        <Row gutter={16} style={{ marginTop: 16, marginBottom: 16 }}>
-          <Col span={5}><Card size='small'><Statistic title='激活APP' value={downloads} valueStyle={{ color: '#1890ff' }} /></Card></Col>
-          <Col span={5}><Card size='small'><Statistic title='开户成功' value={openCount} valueStyle={{ color: '#fa8c16' }} /></Card></Col>
-          <Col span={5}><Card size='small'><Statistic title='入金' value={depositCount} valueStyle={{ color: '#722ed1' }} /></Card></Col>
-          <Col span={5}><Card size='small'><Statistic title='有效户' value={validCount} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-          <Col span={4}><Card size='small'><Statistic title='激活->有效' value={overallRate} precision={2} suffix='%' valueStyle={{ color: '#f5222d' }} /></Card></Col>
-        </Row>
+        <MetricSection title="应用市场获客概览" description="激活、开户、入金、有效户与整体转化率">
+          <MetricCard
+            title="激活APP"
+            value={downloads}
+            valueColor="var(--color-brand)"
+            icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="开户成功"
+            value={openCount}
+            valueColor="var(--chart-color-7)"
+            icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="入金"
+            value={depositCount}
+            valueColor="var(--chart-color-5)"
+            icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="有效户"
+            value={validCount}
+            valueColor="var(--color-success)"
+            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="激活→有效"
+            value={overallRate}
+            formatter="percent"
+            valueColor="var(--color-error)"
+            icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+            showWowChange={false}
+          />
+        </MetricSection>
 
         <Row gutter={16}>
           <Col span={14}>

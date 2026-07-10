@@ -1,57 +1,54 @@
+@use '../../../styles/mixins' as *;
+
 /**
  * TrendChart 组件样式
  */
 
 .trendCard {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .chartHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: var(--spacer-16);
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .chartTitleGroup {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: var(--spacer-12);
 }
 
 .chartTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99;
+  @include card-section-title;
   margin: 0;
 }
 
 .chartDesc {
-  font-size: 12px;
-  color: #bfbfbf;
+  @include card-section-desc;
 }
 
 .chartControls {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--spacer-16);
 }
 
 .metricGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .metricGroupLabel {
-  font-size: 12px;
-  color: #8A8D99;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -59,12 +56,12 @@
 .controlGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .controlLabel {
-  font-size: 14px;
-  color: #666;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
 }
 
 .emptyState {
@@ -72,8 +69,8 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
-  font-size: 14px;
+  color: var(--color-text-disabled);
+  font-size: var(--text-base);
 }
 
 // 响应式
@@ -92,16 +89,16 @@
   .chartHeader {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--spacer-12);
   }
 
   .metricGroup {
     width: 100%;
 
-    :global(.ant-radio-group) {
+    .radioGroup {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px;
+      gap: var(--spacer-4);
     }
   }
 }

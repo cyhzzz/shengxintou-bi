@@ -9,7 +9,7 @@
  * - 运营效率: 单线索成本、单开户成本、单有效户成本
  */
 import React, { useEffect, useCallback, useState } from 'react';
-import { Row, Col, Spin, Tooltip, Card, Typography } from 'antd';
+import { Row, Col, Spin, Tooltip, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { DataFreshnessIndicator } from '@/components/DataFreshness';
 import {
@@ -25,7 +25,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { FilterBar } from '@/components';
-import MetricCard from './components/MetricCard';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import TrendChart, { type MetricType } from './components/TrendChart';
 import {
   useCoreMetrics,
@@ -37,17 +37,17 @@ import styles from './Dashboard.module.scss';
 
 const { Text } = Typography;
 
-// 指标卡片颜色
+// 指标卡片颜色 — 与 tokens.css 中 --chart-color-1 ~ --chart-color-8 对齐
 const METRIC_COLORS = {
-  cost: '#1890ff',
-  impressions: '#52c41a',
-  clicks: '#faad14',
-  leads: '#f5222d',
-  openedAccounts: '#722ed1',
-  validCustomers: '#13c2c2',
-  customerAssets: '#fa8c16',
-  existingAssets: '#eb2f96',
-  contribution: '#722ed1',
+  cost: 'var(--chart-color-1)',
+  impressions: 'var(--chart-color-2)',
+  clicks: 'var(--chart-color-3)',
+  leads: 'var(--chart-color-4)',
+  openedAccounts: 'var(--chart-color-5)',
+  validCustomers: 'var(--chart-color-6)',
+  customerAssets: 'var(--chart-color-7)',
+  existingAssets: 'var(--chart-color-8)',
+  contribution: 'var(--chart-color-5)',
 };
 
 const DashboardPage: React.FC = () => {
@@ -107,7 +107,7 @@ const DashboardPage: React.FC = () => {
       fetchCoreMetrics(params),
       fetchTrendData({
         ...params,
-        metric_type: trendMetricType,
+        metric_type: trendMetricType as PostDashboardTrendDataBody['metric_type'],
         granularity: trendGranularity,
       } as PostDashboardTrendDataBody),
     ]);
@@ -159,10 +159,10 @@ const DashboardPage: React.FC = () => {
   const handleTrendMetricChange = useCallback((metricType: MetricType) => {
     setTrendMetricType(metricType);
     // 重新加载趋势数据
-    const params: PostDashboardTrendDataBody = {
+    const params: PostDashboardTrendDataBody & { granularity: 'daily' | 'weekly' | 'monthly' } = {
       start_date: filters.start_date,
       end_date: filters.end_date,
-      metric_type: metricType,
+      metric_type: metricType as PostDashboardTrendDataBody['metric_type'],
       granularity: trendGranularity,
     };
     if (filters.platforms.length > 0) {
@@ -181,10 +181,10 @@ const DashboardPage: React.FC = () => {
   const handleTrendGranularityChange = useCallback((granularity: 'daily' | 'weekly' | 'monthly') => {
     setTrendGranularity(granularity);
     // 重新加载趋势数据
-    const params: PostDashboardTrendDataBody = {
+    const params: PostDashboardTrendDataBody & { granularity: 'daily' | 'weekly' | 'monthly' } = {
       start_date: filters.start_date,
       end_date: filters.end_date,
-      metric_type: trendMetricType,
+      metric_type: trendMetricType as PostDashboardTrendDataBody['metric_type'],
       granularity,
     };
     if (filters.platforms.length > 0) {
@@ -227,18 +227,16 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* 前端投放指标卡片 */}
-        <Card className={styles.metricsGroupCard} size="small">
-          <div className={styles.groupHeader}>
-            <Text type="secondary" className={styles.groupTitle}>
-              📊 前端投放
-            </Text>
-            <Text type="secondary" className={styles.groupDesc}>
-              广告投放与获取效果
-            </Text>
-          </div>
-          <Row gutter={[16, 16]} className={styles.metricsRow}>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <MetricCard
+        <MetricSection
+          title={
+            <>
+              📊 <Text type="secondary">前端投放</Text>
+            </>
+          }
+          description="广告投放与获取效果"
+        >
+
+                          <MetricCard
                 title="阶段投入金额"
                 value={coreMetrics?.investment}
                 wowChange={wowChanges?.investment ? {
@@ -250,9 +248,7 @@ const DashboardPage: React.FC = () => {
                 formatter="currency"
                 icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <MetricCard
+                          <MetricCard
                 title="总展示数"
                 value={coreMetrics?.total_impressions}
                 wowChange={wowChanges?.total_impressions ? {
@@ -263,9 +259,7 @@ const DashboardPage: React.FC = () => {
                 formatter="number"
                 icon={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
               />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <MetricCard
+                          <MetricCard
                 title="总点击数"
                 value={coreMetrics?.total_clicks}
                 wowChange={wowChanges?.total_clicks ? {
@@ -276,9 +270,7 @@ const DashboardPage: React.FC = () => {
                 formatter="number"
                 icon={<AimOutlined style={{ color: METRIC_COLORS.clicks }} />}
               />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <MetricCard
+                          <MetricCard
                 title="总线索数"
                 value={coreMetrics?.total_leads}
                 wowChange={wowChanges?.total_leads ? {
@@ -289,22 +281,17 @@ const DashboardPage: React.FC = () => {
                 formatter="number"
                 icon={<UserOutlined style={{ color: METRIC_COLORS.leads }} />}
               />
-            </Col>
-          </Row>
-        </Card>
+        </MetricSection>
 
         {/* 后端转化指标卡片 */}
-        <Card className={styles.metricsGroupCard} size="small">
-          <div className={styles.groupHeader}>
-            <Text type="secondary" className={styles.groupTitle}>
-              💼 后端转化
-            </Text>
-            <Text type="secondary" className={styles.groupDesc}>
-              客户获取与价值创造
-            </Text>
-          </div>
-          {/* 使用 flex 布局让 5 个卡片均匀分布在一行 */}
-          <div className={styles.metricsFlexRow}>
+        <MetricSection
+          title={
+            <>
+              💼 <Text type="secondary">后端转化</Text>
+            </>
+          }
+          description="客户获取与价值创造"
+        >
               <MetricCard
                 title="新开客户数"
                 value={coreMetrics?.new_customers}
@@ -375,22 +362,19 @@ const DashboardPage: React.FC = () => {
                 formatter="currency"
                 icon={<GoldOutlined style={{ color: METRIC_COLORS.existingAssets }} />}
               />
-          </div>
-        </Card>
+        </MetricSection>
 
         {/* 运营效率指标卡片 */}
-        <Card className={styles.metricsGroupCard} size="small">
-          <div className={styles.groupHeader}>
-            <Text type="secondary" className={styles.groupTitle}>
-              ⚡ 运营效率
-            </Text>
-            <Text type="secondary" className={styles.groupDesc}>
-              单位成本分析
-            </Text>
-          </div>
-          <Row gutter={[16, 16]} className={styles.metricsRow}>
-            <Col xs={24} sm={12} lg={8}>
-              <MetricCard
+        <MetricSection
+          title={
+            <>
+              ⚡ <Text type="secondary">运营效率</Text>
+            </>
+          }
+          description="单位成本分析"
+        >
+
+                          <MetricCard
                 title="单线索成本"
                 value={coreMetrics?.cost_per_lead}
                 wowChange={wowChanges?.cost_per_lead ? {
@@ -403,9 +387,7 @@ const DashboardPage: React.FC = () => {
                 inverseTrend
                 icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
-            </Col>
-            <Col xs={24} sm={12} lg={8}>
-              <MetricCard
+                          <MetricCard
                 title="单开户成本"
                 value={costPerAccount}
                 wowChange={wowChanges?.cost_per_account ? {
@@ -418,9 +400,7 @@ const DashboardPage: React.FC = () => {
                 inverseTrend
                 icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
-            </Col>
-            <Col xs={24} sm={12} lg={8}>
-              <MetricCard
+                          <MetricCard
                 title="单有效户成本"
                 value={coreMetrics?.cost_per_valid_account}
                 wowChange={wowChanges?.cost_per_valid_account ? {
@@ -433,9 +413,7 @@ const DashboardPage: React.FC = () => {
                 inverseTrend
                 icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
-            </Col>
-          </Row>
-        </Card>
+        </MetricSection>
 
         {/* 趋势图 */}
         <Row gutter={[16, 16]} className={styles.chartsRow}>

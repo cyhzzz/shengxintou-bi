@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 员工转化分析页面 (Bug 4 修复)
  *
  * Bug 4 修复:
@@ -114,12 +114,14 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         params.end_date = dateRange[1];
       }
       if (selectedEmployees.length > 0) params.employees = selectedEmployees;
+      // v3.1 §四：与 /analysis 端点对齐，前端 selectedPlatforms 也传给 channel-overview
+      if (selectedPlatforms.length > 0) params.platforms = selectedPlatforms;
       const res: any = await http.post('/employee-conversion/analysis-channel-overview', params);
       if (res?.success) setChannelOverview(res.data);
     } catch (err) {
       console.warn('channel overview fetch failed', err);
     }
-  }, [dateRange, selectedEmployees, leadType]);
+  }, [dateRange, selectedEmployees, selectedPlatforms, leadType]);
 
   // 初始加载 + 任何筛选项变化都重取
   useEffect(() => {
@@ -228,7 +230,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     { title: '开户量', dataIndex: 'opened_count', align: 'right' as const, sorter: (a: any, b: any) => a.opened_count - b.opened_count },
     { title: '有效户', dataIndex: 'valid_customer_count', align: 'right' as const },
     { title: '开户率%', dataIndex: 'opening_rate', align: 'right' as const, sorter: (a: any, b: any) => a.opening_rate - b.opening_rate, render: (v: number) => (
-      <span style={{ color: v > 30 ? '#52c41a' : v > 10 ? '#fa8c16' : '#999' }}>{v?.toFixed(2)}%</span>
+      <span style={{ color: v > 30 ? 'var(--color-success)' : v > 10 ? 'var(--chart-color-7)' : 'var(--color-text-tertiary)' }}>{v?.toFixed(2)}%</span>
     ) },
     { title: '总资产', dataIndex: 'total_assets', align: 'right' as const, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
   ];
@@ -270,10 +272,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
       {/* 顶部核心指标 */}
       <div className={styles.metricsRow} style={{ marginTop: 16 }}>
-        <MetricCard title='总线索' value={data?.core_metrics?.total_leads || 0} formatter='number' icon={<UserOutlined style={{ color: '#1890ff' }} />} />
-        <MetricCard title='总开口' value={data?.core_metrics?.total_mouth || 0} formatter='number' icon={<UserOutlined style={{ color: '#13c2c2' }} />} />
-        <MetricCard title='总开户' value={data?.core_metrics?.total_opened || 0} formatter='number' icon={<TeamOutlined style={{ color: '#fa8c16' }} />} />
-        <MetricCard title='总有效户' value={data?.core_metrics?.total_valid_customer || 0} formatter='number' icon={<RiseOutlined style={{ color: '#52c41a' }} />} />
+        <MetricCard title='总线索' value={data?.core_metrics?.total_leads || 0} formatter='number' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} />
+        <MetricCard title='总开口' value={data?.core_metrics?.total_mouth || 0} formatter='number' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} />
+        <MetricCard title='总开户' value={data?.core_metrics?.total_opened || 0} formatter='number' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} />
+        <MetricCard title='总有效户' value={data?.core_metrics?.total_valid_customer || 0} formatter='number' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} />
       </div>
 
       {/* 双源对比卡片 */}
@@ -291,7 +293,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
             <Col span={5}><MetricCard title='渠道·总开户' value={channelOverview.channel_caliber?.opens || 0} formatter='number' icon={<DollarOutlined />} /></Col>
             <Col span={4}><MetricCard title='渠道·总有效户' value={channelOverview.channel_caliber?.valid || 0} formatter='number' icon={<RiseOutlined />} /></Col>
           </Row>
-          <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+          <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginTop: 8 }}>
             {channelOverview.note || '两个口径数字不一致是正常的（按用户口径"独立数据源"），仅作参考并列展示。'}
           </div>
         </Card>

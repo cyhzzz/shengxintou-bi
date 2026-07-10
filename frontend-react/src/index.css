@@ -1,22 +1,7 @@
-/* 基础样式重置 - 详细样式在 global.scss 中定义 */
+/* Design Tokens - 必须最先加载，定义 CSS 自定义属性 */
+@import './styles/tokens.css';
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-#root {
-  height: 100%;
 }

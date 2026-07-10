@@ -1,9 +1,11 @@
+@use '../../styles/mixins' as *;
+
 .accountManagementPage {
   .searchCard {
-    margin-bottom: 16px;
+    margin-bottom: var(--spacer-16);
   }
 
   .platformCard {
-    margin-bottom: 16px;
+    margin-bottom: var(--spacer-16);
   }
 }

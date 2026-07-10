@@ -676,9 +676,9 @@ const AgencyAnalysisLegacyPage: React.FC = () => {
         extra={
           <Space>
             <span>代理商数量: <strong>{stats.agencyCount}</strong></span>
-            <span style={{ margin: '0 8px', color: '#d9d9d9' }}>|</span>
+            <span style={{ margin: '0 8px', color: 'var(--color-text-disabled)' }}>|</span>
             <span>平台数量: <strong>{stats.platformCount}</strong></span>
-            <span style={{ margin: '0 8px', color: '#d9d9d9' }}>|</span>
+            <span style={{ margin: '0 8px', color: 'var(--color-text-disabled)' }}>|</span>
             <Tooltip title="导出为CSV格式">
               <Button type="primary" icon={<DownloadOutlined />} onClick={exportToCSV} disabled={!sortedSummary || sortedSummary.length === 0}>
                 导出CSV

@@ -10,11 +10,12 @@
  * 现改用 ECharts 直接渲染后端 trend 数据。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Statistic, Segmented, Space, Button, Tooltip, Spin, Table, Tag, Typography } from 'antd';
-import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined, FireOutlined } from '@ant-design/icons';
+import { Card, Segmented, Space, Button, Tooltip, Spin, Table, Tag, Typography } from 'antd';
+import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { EChartsOption } from 'echarts';
 import { FilterBar } from '@/components';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
@@ -33,14 +34,6 @@ const METRIC_LABELS: Record<MetricType, string> = {
   valid_customer_users: '有效户',
 };
 
-const METRIC_COLORS: Record<MetricType, string> = {
-  cost: '#1890ff',
-  impressions: '#52c41a',
-  clicks: '#faad14',
-  lead_users: '#f5222d',
-  opened_account_users: '#722ed1',
-  valid_customer_users: '#13c2c2',
-};
 
 interface FlattenedSummaryItem {
   platform: string;
@@ -166,6 +159,8 @@ const AgencyAnalysisPage: React.FC = () => {
       }
     });
     return summary.filter((item) => {
+      // 直播业务不进入厂商分析表，已在 直播获客 菜单的 直播漏斗/主播聚类 中独立查看
+      if (item.business_model === '直播' && !item.is_total) return false;
       if (item.is_total) return true;
       if (item.is_subtotal) {
         const key = `${item.platform}|||${item.business_model}`;
@@ -173,30 +168,6 @@ const AgencyAnalysisPage: React.FC = () => {
       }
       return true;
     });
-  }, [summary]);
-
-  const liveSummary = useMemo(() => {
-    const rows = summary.filter((item) => item.business_model === '直播' && !item.is_subtotal && !item.is_total);
-    const total = rows.reduce((acc, item) => ({
-      cost: acc.cost + item.cost,
-      lead_users: acc.lead_users + item.lead_users,
-      opened_account_users: acc.opened_account_users + item.opened_account_users,
-      valid_customer_users: acc.valid_customer_users + item.valid_customer_users,
-      opened_account_assets: acc.opened_account_assets + item.opened_account_assets,
-    }), {
-      cost: 0,
-      lead_users: 0,
-      opened_account_users: 0,
-      valid_customer_users: 0,
-      opened_account_assets: 0,
-    });
-    return {
-      rows,
-      total,
-      leadCost: total.lead_users > 0 ? total.cost / total.lead_users : 0,
-      accountCost: total.opened_account_users > 0 ? total.cost / total.opened_account_users : 0,
-      assetReturn: total.cost > 0 ? total.opened_account_assets / total.cost : 0,
-    };
   }, [summary]);
 
   const trendOption = useMemo((): EChartsOption => {
@@ -216,15 +187,14 @@ const AgencyAnalysisPage: React.FC = () => {
       dayMap.set(s.platform, prev + val);
     });
     const platforms = Array.from(new Set(trend.series.map((s) => s.platform))).filter(Boolean);
-    const color = METRIC_COLORS[metric];
-    const seriesData = platforms.map((p) => ({
+    // 堆叠柱状图（按平台分色堆叠，按日期累加）
+    const PLATFORM_BAR_COLORS = ['#1677ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96', '#13c2c2', '#faad14', '#2f54eb'];
+    const seriesData = platforms.map((p, idx) => ({
       name: p,
-      type: 'line' as const,
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 4,
-      itemStyle: { color },
-      lineStyle: { width: 2 },
+      type: 'bar' as const,
+      stack: '总量',
+      barMaxWidth: 36,
+      itemStyle: { color: PLATFORM_BAR_COLORS[idx % PLATFORM_BAR_COLORS.length] },
       emphasis: { focus: 'series' as const },
       data: trend.dates.map((d) => byPlatform.get(d)?.get(p) || 0),
     }));
@@ -238,7 +208,7 @@ const AgencyAnalysisPage: React.FC = () => {
       grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
       xAxis: {
         type: 'category',
-        boundaryGap: false,
+        boundaryGap: true,
         data: trend.dates,
         axisLabel: { rotate: trend.dates.length > 30 ? 30 : 0, fontSize: 11 },
       },
@@ -258,8 +228,8 @@ const AgencyAnalysisPage: React.FC = () => {
     { title: '平台', dataIndex: 'platform', key: 'platform', width: 100, fixed: 'left' },
     { title: '业务模式', dataIndex: 'business_model', key: 'business_model', width: 100, render: (v: string) => v === '直播' ? <Tag color="magenta">{v}</Tag> : (v || '-') },
     { title: '代理商', dataIndex: 'agency', key: 'agency', width: 160, render: (v: string, r) => {
-      if (r.is_total) return <strong style={{ color: '#1890ff' }}>{v}</strong>;
-      if (r.is_subtotal) return <strong style={{ color: '#722ed1' }}>{v}</strong>;
+      if (r.is_total) return <strong style={{ color: 'var(--color-brand)' }}>{v}</strong>;
+      if (r.is_subtotal) return <strong style={{ color: 'var(--chart-color-5)' }}>{v}</strong>;
       return v || '-';
     } },
     { title: '花费', dataIndex: 'cost', key: 'cost', width: 110, align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
@@ -295,77 +265,52 @@ const AgencyAnalysisPage: React.FC = () => {
     <div className={styles.agencyAnalysisPage}>
       <FilterBar showPlatform showAgency showBusinessModel onSearch={() => fetchData()} onReset={() => fetchData()} />
 
-      <Row gutter={[16, 16]} className={styles.summaryRow}>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总花费" value={totals.cost} precision={2} prefix={<DollarOutlined />}
-              formatter={(v) => `¥${Number(v).toLocaleString()}`} />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总曝光" value={totals.impressions} prefix={<EyeOutlined />} />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总点击" value={totals.clicks} prefix={<AimOutlined />} />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总线索" value={totals.lead_users} prefix={<UserOutlined />} />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总开户" value={totals.opened} prefix={<TeamOutlined />} />
-          </Card>
-        </Col>
-        <Col xs={12} sm={8} md={4} lg={4}>
-          <Card className={styles.metricCard}>
-            <Statistic title="总有效户" value={totals.valid} prefix={<TeamOutlined />} />
-          </Card>
-        </Col>
-      </Row>
-
-      {liveSummary.rows.length > 0 && (
-        <Card
-          className={styles.chartCard}
-          title={<Space><FireOutlined style={{ color: '#eb2f96' }} />直播业务投入产出</Space>}
-          extra={<Tag color="magenta">业务模式 = 直播</Tag>}
-        >
-          <Row gutter={[16, 16]}>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="直播花费" value={liveSummary.total.cost} precision={2} prefix="¥" />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="直播线索" value={liveSummary.total.lead_users} />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="直播开户" value={liveSummary.total.opened_account_users} />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="直播有效户" value={liveSummary.total.valid_customer_users} />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="直播开户成本" value={liveSummary.accountCost} precision={2} prefix="¥" />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic title="开户资产/花费" value={liveSummary.assetReturn} precision={2} suffix="x" />
-            </Col>
-          </Row>
-          <Table
-            columns={columns.filter((col) => ['platform', 'agency', 'cost', 'lead_users', 'opened_account_users', 'valid_customer_users', 'opened_account_assets', 'lead_cost', 'account_cost'].includes(String(col.key)))}
-            dataSource={liveSummary.rows}
-            rowKey={(r) => `live-${r.platform}-${r.agency}`}
-            pagination={false}
-            size="small"
-            scroll={{ x: 960 }}
-            style={{ marginTop: 16 }}
-          />
-        </Card>
-      )}
+      <MetricSection title="厂商投放概览" description="投放消耗、曝光点击与后端转化核心指标">
+        <MetricCard
+          title="总花费"
+          value={totals.cost}
+          prefix="¥"
+          formatter="currency"
+          valueColor="var(--color-brand)"
+          icon={<DollarOutlined style={{ color: 'var(--color-brand)' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总曝光"
+          value={totals.impressions}
+          valueColor="var(--chart-color-2)"
+          icon={<EyeOutlined style={{ color: 'var(--chart-color-2)' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总点击"
+          value={totals.clicks}
+          valueColor="var(--chart-color-3)"
+          icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总线索"
+          value={totals.lead_users}
+          valueColor="var(--chart-color-4)"
+          icon={<UserOutlined style={{ color: 'var(--chart-color-4)' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总开户"
+          value={totals.opened}
+          valueColor="var(--chart-color-5)"
+          icon={<TeamOutlined style={{ color: 'var(--chart-color-5)' }} />}
+          showWowChange={false}
+        />
+        <MetricCard
+          title="总有效户"
+          value={totals.valid}
+          valueColor="var(--color-success)"
+          icon={<TeamOutlined style={{ color: 'var(--color-success)' }} />}
+          showWowChange={false}
+        />
+      </MetricSection>
 
       <Card className={styles.chartCard}>
         <div className={styles.cardHeader}>

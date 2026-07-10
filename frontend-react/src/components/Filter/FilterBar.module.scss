@@ -1,21 +1,13 @@
-.filterBar {
-  margin-bottom: 16px;
+@use '../../styles/mixins' as *;
 
-  :global {
-    .ant-card-body {
-      padding: 12px 16px;
-    }
-  }
+.filterBar {
+  margin-bottom: var(--spacer-16);
 }
 
 .filterGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @include filter-group;
 }
 
 .filterLabel {
-  color: #666;
-  font-size: 14px;
-  white-space: nowrap;
+  @include filter-label;
 }

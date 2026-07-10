@@ -1,50 +1,40 @@
+@use '../../styles/mixins' as *;
+
 .container {
   display: flex;
-  gap: 20px;
-  height: calc(100vh - 140px);
+  gap: var(--spacer-20);
+  height: calc(100vh - var(--header-height) - var(--spacer-32) - var(--spacer-32));
   padding: 0;
-  background: #f5f7fa;
+  background: var(--bg-secondary);
 }
 
 /* 左侧控制面板 */
 .controlPanel {
   width: 320px;
   flex-shrink: 0;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: var(--bg-content);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
 }
 
-// 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .cardDesc {
-  font-size: 12px;
-  color: #bfbfbf !important;
+  @include card-section-desc;
 }
 
 .panelHeader {
-  padding: 16px 20px;
-  border-bottom: 1px solid #e8e8e8;
+  padding: var(--spacer-16) var(--spacer-20);
+  border-bottom: 1px solid var(--border-default);
 
-  // 使用新的标题样式
   .cardHeader {
     margin-bottom: 0;
     padding-bottom: 0;
@@ -53,36 +43,32 @@
 
   h3 {
     margin: 0;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #8A8D99 !important;
+    @include card-section-title;
   }
 }
 
 .panelBody {
-  padding: 20px;
+  padding: var(--spacer-20);
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 .controlGroup {
-  margin-bottom: 24px;
+  margin-bottom: var(--spacer-24);
 }
 
 .controlLabel {
   display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #606266;
-  margin-bottom: 8px;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacer-8);
 }
 
 .btnGroup {
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-8);
 
   button {
     flex: 1;
@@ -96,30 +82,30 @@
 .periodInfo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  margin-top: 8px;
+  gap: var(--spacer-4);
+  padding: var(--spacer-12);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin-top: var(--spacer-8);
 }
 
 .periodDate {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
 }
 
 .periodSequence {
-  font-size: 12px;
-  color: #909399;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
 }
 
 .controlActions {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: var(--spacer-24);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacer-12);
 }
 
 /* 右侧预览画布 */
@@ -128,9 +114,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  background: var(--bg-content);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 
   &.fullscreen {
     position: fixed;
@@ -147,10 +133,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e8e8e8;
+  padding: var(--spacer-16) var(--spacer-20);
+  border-bottom: 1px solid var(--border-default);
 
-  // 使用新的标题样式
   .cardHeader {
     margin-bottom: 0;
     padding-bottom: 0;
@@ -159,16 +144,12 @@
 }
 
 .previewTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .previewActions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .previewCanvas {
@@ -176,9 +157,9 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 40px;
+  padding: var(--spacer-48) var(--spacer-32);
   overflow-y: auto;
-  background: #e8e8e8;
+  background: var(--bg-secondary);
 }
 
 .previewPlaceholder {
@@ -188,27 +169,27 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  color: #909399;
-  gap: 16px;
+  color: var(--color-text-tertiary);
+  gap: var(--spacer-16);
 
   .anticon {
-    color: #c0c4cc;
+    color: var(--color-text-disabled);
   }
 
   span {
-    font-size: 14px;
+    font-size: var(--text-base);
   }
 }
 
 .placeholderHint {
-  font-size: 12px;
-  color: #c0c4cc;
+  font-size: var(--text-sm);
+  color: var(--color-text-disabled);
 }
 
 .reportFrame {
   width: 480px;
   min-height: 800px;
-  background: white;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background: var(--bg-content);
+  box-shadow: var(--shadow-elevated);
   border: none;
 }
