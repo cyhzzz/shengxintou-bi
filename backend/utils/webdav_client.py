@@ -78,6 +78,42 @@ class WebDAVBackupClient:
                     print(f"Attempting to continue anyway...")
                     # 不抛出异常，让后续操作决定是否失败
 
+    def _requests_kwargs(self):
+        """构造 requests 调用的公共参数（代理 / SSL 校验），从 config 读取。"""
+        import config
+        kw: dict = {}
+        proxy = getattr(config, 'WEBDAV_PROXY', None)
+        if proxy:
+            kw['proxies'] = {'http': proxy, 'https': proxy}
+        kw['verify'] = getattr(config, 'WEBDAV_VERIFY_SSL', True)
+        return kw
+
+    def _wrap_conn_err(self, e):
+        """把 requests 连接类异常包装成可操作的中文错误信息。"""
+        import requests as _req
+        from requests.exceptions import ConnectionError as _ConnErr
+        if isinstance(e, (_ConnErr,)) or 'ConnectionResetError' in type(e).__name__ \
+                or 'Connection aborted' in str(e) or '10054' in str(e):
+            return ('无法连接坚果云 WebDAV（连接被远端重置/拒绝）。'
+                    '请检查本机网络、防火墙、代理或 VPN 是否能访问 dav.jianguoyun.com:443，'
+                    '必要时在 .env 设置 WEBDAV_VERIFY_SSL=false 或 WEBDAV_PROXY。')
+        return f'请求坚果云失败: {str(e)}'
+
+    def test_connection(self):
+        """轻量连接自检：对备份目录做一次 PROPFIND，返回结构化结果。"""
+        try:
+            import requests as _req
+            list_url = f'{self.url}{self.backup_dir}/' if self.backup_dir else self.url
+            resp = _req.request('PROPFIND', list_url, headers={'Depth': '1'},
+                                auth=self.auth, timeout=20, **self._requests_kwargs())
+            return {
+                'success': resp.status_code in (207, 200, 401, 403),
+                'status_code': resp.status_code,
+                'message': '连接成功' if resp.status_code in (207, 200) else f'服务器返回 HTTP {resp.status_code}',
+            }
+        except Exception as e:
+            return {'success': False, 'status_code': None, 'message': self._wrap_conn_err(e)}
+
     def upload_backup(self, local_db_path, description='', use_compression=False):
         """
         上传备份到坚果云（使用 requests 库以确保兼容性）
@@ -137,7 +173,7 @@ class WebDAVBackupClient:
 
         try:
             with open(file_to_upload, 'rb') as f:
-                response = requests.put(remote_url, data=f, auth=self.auth)
+                response = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
 
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -187,7 +223,7 @@ class WebDAVBackupClient:
 
                 try:
                     # 下载压缩文件
-                    response = requests.get(remote_url, auth=self.auth, stream=True)
+                    response = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
                     if response.status_code not in [200, 206]:
                         raise Exception(f"HTTP {response.status_code}: {response.text}")
 
@@ -253,12 +289,16 @@ class WebDAVBackupClient:
             headers = {
                 'Depth': '1'
             }
-            response = requests.request(
-                method='PROPFIND',
-                url=list_url,
-                headers=headers,
-                auth=self.auth
-            )
+            try:
+                response = requests.request(
+                    method='PROPFIND',
+                    url=list_url,
+                    headers=headers,
+                    auth=self.auth,
+                    **self._requests_kwargs()
+                )
+            except Exception as e:
+                raise Exception(self._wrap_conn_err(e))
 
             if response.status_code != 207:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -332,7 +372,9 @@ class WebDAVBackupClient:
             return backups
 
         except Exception as e:
-            raise Exception(f"获取备份列表失败: {str(e)}")
+            # 直接向上抛出（连接类错误已由 _wrap_conn_err 包装为可操作提示；
+            # 路由层会统一加上「获取备份列表失败:」前缀，避免重复）
+            raise
 
     def delete_backup(self, filename):
         """
@@ -346,7 +388,7 @@ class WebDAVBackupClient:
         """
         try:
             remote_url = self._get_remote_url(filename)
-            response = requests.delete(remote_url, auth=self.auth)
+            response = requests.delete(remote_url, auth=self.auth, **self._requests_kwargs())
 
             if response.status_code not in [200, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -410,7 +452,7 @@ class WebDAVBackupClient:
             remote_url = self._get_remote_url(remote_filename)
 
             with open(local_file_path, 'rb') as f:
-                response = requests.put(remote_url, data=f, auth=self.auth)
+                response = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
 
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
