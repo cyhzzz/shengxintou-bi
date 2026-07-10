@@ -39,6 +39,13 @@
   - 接入日/夜主题：`<html data-theme="dark">` + `useAppStore.themeMode` + Ant Design `ConfigProvider` `darkAlgorithm`，Header 提供切换入口。
   - 删除 `MainLayout` 中 7 处 `!important` 与 14 处 `:global()` 覆盖，统一 Menu 选中色为品牌色 `#1890ff`。
   - 报表头部数据卡片统一为 `MetricSection + MetricCard` 4/3/2/1 响应式，与互联网渠道数据概览一致（小红书运营报表不动）。
+- v3.1.1 报表样式收敛（2026-07-10）：
+  - 抽出共享 `FunnelChart` 组件（`frontend-react/src/components/Chart/FunnelChart.tsx`，基于 `@ant-design/charts` 的 `Funnel`），用于内容平台漏斗 / 应用市场漏斗 / 主播引流漏斗三个场景；原 ECharts funnel 的对数缩放逻辑下架。已接入：`ConversionFunnel` / `AppMarket/Funnel` / `Live/Funnel`。
+  - 抽出共享 `ReportFooter` 组件（`frontend-react/src/components/ReportFooter/`），作为报表页底部弱化区：用于收纳「数据源 / 端点 / 口径说明」说明性文字，避免散落在筛选卡 / Tab 内容 / 卡片描述里。已迁移页：`OmniChannel` / `AppMarket/Funnel` / `Live/Funnel` / `AnchorCluster` / `ConversionFunnel`。
+  - `全渠道获客概览` 顶部第 4 张卡（TOP 渠道类别 + 占比）的 title 改为 `${channel_category} · 占比 ${share}%`，与其他 3 张卡结构对齐。
+  - `Live/Funnel.tsx` 228 处 `\uXXXX` 转义中文字符残留全部修复，并修复「全冶稿」错别字。
+  - 报表卡片外的 inline「数据源」/「总 xx」备注一律从筛选卡 / Tab 内容里调出，统一接到 `ReportFooter` 底部弱化区。
+
 
 ### 进行中
 
