@@ -1,141 +1,86 @@
-/**
- * 小红书运营分析页面样式
- */
+@use '../../styles/mixins' as *;
+@use '../../styles/variables' as *;
 
 // 页面容器
 .operationPage {
   padding: 0;
-  min-height: calc(100vh - 48px - 32px);
+  min-height: calc(100vh - var(--header-height) - var(--spacer-32));
 }
 
 // 筛选器卡片
 .filterCard {
-  margin-bottom: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--spacer-16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 
-  :global {
-    .ant-card-body {
-      padding: 16px 20px;
-    }
-  }
+  @include card-base;
 }
 
 // 筛选器行
 .filterRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  @include filter-bar;
   align-items: flex-end;
 }
 
 // 筛选器组
 .filterGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @include filter-group;
 }
 
 // 筛选器标签
 .filterLabel {
-  font-size: 13px;
-  color: #666;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
 // 筛选器操作按钮
 .filterActions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
+  @include filter-actions;
 }
 
 // 主内容区域 - 带间距的卡片容器
 .contentSection {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacer-16);
 }
 
 // 卡片通用样式
 .sectionCard {
-  margin-bottom: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--spacer-16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 
-  :global {
-    .ant-card-body {
-      padding: 16px 20px;
-      overflow-x: auto;
-    }
-  }
+  @include card-base;
 }
 
 // 图表卡片
 .chartCard {
-  margin-bottom: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--spacer-16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 
-  :global {
-    .ant-card-head {
-      border-bottom: 1px solid #f0f0f0;
-      min-height: 48px;
-    }
-
-    .ant-card-head-title {
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .ant-card-body {
-      padding: 16px 20px;
-      overflow-x: auto;
-    }
-  }
+  @include card-base;
 }
 
 // 表格卡片
 .tableCard {
-  margin-bottom: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--spacer-16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 
-  :global {
-    .ant-card-head {
-      border-bottom: 1px solid #f0f0f0;
-      min-height: 48px;
-    }
-
-    .ant-card-head-title {
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .ant-card-body {
-      padding: 16px 20px;
-      overflow-x: auto;
-    }
-  }
+  @include card-base;
 }
 
 // 卡片标题区域
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-desc;
   margin: 0;
 }
 
@@ -143,15 +88,15 @@
 .twoColGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--spacer-16);
 }
 
 // 左右等分图表布局 - 转化运营数据模块
 .chartGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 16px;
+  gap: var(--spacer-20);
+  margin-bottom: var(--spacer-16);
 }
 
 .chartGridItem {
@@ -162,16 +107,12 @@
 .contentChartGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: var(--spacer-20);
 }
 
 .sectionTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
-  margin-bottom: 12px;
+  @include card-section-desc;
+  margin-bottom: var(--spacer-12);
 }
 
 .chartEmpty {
@@ -180,8 +121,8 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #8a8d99;
-  font-size: 14px;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
 }
 
 .chartContainer {
@@ -192,28 +133,28 @@
 
 // 员工转化排行表格区域
 .tableSection {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  margin-top: var(--spacer-20);
+  padding-top: var(--spacer-16);
+  border-top: 1px solid var(--border-default);
 }
 
 .tableTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 12px;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacer-12);
 }
 
 // 统计文本
 .statText {
-  font-size: 13px;
-  color: #8a8d99;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
 }
 
 // 正面指标样式（用于高亮重要数值）
 .positive {
-  color: #52c41a;
-  font-weight: 500;
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
 }
 
 // 加载状态
@@ -228,48 +169,48 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 // 错误卡片
 .errorCard {
-  margin: 16px 0;
-  border-color: #ff4d4f;
-  border-radius: 8px;
+  margin: var(--spacer-16) 0;
+  border-color: var(--color-error);
+  border-radius: var(--radius-lg);
 }
 
 .errorContent {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 0;
+  padding: var(--spacer-48) 0;
 }
 
 .errorIcon {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: var(--spacer-48);
+  margin-bottom: var(--spacer-16);
 }
 
 .errorMessage {
-  font-size: 14px;
-  color: #ff4d4f;
-  margin-bottom: 16px;
+  font-size: var(--text-base);
+  color: var(--color-error);
+  margin-bottom: var(--spacer-16);
   text-align: center;
 }
 
 // 响应式调整
-@media (max-width: 1200px) {
+@media (max-width: $breakpoint-xl) {
   .chartGrid,
   .contentChartGrid,
   .twoColGrid {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: var(--spacer-16);
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: $breakpoint-md) {
   .operationPage {
-    padding: 12px;
+    padding: var(--spacer-12);
   }
 
   .filterRow {
@@ -283,7 +224,7 @@
 
   .filterActions {
     margin-left: 0;
-    margin-top: 8px;
+    margin-top: var(--spacer-8);
     justify-content: flex-end;
   }
 }

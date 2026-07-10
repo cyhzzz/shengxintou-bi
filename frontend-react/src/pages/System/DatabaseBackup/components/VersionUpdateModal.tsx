@@ -34,14 +34,14 @@ const VersionUpdateModal: React.FC<VersionUpdateModalProps> = ({
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
         <h3 style={{ marginBottom: 16 }}>版本更新提示</h3>
-        <p style={{ color: '#666', marginBottom: 16 }}>{message}</p>
+        <p style={{ color: 'var(--color-text-secondary)', marginBottom: 16 }}>{message}</p>
         {cloudVersion && (
-          <p style={{ color: '#999', fontSize: 13, marginBottom: 16 }}>
+          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginBottom: 16 }}>
             云端版本: v{cloudVersion}
           </p>
         )}
         {supportContact && (
-          <p style={{ color: '#666', fontSize: 13 }}>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
             支持联系: {supportContact}
           </p>
         )}

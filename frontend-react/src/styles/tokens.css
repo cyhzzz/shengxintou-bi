@@ -1,0 +1,135 @@
+/* ========================================
+   省心投 BI - Design Tokens (CSS Custom Properties)
+   对齐 TRAE Work 规范，品牌色保留蓝色
+   ======================================== */
+
+/* ===== 日间模式 ===== */
+:root {
+  /* 品牌色 */
+  --color-brand: #1890ff;
+  --color-brand-hover: #40a9ff;
+  --color-brand-active: #096dd9;
+  --color-brand-bg: rgba(24, 144, 255, 0.08);
+  --color-brand-border: rgba(24, 144, 255, 0.3);
+
+  /* 文字色 */
+  --color-text-primary: #171717;
+  --color-text-secondary: #525252;
+  --color-text-tertiary: #737373;
+  --color-text-disabled: #a1a1a1;
+  --color-text-brand: #1890ff;
+
+  /* 背景色 */
+  --bg-page: #f5f5f5;
+  --bg-content: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-hover: rgba(115, 115, 115, 0.06);
+  --bg-selected: rgba(24, 144, 255, 0.08);
+
+  /* 边框色 */
+  --border-default: rgba(115, 115, 115, 0.12);
+  --border-strong: rgba(115, 115, 115, 0.24);
+  --border-focus: #000000;
+
+  /* 间距系统 */
+  --spacer-2: 2px;
+  --spacer-4: 4px;
+  --spacer-6: 6px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --spacer-32: 32px;
+  --spacer-48: 48px;
+
+  /* 圆角系统 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* 阴影系统 */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.14), 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  /* 字体系统 */
+  --font-family: "SF Pro Text", "PingFang SC", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-family-metric: "Inter", "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  --font-family-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 字号层级 */
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+
+  /* 行高 */
+  --leading-sm: 16px;
+  --leading-base: 20px;
+  --leading-lg: 28px;
+
+  /* 字重 */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* 功能色 */
+  --color-success: #15a877;
+  --color-warning: #e27900;
+  --color-error: #e8463a;
+  --color-info: #2f74ff;
+
+  /* 图表色板 */
+  --chart-color-1: #1890ff;
+  --chart-color-2: #52c41a;
+  --chart-color-3: #faad14;
+  --chart-color-4: #f5222d;
+  --chart-color-5: #722ed1;
+  --chart-color-6: #13c2c2;
+  --chart-color-7: #fa8c16;
+  --chart-color-8: #eb2f96;
+
+  /* 布局尺寸 */
+  --sidebar-width: 200px;
+  --header-height: 48px;
+
+  /* 过渡 */
+  --transition-fast: 0.12s;
+  --transition-normal: 0.2s;
+}
+
+/* ===== 夜间模式 ===== */
+[data-theme="dark"] {
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a1a1a1;
+  --color-text-tertiary: #737373;
+  --color-text-disabled: #525252;
+  --color-text-brand: #6a9fff;
+
+  --bg-page: #0a0a0a;
+  --bg-content: #171717;
+  --bg-secondary: #0a0a0a;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-selected: rgba(24, 144, 255, 0.15);
+
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.24);
+  --border-focus: #f5f5f5;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+
+  --color-brand-bg: rgba(24, 144, 255, 0.15);
+  --color-brand-border: rgba(24, 144, 255, 0.4);
+
+  --color-success: #2fb287;
+  --color-warning: #f39a35;
+  --color-error: #ea574c;
+  --color-info: #4c88ff;
+}

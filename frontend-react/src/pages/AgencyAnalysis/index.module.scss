@@ -1,114 +1,38 @@
-/**
- * 厂商分析页面样式 - 混合迁移版本
- */
+@use '../../styles/mixins' as *;
+
 .agencyAnalysisPage {
   padding: 0;
 }
 
 .summaryRow {
-  margin-bottom: 20px;
-
-  :global {
-    .ant-card {
-      border-radius: 8px;
-      height: 100%;
-    }
-
-    .ant-statistic {
-      min-height: 60px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .ant-statistic-title {
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 4px;
-      white-space: nowrap;
-    }
-
-    .ant-statistic-content {
-      display: flex;
-      flex-direction: row;
-      align-items: baseline;
-      gap: 4px;
-    }
-
-    .ant-statistic-content-value {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-      font-size: 20px;
-      font-weight: 600;
-    }
-
-    .ant-statistic-content-prefix {
-      margin-right: 2px;
-    }
-  }
-}
-
-.metricCard {
-  :global {
-    .ant-card-body {
-      padding: 16px 20px;
-    }
-  }
+  margin-bottom: var(--spacer-20);
 }
 
 .chartCard {
-  margin-bottom: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-
-  // 隐藏默认标题头
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-  }
+  margin-bottom: var(--spacer-20);
+  @include card-base;
 }
 
 .tableCard {
-  margin-top: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-
-  // 隐藏默认标题头
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-  }
+  margin-top: var(--spacer-20);
+  @include card-base;
 }
 
-// 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .cardDesc {
-  font-size: 12px;
-  color: #bfbfbf !important;
+  @include card-section-desc;
 }
 
 .controlLabel {
-  font-size: 14px;
-  color: #666;
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
 }
 
 .chartContainer {
@@ -117,50 +41,7 @@
   min-height: 350px;
 }
 
-.tableCard {
-  margin-top: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
 .tableContainer {
   width: 100%;
   min-height: 200px;
-
-  // 为旧版表格样式提供覆盖
-  :global {
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-
-      th, td {
-        padding: 12px 16px;
-        text-align: left;
-        border-bottom: 1px solid #f0f0f0;
-      }
-
-      th {
-        background-color: #fafafa;
-        font-weight: 600;
-      }
-
-      .subtotal-row {
-        background-color: #fafafa;
-
-        td {
-          background-color: #fafafa !important;
-          font-weight: 600;
-        }
-      }
-
-      .total-row {
-        background-color: #f0f0f0;
-
-        td {
-          background-color: #f0f0f0 !important;
-          font-weight: 700;
-        }
-      }
-    }
-  }
 }

@@ -107,13 +107,13 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
     series: [{
       name: '转化漏斗',
       type: 'funnel',
-      left: '8%',
-      top: 24,
-      width: '84%',
-      height: '86%',
-      minSize: '12%',
+      left: 'center',
+      top: 10,
+      bottom: 10,
+      width: '92%',
+      minSize: '0%',
       maxSize: '100%',
-      sort: 'none',
+      sort: 'descending',
       gap: 4,
       label: {
         show: true,
@@ -144,14 +144,14 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
           justifyContent: 'center',
         }}
       >
-        <span style={{ color: '#999' }}>暂无数据</span>
+        <span style={{ color: 'var(--color-text-tertiary)' }}>暂无数据</span>
       </div>
     );
   }
 
   return (
-    <div className={styles.funnelChart} style={{ height }}>
-      <EChartsComponent option={option} height={height} />
+    <div className={styles.funnelChart} style={{ width: '100%', height }}>
+      <EChartsComponent option={option} height={height} style={{ width: '100%' }} />
     </div>
   );
 };

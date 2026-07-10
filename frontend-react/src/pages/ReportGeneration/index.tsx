@@ -125,14 +125,15 @@ const ReportGeneration: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        const data = result.data;
-        if (data.is_new) {
-          // 新报告，清空预览
+        const data = result.data || {};
+        const reportData = data.report_data || data;
+        if (data.is_new || !data.report_data) {
+          // 新报告或返回结构异常，清空预览
           setCurrentReport(null);
           setHasChanges(false);
         } else {
-          // 已存在报告
-          setCurrentReport(data);
+          // 已存在报告：合并 report_id 一起存，供保存/导出使用
+          setCurrentReport({ ...reportData, report_id: data.report_id || reportData.report_id });
           setHasChanges(false);
         }
       }
@@ -162,9 +163,12 @@ const ReportGeneration: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        setCurrentReport(result.data);
+        const data = result.data || {};
+        const reportData = data.report_data || data;
+        // 合并 report_id，使保存/导出接口能取到
+        setCurrentReport({ ...reportData, report_id: data.report_id || reportData.report_id });
         setHasChanges(false);
-        message.success(result.data.is_new ? '报告生成成功' : '报告已加载');
+        message.success(data.is_new ? '报告生成成功' : '报告已加载');
       } else {
         message.error(result.error || '生成报告失败');
       }
@@ -461,13 +465,13 @@ const ReportGeneration: React.FC = () => {
             />
           ) : selectedPeriod ? (
             <div className={styles.previewPlaceholder}>
-              <FileTextOutlined style={{ fontSize: 64, color: '#999' }} />
+              <FileTextOutlined style={{ fontSize: 64, color: 'var(--color-text-tertiary)' }} />
               <span>该报告期尚未生成</span>
               <span className={styles.placeholderHint}>点击"生成报告"按钮开始生成</span>
             </div>
           ) : (
             <div className={styles.previewPlaceholder}>
-              <FilePdfOutlined style={{ fontSize: 64, color: '#999' }} />
+              <FilePdfOutlined style={{ fontSize: 64, color: 'var(--color-text-tertiary)' }} />
               <span>选择报告期并点击"生成报告"</span>
             </div>
           )}

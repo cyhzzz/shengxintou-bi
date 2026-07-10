@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 转化漏斗页面（v3.1 §三 重构）
  *
  * 数据源（双漏斗，per 渠道类别拆分）:
@@ -12,8 +12,10 @@
  * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Row, Col, Card, Spin, message, Tabs, Statistic, Tag, Space, Empty } from 'antd';
+import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty } from 'antd';
+import { AimOutlined, BankOutlined, CheckCircleOutlined, EyeOutlined, MessageOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
 import styles from './ConversionFunnel.module.scss';
 
@@ -28,13 +30,13 @@ const ConversionFunnelPage: React.FC = () => {
   const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
   const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
 
-  const [dateRange, setDateRange] = useState<[string, string]>(() => {
+  const [dateRange] = useState<[string, string]>(() => {
     const today = new Date();
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     return [fmt(sixMonthsAgo), fmt(today)];
   });
-  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [platforms] = useState<string[]>([]);
 
   const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
     setLoading(true);
@@ -63,14 +65,6 @@ const ConversionFunnelPage: React.FC = () => {
 
   useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const handleSearch = (searchFilters: {
-    startDate: string; endDate: string; platforms: string[];
-    agencies: string[]; businessModels: string[];
-  }) => {
-    setDateRange([searchFilters.startDate, searchFilters.endDate]);
-    setPlatforms(searchFilters.platforms);
-    loadData({ startDate: searchFilters.startDate, endDate: searchFilters.endDate, platforms: searchFilters.platforms });
-  };
 
   // 转换 stages 给 FunnelChart 组件 (期望 {name, count, rate})
   const contentFunnelData = useMemo(() => {
@@ -96,8 +90,6 @@ const ConversionFunnelPage: React.FC = () => {
     if (!contentStages.length) return null;
     const find = (name: string) => contentStages.find((s) => s.step === name)?.value || 0;
     return {
-      impressions: find('广告曝光'),
-      clicks: find('客户点击'),
       impressions: find('广告曝光'),
       clicks: find('客户点击'),
       leads: find('客户线索'),
@@ -134,15 +126,43 @@ const ConversionFunnelPage: React.FC = () => {
                   {/* 核心指标 */}
                   {contentMetrics && (
                     <Col span={24}>
-                      <Card size="small" title="内容平台核心指标">
-                        <Row gutter={16}>
-                          <Col span={4}><Statistic title="广告曝光" value={contentMetrics.impressions} valueStyle={{ color: '#999' }} /></Col>
-                          <Col span={4}><Statistic title="客户点击" value={contentMetrics.clicks} valueStyle={{ color: '#999' }} /></Col>
-                          <Col span={4}><Statistic title="客户线索" value={contentMetrics.leads} /></Col>
-                          <Col span={4}><Statistic title="客户开口" value={contentMetrics.mouth} /></Col>
-                          <Col span={4}><Statistic title="有效户" value={contentMetrics.valid} valueStyle={{ color: '#52c41a' }} /></Col>
-                        </Row>
-                      </Card>
+                      <MetricSection title="内容平台核心指标" description="曝光、点击、线索到有效户的核心表现">
+                        <MetricCard
+                          title="广告曝光"
+                          value={contentMetrics.impressions}
+                          valueColor="var(--color-text-tertiary)"
+                          icon={<EyeOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="客户点击"
+                          value={contentMetrics.clicks}
+                          valueColor="var(--color-text-tertiary)"
+                          icon={<AimOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="客户线索"
+                          value={contentMetrics.leads}
+                          valueColor="var(--color-brand)"
+                          icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="客户开口"
+                          value={contentMetrics.mouth}
+                          valueColor="var(--chart-color-7)"
+                          icon={<MessageOutlined style={{ color: 'var(--chart-color-7)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="有效户"
+                          value={contentMetrics.valid}
+                          valueColor="var(--color-success)"
+                          icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+                          showWowChange={false}
+                        />
+                      </MetricSection>
                     </Col>
                   )}
                   {/* 漏斗图 */}
@@ -181,14 +201,36 @@ const ConversionFunnelPage: React.FC = () => {
                 <Row gutter={[16, 16]}>
                   {appmarketMetrics && (
                     <Col span={24}>
-                      <Card size="small" title="应用市场核心指标">
-                        <Row gutter={16}>
-                          <Col span={6}><Statistic title="激活APP" value={appmarketMetrics.activate} valueStyle={{ color: '#1890ff' }} /></Col>
-                          <Col span={6}><Statistic title="开户成功" value={appmarketMetrics.opened} valueStyle={{ color: '#fa8c16' }} /></Col>
-                          <Col span={6}><Statistic title="入金" value={appmarketMetrics.deposit} valueStyle={{ color: '#722ed1' }} /></Col>
-                          <Col span={6}><Statistic title="有效户" value={appmarketMetrics.valid} valueStyle={{ color: '#52c41a' }} /></Col>
-                        </Row>
-                      </Card>
+                      <MetricSection title="应用市场核心指标" description="激活、开户、入金与有效户核心表现">
+                        <MetricCard
+                          title="激活APP"
+                          value={appmarketMetrics.activate}
+                          valueColor="var(--color-brand)"
+                          icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="开户成功"
+                          value={appmarketMetrics.opened}
+                          valueColor="var(--chart-color-7)"
+                          icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="入金"
+                          value={appmarketMetrics.deposit}
+                          valueColor="var(--chart-color-5)"
+                          icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="有效户"
+                          value={appmarketMetrics.valid}
+                          valueColor="var(--color-success)"
+                          icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+                          showWowChange={false}
+                        />
+                      </MetricSection>
                     </Col>
                   )}
                   <Col span={14}>
@@ -223,10 +265,10 @@ const ConversionFunnelPage: React.FC = () => {
 
         <Card size="small" style={{ marginTop: 16 }} type="inner">
           <Space direction="vertical" size={0}>
-            <span style={{ color: '#999', fontSize: 12 }}>
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
               数据源: 内容平台 = agg_vendor_daily(平台∈内容平台) + fact_conv_content / 应用市场 = fact_conv_appmarket
             </span>
-            <span style={{ color: '#999', fontSize: 12 }}>
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
               v3.1 双漏斗独立，按渠道类别拆分。占比由前端按响应数据实时算 (value/previous)。
             </span>
           </Space>

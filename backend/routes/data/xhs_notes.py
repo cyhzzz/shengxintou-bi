@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """小红书笔记接口（v2 - 查 agg_xhs_note）"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
@@ -112,3 +112,22 @@ def get_xhs_notes_list_get():
         if v:
             filters[k] = v.split(',')
     return _process({'filters': filters, 'page': page, 'page_size': page_size})
+
+
+@bp.route('/xhs-notes/filter-options', methods=['GET'])
+@handle_exceptions
+def get_filter_options():
+    """P1-4: 提供创作者/内容类型/广告策略/笔记账号 distinct 枚举，避免数据库 0 条时下拉空白"""
+    def distinct(col, label):
+        vals = [r[0] for r in db.session.query(col).distinct()
+                .filter(col.isnot(None), col != '').order_by(col).all() if r[0]]
+        return [{'value': v, 'label': str(v)} for v in vals]
+    return jsonify({
+        'success': True,
+        'data': {
+            'creators': distinct(AggXhsNote.创作者, '创作者'),
+            'content_types': distinct(AggXhsNote.内容类型, '内容类型'),
+            'ad_strategies': distinct(AggXhsNote.广告策略, '广告策略'),
+            'publish_accounts': distinct(AggXhsNote.笔记账号, '账号'),
+        }
+    })

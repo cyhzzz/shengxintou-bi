@@ -67,6 +67,7 @@ const XhsNotesListPage: React.FC = () => {
 
   // 枚举选项
   const [creatorOptions, setCreatorOptions] = useState<string[]>([]);
+  const [contentTypeOptions, setContentTypeOptions] = useState<string[]>([]);
   const [adStrategyOptions, setAdStrategyOptions] = useState<string[]>([]);
   const [accountOptions, setAccountOptions] = useState<string[]>([]);
 
@@ -115,31 +116,16 @@ const XhsNotesListPage: React.FC = () => {
     selectedAccount: '',
   });
 
-  // 加载枚举值（从后端API响应中获取）
+  // 加载枚举值（直接调 filter-options 端点，避免主列表空数据时拉不到）
   const loadEnums = useCallback(async () => {
     try {
-      // 先获取一次数据来获取筛选选项
-      const response = await dataService.getXhsNotesList({
-        filters: {},
-        page: 1,
-        page_size: 1,
-      });
-
+      const response = await dataService.getXhsNotesListFilterOptions();
       if (response.success && response.data) {
-        const responseData = response.data as {
-          notes?: XhsNotesListItem[];
-          pagination?: { page: number; page_size: number; total: number; total_pages?: number };
-          filters?: {
-            creators?: string[];
-            producers?: string[];
-            note_types?: string[];
-            content_types?: string[];
-            publish_accounts?: string[];
-          };
-        };
-        setCreatorOptions(responseData.filters?.creators || responseData.filters?.producers || []);
-        setAdStrategyOptions(responseData.filters?.note_types || []);
-        setAccountOptions(responseData.filters?.publish_accounts || []);
+        const d = response.data;
+        setCreatorOptions(d.creators || []);
+        setContentTypeOptions(d.content_types || []);
+        setAdStrategyOptions(d.ad_strategies || []);
+        setAccountOptions(d.publish_accounts || []);
       }
     } catch (error) {
       console.error('加载枚举值失败:', error);
@@ -758,7 +744,7 @@ const XhsNotesListPage: React.FC = () => {
               mode="multiple"
               value={selectedContentTypes}
               onChange={setSelectedContentTypes}
-              options={CONTENT_TYPE_OPTIONS}
+              options={contentTypeOptions}
               placeholder="全部"
               allowClear
               style={{ minWidth: 120 }}

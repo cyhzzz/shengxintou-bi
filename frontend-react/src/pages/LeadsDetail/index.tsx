@@ -47,12 +47,14 @@ interface FilterOptionsResponse {
 const LeadsDetailPage: React.FC = () => {
   // 筛选状态
   const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
-  const [platform, setPlatform] = useState<string>('');
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [agencies, setAgencies] = useState<string[]>([]);
   const [employeeName, setEmployeeName] = useState<string>('');  // 服务员工
   const [isOpenedAccount, setIsOpenedAccount] = useState<string>('');
 
   // 筛选选项（从API加载）
   const [platformOptions, setPlatformOptions] = useState<FilterOption[]>([]);
+  const [agencyOptions, setAgencyOptions] = useState<FilterOption[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<FilterOption[]>([]);
 
   // 开户状态选项（固定）
@@ -92,10 +94,8 @@ const LeadsDetailPage: React.FC = () => {
         const response: FilterOptionsResponse = await http.get('/leads-detail/filter-options');
         if (response.success && response.data) {
           // 添加"全部"选项
-          setPlatformOptions([
-            { value: '', label: '全部' },
-            ...response.data.platforms
-          ]);
+          setPlatformOptions(response.data.platforms || []);
+          setAgencyOptions(response.data.agencies || []);
           setEmployeeOptions([
             { value: '', label: '全部' },
             ...response.data.employees
@@ -132,8 +132,11 @@ const LeadsDetailPage: React.FC = () => {
       if (filters.dateRange[1]) {
         params.end_date = filters.dateRange[1];
       }
-      if (filters.platform) {
-        params.platforms = filters.platform;
+      if (filters.platforms && filters.platforms.length > 0) {
+        params.platforms = filters.platforms.join(',');
+      }
+      if (filters.agencies && filters.agencies.length > 0) {
+        params.agencies = filters.agencies.join(',');
       }
       if (filters.employeeName) {
         params.employee_name = filters.employeeName;
@@ -172,7 +175,8 @@ const LeadsDetailPage: React.FC = () => {
       ...filtersRef.current,
       page: 1,
       dateRange,
-      platform,
+      platforms,
+      agencies,
       employeeName,
       isOpenedAccount,
     };
@@ -183,7 +187,8 @@ const LeadsDetailPage: React.FC = () => {
   // 处理重置
   const handleReset = () => {
     setDateRange(['', '']);
-    setPlatform('');
+    setPlatforms([]);
+    setAgencies([]);
     setEmployeeName('');
     setIsOpenedAccount('');
     setCurrentPage(1);
@@ -192,7 +197,8 @@ const LeadsDetailPage: React.FC = () => {
       page: 1,
       pageSize: filtersRef.current.pageSize,
       dateRange: ['', ''],
-      platform: '',
+      platforms: [],
+      agencies: [],
       employeeName: '',
       isOpenedAccount: '',
     };
@@ -245,8 +251,11 @@ const LeadsDetailPage: React.FC = () => {
       if (filters.dateRange[1]) {
         params.end_date = filters.dateRange[1];
       }
-      if (filters.platform) {
-        params.platforms = filters.platform;
+      if (filters.platforms && filters.platforms.length > 0) {
+        params.platforms = filters.platforms.join(',');
+      }
+      if (filters.agencies && filters.agencies.length > 0) {
+        params.agencies = filters.agencies.join(',');
       }
       if (filters.employeeName) {
         params.employee_name = filters.employeeName;
@@ -509,10 +518,13 @@ const LeadsDetailPage: React.FC = () => {
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>平台:</span>
             <Select
-              value={platform}
-              onChange={setPlatform}
+              mode="multiple"
+              value={platforms}
+              onChange={setPlatforms}
               options={platformOptions}
-              style={{ width: 120 }}
+              allowClear
+              maxTagCount="responsive"
+              style={{ width: 200 }}
               placeholder="请选择平台"
             />
           </div>

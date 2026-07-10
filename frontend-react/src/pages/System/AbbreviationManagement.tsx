@@ -170,7 +170,7 @@ const AbbreviationManagementPage: React.FC = () => {
       dataIndex: 'platform',
       key: 'platform',
       width: 100,
-      render: (v: string | null) => v ? <Tag>{v}</Tag> : <span style={{ color: '#999' }}>通用</span>,
+      render: (v: string | null) => v ? <Tag>{v}</Tag> : <span style={{ color: 'var(--color-text-tertiary)' }}>通用</span>,
     },
     {
       title: '显示名称',
@@ -184,7 +184,7 @@ const AbbreviationManagementPage: React.FC = () => {
       dataIndex: 'description',
       key: 'description',
       width: 200,
-      render: (v: string | null) => v ? <small style={{ color: '#666' }}>{v}</small> : '-',
+      render: (v: string | null) => v ? <small style={{ color: 'var(--color-text-secondary)' }}>{v}</small> : '-',
     },
     {
       title: '状态',

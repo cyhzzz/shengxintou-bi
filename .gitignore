@@ -90,8 +90,29 @@ htmlcov/
 .workbuddy/
 # playwright cli cache
 .playwright-cli/
-# claude scratch
-CLAUDE.md
 # transient webdav tmp
 database/tmp_*.db.gz
 
+# transient scripts
+
+tmp_*.py
+
+tmp_*.cjs
+
+tmp_*.ps1
+
+.tmp_*.py
+
+# prototype artifacts
+
+prototype/
+
+# UI compare shots
+
+logs/bug-fix-shots/
+
+frontend-react/logs/
+
+frontend-react/_compare_shots.cjs
+
+frontend-react/tmp_*.cjs

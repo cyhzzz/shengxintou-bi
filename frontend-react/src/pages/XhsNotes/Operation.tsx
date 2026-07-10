@@ -87,7 +87,7 @@ const XhsNotesOperationPage: React.FC = () => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: 'var(--bg-page)',
       });
 
       if (type === 'image') {
@@ -484,17 +484,17 @@ const XhsNotesOperationPage: React.FC = () => {
 
     return (
       <div style={{
-        background: 'white',
-        border: '1px solid #E8E9EB',
-        borderRadius: 6,
-        padding: 12,
+        background: 'var(--bg-content)',
+        border: '1px solid var(--border-default)',
+        borderRadius: 'var(--radius-md)',
+        padding: 'var(--spacer-12)',
         textAlign: 'center',
         transition: 'all 0.2s ease'
       }}>
-        <div style={{ fontSize: 10, color: '#8A8D99', marginBottom: 4 }}>{subtitle}</div>
-        <div style={{ fontSize: 11, color: '#5A5C66', fontWeight: 600, marginBottom: 6 }}>{title}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color }}>
-          {value.toFixed(2)}<span style={{ fontSize: 12, fontWeight: 500, marginLeft: 2 }}>%</span>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--spacer-4)' }}>{subtitle}</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacer-6)' }}>{title}</div>
+        <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color }}>
+          {value.toFixed(2)}<span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)', marginLeft: 'var(--spacer-2)' }}>%</span>
         </div>
       </div>
     );
@@ -525,10 +525,10 @@ const XhsNotesOperationPage: React.FC = () => {
         padding: 12,
         transition: 'all 0.2s ease'
       }}>
-        <div style={{ fontSize: 11, color, fontWeight: 600, marginBottom: 6 }}>{title}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#171A23' }}>
+        <div style={{ fontSize: 'var(--text-sm)', color, fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacer-6)' }}>{title}</div>
+        <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
           ¥{formatNumber(value, 2)}
-          <span style={{ fontSize: 12, fontWeight: 500, marginLeft: 4, color: '#8A8D99' }}>{unit}</span>
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)', marginLeft: 'var(--spacer-4)', color: 'var(--color-text-tertiary)' }}>{unit}</span>
         </div>
       </div>
     );
@@ -1398,7 +1398,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: unknown, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -1489,7 +1489,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: unknown, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -1569,7 +1569,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: XhsTopNoteItem, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -1672,7 +1672,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: XhsCreatorAnnualRankingItem, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -1755,7 +1755,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: unknown, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -1862,7 +1862,7 @@ const XhsNotesOperationPage: React.FC = () => {
       render: (_: unknown, __: unknown, index: number) => (
         <span style={{
           fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
+          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
         }}>
           {index + 1}
         </span>
@@ -2116,76 +2116,76 @@ const XhsNotesOperationPage: React.FC = () => {
       {/* 核心运营数据 - 4行结构 */}
       <Card className={styles.sectionCard}>
         {/* 第一行：基础指标 */}
-        <Row gutter={12} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #E8E9EB' }}>
+        <Row gutter={12} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border-default)' }}>
           <Col span={8}>
-            <div style={{ background: '#6366F115', borderLeft: '3px solid #6366F1', padding: '14px 16px', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: '#6366F1', fontWeight: 600, marginBottom: 6 }}>新增笔记数</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#171A23' }}>
+            <div style={{ background: 'rgba(99, 102, 241, 0.08)', borderLeft: '3px solid var(--chart-color-5)', padding: '14px 16px', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--chart-color-5)', fontWeight: 600, marginBottom: 6 }}>新增笔记数</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                 {formatNumber(data?.core_metrics?.new_notes_count || 0)}
               </div>
-              <div style={{ fontSize: 11, color: '#8A8D99', marginTop: 2 }}>篇</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>篇</div>
             </div>
           </Col>
           <Col span={8}>
-            <div style={{ background: '#8B5CF615', borderLeft: '3px solid #8B5CF6', padding: '14px 16px', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: '#8B5CF6', fontWeight: 600, marginBottom: 6 }}>投放笔记数</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#171A23' }}>
+            <div style={{ background: 'rgba(139, 92, 246, 0.08)', borderLeft: '3px solid var(--chart-color-8)', padding: '14px 16px', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--chart-color-8)', fontWeight: 600, marginBottom: 6 }}>投放笔记数</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                 {formatNumber(data?.core_metrics?.ad_notes_count || 0)}
               </div>
-              <div style={{ fontSize: 11, color: '#8A8D99', marginTop: 2 }}>篇</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>篇</div>
             </div>
           </Col>
           <Col span={8}>
-            <div style={{ background: '#F59E0B15', borderLeft: '3px solid #F59E0B', padding: '14px 16px', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600, marginBottom: 6 }}>投放金额</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: '#171A23' }}>
+            <div style={{ background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid var(--color-warning)', padding: '14px 16px', borderRadius: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600, marginBottom: 6 }}>投放金额</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                 ¥{formatNumber(data?.core_metrics?.total_cost || 0, 2)}
               </div>
-              <div style={{ fontSize: 11, color: '#8A8D99', marginTop: 2 }}>元</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>元</div>
             </div>
           </Col>
         </Row>
 
         {/* 第二行：业务转化漏斗 */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#5A5C66', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 3, height: 14, background: '#1890FF', borderRadius: 2 }}></span>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 3, height: 14, background: 'var(--color-text-brand)', borderRadius: 2 }}></span>
             业务转化漏斗
           </div>
           <Row gutter={10}>
             <Col span={4.8} style={{ width: '20%' }}>
-              <div style={{ background: '#E8F4FF', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: '#1890FF', color: 'white', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
-                <div style={{ fontSize: 10, color: '#1890FF', fontWeight: 600, marginBottom: 4 }}>曝光量</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#171A23' }}>{formatNumber(data?.core_metrics?.total_impressions || 0)}</div>
+              <div style={{ background: 'var(--color-brand-bg)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--color-text-brand)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-brand)', fontWeight: 600, marginBottom: 4 }}>曝光量</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_impressions || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
-              <div style={{ background: '#FFF7E6', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: '#FA8C16', color: 'white', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</div>
-                <div style={{ fontSize: 10, color: '#FA8C16', fontWeight: 600, marginBottom: 4 }}>点击量</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#171A23' }}>{formatNumber(data?.core_metrics?.total_clicks || 0)}</div>
+              <div style={{ background: 'rgba(226, 121, 0, 0.1)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-7)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</div>
+                <div style={{ fontSize: 10, color: 'var(--chart-color-7)', fontWeight: 600, marginBottom: 4 }}>点击量</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_clicks || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
-              <div style={{ background: '#FFF0F6', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: '#C41D7F', color: 'white', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</div>
-                <div style={{ fontSize: 10, color: '#C41D7F', fontWeight: 600, marginBottom: 4 }}>私信进线</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#171A23' }}>{formatNumber(data?.core_metrics?.total_private_messages || 0)}</div>
+              <div style={{ background: 'rgba(235, 47, 199, 0.08)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-8)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</div>
+                <div style={{ fontSize: 10, color: 'var(--chart-color-8)', fontWeight: 600, marginBottom: 4 }}>私信进线</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_private_messages || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
-              <div style={{ background: '#F6FFED', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: '#52C41A', color: 'white', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>4</div>
-                <div style={{ fontSize: 10, color: '#52C41A', fontWeight: 600, marginBottom: 4 }}>加企微</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#171A23' }}>{formatNumber(data?.core_metrics?.total_lead_users || 0)}</div>
+              <div style={{ background: 'rgba(21, 168, 119, 0.1)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--color-success)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>4</div>
+                <div style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600, marginBottom: 4 }}>加企微</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_lead_users || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
-              <div style={{ background: '#F9F0FF', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: '#722ED1', color: 'white', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>5</div>
-                <div style={{ fontSize: 10, color: '#722ED1', fontWeight: 600, marginBottom: 4 }}>开户数</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#171A23' }}>{formatNumber(data?.core_metrics?.total_opened_accounts || 0)}</div>
+              <div style={{ background: 'rgba(114, 46, 209, 0.08)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-5)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>5</div>
+                <div style={{ fontSize: 10, color: 'var(--chart-color-5)', fontWeight: 600, marginBottom: 4 }}>开户数</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_opened_accounts || 0)}</div>
               </div>
             </Col>
           </Row>
@@ -2193,8 +2193,8 @@ const XhsNotesOperationPage: React.FC = () => {
 
         {/* 第三行：转化率指标 */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#5A5C66', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 3, height: 14, background: '#52C41A', borderRadius: 2 }}></span>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 3, height: 14, background: 'var(--color-success)', borderRadius: 2 }}></span>
             转化率指标
           </div>
           <Row gutter={10}>
@@ -2215,8 +2215,8 @@ const XhsNotesOperationPage: React.FC = () => {
 
         {/* 第四行：成本效率指标 */}
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#5A5C66', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 3, height: 14, background: '#F59E0B', borderRadius: 2 }}></span>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 3, height: 14, background: 'var(--color-warning)', borderRadius: 2 }}></span>
             成本效率指标
           </div>
           <Row gutter={10}>

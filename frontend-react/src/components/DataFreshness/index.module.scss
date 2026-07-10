@@ -1,74 +1,76 @@
+@use '../../styles/mixins' as *;
+
 .container {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacer-12);
 }
 
 .compact {
-  padding: 8px;
+  padding: var(--spacer-8);
 }
 
 .compactSummary {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #fafafa;
-  border-radius: 6px;
+  gap: var(--spacer-8);
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--transition-normal);
 
   &:hover {
-    background: #f0f0f0;
+    background: var(--bg-hover);
   }
 }
 
 .summary {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
+  gap: var(--spacer-8);
+  padding: var(--spacer-8) 0;
   cursor: pointer;
-  border-bottom: 1px solid #e8e8e8;
-  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: var(--spacer-12);
 
   &:hover {
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--bg-hover);
   }
 }
 
 .label {
-  font-weight: 500;
-  color: #333;
-  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
 }
 
 .dots {
   display: flex;
-  gap: 4px;
+  gap: var(--spacer-4);
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: var(--spacer-8);
+  height: var(--spacer-8);
   border-radius: 50%;
   display: inline-block;
 }
 
 .dot_normal {
-  background-color: #52c41a;
+  background-color: var(--color-success);
 }
 
 .dot_warning {
-  background-color: #faad14;
+  background-color: var(--color-warning);
 }
 
 .dot_critical {
-  background-color: #f5222d;
+  background-color: var(--color-error);
 }
 
 .dot_no_data {
-  background-color: #d9d9d9;
+  background-color: var(--color-text-disabled);
 }
 
 .warningTag {
@@ -76,72 +78,72 @@
 }
 
 .refreshIcon {
-  color: #999;
+  color: var(--color-text-disabled);
   cursor: pointer;
-  transition: color 0.2s;
+  transition: color var(--transition-normal);
 
   &:hover {
-    color: #1890ff;
+    color: var(--color-brand);
   }
 }
 
 .loadingText,
 .errorText {
-  color: #999;
-  font-size: 13px;
-  margin-left: 8px;
+  color: var(--color-text-disabled);
+  font-size: var(--text-base);
+  margin-left: var(--spacer-8);
 }
 
 .errorText {
-  color: #f5222d;
+  color: var(--color-error);
 }
 
 .details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacer-12);
 }
 
 .group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--spacer-6);
 }
 
 .groupLabel {
-  font-size: 12px;
-  color: #666;
-  font-weight: 500;
-  padding-left: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  padding-left: var(--spacer-2);
 }
 
 .groupItems {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--spacer-8);
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacer-6);
 }
 
 .statusTag {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .date {
-  font-size: 11px;
-  color: #999;
+  font-size: var(--text-sm);
+  color: var(--color-text-disabled);
 }
 
 .actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-8);
   justify-content: flex-end;
-  padding-top: 8px;
-  border-top: 1px solid #e8e8e8;
-  margin-top: 4px;
+  padding-top: var(--spacer-8);
+  border-top: 1px solid var(--border-default);
+  margin-top: var(--spacer-4);
 }

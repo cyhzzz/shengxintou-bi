@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 应用市场 / 创意效果 (v3.1 子报表 4/4, Bug 3 修复)
  *
  * 数据源: fact_conv_appmarket (按 广告计划ID + 投放账号 聚合)
@@ -9,10 +9,11 @@
  * 2. Creative 端点之前没有，后端在 app_market.py 已新增 /creative 端点
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Select, DatePicker, Space, Spin, Table, Tag, Button, Statistic, Tooltip } from 'antd';
-import { ReloadOutlined, ThunderboltOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip } from 'antd';
+import { CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, TeamOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceReports } from '@/services/dataService';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -20,9 +21,10 @@ const { RangePicker } = DatePicker;
 const AppMarketCreativePage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
   const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
+  const [channelTypeFilter, setChannelTypeFilter] = useState<string[]>([]);
   const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });
   const [data, setData] = useState<any[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_open: 0, total_deposit: 0, total_valid: 0 });
+  const [totals, setTotals] = useState<any>({ total_plans: 0, top_plans: 0, total_activate: 0, total_open: 0, total_deposit: 0, total_valid: 0 });
   const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(50);
 
@@ -36,7 +38,8 @@ const AppMarketCreativePage: React.FC = () => {
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     app_markets: appMarketFilter.length ? appMarketFilter : undefined,
-  }), [dateRange, appMarketFilter]);
+    channel_types: channelTypeFilter.length ? channelTypeFilter : undefined,
+  }), [dateRange, appMarketFilter, channelTypeFilter]);
 
   const load = async () => {
     setLoading(true);
@@ -84,6 +87,10 @@ const AppMarketCreativePage: React.FC = () => {
           <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
             onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
             style={{ minWidth: 220 }} maxTagCount='responsive' />
+          <span className={styles.label}>渠道类型</span>
+          <Select mode='multiple' allowClear placeholder='全部渠道类型' value={channelTypeFilter}
+            onChange={setChannelTypeFilter} options={opts.channel_types.map((c) => ({ label: c, value: c }))}
+            style={{ minWidth: 200 }} maxTagCount='responsive' />
           <span className={styles.label}>Top</span>
           <Select value={topN} onChange={setTopN} options={[
             { value: 20, label: 'Top 20' },
@@ -95,38 +102,50 @@ const AppMarketCreativePage: React.FC = () => {
         </Space>
       </Card>
       <Spin spinning={loading}>
-        <Row gutter={16} style={{ marginTop: 16, marginBottom: 16 }}>
-          <Col span={5}>
-            <Card size='small'>
-              <Statistic title='创意计划数' value={totals.total_plans || 0} prefix={<ThunderboltOutlined />} valueStyle={{ color: '#1890ff' }} />
-              <div style={{ color: '#999', fontSize: 12, marginTop: 4 }}>当前展示 Top {data.length}</div>
-            </Card>
-          </Col>
-          <Col span={5}>
-            <Card size='small'>
-              <Statistic title='总激活APP' value={totals.total_activate || 0} valueStyle={{ color: '#52c41a' }} />
-            </Card>
-          </Col>
-          <Col span={5}>
-            <Card size='small'>
-              <Statistic title='总开户成功' value={totals.total_open || 0} valueStyle={{ color: '#fa8c16' }} />
-            </Card>
-          </Col>
-          <Col span={5}>
-            <Card size='small'>
-              <Statistic title='总有效户' value={totals.total_valid || 0} valueStyle={{ color: '#722ed1' }} />
-            </Card>
-          </Col>
-          <Col span={4}>
-            <Card size='small'>
-              <Statistic title='激活→有效' value={
-                totals.total_activate > 0
-                  ? Number(((totals.total_valid / totals.total_activate) * 100).toFixed(2))
-                  : 0
-              } precision={2} suffix='%' valueStyle={{ color: '#f5222d' }} />
-            </Card>
-          </Col>
-        </Row>
+        <MetricSection title="创意效果概览" description="广告计划规模、激活、开户、有效户与整体转化率">
+          <MetricCard
+            title="创意计划数"
+            value={totals.total_plans || 0}
+            valueColor="var(--color-brand)"
+            icon={<ThunderboltOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`当前展示 Top ${data.length}`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="总激活APP"
+            value={totals.total_activate || 0}
+            valueColor="var(--color-success)"
+            icon={<MobileOutlined style={{ color: 'var(--color-success)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="总开户成功"
+            value={totals.total_open || 0}
+            valueColor="var(--chart-color-7)"
+            icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="总有效户"
+            value={totals.total_valid || 0}
+            valueColor="var(--chart-color-5)"
+            icon={<CheckCircleOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="激活→有效"
+            value={
+              totals.total_activate > 0
+                ? Number(((totals.total_valid / totals.total_activate) * 100).toFixed(2))
+                : 0
+            }
+            formatter="percent"
+            valueColor="var(--color-error)"
+            icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+            showWowChange={false}
+          />
+        </MetricSection>
+
         <Card title='广告创意效果（按广告计划ID + 投放账号聚合）' size='small'
           extra={<Tooltip title='导出为 CSV'><Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!data.length}>导出 CSV</Button></Tooltip>}>
           <Table size='small' rowKey={(r: any) => r.row_id}

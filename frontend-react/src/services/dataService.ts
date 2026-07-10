@@ -109,6 +109,16 @@ export const dataService = {
     return http.post('/xhs-notes-list', params);
   },
 
+  // 获取小红书笔记列表筛选选项（创作者/内容类型/广告策略/发布账号字典）
+  getXhsNotesListFilterOptions: async (): Promise<ApiResponse<{
+    creators?: string[];
+    content_types?: string[];
+    ad_strategies?: string[];
+    publish_accounts?: string[];
+  }>> => {
+    return http.get('/xhs-notes/filter-options');
+  },
+
   // 获取小红书运营分析
   getXhsNotesOperation: async (filters?: FilterParams): Promise<ApiResponse<unknown>> => {
     return http.post('/xhs-notes-operation-analysis', { filters });
