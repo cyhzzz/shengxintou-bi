@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Tooltip } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
@@ -24,6 +24,7 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
+import { useAppStore } from '@/stores/useAppStore';
 import type { MenuProps } from 'antd';
 import styles from './MainLayout.module.scss';
 
@@ -53,7 +54,6 @@ const menuItems: MenuProps['items'] = [
     label: '线索明细',
     children: [
       { key: '/leads-detail', label: '线索明细', icon: <UnorderedListOutlined /> },
-      { key: '/anchor-clusters', label: '主播聚类', icon: <UserOutlined /> },
     ],
   },
   {
@@ -91,13 +91,14 @@ const menuItems: MenuProps['items'] = [
       { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
     ],
   },
-  // v3.1 §八: 直播占位
+  // 直播获客（含主播聚类二级菜单）
   {
     key: 'live',
     icon: <VideoCameraOutlined />,
     label: '直播获客',
     children: [
       { key: '/live/funnel', label: '直播漏斗', icon: <FunnelPlotOutlined /> },
+      { key: '/anchor-clusters', label: '主播聚类', icon: <UserOutlined /> },
     ],
   },
   { type: 'divider' },
@@ -138,6 +139,7 @@ export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { themeMode, toggleTheme } = useAppStore();
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key);
@@ -192,6 +194,15 @@ export default function MainLayout() {
             </span>
           </div>
           <div className={styles.headerRight}>
+            <Tooltip title={themeMode === 'dark' ? '切换亮色模式' : '切换暗色模式'}>
+              <button
+                className={styles.themeToggle}
+                onClick={toggleTheme}
+                aria-label="切换主题"
+              >
+                {themeMode === 'dark' ? '☀️' : '🌙'}
+              </button>
+            </Tooltip>
             <HelpModal />
           </div>
         </Header>

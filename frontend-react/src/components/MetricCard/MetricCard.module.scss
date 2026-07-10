@@ -1,19 +1,63 @@
-@use '../../../styles/mixins' as *;
+﻿@use '../../styles/mixins' as *;
 
-/**
- * MetricCard 组件样式
- */
+.metricSection {
+  margin-bottom: var(--spacer-16);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.sectionHeader {
+  @include card-section-header;
+}
+
+.sectionTitle {
+  @include card-section-title;
+}
+
+.sectionDesc {
+  @include card-section-desc;
+}
+
+.metricGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-16);
+
+  > * {
+    // 默认 4 列基线（与 Dashboard 互联网渠道数据概览 Row/Col lg={6} 对齐）
+    flex: 1 1 calc(25% - var(--spacer-16));
+    min-width: var(--metric-card-min-width, 180px);
+  }
+
+  @media (max-width: 1200px) {
+    > * {
+      flex: 1 1 calc(33.333% - var(--spacer-16));
+    }
+  }
+
+  @media (max-width: 768px) {
+    > * {
+      flex: 1 1 calc(50% - var(--spacer-16));
+    }
+  }
+
+  @media (max-width: 576px) {
+    > * {
+      flex: 1 1 100%;
+    }
+  }
+}
 
 .metricCard {
+  height: 100%;
   border-radius: var(--radius-lg);
-  transition: all 0.3s ease;
+  transition: transform var(--transition-normal) ease, box-shadow var(--transition-normal) ease;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-elevated);
   }
 
-  // 资产类变体
   &--asset {
     background: linear-gradient(135deg, var(--color-brand-bg) 0%, rgba(24, 144, 255, 0.04) 100%);
     border-left: 3px solid var(--color-brand);
@@ -24,6 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacer-8);
+  min-height: 84px;
 }
 
 .metricTitle {
@@ -37,6 +82,8 @@
 }
 
 .metricIcon {
+  display: inline-flex;
+  align-items: center;
   font-size: 16px;
   color: var(--color-brand);
 }
@@ -55,8 +102,8 @@
 .metricNumber {
   @include text-ellipsis;
   max-width: 100%;
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   font-family: var(--font-family-metric);
 }
@@ -64,6 +111,13 @@
 .metricSuffix {
   font-size: var(--text-sm);
   color: var(--color-text-disabled);
+}
+
+.metricDescription {
+  @include text-ellipsis;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacer-4);
 }
 
 .wowChange {
@@ -83,12 +137,11 @@
 }
 
 .wowValue {
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
-// 响应式
 @media (max-width: 768px) {
   .metricNumber {
-    font-size: 20px;
+    font-size: var(--text-2xl);
   }
 }

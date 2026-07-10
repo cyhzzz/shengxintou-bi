@@ -1,7 +1,15 @@
 {
-  "version": "3.1.0",
-  "release_date": "2026-07-09",
+  "version": "3.1.1",
+  "release_date": "2026-07-10",
   "changelog": [
+    "✅ v3.1.1 前端 UI 统一化：抽出公共 MetricCard / MetricSection 组件，报表头部数据卡片统一为 4/3/2/1 响应式，与互联网渠道数据概览一致",
+    "✅ 设计 token 体系：新增 styles/tokens.css（日夜间变量）与 styles/mixins.scss（共享 mixin），减少硬编码色值与重复样式",
+    "✅ 日/夜主题：<data-theme=dark> + useAppStore.themeMode + Ant Design ConfigProvider darkAlgorithm，Header 提供切换入口",
+    "✅ 报表头部数据卡片统一调用 MetricSection：互联网渠道数据概览 / 全渠道获客 / 转化漏斗 / 厂商分析 / 应用市场漏斗 / 应用市场创意效果 / 直播漏斗 / 主播聚类",
+    "✅ 同步重写 AGENTS.md / CLAUDE.md（字节一致）反映 v3.1.1 状态",
+    "🧹 Dashboard 收敛：删除重复的 Card+Row/Col 卡片组实现，全部走 MetricSection",
+    "🧹 清理临时文件：tmp_*.cjs / prototype/ / logs/bug-fix-shots/ / .tmp_*.py 不再入库",
+    "🔧 后端路由未变动：仍仅识别 6 个 v2 上传类型，旧 7 个类型返回 410 Gone",
     "✅ v3.1 报表重梳：顶级菜单重构（全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 线索明细 / 厂商分析 / 小红书 / 应用市场 / 员工转化 / 直播获客 / 报告生成 / 系统配置）",
     "✅ 应用市场专项：新增 4 个子页（漏斗 / 对比 / 明细 / 创意），独立数据源 fact_conv_appmarket",
     "✅ 双转化漏斗：POST /conversion-funnel/split 返回 content（7 阶段）+ appmarket（8 阶段）两套独立漏斗",
@@ -14,6 +22,34 @@
     "🔧 前端字段适配：dataService 端点路径零变动，内部改查 v2 新表，前端零改动对接"
   ],
   "major_changes": [
+    {
+      "type": "feature",
+      "description": "v3.1.1 前端 UI 统一化",
+      "details": {
+        "components_extracted": [
+          "MetricCard",
+          "MetricSection"
+        ],
+        "token_system": [
+          "styles/tokens.css",
+          "styles/mixins.scss"
+        ],
+        "theme": [
+          "day_defaultAlgorithm",
+          "night_darkAlgorithm_data-theme-dark"
+        ],
+        "unified_pages": [
+          "互联网渠道数据概览",
+          "全渠道获客",
+          "转化漏斗",
+          "厂商分析",
+          "应用市场漏斗",
+          "应用市场创意效果",
+          "直播漏斗",
+          "主播聚类"
+        ]
+      }
+    },
     {
       "type": "feature",
       "description": "v3.1 报表重梳",
@@ -31,7 +67,12 @@
           "报告生成",
           "系统配置（数据导入 / 账号管理 / 缩写管理 / 数据库备份）"
         ],
-        "app_market_pages": ["Funnel", "Comparison", "Detail", "Creative"],
+        "app_market_pages": [
+          "Funnel",
+          "Comparison",
+          "Detail",
+          "Creative"
+        ],
         "dual_funnel": true,
         "omni_channel_report": true
       }
@@ -55,7 +96,11 @@
       "description": "v2 库表重构（随 v2.1 落地，v3.1 延续）",
       "details": {
         "tables": 9,
-        "layers": ["DIM 维度层", "DWD 明细层", "DWS 聚合层"],
+        "layers": [
+          "DIM 维度层",
+          "DWD 明细层",
+          "DWS 聚合层"
+        ],
         "new_tables": [
           "dim_account",
           "dim_vendor",
@@ -72,11 +117,10 @@
     }
   ],
   "upgrade_notes": [
-    "✅ v3.1 报表重梳已落地，菜单与报表结构较 v2.1 有调整",
-    "✅ 应用市场获客已独立成报表模块，与内容平台漏斗分离",
-    "✅ 启动器 省心投启动器.exe 随版本发布，双击即可在便携环境运行",
+    "✅ v3.1.1 前端 UI 统一化已落地，报表头部数据卡片调用统一",
+    "✅ 保留后台启动器 省心投启动器.exe，双击可在便携环境运行",
     "📋 前端开发：npm run dev（:3000，代理 /api → :5000）；生产构建 npm run build → frontend-react/dist/",
-    "📋 后端开发：DEV_MODE=1 python app.py（:5000）"
+    "📋 后端开发：DEV_MODE=1 python app.py（:5000）；代码变动后需重启 Flask"
   ],
   "cloud_version_file": "version_cloud.json",
   "update_url": "",
@@ -90,6 +134,12 @@
       "backend/routes/upload.py - 仅识别 6 个新数据类型，旧类型返回 410 Gone"
     ],
     "frontend_changes": [
+      "frontend-react/src/components/MetricCard/ 公共指标卡组件",
+      "frontend-react/src/styles/tokens.css 设计变量体系",
+      "frontend-react/src/styles/mixins.scss 共享 mixin",
+      "frontend-react/src/App.tsx ConfigProvider 动态切换算法",
+      "frontend-react/src/stores/useAppStore.ts themeMode 持久化",
+      "frontend-react/src/pages/* 报表头部换用 MetricSection",
       "frontend-react/ - React 19 + TypeScript + Vite + Ant Design",
       "pages/Reports/AppMarket/* - 应用市场 4 子页",
       "pages/Live/Funnel.tsx - 直播获客占位页",
@@ -99,6 +149,6 @@
       "省心投启动器.spec / 省心投-开发版_new.spec - PyInstaller 打包配置",
       "便携版启动器已重新构建并随仓库发布"
     ],
-    "completion_time": "2026-07-09"
+    "completion_time": "2026-07-10"
   }
 }

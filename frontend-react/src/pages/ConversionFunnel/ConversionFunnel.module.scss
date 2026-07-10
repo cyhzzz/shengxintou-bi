@@ -1,17 +1,9 @@
-// 转化漏斗页面样式 - 使用 Ant Design 标准样式和配色
+@use '../../styles/mixins' as *;
+
+// 转化漏斗页面样式
 
 .conversionFunnelPage {
   padding: 0;
-}
-
-// 核心指标卡片
-.metricCard {
-  :global {
-    .ant-statistic-title {
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.45);
-    }
-  }
 }
 
 .funnelTable {
@@ -21,7 +13,7 @@
 }
 
 .funnelStageItem {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-default);
 
   &:last-child {
     border-bottom: none;
@@ -31,20 +23,20 @@
 .funnelRow {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--spacer-12);
+  padding: var(--spacer-12) 0;
 }
 
 .stageInfo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-8);
   min-width: 140px;
 }
 
 .stageRate {
-  font-size: 15px;
-  color: #1890ff;
+  font-size: var(--text-lg);
+  color: var(--color-brand);
 }
 
 .progressSection {
@@ -55,95 +47,60 @@
 .stageCount {
   min-width: 100px;
   text-align: right;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .nextStepRate {
-  padding: 8px 0 8px 48px;
-  font-size: 12px;
-  background: #fafafa;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  padding: var(--spacer-8) 0 var(--spacer-8) var(--spacer-48);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacer-8);
 }
 
 // 合并转化率卡片
 .combinedRatesCard {
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-    .ant-card-body {
-      padding: 12px 16px 16px 16px;
-    }
-  }
 }
 
 // 使用自定义标题时的卡片样式调整
 .withCustomHeader {
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-    .ant-card-body {
-      padding: 12px 16px 16px 16px;
-    }
-  }
 }
 
 // 漏斗数据卡片 - 无标题头部
 .detailCard {
   height: 100%;
-
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-    .ant-card-body {
-      padding: 12px 16px 16px 16px;
-    }
-  }
 }
 
 // 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .cardDesc {
-  font-size: 12px;
-  color: #bfbfbf !important;
+  @include card-section-desc;
 }
 
 .combinedRates {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-4);
 }
 
 .rateItem {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
-  font-size: 13px;
+  padding: var(--spacer-6) 0;
+  font-size: var(--text-sm);
 }
 
 // 平台对比表格
 .tableRow {
-  margin-top: 16px;
+  margin-top: var(--spacer-16);
 }
 
 .platformTable {
@@ -155,19 +112,19 @@
     border-collapse: collapse;
 
     th, td {
-      padding: 12px 8px;
+      padding: var(--spacer-12) var(--spacer-8);
       text-align: left;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid var(--border-default);
     }
 
     th {
-      background: #fafafa;
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.85);
+      background: var(--bg-secondary);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
     }
 
     td {
-      color: rgba(0, 0, 0, 0.65);
+      color: var(--color-text-secondary);
     }
 
     td:not(:first-child) {
@@ -189,7 +146,7 @@
   .progressSection {
     order: 3;
     width: 100%;
-    margin-top: 8px;
+    margin-top: var(--spacer-8);
   }
 
   .stageCount {
@@ -199,8 +156,8 @@
   .platformTable {
     table {
       th, td {
-        padding: 8px 4px;
-        font-size: 12px;
+        padding: var(--spacer-8) var(--spacer-4);
+        font-size: var(--text-sm);
       }
     }
   }

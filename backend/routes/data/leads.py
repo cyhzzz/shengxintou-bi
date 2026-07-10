@@ -100,6 +100,9 @@ def get_filter_options():
     platforms = [r[0] for r in db.session.query(FactConvContent.平台来源).distinct()
                  .filter(FactConvContent.平台来源.isnot(None), FactConvContent.平台来源 != '')
                  .order_by(FactConvContent.平台来源).all()]
+    agencies = [r[0] for r in db.session.query(FactConvContent.广告代理商).distinct()
+                .filter(FactConvContent.广告代理商.isnot(None), FactConvContent.广告代理商 != '')
+                .order_by(FactConvContent.广告代理商).all()]
     employees = [r[0] for r in db.session.query(FactConvContent.添加员工姓名).distinct()
                  .filter(FactConvContent.添加员工姓名.isnot(None), FactConvContent.添加员工姓名 != '')
                  .order_by(FactConvContent.添加员工姓名).all()]
@@ -107,7 +110,7 @@ def get_filter_options():
         'success': True,
         'data': {
             'platforms': [{'value': p, 'label': p} for p in platforms],
-            'agencies': [],
+            'agencies': [{'value': a, 'label': a} for a in agencies],
             'employees': [{'value': e, 'label': e} for e in employees],
         }
     })

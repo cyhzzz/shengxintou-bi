@@ -7,9 +7,7 @@ import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { UploadResponse } from '@/types/api.schemas';
 import ImportResult from './ImportResult';
 import styles from './FileUploader.module.scss';
-
-// 数据类型
-type DataType = 'tencent_ads' | 'douyin_ads' | 'xiaohongshu_ads' | 'xhs_notes' | 'backend_conversion';
+import type { DataType } from '../constants';
 
 const { Dragger } = Upload;
 

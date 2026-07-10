@@ -3,19 +3,7 @@
  * 使用 @ant-design/charts Funnel 组件，样式由组件内部处理
  */
 
-// 容器样式（如需要可在此添加）
+// 容器样式
 .funnelChart {
   width: 100%;
-}
-
-// 强制覆盖漏斗图内部标签颜色为白色
-:global {
-  // G2 图表标签样式覆盖
-  .g2-label text,
-  .g2-html-label,
-  text[class*="label"],
-  .funnel-label text {
-    fill: #ffffff !important;
-    color: #ffffff !important;
-  }
 }

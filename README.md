@@ -1,8 +1,23 @@
 # 省心投 BI
 
-> **版本**: v3.1.0
-> **更新日期**: 2026-07-09
+> **版本**: v3.1.1
+> **更新日期**: 2026-07-10
 > **项目类型**: 券商互联网广告投放数据分析平台
+
+---
+
+
+---
+
+## 🚀 最新版本 v3.1.1（2026-07-10）
+
+本次更新重点是前端 UI 统一化与主题能力接入，后端表与路由未变动：
+
+- **指标卡组件抽出**：新增 `components/MetricCard/`（MetricCard + MetricSection），所有报表头部数据卡片统一调用，与互联网渠道数据概览保持一致。
+- **设计 token 体系**：新增 `styles/tokens.css`（品牌色 / 间距 / 圆角 / 阴影 / 字体 / 功能色 / 图表色板，日夜间变量）与 `styles/mixins.scss`（card-section-header / filter-bar / text-ellipsis / card-base）。
+- **日/夜主题**：顶部 Header 提供切换入口，`useAppStore.themeMode` 持久化到 localStorage；Ant Design ConfigProvider 动态切换 defaultAlgorithm / darkAlgorithm。
+- **报表头部统一**：互联网渠道数据概览 / 全渠道获客 / 转化漏斗 / 厂商分析 / 应用市场漏斗 / 应用市场创意效果 / 直播漏斗 / 主播聚类 8 个报表都走 MetricSection 4/3/2/1 响应式。
+- **文档同步**：`AGENTS.md` 与 `CLAUDE.md` 重写到 v3.1.1 状态，字节完全一致（SHA256 验证）。
 
 ---
 

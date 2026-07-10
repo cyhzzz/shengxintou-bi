@@ -1,3 +1,13 @@
-.page { padding: 0; }
-.filterCard { margin-bottom: 16px; :global { .ant-card-body { padding: 12px 16px; } } }
-.label { font-size: 14px; color: #666; white-space: nowrap; }
+.page {
+  padding: 0;
+}
+
+.filterCard {
+  margin-bottom: var(--spacer-16);
+}
+
+.label {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}

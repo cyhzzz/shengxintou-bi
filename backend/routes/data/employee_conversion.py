@@ -66,13 +66,19 @@ def get_weekly_data():
     platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
     start_date = data.get('start_date')
     end_date = data.get('end_date')
+    # v3.1：接受前端 top_count（默认 10），不再硬编码 [:10]
+    try:
+        top_count = max(1, min(50, int(data.get('top_count') or 10)))
+    except (TypeError, ValueError):
+        top_count = 10
     return jsonify({
         'success': True,
         'data': {
+            'top_count': top_count,
             'rankings': {p: {
-                'total': get_employee_conversion_ranking([p], start_date, end_date, 'all')[:10],
-                'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing')[:10],
-                'new': get_employee_conversion_ranking([p], start_date, end_date, 'new')[:10],
+                'total': get_employee_conversion_ranking([p], start_date, end_date, 'all')[:top_count],
+                'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing')[:top_count],
+                'new': get_employee_conversion_ranking([p], start_date, end_date, 'new')[:top_count],
             } for p in platforms},
             'overview': get_platform_overview(platforms, start_date, end_date),
             'trend': get_weekly_trend_data(platforms, start_date, end_date),
@@ -122,6 +128,10 @@ def get_employee_analysis_channel_overview():
     ed = data.get('end_date')
     employees = data.get('employees') or []
     lead_type = data.get('lead_type', 'all')
+    # v3.1 §四：analysis-channel-overview 接受 platforms，仅作用于 detail_caliber（渠道口径 agg_daily_channel_open 不存在"平台"字段，保留全量）
+    platforms_param = data.get('platforms') or []
+    if isinstance(platforms_param, str):
+        platforms_param = [s for s in platforms_param.split(',') if s.strip()]
 
     # 员工明细口径（fact_conv_content）
     detail_q = db.session.query(
@@ -136,6 +146,8 @@ def get_employee_analysis_channel_overview():
         detail_q = detail_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if employees:
         detail_q = detail_q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
+    if platforms_param:
+        detail_q = detail_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms_param]))
     if lead_type == 'existing':
         detail_q = detail_q.filter(FactConvContent.是否为存量客户 == 1)
     elif lead_type == 'new':

@@ -1,10 +1,10 @@
 .dateRangeFilter {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacer-12);
 }
 
 .quickSelect {
   display: flex;
-  gap: 4px;
+  gap: var(--spacer-4);
 }

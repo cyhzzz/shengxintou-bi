@@ -212,9 +212,11 @@ def get_conversion_funnel_split():
             'end_date': request.args.get('end_date'),
             'platforms': [p for p in (request.args.get('platforms') or '').split(',') if p],
         }
+        is_employee_mode = (request.args.get('is_employee_mode') or 'false').lower() == 'true'
     else:
         body = request.get_json() or {}
         filters = body.get('filters') or {}
+        is_employee_mode = bool(body.get('is_employee_mode', False))
 
     sd = filters.get('start_date')
     ed = filters.get('end_date')
@@ -286,8 +288,16 @@ def get_conversion_funnel_split():
         'success': True,
         'data': {
             'funnels': {
-                'content': {'stages': content_stages, 'source': 'fact_conv_content'},
-                'appmarket': {'stages': appmarket_stages, 'source': 'fact_conv_appmarket'},
+                'content': {
+                    'stages': content_stages,
+                    'data_source': 'fact_conv_content + agg_vendor_daily(前 2 段)',
+                    'channel_category': 'content',
+                },
+                'appmarket': {
+                    'stages': appmarket_stages,
+                    'data_source': 'fact_conv_appmarket',
+                    'channel_category': 'appmarket',
+                },
             },
             'core_metrics': {
                 'cost': round(cost_total, 2),
@@ -295,7 +305,7 @@ def get_conversion_funnel_split():
                 'opened_account_users': opened + counts['开户成功'],
                 'valid_customer_users': valid + counts['有效户'],
             },
-            'is_employee_mode': False,
+            'is_employee_mode': is_employee_mode,
         },
         'meta': {**_META, 'version': 'v3.1-split', 'raw_sums_keys': ['value'], 'derived_keys': ['rate']},
     })

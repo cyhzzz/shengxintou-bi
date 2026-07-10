@@ -21,3 +21,5 @@ export * from './Filter';
 
 // 图表组件
 export * from './Chart';
+// 统一指标卡片
+export * from './MetricCard';

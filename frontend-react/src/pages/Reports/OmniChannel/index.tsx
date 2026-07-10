@@ -20,7 +20,6 @@ import {
   DatePicker,
   Space,
   Spin,
-  Statistic,
   Tabs,
   Table,
   Tag,
@@ -29,10 +28,11 @@ import {
   Segmented,
   Select,
 } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { BankOutlined, CheckCircleOutlined, ReloadOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import styles from './index.module.scss';
 
@@ -92,36 +92,66 @@ const OmniChannelPage: React.FC = () => {
   const [byChannel, setByChannel] = useState<Record<string, SubRow[]>>({});
   const [loading, setLoading] = useState(false);
 
+  // v3.1 §2.5: 页面级渠道类别 + 子渠道多选筛选
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubChannels, setSelectedSubChannels] = useState<string[]>([]);
+  const [channelCategoryOptions, setChannelCategoryOptions] = useState<string[]>([]);
+  const [subChannelOptions, setSubChannelOptions] = useState<string[]>([]);
+
+  // 加载筛选选项
+  useEffect(() => {
+    dataServiceOmniChannel.getOmniChannelFilterOptions().then((res: any) => {
+      if (res?.success && res.data) {
+        setChannelCategoryOptions(res.data.channel_categories || []);
+        setSubChannelOptions(res.data.sub_channels || []);
+      }
+    }).catch(() => {});
+  }, []);
+
   // 趋势图切换：一级/二级渠道 + 开户/有效户 维度
   const [trendLevel, setTrendLevel] = useState<'L1' | 'L2'>('L1');
   const [trendMetric, setTrendMetric] = useState<'opens' | 'valid'>('opens');
   const [trendCategory, setTrendCategory] = useState<string>('合作机构');
 
+  // v3.1 §二.5：所有 3 个端点（summary / daily-trend / by-channel）都接受渠道类别 + 子渠道筛选
   const filters = useMemo(
     () => ({
       start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
       end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
+      ...(selectedCategories.length > 0 ? { channel_categories: selectedCategories } : {}),
+      ...(selectedSubChannels.length > 0 ? { sub_channels: selectedSubChannels } : {}),
     }),
-    [dateRange]
+    [dateRange, selectedCategories, selectedSubChannels]
   );
+
+  const activeCategories = useMemo(
+    () => (selectedCategories.length > 0 ? selectedCategories : CATEGORY_ORDER),
+    [selectedCategories]
+  );
+
+  // 兼容旧 by-channel 路径：filters 里已有 sub_channels 时 by-channel 也透传
+  const byChannelFilters = filters;;
 
   const load = async () => {
     setLoading(true);
     try {
-      const [sumRes, trendRes, merged] = await Promise.all([
+      const [sumRes, trendRes, channelResponses] = await Promise.all([
         dataServiceOmniChannel.getOmniChannelSummary({ filters }),
         dataServiceOmniChannel.getOmniChannelDailyTrend({ filters }),
         Promise.all(
-          CATEGORY_ORDER.map((c) =>
-            dataServiceOmniChannel.getOmniChannelByChannel({ filters, channel_category: c })
+          activeCategories.map((category) =>
+            dataServiceOmniChannel.getOmniChannelByChannel({
+              filters: byChannelFilters,
+              channel_category: category,
+            })
           )
         ),
       ]);
       if (sumRes?.success) setSummary(sumRes.data);
       if (trendRes?.success) setTrend(trendRes.data.daily_trend || trendRes.data.trend || []);
       const map: Record<string, SubRow[]> = {};
-      CATEGORY_ORDER.forEach((catName, idx) => {
-        const res = merged[idx];
+      activeCategories.forEach((catName, idx) => {
+        const res = channelResponses[idx];
         if (res?.success) map[catName] = res.data.items || [];
       });
       setByChannel(map);
@@ -133,7 +163,11 @@ const OmniChannelPage: React.FC = () => {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, activeCategories, byChannelFilters]);
+
+  const topCategory = summary?.top_category;
+  // 前端 summary state 类型补 top_category 字段（TS 宽类型 any 等价兼容）
+
 
   // 趋势图：按 一级/二级渠道 + 开户/有效户 维度运行时聚合（长格式 -> 宽格式 + series）
   const chartData = useMemo(() => {
@@ -200,7 +234,7 @@ const OmniChannelPage: React.FC = () => {
 
   const totals = summary?.totals || { opens: 0, deposit: 0, valid: 0 };
 
-  const tabItems = CATEGORY_ORDER.map((cat) => {
+  const tabItems = activeCategories.map((cat) => {
     const rows = byChannel[cat] || [];
     const catSum = (summary?.by_category || []).find((c) => c.channel_category === cat);
     const catOpens = catSum?.opens || 0;
@@ -219,7 +253,7 @@ const OmniChannelPage: React.FC = () => {
             }}
           />
           {cat}
-          <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>
+          <span style={{ marginLeft: 8, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
             ({catOpens.toLocaleString()})
           </span>
         </span>
@@ -326,10 +360,39 @@ const OmniChannelPage: React.FC = () => {
             onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])}
             allowClear={false}
           />
+          <span className={styles.label}>渠道类别</span>
+          <Select
+            mode="multiple"
+            placeholder="全部类别"
+            value={selectedCategories}
+            onChange={setSelectedCategories}
+            style={{ minWidth: 180 }}
+            allowClear
+            maxTagCount="responsive"
+          >
+            {channelCategoryOptions.map((c) => (
+              <Select.Option key={c} value={c}>{c}</Select.Option>
+            ))}
+          </Select>
+          <span className={styles.label}>子渠道</span>
+          <Select
+            mode="multiple"
+            placeholder="全部子渠道"
+            value={selectedSubChannels}
+            onChange={setSelectedSubChannels}
+            style={{ minWidth: 220 }}
+            allowClear
+            maxTagCount="responsive"
+            showSearch
+          >
+            {subChannelOptions.map((s) => (
+              <Select.Option key={s} value={s}>{s}</Select.Option>
+            ))}
+          </Select>
           <Button icon={<ReloadOutlined />} onClick={load}>
             刷新
           </Button>
-          <span style={{ color: '#999', fontSize: 12 }}>
+          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
             数据源：agg_daily_channel_open · 总 {totals.opens.toLocaleString()} 开户 /{' '}
             {totals.deposit.toLocaleString()} 入金 / {totals.valid.toLocaleString()} 有效户
           </span>
@@ -337,39 +400,68 @@ const OmniChannelPage: React.FC = () => {
       </Card>
 
       <Spin spinning={loading}>
-        {/* ① 3 指标卡（已移除 TOP 渠道类别卡片） */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title="总开户成功人数"
-                value={totals.opens}
-                valueStyle={{ color: '#1677ff' }}
-                suffix="人"
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title="总入金户数"
-                value={totals.deposit}
-                valueStyle={{ color: '#fa8c16' }}
-                suffix="人"
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title="总有效户数"
-                value={totals.valid}
-                valueStyle={{ color: '#52c41a' }}
-                suffix="人"
-              />
-            </Card>
-          </Col>
-        </Row>
+        {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
+        <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
+          <MetricCard
+            title="总开户成功人数"
+            value={totals.opens}
+            suffix="人"
+            valueColor="var(--color-brand)"
+            icon={<TeamOutlined style={{ color: 'var(--color-brand)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="总入金户数"
+            value={totals.deposit}
+            suffix="人"
+            valueColor="var(--chart-color-7)"
+            icon={<BankOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="总有效户数"
+            value={totals.valid}
+            suffix="人"
+            valueColor="var(--color-success)"
+            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="4 类渠道开户 TOP"
+            value={topCategory?.opens ?? 0}
+            suffix="人"
+            valueColor="var(--chart-color-2)"
+            icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
+            showWowChange={false}
+            description={
+              topCategory?.channel_category ? (
+                <span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background:
+                        CATEGORY_COLORS[topCategory.channel_category] ||
+                        'var(--chart-color-2)',
+                      marginRight: 6,
+                    }}
+                  />
+                  <strong>{topCategory.channel_category}</strong>
+                  <span style={{ marginLeft: 8, color: 'var(--color-text-tertiary)' }}>
+                    占比{' '}
+                    <strong style={{ color: 'var(--chart-color-2)' }}>
+                      {topCategory.share ?? 0}%
+                    </strong>
+                  </span>
+                </span>
+              ) : (
+                <span style={{ color: 'var(--color-text-tertiary)' }}>暂无数据</span>
+              )
+            }
+          />
+        </MetricSection>
 
         {/* ② 趋势图：支持一级/二级渠道切换 + 开户/有效户 维度切换 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>

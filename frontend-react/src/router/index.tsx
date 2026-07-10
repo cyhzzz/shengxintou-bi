@@ -1,4 +1,4 @@
-﻿import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/Dashboard';
@@ -28,7 +28,7 @@ import AnchorClusterPage from '@/pages/AnchorCluster';
 const LazyXhsNotesOperation = lazy(() => import('@/pages/XhsNotes/Operation').then((m) => ({ default: m.default })));
 const LazyReportGeneration = lazy(() => import('@/pages/ReportGeneration').then((m) => ({ default: m.default })));
 
-const PageFallback = () => <div style={{ padding: 32, textAlign: 'center', color: '#999' }}>加载中...</div>;
+const PageFallback = () => <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>加载中...</div>;
 
 export const router = createBrowserRouter([
   {

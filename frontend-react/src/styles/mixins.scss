@@ -1,0 +1,83 @@
+// ========================================
+// 省心投 BI - Shared Mixins
+// 所有 module.scss 通过 @use 引入
+// ========================================
+
+// ===== 卡片区块标题 =====
+@mixin card-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacer-12);
+  margin-bottom: var(--spacer-12);
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px solid var(--border-default);
+}
+
+@mixin card-section-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@mixin card-section-desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+// ===== 筛选栏 =====
+@mixin filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-16);
+  align-items: center;
+}
+
+@mixin filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+}
+
+@mixin filter-label {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+@mixin filter-actions {
+  display: flex;
+  gap: var(--spacer-8);
+  margin-left: auto;
+}
+
+// ===== 文本截断 =====
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin text-ellipsis-multi($lines: 2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  overflow: hidden;
+}
+
+// ===== 卡片基础 =====
+@mixin card-base {
+  background: var(--bg-content);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+// ===== 表格区块标题 =====
+@mixin table-section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacer-16);
+}

@@ -1,25 +1,20 @@
+@use '../../../../styles/mixins' as *;
+
 .result {
-  margin-top: 16px;
+  margin-top: var(--spacer-16);
 
   .summary {
-    margin-top: 8px;
+    margin-top: var(--spacer-8);
   }
 
   .statRow {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--spacer-8);
   }
 
   .errorCollapse {
-    margin-top: 12px;
-
-    :global {
-      .ant-collapse-header {
-        background: #fff2f0;
-        border-color: #ffccc7;
-      }
-    }
+    margin-top: var(--spacer-12);
   }
 
   .errorList {
@@ -28,8 +23,8 @@
   }
 
   .errorItem {
-    padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
+    padding: var(--spacer-8) 0;
+    border-bottom: 1px solid var(--border-default);
 
     &:last-child {
       border-bottom: none;

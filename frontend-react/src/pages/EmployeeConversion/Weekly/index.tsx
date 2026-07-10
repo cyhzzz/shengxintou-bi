@@ -81,7 +81,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
 
       if (response.success && response.data) {
         setReportData(response.data);
-        const content = formatReportContent(response.data, dateRange[0], dateRange[1]);
+        const content = formatReportContent(response.data, dateRange[0], dateRange[1], topCount);
         setReportContent(content);
         message.success('周报生成成功');
       } else {
@@ -272,7 +272,12 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
 /**
  * 格式化周报内容
  */
-function formatReportContent(data: EmployeeConversionWeeklyData, startDate: string, endDate: string): string {
+function formatReportContent(
+  data: EmployeeConversionWeeklyData,
+  startDate: string,
+  endDate: string,
+  topCount: number = 10,
+): string {
   const overview = data.overview || {};
   const rankings = data.rankings || {};
   const stars = data.stars || {};
@@ -324,10 +329,10 @@ function formatReportContent(data: EmployeeConversionWeeklyData, startDate: stri
     // 全部线索榜单
     const totalList = platformRankings.total || [];
     if (totalList.length > 0) {
-      content += `【全部线索转化榜 TOP${Math.min(totalList.length, 10)}】\n`;
+      content += `【全部线索转化榜 TOP${Math.min(totalList.length, topCount)}】\n`;
       content += `排名  服务人员    线索量  开户量  开户率\n`;
       content += `──────────────────────────────────────\n`;
-      totalList.slice(0, 10).forEach((item, idx) => {
+      totalList.slice(0, topCount).forEach((item, idx) => {
         content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
       });
       content += `\n`;
@@ -336,10 +341,10 @@ function formatReportContent(data: EmployeeConversionWeeklyData, startDate: stri
     // 存量线索榜单
     const existingList = platformRankings.existing || [];
     if (existingList.length > 0) {
-      content += `【存量线索转化榜 TOP${Math.min(existingList.length, 10)}】\n`;
+      content += `【存量线索转化榜 TOP${Math.min(existingList.length, topCount)}】\n`;
       content += `排名  服务人员    线索量  开户量  开户率\n`;
       content += `──────────────────────────────────────\n`;
-      existingList.slice(0, 10).forEach((item, idx) => {
+      existingList.slice(0, topCount).forEach((item, idx) => {
         content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
       });
       content += `\n`;
@@ -348,10 +353,10 @@ function formatReportContent(data: EmployeeConversionWeeklyData, startDate: stri
     // 新增线索榜单
     const newList = platformRankings.new || [];
     if (newList.length > 0) {
-      content += `【新增线索转化榜 TOP${Math.min(newList.length, 10)}】\n`;
+      content += `【新增线索转化榜 TOP${Math.min(newList.length, topCount)}】\n`;
       content += `排名  服务人员    线索量  开户量  开户率\n`;
       content += `──────────────────────────────────────\n`;
-      newList.slice(0, 10).forEach((item, idx) => {
+      newList.slice(0, topCount).forEach((item, idx) => {
         content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
       });
       content += `\n`;

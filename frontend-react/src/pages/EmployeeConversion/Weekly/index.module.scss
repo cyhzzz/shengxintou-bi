@@ -1,12 +1,14 @@
 /**
  * 员工转化周报页面样式
  */
+@use '../../../styles/mixins' as *;
+
 .weeklyPage {
   padding: 0;
 }
 
 .configCard {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacer-20);
 }
 
 .configContent {
@@ -14,51 +16,31 @@
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--spacer-16);
 }
 
 .filterGroup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @include filter-group;
 }
 
 .filterLabel {
-  font-weight: 500;
-  color: #333;
-  white-space: nowrap;
+  @include filter-label;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
 }
 
 .reportCard {
-  margin-top: 20px;
-
-  // 隐藏默认标题头
-  :global {
-    .ant-card-head {
-      display: none;
-    }
-  }
+  margin-top: var(--spacer-20);
 }
 
-// 卡片标题区域样式 - 与 Dashboard 保持一致
 .cardHeader {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  @include card-section-header;
 }
 
 .cardTitle {
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #8A8D99 !important;
+  @include card-section-title;
 }
 
 .cardDesc {
-  font-size: 12px;
-  color: #bfbfbf !important;
+  @include card-section-desc;
 }
