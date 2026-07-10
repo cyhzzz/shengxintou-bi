@@ -156,6 +156,30 @@ def list_backups():
         }), 500
 
 
+@bp.route('/test', methods=['GET'])
+@handle_exceptions
+def test_webdav_connection():
+    """WebDAV 连接自检（轻量 PROPFIND，用于快速排查网络/凭据/代理问题）"""
+    try:
+        from backend.utils.webdav_client import WebDAVBackupClient
+        import config
+
+        client = WebDAVBackupClient(
+            url=config.WEBDAV_URL,
+            username=config.WEBDAV_USERNAME,
+            password=config.WEBDAV_PASSWORD,
+            backup_dir=config.WEBDAV_BACKUP_DIR
+        )
+        result = client.test_connection()
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'TEST_FAILED',
+            'message': f'连接自检失败: {str(e)}'
+        }), 500
+
+
 @bp.route('/delete', methods=['POST'])
 @handle_exceptions
 def delete_backup():

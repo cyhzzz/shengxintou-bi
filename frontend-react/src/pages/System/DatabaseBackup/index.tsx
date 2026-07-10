@@ -37,7 +37,7 @@ const DatabaseBackupPage: React.FC = () => {
       if (response.success) {
         setBackupList(response.data || []);
       } else {
-        message.error('获取备份列表失败');
+        message.error(response.message || '获取备份列表失败');
       }
     } catch {
       message.error('获取备份列表失败');
@@ -133,6 +133,19 @@ const DatabaseBackupPage: React.FC = () => {
     }
   };
 
+  const handleTest = async () => {
+    try {
+      const response = await http.get<{ success: boolean; status_code?: number; message?: string }>('/webdav/test');
+      if (response.success && response.data?.success) {
+        message.success(`连接正常（HTTP ${response.data.status_code ?? ''}）`);
+      } else {
+        message.error('连接异常：' + (response.data?.message || response.message || '未知错误'));
+      }
+    } catch {
+      message.error('连接测试失败');
+    }
+  };
+
   const handleRestore = async (filename: string) => {
     Modal.confirm({
       title: '确认恢复',
@@ -203,7 +216,7 @@ const DatabaseBackupPage: React.FC = () => {
           <span>
             {formatFileSize(size)}
             {isCompressed && (
-              <span style={{ color: '#52c41a', fontSize: 12, marginLeft: 8 }}>
+              <span style={{ color: 'var(--color-success)', fontSize: 'var(--text-sm)', marginLeft: 8 }}>
                 (压缩)
               </span>
             )}
@@ -266,6 +279,12 @@ const DatabaseBackupPage: React.FC = () => {
             disabled={progressVisible}
           >
             刷新备份列表
+          </Button>
+          <Button
+            onClick={handleTest}
+            disabled={progressVisible}
+          >
+            测试连接
           </Button>
         </Space>
 

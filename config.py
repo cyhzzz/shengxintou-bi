@@ -74,3 +74,7 @@ WEBDAV_PASSWORD = os.getenv('WEBDAV_PASSWORD', '')
 WEBDAV_BACKUP_DIR = os.getenv('WEBDAV_BASE_PATH') or os.getenv('WEBDAV_BACKUP_DIR', '/shengxintou-backup')
 WEBDAV_MAX_BACKUPS = int(os.getenv('WEBDAV_MAX_BACKUPS', '3'))
 WEBDAV_USE_COMPRESSION = os.getenv('WEBDAV_USE_COMPRESSION', 'true').lower() == 'true'
+# 是否校验 SSL 证书（企业内网自签证书/证书缺失导致 SSL 错误时可临时关闭）
+WEBDAV_VERIFY_SSL = os.getenv('WEBDAV_VERIFY_SSL', 'true').lower() == 'true'
+# 可选：为 WebDAV 请求单独指定代理（如 http://127.0.0.1:7890）；留空则使用 requests 默认行为（读取系统/环境变量）
+WEBDAV_PROXY = os.getenv('WEBDAV_PROXY', '') or None
