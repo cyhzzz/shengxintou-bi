@@ -156,10 +156,14 @@ const AnchorClusterPage: React.FC = () => {
           )}
         </Card>
 
-        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginTop: 8 }}>
-          数据源: fact_conv_content.客户来源 字段中符合 [平台]引流-[主播名字] 模式的记录（如 视频号引流-姚立琦、抖音引流-赵茜、财联社引流-谭记恩 等）。
-          非引流类客户来源（如 广告投放-新客权益）不参与聚类。
-        </div>
+                <ReportFooter
+          sources={[
+            { label: '数据源', value: 'fact_conv_content.客户来源 字段中符合 [平台]引流-[主播名字] 模式的记录（例如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩 等）' },
+            { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
+            { label: '默认 top_n', value: '100' },
+          ]}
+          notes={'非引流类客户来源（如 广告投放-新客权益）不参与聚类。'}
+        />
       </Spin>
     </div>
   );
