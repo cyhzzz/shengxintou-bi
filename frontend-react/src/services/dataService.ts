@@ -235,6 +235,9 @@ export const dataServiceOmniChannel = {
   getOmniChannelFilterOptions: async () => {
     return http.get('/reports/omni-channel/filter-options');
   },
+  getOmniChannelDailyCalendar: async (params: { filters?: Record<string, unknown>; days?: number } = {}) => {
+    return http.post('/reports/omni-channel/daily-calendar', params);
+  },
 };
 
 
