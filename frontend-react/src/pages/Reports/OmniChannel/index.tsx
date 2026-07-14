@@ -424,29 +424,33 @@ const OmniChannelPage: React.FC = () => {
             icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
             showWowChange={false}
           />
-          <MetricCard
-            title="互联网渠道开户数"
-            value={totals.opens ?? 0}
-            suffix="户"
-            valueColor="var(--chart-color-2)"
-            icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
-            description={(() => {
-              const opened = totals.opens ?? 0;
-              const valid = totals.valid ?? 0;
-              const now = new Date();
-              const year = now.getFullYear();
-              const yearStart = new Date(year, 0, 1).getTime();
-              const yearEnd = new Date(year + 1, 0, 1).getTime();
-              const elapsedRatio = Math.min(1, Math.max(0, (now.getTime() - yearStart) / (yearEnd - yearStart)));
-              const openTarget = 20000 * elapsedRatio;
-              const validTarget = 10000 * elapsedRatio;
-              const openRate = openTarget > 0 ? Math.min(opened / openTarget, 2) : 0;
-              const validRate = validTarget > 0 ? Math.min(valid / validTarget, 2) : 0;
-              const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
-              return `KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天）`;
-            })()}
-            showWowChange={false}
-          />
+          {(() => {
+            const internetRow = (summary?.by_category || []).find((c) => c.channel_category === '互联网引流');
+            const openedCount = internetRow?.opens ?? 0;
+            const validCnt = internetRow?.valid ?? 0;
+            const depositCnt = internetRow?.deposit ?? 0;
+            const now = new Date();
+            const year = now.getFullYear();
+            const yearStart = new Date(year, 0, 1).getTime();
+            const yearEnd = new Date(year + 1, 0, 1).getTime();
+            const elapsedRatio = Math.min(1, Math.max(0, (now.getTime() - yearStart) / (yearEnd - yearStart)));
+            const openTarget = 20000 * elapsedRatio;
+            const validTarget = 10000 * elapsedRatio;
+            const openRate = openTarget > 0 ? Math.min(openedCount / openTarget, 2) : 0;
+            const validRate = validTarget > 0 ? Math.min(validCnt / validTarget, 2) : 0;
+            const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
+            return (
+              <MetricCard
+                title="互联网渠道开户数"
+                value={openedCount}
+                suffix="户"
+                valueColor="var(--chart-color-2)"
+                icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
+                description={`KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天） · 互联网引流入金 ${depositCnt.toLocaleString()} 户 / 有效 ${validCnt.toLocaleString()} 户`}
+                showWowChange={false}
+              />
+            );
+          })()}
         </MetricSection>
 
         {/* ② 趋势图：支持一级/二级渠道切换 + 开户/有效户 维度切换 */}

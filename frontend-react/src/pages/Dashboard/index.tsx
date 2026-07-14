@@ -25,6 +25,8 @@ import {
 import { FilterBar } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import TrendChart, { type MetricType } from './components/TrendChart';
+import CalendarHeatmap from './components/CalendarHeatmap';
+import { dataServiceOmniChannel } from '@/services/dataService';
 import {
   useCoreMetrics,
   useTrendData,
@@ -77,6 +79,24 @@ const DashboardPage: React.FC = () => {
     loading: trendLoading,
     fetchTrendData,
   } = useTrendData();
+
+  // 开户日历热力图：过去 365 天 互联网渠道每日开户数
+  const [calendarData, setCalendarData] = useState<{ date: string; value: number }[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setCalendarLoading(true);
+    dataServiceOmniChannel
+      .getOmniChannelDailyCalendar({ days: 365 })
+      .then((resp: any) => {
+        if (!alive) return;
+        const rows = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+        setCalendarData(rows.map((r: any) => ({ date: r.date, value: Number(r.opens ?? r.value ?? 0) })));
+      })
+      .catch(() => { if (alive) setCalendarData([]); })
+      .finally(() => { if (alive) setCalendarLoading(false); });
+    return () => { alive = false; };
+  }, []);
 
   // 合并加载状态
   const loading = coreMetricsLoading || trendLoading;
@@ -415,6 +435,13 @@ const DashboardPage: React.FC = () => {
               onMetricTypeChange={handleTrendMetricChange}
               onGranularityChange={handleTrendGranularityChange}
             />
+          </Col>
+        </Row>
+
+        {/* 互联网渠道开户日历热力图 */}
+        <Row gutter={[16, 16]} className={styles.chartsRow}>
+          <Col xs={24} lg={24}>
+            <CalendarHeatmap data={calendarData} loading={calendarLoading} />
           </Col>
         </Row>
       </Spin>

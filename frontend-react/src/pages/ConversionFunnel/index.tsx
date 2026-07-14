@@ -12,7 +12,8 @@
  * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty } from 'antd';
+import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty, DatePicker, Select, Button } from 'antd';
+import dayjs, { Dayjs } from 'dayjs';
 import { AimOutlined, BankOutlined, CheckCircleOutlined, EyeOutlined, MessageOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -31,13 +32,47 @@ const ConversionFunnelPage: React.FC = () => {
   const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
   const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
 
-  const [dateRange] = useState<[string, string]>(() => {
+  const [dateRange, setDateRange] = useState<[string, string]>(() => {
     const today = new Date();
     const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     return [fmt(sixMonthsAgo), fmt(today)];
   });
-  const [platforms] = useState<string[]>([]);
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  // 筛选器可选平台：内容平台 + 应用市场
+  const PLATFORM_OPTIONS = [
+    { label: '小红书', value: '小红书' },
+    { label: '腾讯高类平台', value: '腾讯高类平台' },
+    { label: '抖音', value: '抖音' },
+    { label: '快手', value: '快手' },
+    { label: '小米', value: '小米' },
+    { label: '华为', value: '华为' },
+    { label: 'OPPO', value: 'OPPO' },
+    { label: 'VIVO', value: 'VIVO' },
+    { label: '荣耀', value: '荣耀' },
+    { label: '苹果', value: '苹果' },
+  ];
+  // dateRange state 是 string[]，DatePicker 需要 dayjs，转换中间变量
+  const dateRangeDayjs: [Dayjs, Dayjs] = [dayjs(dateRange[0]), dayjs(dateRange[1])];
+  const applyFilters = (next: { start?: Dayjs; end?: Dayjs; pls?: string[] }) => {
+    if (next.start && next.end) {
+      setDateRange([next.start.format('YYYY-MM-DD'), next.end.format('YYYY-MM-DD')]);
+    }
+    if (next.pls !== undefined) setPlatforms(next.pls);
+    loadData({
+      startDate: next.start ? next.start.format('YYYY-MM-DD') : undefined,
+      endDate: next.end ? next.end.format('YYYY-MM-DD') : undefined,
+      platforms: next.pls !== undefined ? next.pls : platforms,
+    });
+  };
+  const resetFilters = () => {
+    const today = new Date();
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    setDateRange([fmt(sixMonthsAgo), fmt(today)]);
+    setPlatforms([]);
+    loadData({ startDate: fmt(sixMonthsAgo), endDate: fmt(today), platforms: [] });
+  };
 
   const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
     setLoading(true);
@@ -50,6 +85,8 @@ const ConversionFunnelPage: React.FC = () => {
         end_date: ed,
         platforms: pls.length ? pls : undefined,
       } as any);
+      // 同步平台状态到 state（可选）
+      // 25: __syncPlatforms(pls);
       if (response.success && response.data) {
         const funnels = response.data.funnels || {};
         setContentStages(funnels.content?.stages || []);
@@ -115,6 +152,33 @@ const ConversionFunnelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <Spin spinning={loading}>
+        {/* v3.1.4: 筛选器 — 日期范围 + 平台多选 */}
+        <Card size='small' style={{ marginBottom: 16 }}>
+          <Space size={16} wrap>
+            <span>日期范围：</span>
+            <DatePicker.RangePicker
+              value={dateRangeDayjs}
+              onChange={(d) => d && d[0] && d[1] && applyFilters({ start: d[0], end: d[1], pls: platforms })}
+              allowClear={false}
+            />
+            <span>平台：</span>
+            <Select
+              mode='multiple'
+              maxTagCount='responsive'
+              placeholder='全部平台'
+              style={{ minWidth: 220 }}
+              value={platforms}
+              onChange={(pls) => applyFilters({ start: dateRangeDayjs[0], end: dateRangeDayjs[1], pls })}
+              options={PLATFORM_OPTIONS}
+              allowClear
+            />
+            <Button onClick={resetFilters}>重置</Button>
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>
+              当前只针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制。
+            </span>
+          </Space>
+        </Card>
+
         {/* v3.1: Tab 切换两套独立漏斗 */}
         <Tabs
           defaultActiveKey="content"
@@ -127,21 +191,7 @@ const ConversionFunnelPage: React.FC = () => {
                   {/* 核心指标 */}
                   {contentMetrics && (
                     <Col span={24}>
-                      <MetricSection title="内容平台核心指标" description="曝光、点击、线索到有效户的核心表现">
-                        <MetricCard
-                          title="广告曝光"
-                          value={contentMetrics.impressions}
-                          valueColor="var(--color-text-tertiary)"
-                          icon={<EyeOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
-                          showWowChange={false}
-                        />
-                        <MetricCard
-                          title="客户点击"
-                          value={contentMetrics.clicks}
-                          valueColor="var(--color-text-tertiary)"
-                          icon={<AimOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
-                          showWowChange={false}
-                        />
+                      <MetricSection title="内容平台核心指标" description="线索、开口到有效户的核心转化表现（v3.1.4 起从客户线索起步；曝光 / 点击仍见下方漏斗 7 阶段）">
                         <MetricCard
                           title="客户线索"
                           value={contentMetrics.leads}

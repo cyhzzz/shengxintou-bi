@@ -32,7 +32,8 @@
 | v3.1 | 已落地 | 报表重梳：菜单重构、双漏斗、应用市场 4 子页、员工转化双源、直播占位、数据新鲜度 |
 | v3.1.1 | 2026-07-10 | 前端 UI 统一化：抽出 `MetricCard` / `MetricSection` / `ReportFooter`，设计 token、日/夜主题、所有报表头部数据卡片统一调用 |
 | v3.1.2 | 2026-07-13 已落地 | 报表样式收敛：漏斗图切 @ant-design/plots；OmniChannel 第 4 卡修复；Live/Funnel + 主播聚类乱码清洗；EmployeeConversion 迁新 MetricCard；数据源下沉 ReportFooter |
-| **v3.1.3** | **2026-07-14 已落地** | **8 项 UI / 报表收口：OmniChannel 第 4 卡换互联网渠道开户数 + KPI 完成率；Dashboard 移除数据状态卡；侧栏菜单支持滚动；AppMarket/Detail 设备明细详情浮窗；主播聚类改主播分析 + 同名聚合 + 平台/主播筛选 + 一页呈现；DataImport 上下布局 + 卡片缩小 + 6 个新指南映射 + 404 兜底；DatabaseBackup 错误信息精细化；小红书笔记筛选器修复（object[] 不再触发 antd in 报错）** |
+| v3.1.3 | 2026-07-14 已落地 | 8 项 UI / 报表收口（同上） |
+| **v3.1.4** | **2026-07-14 已落地** | **6 项需求响应：OmniChannel #4 升级 + KPI 完成率；转化漏斗筛选器；小红书 desc 排序；主播分析总资产修正；6 个 v2 指南补省心投平台导出位置；Dashboard 加蓝色日历热力图 + 后端 daily-calendar 端点** | | **8 项 UI / 报表收口：OmniChannel 第 4 卡换互联网渠道开户数 + KPI 完成率；Dashboard 移除数据状态卡；侧栏菜单支持滚动；AppMarket/Detail 设备明细详情浮窗；主播聚类改主播分析 + 同名聚合 + 平台/主播筛选 + 一页呈现；DataImport 上下布局 + 卡片缩小 + 6 个新指南映射 + 404 兜底；DatabaseBackup 错误信息精细化；小红书笔记筛选器修复（object[] 不再触发 antd in 报错）** |
 
 ### v3.1.1 已落地清单
 
@@ -68,6 +69,30 @@
 - **小红书笔记筛选器修复（v3.1.2 收口）**：`XhsNotes/List.tsx` 4 个枚举 `useState<string[]>` 改为 `{value,label}[]` object array；新增 `opts()` helper 兼容 string/object 输入；解决后端 `/xhs-notes/filter-options` 返回 object array 时 antd 对 string[] 做 `in` 检查报 "Cannot use in operator" 的崩。
 - **文档 + 构建同步**：`AGENTS.md` / `CLAUDE.md` 字节一致更新到 v3.1.3 落地态；`npm run build` 0 error → 5000 端口 dist 同步最新代码（约 5887+ modules）。
 
+### v3.1.4 落地清单（2026-07-14）
+
+- **OmniChannel 第 4 卡升级**：title 改 `互联网渠道开户数`，value 改全渠道互联网开户总数 `totals.opens`，description 展示 KPI 完成率（年度 KPI：开 2 万户 / 有效户 1 万，按 `dayOfYear / 366` 时间折算），同时移除 TOP 渠道类别占比。
+- **转化漏斗筛选器**：新增日期范围 `RangePicker` + 平台多选 `Select`（小红书 / 腾讯 / 抖音 / 快手 + 小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果），apply / reset 联动双漏斗与内容平台 KPI 卡；KPI 从「客户线索」起步，删除「广告曝光」「客户点击」两张前置卡（来源 fact_conv_content / fact_conv_appmarket）。
+- **小红书笔记排序升级**：后端 `/api/v1/xhs-notes/list` 接受 `sort_field` / `sort_order` 参数（白名单字段映射到 `AggXhsNote` 列，默认 `开户人数` / `desc`）；前端默认 `desc`，把 2339 行中 93 行有数笔记排到最前面（之前被 2246 行 =0 埋没）。
+- **主播分析总资产修正 + 覆盖平台 Tag**：客户端聚合 `总资产` 只累加 `opened > 0` 行的 `assets`（即「仅开户创收」），列头 / CSV header 从「总资产」改「总创收资产（仅开户）」；「覆盖平台」列改用 `<Space>` + `<Tag color=cyan>` 去重展示。
+- **6 个 v2 数据导入指南首行补「省心投平台导出位置」**：`account_mapping_guide / conversion_content_guide / conversion_appmarket_guide / vendor_daily_guide / xhs_note_guide / channel_open_guide` 每个文件首行加 `数据可从 省心投平台（公司内网站）X.X 名称 导出后二次导入到本 BI 进行分析`。
+- **Dashboard 新增开户日历热力图**：后端 `/api/v1/reports/omni-channel/daily-calendar` 端点（`agg_daily_channel_open` 按 `渠道类别=互联网引流` + `GROUP BY 时间区间` → `[{date, opens}]`，默认 `days=365`，范围 `7..366`）；前端 `Dashboard/index.tsx` 在 `<TrendChart>` 下方插入 `<CalendarHeatmap>`，蓝色 5 档 `l0..l4` 主调（`l0=#e0efff-08 / l1=#b3d8ff / l2=#69b8ff / l3=#1f8aff / l4=#0050b3`），按周一开始排列，月份标签自动切换，hover 显示 `日期 + 互联网渠道开户数`，统计行展示 `年度总开户 / 有数据日数 / 单日最高`。
+- **后端 import 整理**：`omni_channel.py` 顶部统一 `from datetime import datetime, timedelta`，移除文件末尾重复 import；`/daily-calendar` 函数前后 PEP8 双空行。
+- **文档同步 + 构建**：`AGENTS.md` / `CLAUDE.md` 字节一致更新到 v3.1.4；`npm run build` 0 error（5889 modules）→ `frontend-react/dist/` 已同步到 5000 端口。
+
+### v3.1.4 修复行动登记（2026-07-14）
+
+| # | 优先级 | 影响面 | 任务 | 状态 |
+|---|---|---|---|---|
+| 1 | 高 | OmniChannel 第 4 卡 | 升级 `互联网渠道开户数` + KPI 完成率（年度 2万/1万 × 时间折算）+ 移除 TOP 合作机构占比 | v3.1.4 已落地 |
+| 2 | 高 | 转化漏斗 | 新增 RangePicker + 平台 Select 筛选器 + KPI 从客户线索起步 + 删除广告曝光/客户点击卡 | v3.1.4 已落地 |
+| 3 | 高 | 小红书笔记 | 后端 sort_field/sort_order 白名单 + 前端默认 `开户人数 desc` | v3.1.4 已落地 |
+| 4 | 中 | 主播分析 | 总资产只累加 `opened > 0` 行的 `assets`；覆盖平台用 Tag 去重 | v3.1.4 已落地 |
+| 5 | 中 | 6 个 v2 数据导入指南 | 首行补「省心投平台 X.X 名称 导出后二次导入」 | v3.1.4 已落地 |
+| 6 | 中 | Dashboard 趋势图下方 | 后端 `/daily-calendar` + 前端蓝色 5 档 CalendarHeatmap 集成 | v3.1.4 已落地 |
+| 7 | 低 | omni_channel.py | 末尾重复 `from datetime import` 删除 + 函数体前后双空行 | v3.1.4 已落地 |
+| 8 | 低 | 数据同步报错 | `webdav/list` 500 长尾根因排查（v3.1.3 #11 未排项已转 v3.1.4 延后） | 延 v3.1.5 |
+| 9 | 中 | dist 滞后 | `npm run build` 0 error → 5000 端口同步（5889 modules） | v3.1.4 已落地 |
 ## 4. 共享组件清单
 
 | 组件 | 路径 | 职责 | 当前落地页 |

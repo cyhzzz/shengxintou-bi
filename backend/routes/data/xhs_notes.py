@@ -43,7 +43,13 @@ def _process(params):
         q = q.filter(AggXhsNote.笔记账号 == filters['account'])
 
     total = q.count()
-    rows = q.order_by(AggXhsNote.发布时间.desc()).limit(page_size).offset((page - 1) * page_size).all()
+    # v3.1.4: 筛选器参数 sort_field 可选：统一以默认「开户人数 desc」让有数据的笔记排在前面
+    sort_field = (params.get('sort_field') or '').strip() or '开户人数'
+    sort_order = (params.get('sort_order') or '').strip().lower()
+    if sort_order not in ('asc', 'desc'):
+        sort_order = 'desc'
+    sort_col = getattr(AggXhsNote, sort_field, None) or AggXhsNote.发布时间
+    rows = q.order_by(getattr(sort_col, sort_order)()).limit(page_size).offset((page - 1) * page_size).all()
 
     notes = []
     for r in rows:

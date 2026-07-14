@@ -191,7 +191,10 @@ const XhsNotesListPage: React.FC = () => {
         filters,
         page,
         page_size: pageSize,
-      });
+        // v3.1.4: 默认按开户人数 desc 让有数据的笔记排在前
+        sort_field: '开户人数',
+        sort_order: 'desc',
+      } as any);
 
       // 后端返回格式: { success, notes, pagination: { page, page_size, total, total_pages } }
       // http 客户端将响应包装在 response.data 中
@@ -297,7 +300,10 @@ const XhsNotesListPage: React.FC = () => {
         filters: filterParams,
         page: currentPage,
         page_size: exportPageSize,
-      });
+        // v3.1.4: 导出也默认按开户人数 desc
+        sort_field: '开户人数',
+        sort_order: 'desc',
+      } as any);
 
       if (response.success && response.data) {
         const responseData = response.data as {
