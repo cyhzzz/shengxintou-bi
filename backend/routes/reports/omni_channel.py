@@ -15,6 +15,7 @@ v3.1 重构:
 - content-detail / appmarket-detail / nonad-detail 合并为 by-channel（按渠道类别筛选）
 """
 
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggDailyChannelOpen
@@ -36,13 +37,11 @@ _META = {
 # v3.1 §二.5: 严格基于 agg_daily_channel_open 全表 SUM 排序
 CATEGORY_ORDER = ['合作机构', '自然流入', '员工开户', '互联网引流']
 
-
 def _i(v):
     try:
         return int(float(v or 0))
     except (TypeError, ValueError):
         return 0
-
 
 def _f(v):
     try:
@@ -50,11 +49,9 @@ def _f(v):
     except (TypeError, ValueError):
         return 0
 
-
 def _apply_date(filters):
     """返回 (sd, ed) 元组，时间区间是 TEXT 字段，使用字符串比较"""
     return filters.get('start_date'), filters.get('end_date')
-
 
 def _date_filter(model, col, sd, ed):
     if sd and ed:
@@ -70,7 +67,6 @@ def _parse_list(v):
         return [s.strip() for s in v.split(',') if s.strip()]
     return [str(v)]
 
-
 def _channel_filter_clause(filters):
     """读取 channel_categories / sub_channels，返回 (cat_clause, sub_clause)"""
     channel_categories = _parse_list(filters.get('channel_categories') or filters.get('channel_category'))
@@ -78,7 +74,6 @@ def _channel_filter_clause(filters):
     cat_clause = AggDailyChannelOpen.渠道类别.in_(channel_categories) if channel_categories else None
     sub_clause = AggDailyChannelOpen.渠道名称.in_(sub_channels) if sub_channels else None
     return cat_clause, sub_clause
-
 
 @bp.route('/summary', methods=['POST'])
 @handle_exceptions
@@ -200,6 +195,23 @@ def omni_channel_summary():
         'meta': _META,
     })
 
+@bp.route('/daily-calendar', methods=['POST'])
+@handle_exceptions
+def omni_channel_daily_calendar():
+    data = request.get_json() or {}
+    days = max(7, min(366, int(data.get('days') or 365)))
+    today = datetime.now().date()
+    start = today - timedelta(days=days - 1)
+    cond = AggDailyChannelOpen.时间区间 >= start.isoformat()
+    end_cond = AggDailyChannelOpen.时间区间 <= today.isoformat()
+    cat_clause = (AggDailyChannelOpen.渠道类别 == '互联网引流')
+    rows = db.session.query(
+        AggDailyChannelOpen.时间区间.label('date'),
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
+    ).filter(cond).filter(end_cond).filter(cat_clause).group_by(AggDailyChannelOpen.时间区间).order_by(AggDailyChannelOpen.时间区间).all()
+    calendar = [{'date': r.date, 'opens': int(r.opens or 0)} for r in rows]
+    return jsonify({'success': True, 'data': calendar})
+
 
 @bp.route('/daily-trend', methods=['POST'])
 @handle_exceptions
@@ -257,7 +269,6 @@ def omni_channel_daily_trend():
         'data': {'daily_trend': trend, 'trend': trend},  # trend 保留兼容
         'meta': _META,
     })
-
 
 @bp.route('/by-channel', methods=['POST'])
 @handle_exceptions
@@ -322,7 +333,6 @@ def omni_channel_by_channel():
         },
         'meta': _META,
     })
-
 
 @bp.route('/filter-options', methods=['GET'])
 @handle_exceptions

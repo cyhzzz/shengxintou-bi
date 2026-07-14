@@ -1,7 +1,16 @@
 {
-  "version": "3.1.3",
+  "version": "3.1.4",
   "release_date": "2026-07-14",
   "changelog": [
+    "✅ v3.1.4 OmniChannel 第 4 卡升级：title 改 互联网渠道开户数 + KPI 完成率（年度 KPI 开 2 万户 / 有效户 1 万，按 dayOfYear/366 时间折算），带动日报趋势联动；同时移除 TOP 渠道类别占比模糊语义",
+    "✅ v3.1.4 转化漏斗筛选器：新增日期范围 RangePicker + 平台多选 Select（小红书/腾讯/抖音/快手 + 小米/华为/OPPO/VIVO/荣耀/苹果），apply/reset 联动到双漏斗 + 内容平台 KPI 卡；KPI 从 客户线索 起步，移除 广告曝光 / 客户点击两张前置卡",
+    "✅ v3.1.4 小红书笔记按 开户人数 desc 排序：后端 /xhs-notes/list 接受 sort_field/sort_order 参数；前端默认 desc。底表 2339 行中 93 行 有数 终于排到最前面，避免 2246 行 =0 把有数数据埋没",
+    "✅ v3.1.4 主播分析总资产逻辑修正：客户端只累加 opened > 0 行的 assets（总创收资产仅开户）；覆盖平台列改用 Space + Tag 去重展示；CSV header 从 总资产 改 总创收资产（仅开户）",
+    "✅ v3.1.4 6 个 v2 数据导入指南开头补注：每个指南首行加 数据可从 省心投平台（公司内网站）对应模块 X.X 名称 导出后二次导入到本 BI 进行分析（account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open）",
+    "✅ v3.1.4 Dashboard 新增开户日历热力图：后端 /reports/omni-channel/daily-calendar 端点（agg_daily_channel_open 按 互联网引流 + GROUP BY 时间区间）；前端 Dashboard 趋势图下方插入蓝色 5 档 CalendarHeatmap（l0/l1/l2/l3/l4），过去 365 天每日开户密度可视化",
+    "✅ v3.1.4 后端 imports 整理：omni_channel.py 顶部统一 from datetime import datetime, timedelta，移除末尾重复 import；PEP8 双空行",
+    "🧹 v3.1.4 build：npm run build 0 error（5889 modules）→ 5000 端口同步最新代码",
+    "🧹 v3.1.4 文档同步：AGENTS.md / CLAUDE.md 字节一致更新到 v3.1.4 落地态",
     "✅ v3.1.3 全渠道获客第 4 卡修复：title 改 互联网渠道开户数，value 改全渠道互联网开户总数，description 展示 KPI 完成率（年度 2 万户 / 1 万有效户 按 dayOfYear/366 时间折算）",
     "✅ v3.1.3 Dashboard（互联网渠道数据概览）移除数据状态卡：DataFreshnessIndicator import / useNavigate / freshnessRef / JSX 全部清完；数据状态仅在数据导入 + 关于页面保留",
     "✅ v3.1.3 侧栏菜单支持滚动：MainLayout.module.scss .sider 改 overflow-y: auto；菜单 label 主播聚类 改 主播分析",
@@ -128,6 +137,7 @@
     }
   ],
   "upgrade_notes": [
+    "✅ v3.1.4 已落地：OmniChannel #4 = 互联网渠道开户数 + KPI 完成率；转化漏斗筛选器 + 内容平台 KPI 从 客户线索起步；小红书笔记按开户数 desc 排序；主播分析总资产 = 仅累计已开户 + 覆盖平台 Tag；6 个 v2 数据导入指南加省心投平台导出位置；Dashboard 加蓝色 5 档开户日历热力图",
     "✅ v3.1.3 已落地：OmniChannel 第 4 卡换 互联网渠道开户数 + KPI 完成率；Dashboard 移除数据状态；侧栏滚动；AppMarket/Detail 设备明细浮窗；主播聚类 改 主播分析（同名跨平台聚合 + 平台/主播筛选 + 一页呈现）；DataImport 上下布局 + 卡片缩小 + 6 个 v2 新指南 + 404 兜底；DatabaseBackup 错误精细化；小红书笔记筛选器修复",
     "📋 v3.1.3 重新构建 dist：npm run build → frontend-react/dist/ 已包含 sanitizeText / FunnelChart @ant-design/plots / MetricCard v2 / 主播分析筛选器",
     "✅ v3.1.2 前程已落地：漏斗图切 @ant-design/plots、主播聚类/直播漏斗乱码清洗、EmployeeConversion 迁 MetricSection、数据源下沉 ReportFooter",
@@ -169,6 +179,13 @@
     "completion_time": "2026-07-14"
   },
   "frontend_changes": [
+    "frontend-react/src/pages/Reports/OmniChannel/index.tsx - 第 4 卡换 互联网渠道开户数 + KPI 完成率",
+    "frontend-react/src/pages/ConversionFunnel/index.tsx - 时间范围 + 平台多选 筛选器 + 内容平台 KPI 从 客户线索 起步",
+    "frontend-react/src/pages/XhsNotes/List.tsx - 默认排序字段 开户人数 desc + order 透传给后端",
+    "frontend-react/src/pages/AnchorCluster/index.tsx - 总资产只累加 opened > 0；覆盖平台用 Tag 去重",
+    "frontend-react/src/pages/Dashboard/index.tsx - 集成 CalendarHeatmap + fetch /reports/omni-channel/daily-calendar",
+    "frontend-react/src/pages/Dashboard/components/CalendarHeatmap.tsx + .module.scss - 蓝色 5 档日历热力图",
+    "frontend-react/src/services/dataService.ts - 新增 dataServiceOmniChannel.getOmniChannelDailyCalendar",
     "frontend-react/src/pages/Reports/OmniChannel/index.tsx - 第 4 卡换 互联网渠道开户数 + KPI 完成率",
     "frontend-react/src/pages/Dashboard/index.tsx - 移除 DataFreshnessIndicator 顶部块",
     "frontend-react/src/layouts/MainLayout.tsx + .module.scss - 侧栏 overflow-y: auto；菜单 主播聚类 改 主播分析",

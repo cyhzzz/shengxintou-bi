@@ -54,7 +54,7 @@ const AnchorClusterPage: React.FC = () => {
 
   const exportCsv = () => {
     if (!items.length) return;
-    const headers = ['平台', '主播', '线索量', '开口量', '有效线索', '开户量', '有效户', '开户率%', '有效率%', '总资产'];
+    const headers = ['平台', '主播', '线索量', '开口量', '有效线索', '开户量', '有效户', '开户率%', '有效率%', '总创收资产（仅开户）'];
     const rows = items.map((r) => [
       r.platform, r.anchor, r.leads, r.mouth, r.valid_lead, r.opened, r.valid,
       r.opening_rate, r.valid_rate, r.assets,
@@ -148,7 +148,8 @@ const AnchorClusterPage: React.FC = () => {
                 g.valid_lead += r.valid_lead || 0;
                 g.opened += r.opened || 0;
                 g.valid += r.valid || 0;
-                g.assets += r.assets || 0;
+                // v3.1.4: 总创收资产只累加「开户成功」的行，避免未开户粉丝资产抹平平均
+                g.assets += (r.opened || 0) > 0 ? (r.assets || 0) : 0;
                 g.sources = Array.from(new Set([...(g.sources || []), ...(r.sources || [])]));
               } else {
                 grouped.set(k, { ...r, platforms: r.platform, sources: [...(r.sources || [])] });
@@ -166,8 +167,14 @@ const AnchorClusterPage: React.FC = () => {
               scroll={{ x: 'max-content' }}
               columns={[
                 { title: '主播名字', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
-                { title: '覆盖平台', dataIndex: 'platforms', width: 200, render: (v: string) => v.split(' / ').map((p: string) => <Tag key={p} color='cyan' style={{ marginBottom: 2 }}>{sanitizeText(p)}</Tag>) },
-                { title: '平台数', width: 80, align: 'center', render: (_: any, r: any) => <Tag color='blue'>{r.platforms.split(' / ').length}</Tag> },
+                { title: '覆盖平台', dataIndex: 'platforms', width: 220, render: (v: string) => (
+                  <Space size={[4, 4]} wrap>
+                    {Array.from(new Set(v.split(' / ').map((p) => sanitizeText(p)))).map((p) => <Tag key={p} color='cyan'>{p}</Tag>)}
+                  </Space>
+                ) },
+                { title: '平台数', width: 80, align: 'center', render: (_: any, r: any) => (
+                  <Tag color='blue'>{Array.from(new Set(r.platforms.split(' / '))).length}</Tag>
+                ) },
                 { title: '线索量', dataIndex: 'leads', align: 'right', sorter: (a: any, b: any) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
                 { title: '开口量', dataIndex: 'mouth', align: 'right', render: (v: number) => v.toLocaleString() },
                 { title: '有效线索', dataIndex: 'valid_lead', align: 'right', render: (v: number) => v.toLocaleString() },
@@ -179,7 +186,7 @@ const AnchorClusterPage: React.FC = () => {
                 { title: '有效率', dataIndex: 'valid_rate', align: 'right', render: (v: number) => (
                   <Tag color={v > 15 ? 'green' : v > 5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
                 ) },
-                { title: '总资产', dataIndex: 'assets', align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
+                { title: '总创收资产（仅开户）', dataIndex: 'assets', align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
                 { title: '线索来源（原始）', dataIndex: 'sources', width: 280, render: (v: string[]) => {
                   const cleaned = sanitizeList(v);
                   return (
