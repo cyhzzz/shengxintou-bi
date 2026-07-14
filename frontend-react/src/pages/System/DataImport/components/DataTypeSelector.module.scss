@@ -7,15 +7,15 @@
 
 .typeGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--spacer-16);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--spacer-12);
 }
 
 .typeCard {
   position: relative;
-  padding: var(--spacer-20) var(--spacer-16);
+  padding: var(--spacer-12) var(--spacer-12);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-normal);
   background: var(--bg-content);
@@ -62,8 +62,8 @@
 }
 
 .cardIcon {
-  font-size: var(--text-3xl);
-  margin-bottom: var(--spacer-12);
+  font-size: var(--text-2xl);
+  margin-bottom: var(--spacer-8);
   line-height: 1;
 }
 
@@ -79,7 +79,7 @@
   font-size: var(--text-sm);
   color: var(--color-text-tertiary);
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.4;
   @include text-ellipsis-multi(2);
-  min-height: 36px;
+  min-height: 32px;
 }

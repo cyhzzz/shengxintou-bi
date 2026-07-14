@@ -31,7 +31,15 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   defaultDays = 0,  // 默认选中"全部"
 }) => {
   const { dateRange, setDateRange, setQuickDateRange } = useFilterStore();
-  const [activeQuick, setActiveQuick] = useState<number | null>(defaultDays);
+  // 从持久化的 store 状态派生初始高亮按钮，避免跨页面导航后高亮与实际范围不一致
+  const [activeQuick, setActiveQuick] = useState<number | null>(() => {
+    if (dateRange.startDate === '2020-01-01') return 0; // "全部"
+    const today = dayjs();
+    const startDiff = today.diff(dayjs(dateRange.startDate), 'day');
+    const endDiff = today.diff(dayjs(dateRange.endDate), 'day');
+    if (endDiff === 0 && [7, 30, 90].includes(startDiff)) return startDiff;
+    return null; // 自定义范围
+  });
 
   // 处理快速选择
   const handleQuickSelect = (days: number) => {

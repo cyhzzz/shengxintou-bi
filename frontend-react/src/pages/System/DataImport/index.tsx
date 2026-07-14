@@ -3,7 +3,7 @@
  * 数据类型选择使用卡片网格布局，指南通过角标访问
  */
 import React, { useState } from 'react';
-import { Card, Row, Col, Typography, Alert } from 'antd';
+import { Card, Typography, Alert, Space } from 'antd';
 import DataTypeSelector from './components/DataTypeSelector';
 import FileUploader from './components/FileUploader';
 import { DataFreshnessIndicator } from '@/components/DataFreshness';
@@ -44,35 +44,31 @@ const DataImportPage: React.FC = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <Row gutter={24}>
-        <Col xs={24} lg={10}>
-          <Card className={styles.selectorCard}>
-            <div className={styles.cardHeader}>
-              <Text type="secondary" className={styles.cardTitle}>
-                📁 选择数据类型
-              </Text>
-              <Text type="secondary" className={styles.cardDesc}>
-                选择要导入的数据类型
-              </Text>
-            </div>
-            <DataTypeSelector selected={selectedType} onChange={setSelectedType} />
-          </Card>
-        </Col>
+      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+        <Card className={styles.selectorCard} size="small">
+          <div className={styles.cardHeader}>
+            <Text type="secondary" className={styles.cardTitle}>
+              选择数据类型
+            </Text>
+            <Text type="secondary" className={styles.cardDesc}>
+              选择要导入的数据类型（点击右上角 ? 查看字段说明）
+            </Text>
+          </div>
+          <DataTypeSelector selected={selectedType} onChange={setSelectedType} />
+        </Card>
 
-        <Col xs={24} lg={14}>
-          <Card className={styles.uploadCard}>
-            <div className={styles.cardHeader}>
-              <Text type="secondary" className={styles.cardTitle}>
-                📤 上传文件
-              </Text>
-              <Text type="secondary" className={styles.cardDesc}>
-                {selectedTypeInfo?.label} - 上传数据文件
-              </Text>
-            </div>
-            <FileUploader dataType={selectedType} onImportSuccess={handleImportSuccess} />
-          </Card>
-        </Col>
-      </Row>
+        <Card className={styles.uploadCard} size="small">
+          <div className={styles.cardHeader}>
+            <Text type="secondary" className={styles.cardTitle}>
+              上传文件
+            </Text>
+            <Text type="secondary" className={styles.cardDesc}>
+              {selectedTypeInfo?.label} - 数据源自省心投系统导出，二次导入分析（数据落库后由本平台做查询/聚合/可视化，不在本页做任何业务计算）
+            </Text>
+          </div>
+          <FileUploader dataType={selectedType} onImportSuccess={handleImportSuccess} />
+        </Card>
+      </Space>
     </div>
   );
 };

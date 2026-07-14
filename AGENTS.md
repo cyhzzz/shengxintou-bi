@@ -1,252 +1,330 @@
-# 省心投 BI 项目文档（AGENTS / CLAUDE）
+﻿# 省心投 BI 项目文档（AGENTS / CLAUDE）
 
 > 本文件是仓库根目录的项目工作说明。`AGENTS.md` 与 `CLAUDE.md` 应保持同一内容；修改其中一份时必须同步另一份。
-> 本地工作目录：`D:/AIproject/省心投BI`，默认环境：Windows + PowerShell。
+> 本地工作目录：`D:/AIproject/省心投BI`，默认环境：Windows + PowerShell。当前日期 2026-07-14。
 
 ## 1. 项目概况
 
-省心投 BI 是互联网广告投放与开户转化数据分析平台，面向券商财富管理场景，核心能力是把上游 ETL 已处理好的投放、转化、开户与内容数据原样入库，并在前端做多维查询和可视化报表。
+省心投 BI 是券商财富管理场景下的互联网广告投放 + 开户转化数据分析平台，定位是「数据存储 + 查询聚合 + 可视化呈现」。原始数据的 mapping / 清洗 / 归一化 / 漏斗预计算由上游 ETL 完成，下游只做原样入库 + SELECT 聚合 + 报表展示。
 
-- 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入。
-- 前端：React 19 + TypeScript + Vite + Ant Design 5 + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.1`，发布日期 `2026-07-10`。
-- 当前代码状态：v2 库表重构、v3.1 报表重梳与 v3.1.1 前端 UI 统一化（指标卡 / token / 日夜主题）均已落地。
-- 历史命名：仓库目录是 `省心投BI`，但数据库、包名和部分历史文档仍使用 `shengxintou`，不要为了“统一命名”随意改路径或表名。
+- 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
+- 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
+- 当前版本基线：`version.json` 为 `3.1.3`（2026-07-14）。下一站 `v3.1.4`（计划：WebDAV 500 长尾根因排查 + OmniChannel「TOP 合作机构」长尾排名）。
+- 历史命名：仓库目录是「省心投 BI」，但数据库文件 `database/shengxintou.db`、模块名 `shengxintou-platform` 仍沿用旧名，禁止为了"统一命名"随意改路径或表名。
 
-## 2. 产品与数据方向
+## 2. 产品与数据方向（重要）
 
-**战略方向：只做数据存储 + 查询聚合 + 可视化呈现，不在本项目继续做业务 mapping / 清洗 / 归一化 / 字段补全。**
+战略方向：**只做数据存储 + 查询聚合 + 可视化呈现，不在本项目继续做业务 mapping / 清洗 / 归一化 / 字段补全。**
 
 落地含义：
 
 - 上游 ETL 负责业务清洗、规范化、字段补全、漏斗预计算与口径修正。
-- 后端导入只做文件读取、空值处理、日期/布尔/ID 等格式层面的安全处理，以及 `pandas.to_sql(if_exists='replace')` 原样落库。
-- 查询端点可以做 SELECT、SUM、GROUP BY、分页和兼容性派生字段，但不要新增下游业务口径修补逻辑。
+- 后端导入只做文件读取、空值处理、日期/布尔/ID 的格式层安全处理，外加 `pandas.to_sql(if_exists='replace')` 原样落库。
+- 查询端点可以做 SELECT、SUM、GROUP BY、分页和兼容派生字段，不要新增下游业务口径修补逻辑。
 - 新数据类型必须走 v2 原样导入入口：`backend/processors/v2/raw_import.py`。
 - 旧 v1 上传类型已退役并返回 410 Gone，不要复活旧 processor 或旧表链路。
 
-## 3. 当前阶段
+## 3. 当前版本状态（2026-07-14，v3.1.3 已落地）
 
-### 已完成
+| 版本 | 日期 | 主题 |
+|---|---|---|
+| v2.x | 已落地 | 库表重构：9 张 DIM/DWD/DWS 新表 + 13 个查询端点改查新表 |
+| v3.1 | 已落地 | 报表重梳：菜单重构、双漏斗、应用市场 4 子页、员工转化双源、直播占位、数据新鲜度 |
+| v3.1.1 | 2026-07-10 | 前端 UI 统一化：抽出 `MetricCard` / `MetricSection` / `ReportFooter`，设计 token、日/夜主题、所有报表头部数据卡片统一调用 |
+| v3.1.2 | 2026-07-13 已落地 | 报表样式收敛：漏斗图切 @ant-design/plots；OmniChannel 第 4 卡修复；Live/Funnel + 主播聚类乱码清洗；EmployeeConversion 迁新 MetricCard；数据源下沉 ReportFooter |
+| **v3.1.3** | **2026-07-14 已落地** | **8 项 UI / 报表收口：OmniChannel 第 4 卡换互联网渠道开户数 + KPI 完成率；Dashboard 移除数据状态卡；侧栏菜单支持滚动；AppMarket/Detail 设备明细详情浮窗；主播聚类改主播分析 + 同名聚合 + 平台/主播筛选 + 一页呈现；DataImport 上下布局 + 卡片缩小 + 6 个新指南映射 + 404 兜底；DatabaseBackup 错误信息精细化；小红书笔记筛选器修复（object[] 不再触发 antd in 报错）** |
 
-- v2 库表重构：9 张 DIM/DWD/DWS 新表，13 个历史查询端点改查新表，前端字段适配完成。
-- v1 清理：旧 ORM、旧处理器、旧 SQLite 表与旧原生前端已清理到历史状态。
-- v3.1 报表重梳：菜单重构、全渠道获客、应用市场四子页、双漏斗、员工转化双源、直播占位、数据新鲜度均已落地。
-- 数据导入：仅识别 6 个 v2 数据类型，旧 7 个类型返回 410。
-- v3.1.1 前端 UI 统一化：
-  - 抽出公共 `MetricCard` / `MetricSection` 组件（`frontend-react/src/components/MetricCard/`），所有报表头部数据卡片统一调用。
-  - 引入 design token 体系 `frontend-react/src/styles/tokens.css`（品牌色 / 间距 / 圆角 / 阴影 / 字体 / 功能色 / 图表色板，日夜间变量）与共享 mixin `frontend-react/src/styles/mixins.scss`（`card-section-header` / `filter-bar` / `text-ellipsis` / `card-base` / `table-section-title`）。
-  - 接入日/夜主题：`<html data-theme="dark">` + `useAppStore.themeMode` + Ant Design `ConfigProvider` `darkAlgorithm`，Header 提供切换入口。
-  - 删除 `MainLayout` 中 7 处 `!important` 与 14 处 `:global()` 覆盖，统一 Menu 选中色为品牌色 `#1890ff`。
-  - 报表头部数据卡片统一为 `MetricSection + MetricCard` 4/3/2/1 响应式，与互联网渠道数据概览一致（小红书运营报表不动）。
-- v3.1.1 报表样式收敛（2026-07-10）：
-  - 抽出共享 `FunnelChart` 组件（`frontend-react/src/components/Chart/FunnelChart.tsx`，基于 `@ant-design/charts` 的 `Funnel`），用于内容平台漏斗 / 应用市场漏斗 / 主播引流漏斗三个场景；原 ECharts funnel 的对数缩放逻辑下架。已接入：`ConversionFunnel` / `AppMarket/Funnel` / `Live/Funnel`。
-  - 抽出共享 `ReportFooter` 组件（`frontend-react/src/components/ReportFooter/`），作为报表页底部弱化区：用于收纳「数据源 / 端点 / 口径说明」说明性文字，避免散落在筛选卡 / Tab 内容 / 卡片描述里。已迁移页：`OmniChannel` / `AppMarket/Funnel` / `Live/Funnel` / `AnchorCluster` / `ConversionFunnel`。
-  - `全渠道获客概览` 顶部第 4 张卡（TOP 渠道类别 + 占比）的 title 改为 `${channel_category} · 占比 ${share}%`，与其他 3 张卡结构对齐。
-  - `Live/Funnel.tsx` 228 处 `\uXXXX` 转义中文字符残留全部修复，并修复「全冶稿」错别字。
-  - 报表卡片外的 inline「数据源」/「总 xx」备注一律从筛选卡 / Tab 内容里调出，统一接到 `ReportFooter` 底部弱化区。
+### v3.1.1 已落地清单
 
+- 抽出公共 `MetricCard` + `MetricSection` 组件（`frontend-react/src/components/MetricCard/`）。
+- 抽出 `ReportFooter` 组件（`frontend-react/src/components/ReportFooter/`）作为报表页底部弱化区，集中展示「数据源 / 端点 / 口径说明」。
+- 抽出 `FunnelChart`（基于 antd Card + CSS 自渲染横条漏斗）作为 v3.1.1 临时方案。
+- 引入 design token 体系 `styles/tokens.css`（品牌色 / 间距 / 圆角 / 阴影 / 字体 / 功能色 / 图表色板，日夜间变量）与共享 mixin `styles/mixins.scss`。
+- 接入日/夜主题：`<html data-theme="dark">` + `useAppStore.themeMode` + Ant Design `ConfigProvider` 动态算法 + Header 切换入口。
+- 报表头部 4 KPI 卡片统一为 `MetricSection + MetricCard` 4/3/2/1 响应式，与 Dashboard（互联网渠道数据概览）一致。
+- 清理 `MainLayout` 中 7 处 `!important` 与 14 处 `:global()` 覆盖，统一 Menu 选中色为品牌色。
+- Dashboard 重复的 `Card+Row/Col` 卡片组收敛，全部走 `MetricSection`。
 
-### 进行中
+### v3.1.2 已落地清单（2026-07-13）
 
-- 海报设计子系统（`PosterModal` / `WeeklyReportPreview` / `PosterExportButtons`）保留自包含样式，不纳入全局 token 改造。
-- 数据图表 JS option 配色暂未迁移到 token 色板常量；按需在 `EChartsComponent` 选项中按业务自定义。
+- **漏斗图改造**：`FunnelChart` 切换为 `@ant-design/plots` 的 `Funnel`（用户明确期望的「antd 合适的漏斗图组件」），CSS 横条漏斗仅作 `ErrorBoundary` 降级；标签加 `人` 单位 + 阶段转化率 `Tag`。
+- **漏斗图布局统一**：`ConversionFunnel` / `Live/Funnel` / `Reports/AppMarket/Funnel` 三处漏斗图 `Col span` 从 14/10 改为 24，整行展示，避免出界。
+- **全渠道获客概览顶部第 4 张卡修复**：title 由静态 `TOP 渠道类别占比` 改为动态 `TOP 渠道类别开户人数（合作机构）`，value 改绝对开户人数，description 展示占比 + 分子分母，语义一眼可读。
+- **直播漏斗 / 主播聚类乱码修复**：新增 `frontend-react/src/utils/sanitizeText.ts`，渲染 `platform` / `anchor` / `sources` 前清洗 NUL、控制字符、`\uFFFD`、不可见零宽字符。
+- **AnchorCluster 第 1 张卡净化**：移除冗余 description（信息已下沉到 `ReportFooter` notes）。
+- **EmployeeConversion/Analysis 切新 MetricCard**：顶部 4 卡 + 双源对比 5 卡共 9 张卡统一迁到新 `MetricCard + MetricSection`，双源 5 卡的 `description` 不再写数据源（fact_conv_content / agg_daily_channel_open），全部下沉到 `ReportFooter`。
+- **数据源 / 端点 / 口径说明统一下沉**：所有报表页（除小红书运营 XhsNotes/Operation 与员工转化 Weekly 周报海报外）底部都用 `ReportFooter` 弱化区集中标注，MetricCard description 只保留单卡轻量上下文。
+- **同步重写文档**：`AGENTS.md` / `CLAUDE.md` 字节一致更新到 v3.1.2 已落地。
+- **重新构建 dist**：`npm run build`（5887 modules，0 error）→ 5000 端口已同步最新代码。
+### v3.1.3 落地清单（2026-07-14）
 
-## 4. 开发命令
+- **OmniChannel 第 4 卡换互联网渠道开户数 + KPI 完成率**：title 改 `互联网渠道开户数`，value 改全渠道互联网开户总数 `totals.opens`，description 展示 KPI 完成率（年度 KPI：开 2 万户 / 1 万有效户，按 `elapsedRatio = dayOfYear / 366` 时间折算），第 N 天等上下文。
+- **Dashboard 移除数据状态卡**：删除 `DataFreshnessIndicator` 顶部块 + import + `useNavigate` + `freshnessRef` 残留；数据状态仅在数据导入页 + 关于页面保留。
+- **侧栏菜单支持滚动**：`MainLayout.module.scss` `.sider` 改 `overflow-x: hidden; overflow-y: auto; height: 100vh;`；`MainLayout.tsx` 菜单 `主播聚类` label 改 `主播分析`。
+- **AppMarket/Detail 设备明细详情浮窗**：行点击 `EyeOutlined` → `Modal` + `Descriptions column={2}`，展示 `下载日期 / 应用市场 / 渠道类型 / 设备号 / 资金账号 / 激活APP / 开户成功 / 新开户 / 入金 / 有效户` + 剩余字段动态列出。
+- **主播聚类改名 + 多平台聚合 + 平台/主播筛选 + 一页呈现**：菜单 label + 页面 title + 顶部 MetricSection + Card title 全改 `主播分析`；`items` 包 IIFE 客户端按 `anchor` 聚合 `platforms/leads/mouth/valid_lead/opened/valid/assets/sources`；列改造为「主播名字 / 覆盖平台 / 平台数 / 线索量 / 开口量 / 有效线索 / 开户量 / 有效户 / 开户率 / 有效率 / 总资产 / 线索来源」；filter 卡片加 `主播` Select（`showSearch`，`optionFilterProp='label'`）；`pagination={false}` 强制一页呈现。
+- **DataImport 上下布局 + 卡片缩小 + 6 个新指南映射 + 404 兜底**：`index.tsx` Row/Col 左右布局 → `<Space direction='vertical'>` 上下布局 + 描述补充「数据源自省心投系统导出，二次导入分析」；`DataTypeSelector.module.scss` `minmax(160px → 140px)` + gap/padding/font-size 全部缩一档；`GuideModal` GUIDE_TITLES 增补 6 个 v2 新类型（`account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open`）并保留 7 个 v1 旧类型（标 `已下线` 兜底）；`loadGuide` 增加 `content-type: text/markdown` 校验，避免后端 SPA 兜底返回 `index.html` 被 ReactMarkdown 当 md 渲染成乱码。
+- **DatabaseBackup 错误信息精细化**：`loadBackupList` 透出后端 `error` code（`LIST_FAILED / UNKNOWN`），网络层异常显示 `status` 并引导用户点「测试连接」自检。
+- **小红书笔记筛选器修复（v3.1.2 收口）**：`XhsNotes/List.tsx` 4 个枚举 `useState<string[]>` 改为 `{value,label}[]` object array；新增 `opts()` helper 兼容 string/object 输入；解决后端 `/xhs-notes/filter-options` 返回 object array 时 antd 对 string[] 做 `in` 检查报 "Cannot use in operator" 的崩。
+- **文档 + 构建同步**：`AGENTS.md` / `CLAUDE.md` 字节一致更新到 v3.1.3 落地态；`npm run build` 0 error → 5000 端口 dist 同步最新代码（约 5887+ modules）。
 
-### 后端（项目根目录）
+## 4. 共享组件清单
+
+| 组件 | 路径 | 职责 | 当前落地页 |
+|---|---|---|---|
+| `MetricCard` | `frontend-react/src/components/MetricCard/index.tsx` | 单张指标卡：title + icon + value + wowChange + suffix + description；支持 `formatter`（number/currency/percent）、`inverseTrend` | Dashboard / OmniChannel / ConversionFunnel / AgencyAnalysis / AppMarket/* / Live/Funnel / AnchorCluster / EmployeeConversion/Analysis |
+| `MetricSection` | 同上 | 卡组容器：title + description + 响应式 4/3/2/1 grid（1200/768/576 三档断点） | 同上（v3.1.1 后所有报表头部） |
+| `ReportFooter` | `frontend-react/src/components/ReportFooter/index.tsx` | 报表页底部弱化区：sources（结构化标签 / 值）+ notes（自由备注文本），字号 `--text-sm`，色 `--color-text-tertiary` | 所有报表页（除 XhsNotes/Operation 与 EmployeeConversion/Weekly） |
+| `FunnelChart` | `frontend-react/src/components/Chart/FunnelChart.tsx` | 漏斗图：主实现 `@ant-design/plots` Funnel + `ErrorBoundary` 降级到 CSS 横条 | ConversionFunnel（双漏斗）/ Live/Funnel / AppMarket/Funnel |
+| `sanitizeText` | `frontend-react/src/utils/sanitizeText.ts` | 客户端文本清洗：剥 BOM / NUL / 控制字符 / `\uFFFD` / 零宽，折叠空白 | Live/Funnel + AnchorCluster 表格渲染 |
+
+## 5. 关键架构
+
+### 5.1 后端分层（M / Q / V — 见 docs/库表重构设计_v3.md）
+
+```
+backend/
+├── models.py          # 系统表 ORM（DataImportLog / SystemConfiguration / WeeklyReport）
+├── models_v2.py       # ✅ 新表 ORM（9 张 DIM/DWD/DWS，列名 1:1 含中文）
+├── database.py        # 单例 SQLAlchemy(db)，避免循环导入
+├── __init__.py        # 启动时 import models_v2 注册到 metadata
+├── processors/
+│   └── v2/raw_import.py   # ✅ v2 原样导入（pandas to_sql replace，无业务计算）
+├── routes/
+│   ├── upload.py      # v2 上传入口，仅识别 6 个新数据类型，旧类型返回 410 Gone
+│   ├── metadata.py    # 元数据 + 数据新鲜度（5 张新表）
+│   ├── version.py
+│   ├── webdav_backup.py # 备份到坚果云 WebDAV
+│   ├── weekly_reports.py
+│   ├── data/            # 14 个查询蓝图（v3.1 全部查新表）
+│   │   ├── cost_analysis.py          # /conversion-funnel + /conversion-funnel/split
+│   │   ├── employee_conversion.py    # /employee-conversion/* (analysis/weekly/employees/filter-options/analysis-channel-overview)
+│   │   ├── agency_analysis.py
+│   │   ├── dashboard.py
+│   │   ├── leads.py
+│   │   ├── query.py / trend.py
+│   │   ├── xhs_notes.py / xhs_operation.py
+│   │   ├── weekly_report_poster.py / external_analysis.py
+│   │   ├── account_mapping.py / abbreviation_mapping.py
+│   │   └── employee_conversion_helpers.py
+│   └── reports/         # v3.1 新增：reports 蓝图
+│       ├── omni_channel.py  # /reports/omni-channel/{summary,daily-trend,by-channel,filter-options}
+│       └── app_market.py    # /reports/app-market/{summary,funnel,detail,filter-options,creative}
+├── utils/decorators.py  # @handle_exceptions 等装饰器
+```
+
+**v2 重构（已落地，2026-07）**：
+- **6 个新数据类型**（v2 上传识别）→ `dim_account` / `dim_vendor` / `fact_conv_content` / `fact_conv_appmarket` / `agg_vendor_daily` / `agg_xhs_note` / `agg_daily_channel_open`
+- **7 个旧数据类型** 退役（`tencent_ads` / `douyin_ads` / `xiaohongshu_ads` / `backend_conversion` / `xhs_notes_list` / `xhs_notes_daily` / `xhs_notes_content_daily`），旧上传返回 410
+- 13 个查询端点路径零变动，内部从旧表改为查询新表，前端零改动
+
+**v3.1 报表重梳（已完成，2026-07-09）**：
+- 顶级菜单重构：全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 线索明细 / 厂商分析 / 小红书 / 应用市场 / 员工转化 / 直播获客 / 报告生成 / 系统配置
+- 双漏斗：`POST /conversion-funnel/split` 返回 content（7 阶段 fact_conv_content） + appmarket（8 阶段 fact_conv_appmarket）
+- 员工转化双源：detail（fact_conv_content）+ analysis-channel-overview（agg_daily_channel_open，独立口径）
+- 应用市场 4 子页：/app-market/{funnel,comparison,detail,creative}（拆自原 AppMarket/index.tsx 3 Tab）
+- 直播占位：/live/funnel（v3.2 接入规范文档）
+- 数据新鲜度：`/data-freshness` 返回 5 张新表（vendor_daily / xhs_note / fact_conv_content / fact_conv_appmarket / agg_daily_channel_open）
+- 旧路径 redirect：/reports/app-market → /app-market/funnel；/reports/omni-channel → /omni-channel
+
+### 5.2 路由前缀
+
+`API_PREFIX = /api/v1`（见 `config.py`），但部分蓝图用硬编码：`/api/v1/feishu`、`/api/v1/webdav`、`/api/v1/version`、`/api/v1/xhs-note-info`。v3.1 新增 `reports/` 蓝图：`/api/v1/reports/omni-channel/*` + `/api/v1/reports/app-market/*`。
+
+### 5.3 WSGI 中间件
+`app.py` 中 `DoubleApiRewriteMiddleware` 把 `/api/api/...` 重写为 `/api/...`，兼容旧版 JS 缓存的重复前缀 bug。
+
+### 5.4 React Router SPA 兜底
+`@app.before_request serve_react_app` 在路由匹配失败时返回 `index.html`，让前端路由接管；Flask 还显式提供 `/js/`、`/libs/`、`/assets/`、`/icons/` 静态目录。
+
+### 5.5 前端结构（frontend-react/src/）
+
+```
+components/    # Chart / DataFreshness / Filter / GuideModal / HelpModal / Icon
+                # MetricCard / MetricReportFooter (公共指标卡 + 底部说明)
+stores/        # zustand: useAppStore, useFilterStore（筛选条件全局状态）
+services/      # http.ts (HttpClient + 拦截器) / dataService / metadataService / uploadService
+                # orvalMutator.ts（orval 生成的 fetcher 自定义实现）
+types/         # api.ts（orval 生成，勿手改）/ api.schemas.ts / index.ts
+utils/         # filterAdapter / agencyAnalysisChart / legacyLoader / sanitizeText
+router/        # createBrowserRouter 配置（含旧路径 redirect：/reports/app-market → /app-market/funnel，/reports/omni-channel → /omni-channel）
+layouts/MainLayout.tsx
+styles/        # SCSS，variables.scss + global.scss + tokens.css + mixins.scss
+pages/         # 顶级页面
+                # Dashboard / OmniChannel / ConversionFunnel / LeadsDetail / AgencyAnalysis
+                # XhsNotes/{List,Operation} / EmployeeConversion/{Analysis,Weekly}
+                # Reports/AppMarket/{Funnel,Comparison,Detail,Creative} / Reports/OmniChannel
+                # Live/Funnel (主播引流业务漏斗) / AnchorCluster / ReportGeneration
+                # System/{DataImport,AccountManagement,AbbreviationManagement,DatabaseBackup}
+```
+
+### 5.6 数据库
+
+- 默认 SQLite：`database/shengxintou.db`（路径可由 `DATABASE_PATH` env 覆盖）
+- 启动时 `app.configure_sqlite_optimization()` 设置 PRAGMA（cache_size 100MB、synchronous=NORMAL、temp_store=MEMORY、busy_timeout=5s）；注意使用传统模式 journal_mode=DELETE（非 WAL），避免便携版数据库损坏
+- `config.py` 同时定义 `FEISHU_TABLE_IDS`（数据库表 → 飞书 bitable ID 映射）和 `WEBDAV_*`（坚果云备份）配置
+
+### 5.7 飞书 / WebDAV 集成
+
+- `feishu_sync.py` 通过 `FEISHU_TABLE_IDS` 做双向同步；启用开关 `FEISHU_ENABLED`
+- `webdav_backup.py` 用 `webdavclient3` 推送到坚果云，保留最近 `WEBDAV_MAX_BACKUPS` 个（默认 3），支持压缩 `WEBDAV_USE_COMPRESSION`
+
+## 6. 数据导入流程（v2）
+
+上传文件 → `POST /api/v1/upload` → `backend.routes.upload` 异步线程：
+
+1. 创建 `DataImportLog` 记录（status/progress/inserted_rows/...）
+2. 调用 `backend.processors.v2.raw_import.write_to_db(data_type, filepath)`
+3. v2 原样导入：`pandas.read_excel` → 规范化（`nan`→NULL、时间解析、超长 ID 转字符串、`是/否`→0/1）→ `pandas.to_sql(if_exists='replace')`
+4. 更新 `DataImportLog` 完成
+
+> **关键**：v2 不算漏斗、不算转化率、不补映射 — 这一切都在 ETL 上游完成。下游查询只做 SELECT + 聚合。
+
+## 7. 开发命令
+
+### 7.1 后端（项目根目录）
 
 ```powershell
 pip install -r requirements.txt
 
-# 开发模式：标准 Flask 服务，默认 5000 端口
+# 开发模式（标准 Flask，5000 端口）
 $env:DEV_MODE='1'; python app.py
 
-# 桌面模式：检测到 pywebview 时打开嵌入式窗口，打包版使用
+# 桌面模式（pywebview，打包版本用）
 python app.py
 
-# 数据库建表（删除数据库后可用；会按当前 ORM 建表）
-python -c "from backend.database import db; from app import app; app.app_context().push(); db.create_all()"
+# 重置数据库：删 database/shengxintou.db 后重启会自动 db.create_all()
 ```
 
-### 前端（`frontend-react/`）
+### 7.2 前端（frontend-react/）
 
 ```powershell
 cd frontend-react
 npm install
-npm run dev          # Vite dev server :3000，代理 /api -> 127.0.0.1:5000
+npm run dev          # Vite dev server :3000，自动代理 /api -> 127.0.0.1:5000
 npm run build        # tsc 类型检查 + vite build，产物到 dist/
-npm run typecheck    # TypeScript 检查
-npm run lint         # ESLint flat config
-npm run preview      # 预览构建产物
+npm run lint         # ESLint flat config (eslint.config.js)
+npm run preview
+npm run generate:api # orval -> src/types/api.ts
+```
 
-# API 类型生成（orval 会覆盖生成文件，不要手改生成物）
-npm run generate:api
+### 7.3 端到端测试（Playwright）
 
-# Playwright E2E
+```powershell
+cd frontend-react
 npm run test
 npm run test:headed
-npm run test:report
+npm run test:report  # 打开 HTML 报告
 ```
 
-### 前后端联动
+### 7.4 构建产物路径说明
 
-- 开发期通常同时运行后端 `:5000` 与前端 `:3000`。
-- 生产/桌面模式下，Flask 直接托管 `frontend-react/dist/`；前端重新构建后刷新页面即可，不一定要重启 Flask。
-- React Router 依赖 `dist/index.html` 做 SPA 兜底；如果只有后端没有前端构建产物，非 API 路由会不可用。
-- 后端代码有未提交改动时 Flask 不会自动 reload，需要手动重启 `python app.py`；前端 `:3000` 由 Vite HMR 自动刷新，不依赖 Flask。
+Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。**dev 时**前端用 vite dev :3000 走代理；**生产时**直接访问 Flask :5000 读 dist。
+开发期改前端代码不需要重启 Flask（vite HMR 自动刷新）；改后端需要重启 Flask。
+**生产前端看不到最新代码时** = dist 没构建，跑一次 `npm run build` 即可（5000 端口不需要重启 Flask，dist 文件被即时读取）。
 
-## 5. 后端架构
+### 7.5 一次性构建产物
 
-```text
-backend/
-├── database.py                 # SQLAlchemy 单例 db，避免循环导入
-├── models.py                   # 系统表：DataImportLog / SystemConfiguration / WeeklyReport
-├── models_v2.py                # v2 新表 ORM，列名 1:1 对齐源表，含中文字段
-├── processors/v2/raw_import.py # v2 原样导入入口
-├── routes/upload.py            # 上传、任务进度、导入历史、数据类型列表
-├── routes/metadata.py          # 元数据与数据新鲜度
-├── routes/data/                # 历史业务查询蓝图，路径兼容旧前端
-├── routes/reports/             # v3.1 新报表蓝图：omni_channel / app_market
-├── routes/webdav_backup.py     # 坚果云 WebDAV 备份与恢复
-├── routes/version.py           # 本地版本信息
-└── routes/weekly_reports.py    # 周报生成与保存
-```
+后端 Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管（见 `app.py`），所以前端构建后无需重启 Flask，刷新页面即可。但 React Router 兜底路由需要 dist 内的 `index.html` 存在。
 
-`app.py` 负责：
+## 8. 配置
 
-- 创建 Flask 应用并初始化 SQLAlchemy。
-- 注册 `API_PREFIX = /api/v1` 下的数据蓝图，以及硬编码前缀的 `webdav`、`version`、`weekly_reports`、`reports/*` 蓝图。
-- 通过 `DoubleApiRewriteMiddleware` 把旧缓存导致的 `/api/api/...` 重写为 `/api/...`。
-- 托管 `frontend-react/dist/`，并为 `/assets/`、`/icons/`、`/js/`、`/libs/` 提供静态路由。
-- 非 API 路径交给 React Router SPA 兜底。
-- 可选初始化 Swagger；`flasgger` 未安装时应优雅跳过。
+复制 `.env.example` 为 `.env`（已 gitignored）。重要变量：
+- `DATABASE_PATH`、`HOST`、`PORT`(5000)、`DEBUG`、`DEV_MODE`
+- `FEISHU_APP_ID/SECRET/BITABLE_ID`、`FEISHU_ENABLED`
+- `WEBDAV_URL/USERNAME/PASSWORD/BASE_PATH/MAX_BACKUPS/USE_COMPRESSION`
+- `MAX_CONTENT_LENGTH`(MB)、`ALLOWED_EXTENSIONS`、`UPLOAD_FOLDER`、`LOG_FOLDER`、`LOG_LEVEL`
 
-## 6. v2 数据模型与导入
+数据库/上传/日志目录若不存在会在启动时自动创建。
 
-### 9 张新表
+## 9. 注意事项 / 踩坑记录
 
-- 维度层：`dim_account`、`dim_vendor`、`dim_channel_category`、`dim_channel`。
-- 明细层：`fact_conv_content`、`fact_conv_appmarket`。
-- 聚合层：`agg_vendor_daily`、`agg_xhs_note`、`agg_daily_channel_open`。
+- **不要动 `data.py.backup_20260211_174355`**：v0.9.1 拆分前的 4000 行单文件备份，仅留作对照
+- **`models_v2.py` 列名含中文**（如 `AggVendorDaily.花费`、`FactConvContent.微信昵称`），SQLAlchemy 用 `Text`/`BigInteger`/`Float`，**禁止改列名以匹配业务字段**（会影响 `pd.to_sql` 落库）
+- **报表头部数据卡片一律 `MetricCard + MetricSection`**；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表 XhsNotes/Operation 与 EmployeeConversion Weekly 周报海报子系统除外）
+- **数据源 / 端点 / 口径说明一律放进 `ReportFooter`**，不要在 MetricCard description 或筛选卡里重复
+- **乱码防御**：v3.1.2 起所有页面渲染 Excel 导入的脏字符字段（主播名 / 来源 / 备注等）前都要走 `sanitizeText()`，防止上游 GBK/控制字符渲染成方块
+- **`POST /api/v1/conversion-funnel` 拆两套漏斗**：内容平台走 `fact_conv_content`，应用市场走 `fact_conv_appmarket`，响应带 `channel_category` 字段（见 `cost_analysis.py`）
+- **`POST /api/v1/employee-conversion/analysis`** 顶部核心指标不过滤，从 `agg_daily_channel_open` + `agg_vendor_daily` 平台概览计算（v1.0 修复：旧版会被筛选过滤掉）
+- **`POST /api/v1/employee-conversion/analysis-channel-overview`**：员工渠道概览，数据源 `agg_daily_channel_open`，**与 detail 端点是独立口径**（按用户口径与明细解耦），数字不一致是**预期**的，前端必须明确标注口径来源
+- **`POST /api/v1/reports/omni-channel/*`**：单一独立数据源 `agg_daily_channel_open`，**禁止混合** fact_conv_* / agg_vendor_daily。占比由前端按响应数据实时算
+- **`POST /api/v1/reports/app-market/*`**：数据源 `fact_conv_appmarket`（明细）+ `agg_vendor_daily`（创意），双源。creative 端点是客户端聚合
+- **`/api/v1/data-freshness`**：返回 5 张新表数据状态。`critical`（>14 天）/ `warning`（>5 天）/ `normal`（≤5 天）
+- **`funnel` 与 `split` 端点**：旧 `/conversion-funnel`（含 is_employee_mode 单端点）保留 1 个 release 加 deprecation，v3.2 删除；新代码走 `/conversion-funnel/split`
+- **打包**：`省心投启动器.exe`（gitignored，7.7MB，PyInstaller 产物）+ `python-3.9-embed/` + `lib/` 便携版结构；dev 环境双击 exe 自动 fallback 到 `.venv/Scripts/python.exe`
+- **orval**：不要手改 `src/types/api.ts`，必须通过 `npm run generate:api` 重新生成
+- **数据源**：v2 上传识别 6 个新类型（account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open）→ 旧 7 个类型 → 410 Gone
+- **bizModel 推断**：`backend_conversions` 的 `business_model` 用 `customer_source` 推断（旧 bug：曾用 `traffic_type` 推断错误）
+- **代理商分析小计/合计行**：`agency_analysis.py` 响应里带 `is_subtotal`/`is_total` 字段，前端展示指标卡片需跳过
+- **Swagger**：`/apidocs` 可选（需装 flasgger，未列在 requirements.txt），app.py 已做 ImportError 容错
+- **`@ant-design/plots` 漏斗图**：通过 `ErrorBoundary` 降级到 CSS 横条漏斗；数据传入前 `clean.filter(d => typeof d.count === 'number' && Number.isFinite(d.count))`，避免 g2 v5 抛错
+- **`scripts/_write_docs.py` / `_patch_creative.py` 等** 一次性脚本：保留在 `scripts/` 下，不进 git 索引，使用时按需
 
-### 6 个有效上传类型
+## 10. 修复行动登记（v3.1.2 / v3.1.3 已落地）
 
-| data_type | 业务含义 | 目标表 |
-| --- | --- | --- |
-| `account_mapping` | 投放账号映射 | `dim_account` + `dim_vendor` |
-| `conversion_content` | 内容平台加微链路 | `fact_conv_content` |
-| `conversion_appmarket` | 应用市场下载链路 | `fact_conv_appmarket` |
-| `vendor_daily` | 厂商广告投放分析 | `agg_vendor_daily` |
-| `xhs_note` | 小红书笔记 | `agg_xhs_note` |
-| `channel_open` | 开户渠道分析 | `agg_daily_channel_open` |
+### v3.1.2 已落地
 
-### 退役上传类型
+| # | 优先级 | 影响面 | 任务 | 状态 |
+|---|---|---|---|---|
+| 1 | 高 | 4 处漏斗（ConversionFunnel ×2 / Live/Funnel / AppMarket/Funnel）| `FunnelChart` 切到 `@ant-design/plots` 的 `Funnel`，CSS 横条作 ErrorBoundary 降级 | v3.1.2 已落地 |
+| 2 | 中 | 全渠道获客顶部 4 卡 | 第 4 张卡 title 动态化 + 占比上下文 | v3.1.2 已落地 |
+| 3 | 中 | Live/Funnel + AnchorCluster 表格 | `sanitizeText()` 剥 NUL / 控制字符 / `\uFFFD` / 零宽 | v3.1.2 已落地 |
+| 4 | 中 | AnchorCluster | 第 1 张卡冗余 description 移除（信息在 ReportFooter notes）| v3.1.2 已落地 |
+| 5 | 中 | EmployeeConversion/Analysis | 切新 `MetricCard + MetricSection`；`ReportFooter` 标注双源对比口径（detail_caliber / channel_caliber）；双源 5 卡 description 清掉数据源 | v3.1.2 已落地 |
+| 6 | 中 | 所有报表页（除 XhsNotes/Operation 与 EmployeeConversion/Weekly）| 数据源 / 端点 / 口径说明统一下沉到 `ReportFooter`，MetricCard description 仅保留轻量上下文 | v3.1.2 已落地 |
+| 7 | 中 | 3 处漏斗图 | `Col span` 14/10 → 24，整行展示 | v3.1.2 已落地 |
+| 8 | 中 | dist 滞后 | `npm run build` 5887 modules → 5000 端口同步 | v3.1.2 已落地 |
 
-以下类型保留识别但返回 410：`tencent_ads`、`douyin_ads`、`xiaohongshu_ads`、`backend_conversion`、`xhs_notes_list`、`xhs_notes_daily`、`xhs_notes_content_daily`。
+### v3.1.3 已落地（2026-07-14）
 
-### 导入流程
+| # | 优先级 | 影响面 | 任务 | 状态 |
+|---|---|---|---|---|
+| 1 | 高 | XhsNotes/List 筛选器崩 | 4 个枚举 useState 改 `{value,label}[]` object array + `opts()` helper | v3.1.3 已落地 |
+| 2 | 高 | 全渠道获客第 4 卡 | 换 `互联网渠道开户数` + KPI 完成率（年度 2万/1万 × 时间折算）| v3.1.3 已落地 |
+| 3 | 中 | 互联网渠道数据概览 | 顶部 `DataFreshnessIndicator` 整块移除（import / useNavigate / freshnessRef / JSX 全部清干净）| v3.1.3 已落地 |
+| 4 | 中 | MainLayout 侧栏 | `.sider` 改 `overflow-y: auto`，菜单 label `主播聚类` → `主播分析` | v3.1.3 已落地 |
+| 5 | 中 | AppMarket/Detail 设备明细 | 行点击 → `Modal` + `Descriptions` 详情浮窗，参考 LeadsDetail 模式 | v3.1.3 已落地 |
+| 6 | 高 | 主播聚类 → 主播分析 | IIFE 客户端按 `anchor` 聚合 `platforms/leads/...`；列改造；filter 加 `主播` Select；`pagination={false}` 一页呈现 | v3.1.3 已落地 |
+| 7 | 高 | DataImport 布局 | Row/Col → Space 上下；DataTypeSelector 卡片缩小（140/12）；数据源自省心投系统导出声明 | v3.1.3 已落地 |
+| 8 | 中 | GuideModal 问号乱码 | 6 个 v2 新类型映射 + 7 个 v1 旧类型保留兜底；`loadGuide` 增 `content-type: text/markdown` 校验 | v3.1.3 已落地 |
+| 9 | 中 | System/DatabaseBackup | `loadBackupList` 透出后端 `error` code + 网络层 `status`，引导「测试连接」自检 | v3.1.3 已落地 |
+| 10 | 中 | dist 滞后 | `npm run build` 0 error → 5000 端口同步（约 5887+ modules）| v3.1.3 已落地 |
+| 11 | 低 | System/DatabaseBackup | `webdav/list` 500 长尾根因排查（用户本轮反馈「现在好像同步不了，会报错」，实测当前 200 OK + 凭证有效，问题大概率是历史/环境层面；后续 v3.1.4 跟进）| 未排 |
 
-`POST /api/v1/upload` → 创建 `DataImportLog` → 后台线程调用 `raw_import.write_to_db()` → `pandas.read_excel/read_csv` → 格式层处理 → `to_sql(replace)` → 更新导入日志 → 成功后删除上传临时文件。
+## 11. 修改守则
 
-## 7. 查询与报表口径
+- 修改 `AGENTS.md` 或 `CLAUDE.md` 必须保持两者内容完全一致（字节一致 / 段落一致）。
+- 修改业务查询前，先确认端点当前使用的源表和口径，不要照搬 README 或旧文档的过期描述。
+- 不要改 `models_v2.py` 的中文列名来迎合前端字段；这些列名要与源表 / `to_sql` 结果对齐。
+- 不要新增 mapping / 归一化 processor；确需处理新数据源时，优先补充上游 ETL 或 v2 原样导入映射。
+- 不要复活旧上传类型、旧 v1 表、旧原生前端目录或历史迁移脚本。
+- 不要手改生成文件，尤其是 orval 生成的 `src/types/api.ts`。
+- 报表头部数据卡片一律使用 `MetricCard + MetricSection`；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表与 EmployeeConversion 周报海报子系统除外）。
+- **数据源 / 端点 / 口径说明一律放进 `ReportFooter`**，不要在 MetricCard 的 `description` 或筛选卡里重复。
+- 渲染 Excel 导入的脏字符字段前先走 `sanitizeText()`。
+- **v3.1.3 起**：数据导入页用 `Space direction="vertical"` 上下布局，禁用 `Row/Col` 左右布局。
+- **v3.1.3 起**：设备明细 / 线索明细等行级数据支持详情浮窗（Modal + Descriptions column={2}），参考 `LeadsDetail` 的浮窗组件 pattern。
+- **v3.1.3 起**：主播聚类（现 `主播分析`）同名主播按 anchor 跨平台前端聚合，顶部加 `平台` + `主播` 双筛选，表格 `pagination={false}` 一页呈现。
+- **v3.1.3 起**：侧栏菜单多时 `.sider` 用 `overflow-y: auto` 滚动，禁用 `overflow: hidden`。
+- **v3.1.3 起**：OmniChannel 第 4 卡 = `互联网渠道开户数` + KPI 完成率，年度 2 万户 / 1 万有效户按 `dayOfYear/366` 时间折算；不再展示 TOP 合作机构占比。
+- **v3.1.3 起**：Dashboard（互联网渠道数据概览）顶部不再显示数据状态卡；`DataFreshnessIndicator` 仅在「数据导入」「关于」页面保留。
+- **v3.1.3 起**：`GuideModal` 必须校验 `content-type: text/markdown`，后端 SPA 兜底不会让 404 → index.html 被 ReactMarkdown 当 md 渲染成乱码；GUIDE_TITLES 增补 6 个 v2 新类型映射。
+- **v3.1.3 起**：后端 `webdav/list` 500 错误透出 `error` code 到前端 `loadBackupList` 错误信息，便于用户用「测试连接」自检定位。
+- 提交前确认：未把本地数据库 / 上传文件 / 备份文件 / `prototype/` / `tmp_*` / `logs/bug-fix-shots/` 加入索引；`.env` 与 `database/*.db` 已被 `.gitignore` 排除。
+- 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，**以代码和 `version.json` 为准**，并在文档中标注滞后点。
 
-通用原则：端点路径尽量保持兼容，但内部必须查询 v2 新表；不要混查已退役 v1 表。
+## 12. 验证建议
 
-- `POST /api/v1/dashboard/core-metrics` 与 `/dashboard/trend-data`：主源 `agg_vendor_daily`，返回 SUM 聚合与兼容性派生字段。
-- `POST /api/v1/summary`、`/query`、`/trend`：历史兼容端点，仍按 v2 新表输出旧前端可消费结构。
-- `POST /api/v1/conversion-funnel/split`：双漏斗端点，内容平台查 `fact_conv_content`，应用市场查 `fact_conv_appmarket`。
-- `POST /api/v1/conversion-funnel`：兼容旧端点，仍保留但后续应优先使用 `/conversion-funnel/split`。
-- `POST /api/v1/reports/omni-channel/*`：全渠道获客，**单一数据源 `agg_daily_channel_open`**；不要混入 `fact_conv_*` 或 `agg_vendor_daily`。
-- `POST /api/v1/reports/app-market/*`：应用市场专项，数据源 `fact_conv_appmarket`；四类端点为 `summary`、`funnel`、`detail`、`creative`，筛选项为 `filter-options`。
-- `POST /api/v1/employee-conversion/analysis`：员工转化分析；明细口径来自 `fact_conv_content`，顶部/概览指标注意现有兼容逻辑。
-- `POST /api/v1/employee-conversion/analysis-channel-overview`：渠道概览来自 `agg_daily_channel_open`，与 detail 是独立口径，数字不一致是预期。
-- `GET /api/v1/leads-detail`：线索明细来自 `fact_conv_content`。
-- `POST /api/v1/leads-detail/anchor-clusters`：按 `客户来源` 中“平台引流-主播名”模式聚类，供主播聚类页面使用。
-- `POST /api/v1/xhs-notes-list` 与 `/xhs-notes-operation-analysis`：小红书笔记与运营分析来自 `agg_xhs_note`。
-- `GET /api/v1/data-freshness`：返回 5 张核心表新鲜度：`vendor_daily`、`xhs_note`、`fact_conv_content`、`fact_conv_appmarket`、`agg_daily_channel_open`；状态阈值为 normal ≤5 天、warning ≤14 天、critical >14 天。
+- 后端改动：优先跑相关端点的最小 smoke（如 `curl -X POST ...`），再视情况启动 `python app.py`；如果修改了 `backend/routes/*` 而 Flask 进程仍在跑，需手动重启。
+- 前端逻辑 / 类型改动：优先跑 `npm run typecheck`，再跑 `npm run lint` 与必要页面 smoke。
+- 前端样式改动：结合浏览器检查日/夜主题、报表头部卡片、表格和筛选栏；不要只看构建结果。
+- 全量验证成本较高时，在最终说明里明确已跑和未跑的命令。
+- **生产前端没看到最新代码**：先 `cd frontend-react && npm run build`，5000 端口不需要重启 Flask；确认 vite build 无 error 后再 curl 资源大小对比 dist 时间戳。
 
-## 8. 前端架构
-
-```text
-frontend-react/src/
-├── pages/          # 顶级页面与报表页面
-├── components/     # Chart / DataFreshness / Filter / GuideModal / HelpModal / Icon / MetricCard
-├── services/       # http、dataService、metadataService、uploadService、orvalMutator
-├── stores/         # Zustand：useAppStore（含 themeMode）、useFilterStore
-├── router/         # createBrowserRouter 路由配置与旧路径 redirect
-├── layouts/        # MainLayout 菜单与整体框架
-├── styles/         # tokens.css / variables.scss / mixins.scss / global.scss
-└── types/          # API 与业务类型；生成文件不要手改
-```
-
-### 公共组件：MetricCard / MetricSection
-
-- 路径：`frontend-react/src/components/MetricCard/{index.tsx, MetricCard.module.scss}`。
-- 职责：所有报表头部数据卡片统一调用，禁止在 page 内重写 `Card + Row/Col` 重复实现。
-- `MetricCard`：单卡片，支持 `title` / `value` / `wowChange` / `prefix` / `suffix` / `formatter` / `inverseTrend` / `variant` / `icon` / `tooltip` / `description`。
-- `MetricSection`：分组容器，支持 `title` / `description` / `minCardWidth`（默认走 token）；内含 `sectionHeader`（标题 + 描述）与 `metricGrid`（flex 自适应）。
-- `metricGrid` 响应式：默认 4 列基线（与互联网渠道数据概览 `Row/Col lg={6}` 对齐），1200px 以下 3 列，768px 以下 2 列，576px 以下 1 列。
-
-### 已统一数据卡片样式的报表
-
-| 报表 | 路径 | 头部卡片 |
-| --- | --- | --- |
-| 互联网渠道数据概览 | `pages/Dashboard/` | 前端投放 / 后端转化 / 运营效率 三组 |
-| 全渠道获客 | `pages/Reports/OmniChannel/` | 总开户 / 总入金 / 总有效户 / TOP 渠道 |
-| 转化漏斗 | `pages/ConversionFunnel/` | 内容平台 + 应用市场漏斗指标 |
-| 厂商分析 | `pages/AgencyAnalysis/` | 花费 / 曝光 / 点击 / 线索 / 开户 / 有效户 |
-| 应用市场 / 获客漏斗 | `pages/Reports/AppMarket/Funnel.tsx` | 漏斗阶段汇总 |
-| 应用市场 / 创意效果 | `pages/Reports/AppMarket/Creative.tsx` | 创意汇总 |
-| 直播获客 / 业务漏斗 | `pages/Live/Funnel.tsx` | 主播引流漏斗指标 |
-| 主播聚类 | `pages/AnchorCluster/` | 主播线索 / 开口 / 有效 / 开户指标 |
-
-> 小红书运营报表（`pages/XhsNotes/Operation.tsx`）与海报子系统保持原有样式，不纳入统一。
-
-### 当前路由与菜单
-
-- `/omni-channel`：全渠道获客，默认首页。
-- `/dashboard`：互联网渠道数据概览。
-- `/conversion-funnel`：内容平台 + 应用市场双漏斗。
-- `/leads-detail`：线索明细。
-- `/anchor-clusters`：主播聚类。
-- `/agency-analysis`：厂商分析。
-- `/xhs-notes/list`、`/xhs-notes/operation`：小红书笔记与运营分析。
-- `/app-market/funnel`、`/app-market/comparison`、`/app-market/detail`、`/app-market/creative`：应用市场四子页。
-- `/employee-conversion/analysis`、`/employee-conversion/weekly`：员工转化分析与周报。
-- `/live/funnel`：直播获客占位页，后续 v3.2 接入。
-- `/report-generation`：报告生成。
-- `/system/data-import`、`/system/account-management`、`/system/abbreviation-management`、`/system/database-backup`：系统配置。
-- 旧路径 `/reports/app-market` 与 `/reports/omni-channel` 已 redirect 到新路径。
-
-### 主题与样式 token
-
-- `styles/tokens.css`：CSS 自定义属性单一事实来源（颜色 / 间距 / 圆角 / 阴影 / 字号 / 字重 / 图表色板），日间在 `:root`、夜间在 `[data-theme="dark"]`。
-- `styles/mixins.scss`：共享 SCSS mixin（`card-section-header` / `card-section-title` / `card-section-desc` / `filter-bar` / `filter-group` / `filter-label` / `text-ellipsis` / `card-base` / `table-section-title`），通过 `@use '../../styles/mixins' as *;` 引入。
-- `App.tsx` 的 `ConfigProvider`：日间用显式 token + `defaultAlgorithm`，夜间切换到 `darkAlgorithm`，并把 `colorPrimary` 等关键 token 同步到 `tokens.css` 的值，避免双份维护漂移。
-- `useAppStore.themeMode`：`'light' | 'dark'`，持久化到 `localStorage`；切换时改写 `<html data-theme="...">` 让 `tokens.css` 的夜间变量生效。
-
-### 前端注意事项
-
-- `frontend-react/src/types/api.ts` 为 orval 生成文件，不要手改；需要更新时运行 `npm run generate:api`。
-- 新增样式优先使用 `styles/tokens.css` 的 CSS 变量和 `styles/mixins.scss` 的 mixin；不要继续硬编码 `#1890ff` / `#333` / `#666` / `#f0f0f0` 等。
-- 暗色主题由 `useAppStore.themeMode` + `<html data-theme="dark">` + Ant Design `ConfigProvider` 联动；不要只改 SCSS 而忽略组件 token。
-- `PosterModal`、周报海报预览与导出按钮是相对独立的海报设计子系统，除非任务明确要求，不要强行纳入全局 UI token 改造。
-
-## 9. 数据库、配置与集成
-
-- 默认 SQLite：`database/shengxintou.db`，可通过 `DATABASE_PATH` 覆盖。
-- 启动时会自动创建数据库、上传、日志目录，并执行 `db.create_all()`。
-- SQLite 优化在 `app.py` 中配置：cache、synchronous、temp_store、busy_timeout 等；当前倾向传统 `journal_mode=DELETE`，不要轻易切 WAL。
-- 环境变量读取 `.env`；示例在 `.env.example`。
-- WebDAV 备份使用 `webdavclient3`，配置项为 `WEBDAV_*`，默认保留最近 3 个备份。
-- 飞书配置仍存在于 `config.py` 与相关同步脚本中，但部分表 ID 映射带历史表名；改飞书同步前必须重新核实当前 v2 表结构。
-- 打包形态包含 `省心投启动器.exe`、便携 Python / `lib/` 目录与 PyInstaller spec；不要把打包产物当源码重构对象。
-
-## 10. 文档索引
+## 13. 文档索引
 
 - `README.md`：用户视角介绍，部分版本描述可能滞后于 `version.json`。
-- `docs/v3.1_报表重梳方案.md`：v3.1 菜单、双漏斗、双源、应用市场、直播占位设计。
+- `docs/v3.1_报表重梳方案.md`：v3.1 菜单 / 双漏斗 / 双源 / 应用市场 / 直播占位设计。
 - `docs/库表重构设计_v2.md`：v2 DIM/DWD/DWS 设计基线。
 - `docs/库表重构设计_v3.md`：v3 实施与收尾对账。
 - `docs/前端UI优化规划PRD.md`：v3.1.1 设计 token / 日夜模式 / 样式治理规划与验收标准。
@@ -255,23 +333,3 @@ frontend-react/src/
 - `docs/部署指南.md`：开发、生产、Docker、性能优化、监控与故障排查。
 - `docs/uploads_cleanup_guide.md`：上传目录清理指引。
 - `docs/*_legacy.md`：历史归档，仅作参考。
-
-## 11. 修改守则
-
-- 修改 `AGENTS.md` 或 `CLAUDE.md` 时，必须保持两者内容一致。
-- 修改业务查询前，先确认端点当前使用的源表和口径，不要照搬 README 或旧文档中的过期描述。
-- 不要改 `models_v2.py` 的中文列名来迎合前端字段；这些列名要与源表/to_sql 结果对齐。
-- 不要新增 mapping/归一化 processor；确需处理新数据源时，优先补充上游 ETL 或 v2 原样导入映射。
-- 不要复活旧上传类型、旧 v1 表、旧原生前端目录或历史迁移脚本。
-- 不要手改生成文件；尤其是 orval 生成的 API 类型。
-- 报表头部数据卡片一律使用 `MetricCard` + `MetricSection`；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表除外）。
-- 提交前必须确认：未把本地数据库、上传文件、备份文件、`prototype/`、`tmp_*`、`logs/bug-fix-shots/` 加入索引；`.env` 与 `database/*.db` 已被 `.gitignore` 排除。
-- 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，以代码和 `version.json` 为准，并在文档中标注滞后点。
-
-## 12. 验证建议
-
-- 文档改动：至少检查 `git diff -- AGENTS.md CLAUDE.md`，并确认两份文件一致（`fc /b` 比对文件哈希）。
-- 后端改动：优先跑相关端点的最小 smoke，再视情况启动 `$env:DEV_MODE='1'; python app.py`；如果修改了 `backend/routes/*` 而 Flask 进程仍在跑，需要手动重启。
-- 前端逻辑/类型改动：优先跑 `npm run typecheck`，再跑 `npm run lint` 与必要页面 smoke。
-- 前端样式改动：结合浏览器检查日/夜主题、报表头部卡片、表格和筛选栏；不要只看构建结果。
-- 全量验证成本较高时，在最终说明里明确已跑和未跑的命令。

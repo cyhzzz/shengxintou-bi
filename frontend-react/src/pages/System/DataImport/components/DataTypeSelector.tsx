@@ -37,6 +37,7 @@ const DataTypeSelector: React.FC<DataTypeSelectorProps> = ({ selected, onChange 
             onClick={() => handleCardClick(type.type)}
           >
             <button
+              type="button"
               className={styles.guideBtn}
               onClick={(e) => handleGuideClick(e, type.type)}
               title="查看导入说明"

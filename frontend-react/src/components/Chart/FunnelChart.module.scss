@@ -1,9 +1,110 @@
-/**
- * 漏斗图组件样式
- * 使用 @ant-design/charts Funnel 组件，样式由组件内部处理
+﻿/**
+ * 漏斗图容器（v3.1.2：与 @ant-design/plots Funnel 配套）
+ *
+ * 主图区域由 antd-plots 自动撑开；
+ * 下方是阶段明细 + 整体转化（自定义区域，不受 antd-plots 控制）。
+ * 降级 FallbackBars 用 fallback / fb* 类名。
  */
 
-// 容器样式
 .funnelChart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
+  padding: 4px 0 8px;
+}
+
+.chartWrap {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.stageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  margin: 4px 0 0;
+}
+
+.stageTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overall {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-default, rgba(0,0,0,0.08));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #525252);
+}
+
+.overallLabel {
+  color: var(--color-text-tertiary, #999);
+  font-weight: 500;
+}
+
+.emptyCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// —— 错误兜底：CSS 横条 ——
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.fbRow {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.fbBar {
+  min-width: 120px;
+  max-width: 100%;
+  height: 52px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.fbName {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+.fbCount {
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .overall {
+  border-top-color: rgba(255,255,255,0.08);
+}
+
+[data-theme="dark"] .fbBar {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }

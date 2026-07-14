@@ -16,6 +16,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { EChartsOption } from 'echarts';
 import { FilterBar } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
@@ -334,7 +335,7 @@ const AgencyAnalysisPage: React.FC = () => {
         <div className={styles.cardHeader}>
           <Text type="secondary" className={styles.cardTitle}>📈 平台×代理商聚合数据</Text>
           <Text type="secondary" className={styles.cardDesc}>
-            代理商: {stats.agency_count} | 平台: {stats.platform_count}
+            按平台 × 代理商聚合
           </Text>
           <Tooltip title="导出为 CSV" style={{ marginLeft: 'auto' }}>
             <Button type="primary" icon={<DownloadOutlined />} onClick={exportCsv} disabled={!visibleSummary.length}>
@@ -358,6 +359,14 @@ const AgencyAnalysisPage: React.FC = () => {
           />
         </Spin>
       </Card>
+        <ReportFooter
+          sources={[
+            { label: '数据源', value: 'agg_vendor_daily' },
+            { label: '端点', value: 'GET /api/v1/agency-analysis' },
+            { label: '覆盖范围', value: `代理商 ${stats.agency_count ?? 0} 家 · 平台 ${stats.platform_count ?? 0} 个` },
+          ]}
+          notes={'顶部核心指标为平台 × 代理商 × 业务模式的 SUM，表格按代理商聚合展示，is_subtotal/is_total 行为层级小计/合计；导出 CSV 含全部行。'}
+        />
     </div>
   );
 };
