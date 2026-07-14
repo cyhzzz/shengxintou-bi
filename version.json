@@ -1,7 +1,18 @@
 {
-  "version": "3.1.1",
-  "release_date": "2026-07-10",
+  "version": "3.1.3",
+  "release_date": "2026-07-14",
   "changelog": [
+    "✅ v3.1.3 全渠道获客第 4 卡修复：title 改 互联网渠道开户数，value 改全渠道互联网开户总数，description 展示 KPI 完成率（年度 2 万户 / 1 万有效户 按 dayOfYear/366 时间折算）",
+    "✅ v3.1.3 Dashboard（互联网渠道数据概览）移除数据状态卡：DataFreshnessIndicator import / useNavigate / freshnessRef / JSX 全部清完；数据状态仅在数据导入 + 关于页面保留",
+    "✅ v3.1.3 侧栏菜单支持滚动：MainLayout.module.scss .sider 改 overflow-y: auto；菜单 label 主播聚类 改 主播分析",
+    "✅ v3.1.3 AppMarket/Detail 设备明细详情浮窗：行点击 → Modal + Descriptions column=2，10 个固定字段 + 剩余字段动态列出，参考 LeadsDetail 模式",
+    "✅ v3.1.3 主播聚类 改 主播分析：菜单 / 页面 / MetricSection / Card title 全改；IIFE 客户端按 anchor 跨平台聚合 platforms/leads/mouth/valid_lead/opened/valid/assets/sources；filter 加 主播 Select；pagination={false} 一页呈现",
+    "✅ v3.1.3 DataImport 上下布局：Row/Col → Space direction=vertical；DataTypeSelector 卡片缩一档（140/12/spacer）；描述补 数据源自省心投系统导出，二次导入分析",
+    "✅ v3.1.3 GuideModal 问号修复：GUIDE_TITLES 增 6 个 v2 新类型映射 + 7 个 v1 旧类型保留 已下线 兜底；loadGuide 增 content-type: text/markdown 校验，避免后端 SPA 兜底返回 index.html 被 ReactMarkdown 当 md 渲染乱码",
+    "✅ v3.1.3 DatabaseBackup 错误精细化：loadBackupList 透出后端 error code（LIST_FAILED / UNKNOWN）+ 网络层 status，引导用户点 测试连接 自检",
+    "✅ v3.1.3 小红书笔记筛选器修复：XhsNotes/List 4 个枚举 useState 改 {value,label}[] + opts() helper 兼容 object/string 输入，解决后端 filter-options 返回 object[] 时 antd 报 in operator 崩",
+    "🧹 v3.1.3 同步重写文档：AGENTS.md / CLAUDE.md 字节一致更新到 v3.1.3 落地态，增加 v3.1.3 表格行 + 落地清单 + 修改守则、修复行动登记子表",
+    "🧹 v3.1.3 重新构建 dist：npm run build 0 error → 5000 端口同步最新代码（约 5887+ modules）",
     "✅ v3.1.1 前端 UI 统一化：抽出公共 MetricCard / MetricSection 组件，报表头部数据卡片统一为 4/3/2/1 响应式，与互联网渠道数据概览一致",
     "✅ 设计 token 体系：新增 styles/tokens.css（日夜间变量）与 styles/mixins.scss（共享 mixin），减少硬编码色值与重复样式",
     "✅ 日/夜主题：<data-theme=dark> + useAppStore.themeMode + Ant Design ConfigProvider darkAlgorithm，Header 提供切换入口",
@@ -117,7 +128,13 @@
     }
   ],
   "upgrade_notes": [
-    "✅ v3.1.1 前端 UI 统一化已落地，报表头部数据卡片调用统一",
+    "✅ v3.1.3 已落地：OmniChannel 第 4 卡换 互联网渠道开户数 + KPI 完成率；Dashboard 移除数据状态；侧栏滚动；AppMarket/Detail 设备明细浮窗；主播聚类 改 主播分析（同名跨平台聚合 + 平台/主播筛选 + 一页呈现）；DataImport 上下布局 + 卡片缩小 + 6 个 v2 新指南 + 404 兜底；DatabaseBackup 错误精细化；小红书笔记筛选器修复",
+    "📋 v3.1.3 重新构建 dist：npm run build → frontend-react/dist/ 已包含 sanitizeText / FunnelChart @ant-design/plots / MetricCard v2 / 主播分析筛选器",
+    "✅ v3.1.2 前程已落地：漏斗图切 @ant-design/plots、主播聚类/直播漏斗乱码清洗、EmployeeConversion 迁 MetricSection、数据源下沉 ReportFooter",
+    "✅ v3.1.1 前程 UI 统一化已落地，报表头部数据卡片调用统一",
+    "✅ 保留后台启动器 省心投启动器.exe，双击可在便携环境运行",
+    "📋 前端开发：npm run dev（:3000，代理 /api → :5000）；生产构建 npm run build → frontend-react/dist/",
+    "📋 后端开发：DEV_MODE=1 python app.py（:5000）；代码变动后需重启 Flask",
     "✅ 保留后台启动器 省心投启动器.exe，双击可在便携环境运行",
     "📋 前端开发：npm run dev（:3000，代理 /api → :5000）；生产构建 npm run build → frontend-react/dist/",
     "📋 后端开发：DEV_MODE=1 python app.py（:5000）；代码变动后需重启 Flask"
@@ -149,6 +166,18 @@
       "省心投启动器.spec / 省心投-开发版_new.spec - PyInstaller 打包配置",
       "便携版启动器已重新构建并随仓库发布"
     ],
-    "completion_time": "2026-07-10"
-  }
+    "completion_time": "2026-07-14"
+  },
+  "frontend_changes": [
+    "frontend-react/src/pages/Reports/OmniChannel/index.tsx - 第 4 卡换 互联网渠道开户数 + KPI 完成率",
+    "frontend-react/src/pages/Dashboard/index.tsx - 移除 DataFreshnessIndicator 顶部块",
+    "frontend-react/src/layouts/MainLayout.tsx + .module.scss - 侧栏 overflow-y: auto；菜单 主播聚类 改 主播分析",
+    "frontend-react/src/pages/Reports/AppMarket/Detail.tsx - 设备明细详情浮窗（Modal + Descriptions）",
+    "frontend-react/src/pages/AnchorCluster/index.tsx - 改 主播分析；同名跨平台聚合；filter 加 主播 Select；pagination={false}",
+    "frontend-react/src/pages/System/DataImport/index.tsx - Row/Col → Space direction=vertical",
+    "frontend-react/src/pages/System/DataImport/components/DataTypeSelector.tsx + .module.scss - 卡片缩一档",
+    "frontend-react/src/components/GuideModal/index.tsx - GUIDE_TITLES 增 6 个 v2 映射；loadGuide content-type 校验",
+    "frontend-react/src/pages/System/DatabaseBackup/index.tsx - loadBackupList 透出 error code + status",
+    "frontend-react/src/pages/XhsNotes/List.tsx - 4 个枚举 useState 改 {value,label}[] + opts() helper"
+  ]
 }

@@ -109,13 +109,13 @@ const AppMarketFunnelPage: React.FC = () => {
           />
         </MetricSection>
 
-        <Row gutter={16}>
-          <Col span={14}>
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
             <Card title='9 阶段漏斗图' size='small'>
-              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={460} />
+              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={500} />
             </Card>
           </Col>
-          <Col span={10}>
+          <Col span={24}>
             <Card title='各阶段转化详情' size='small'>
               <div className={styles.funnelList}>
                 {funnel.map((s: any, idx: number) => (

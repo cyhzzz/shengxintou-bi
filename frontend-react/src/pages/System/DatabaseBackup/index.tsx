@@ -37,10 +37,14 @@ const DatabaseBackupPage: React.FC = () => {
       if (response.success) {
         setBackupList(response.data || []);
       } else {
-        message.error(response.message || '获取备份列表失败');
+        // 透出后端 error code，便于定位是 LIST_FAILED / 配置 / 凭据问题
+        const errCode = (response as any)?.error || 'UNKNOWN';
+        message.error(`获取备份列表失败（${errCode}）：${response.message || '未知原因'}，请使用「测试连接」按钮自检`);
       }
-    } catch {
-      message.error('获取备份列表失败');
+    } catch (err: any) {
+      // 网络层异常：Vite proxy / Flask 500 / 离线 / 跨域
+      const status = err?.response?.status || err?.status || '网络层错误';
+      message.error(`获取备份列表失败（${status}）：请检查后端 Flask 是否启动或使用「测试连接」自检`);
     } finally {
       setLoading(false);
     }

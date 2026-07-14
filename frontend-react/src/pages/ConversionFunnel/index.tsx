@@ -167,17 +167,17 @@ const ConversionFunnelPage: React.FC = () => {
                     </Col>
                   )}
                   {/* 漏斗图 */}
-                  <Col span={14}>
+                  <Col span={24}>
                     <Card title="7 阶段转化漏斗" size="small">
                       {contentStages.length ? (
-                        <FunnelChart data={contentFunnelData} height={500} />
+                        <FunnelChart data={contentFunnelData} height={520} />
                       ) : (
                         <Empty description="无数据" />
                       )}
                     </Card>
                   </Col>
                   {/* 阶段明细 */}
-                  <Col span={10}>
+                  <Col span={24}>
                     <Card title="阶段转化详情" size="small">
                       <div className={styles.stageList}>
                         {contentStages.map((s, idx) => (
@@ -234,16 +234,16 @@ const ConversionFunnelPage: React.FC = () => {
                       </MetricSection>
                     </Col>
                   )}
-                  <Col span={14}>
-                    <Card title="8 阶段转化漏斗" size="small">
+                  <Col span={24}>
+                    <Card title="8 阶段转化漏斗（应用市场口径）" size="small">
                       {appmarketStages.length ? (
-                        <FunnelChart data={appmarketFunnelData} height={500} />
+                        <FunnelChart data={appmarketFunnelData} height={520} />
                       ) : (
                         <Empty description="无数据" />
                       )}
                     </Card>
                   </Col>
-                  <Col span={10}>
+                  <Col span={24}>
                     <Card title="阶段转化详情" size="small">
                       <div className={styles.stageList}>
                         {appmarketStages.map((s, idx) => (

@@ -66,10 +66,10 @@ const XhsNotesListPage: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<string>('');
 
   // 枚举选项
-  const [creatorOptions, setCreatorOptions] = useState<string[]>([]);
-  const [contentTypeOptions, setContentTypeOptions] = useState<string[]>([]);
-  const [adStrategyOptions, setAdStrategyOptions] = useState<string[]>([]);
-  const [accountOptions, setAccountOptions] = useState<string[]>([]);
+  const [creatorOptions, setCreatorOptions] = useState<{value:string;label:string}[]>([]);
+  const [contentTypeOptions, setContentTypeOptions] = useState<{value:string;label:string}[]>([]);
+  const [adStrategyOptions, setAdStrategyOptions] = useState<{value:string;label:string}[]>([]);
+  const [accountOptions, setAccountOptions] = useState<{value:string;label:string}[]>([]);
 
   // 详情弹窗状态
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -122,10 +122,15 @@ const XhsNotesListPage: React.FC = () => {
       const response = await dataService.getXhsNotesListFilterOptions();
       if (response.success && response.data) {
         const d = response.data;
-        setCreatorOptions(d.creators || []);
-        setContentTypeOptions(d.content_types || []);
-        setAdStrategyOptions(d.ad_strategies || []);
-        setAccountOptions(d.publish_accounts || []);
+        // 后端 /xhs-notes/filter-options 返回 [{value, label}] 形式,
+        // 统一保留对象数组, 避免 string[] + {value,label} 混用触发 antd 'in' 报错
+        const opts = (arr: any) => (arr || [])
+          .map((x: any) => (x && typeof x === 'object' ? x : { value: String(x), label: String(x) }))
+          .filter((o: any) => o && o.value !== null && o.value !== undefined && o.value !== '');
+        setCreatorOptions(opts(d.creators));
+        setContentTypeOptions(opts(d.content_types));
+        setAdStrategyOptions(opts(d.ad_strategies));
+        setAccountOptions(opts(d.publish_accounts));
       }
     } catch (error) {
       console.error('加载枚举值失败:', error);
@@ -725,7 +730,7 @@ const XhsNotesListPage: React.FC = () => {
               mode="multiple"
               value={selectedCreators}
               onChange={setSelectedCreators}
-              options={creatorOptions.map((c) => ({ label: c, value: c }))}
+              options={creatorOptions}
               placeholder="全部"
               allowClear
               style={{ minWidth: 150 }}
@@ -759,7 +764,7 @@ const XhsNotesListPage: React.FC = () => {
               mode="multiple"
               value={selectedAdStrategies}
               onChange={setSelectedAdStrategies}
-              options={adStrategyOptions.map((s) => ({ label: s, value: s }))}
+              options={adStrategyOptions}
               placeholder="全部"
               allowClear
               style={{ minWidth: 150 }}
@@ -773,7 +778,7 @@ const XhsNotesListPage: React.FC = () => {
             <Select
               value={selectedAccount}
               onChange={setSelectedAccount}
-              options={[{ label: '全部', value: '' }, ...accountOptions.map((a) => ({ label: a, value: a }))]}
+              options={[{ label: '全部', value: '' }, ...accountOptions]}
               placeholder="全部"
               allowClear
               style={{ minWidth: 150 }}

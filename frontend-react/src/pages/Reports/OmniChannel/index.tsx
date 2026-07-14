@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 全渠道获客 (v3.1 §二.5 重构)
  * 数据源：agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket 独立）
  *
@@ -88,6 +88,7 @@ const OmniChannelPage: React.FC = () => {
   const [summary, setSummary] = useState<{
     totals: { opens: number; deposit: number; valid: number };
     by_category: CategoryRow[];
+    top_category?: { channel_category: string; share: number; opens: number } | null;
   } | null>(null);
   const [trend, setTrend] = useState<TrendRow[]>([]);
   const [byChannel, setByChannel] = useState<Record<string, SubRow[]>>({});
@@ -424,15 +425,26 @@ const OmniChannelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title={
-              topCategory?.channel_category
-                ? `${topCategory.channel_category} · 占比 ${topCategory.share ?? 0}%`
-                : 'TOP 渠道类别'
-            }
-            value={topCategory?.opens ?? 0}
-            suffix="人"
+            title="互联网渠道开户数"
+            value={totals.opens ?? 0}
+            suffix="户"
             valueColor="var(--chart-color-2)"
             icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
+            description={(() => {
+              const opened = totals.opens ?? 0;
+              const valid = totals.valid ?? 0;
+              const now = new Date();
+              const year = now.getFullYear();
+              const yearStart = new Date(year, 0, 1).getTime();
+              const yearEnd = new Date(year + 1, 0, 1).getTime();
+              const elapsedRatio = Math.min(1, Math.max(0, (now.getTime() - yearStart) / (yearEnd - yearStart)));
+              const openTarget = 20000 * elapsedRatio;
+              const validTarget = 10000 * elapsedRatio;
+              const openRate = openTarget > 0 ? Math.min(opened / openTarget, 2) : 0;
+              const validRate = validTarget > 0 ? Math.min(valid / validTarget, 2) : 0;
+              const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
+              return `KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天）`;
+            })()}
             showWowChange={false}
           />
         </MetricSection>
@@ -500,3 +512,4 @@ const OmniChannelPage: React.FC = () => {
 };
 
 export default OmniChannelPage;
+

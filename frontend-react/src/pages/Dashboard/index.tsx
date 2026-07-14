@@ -10,8 +10,6 @@
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import { Row, Col, Spin, Tooltip, Typography } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { DataFreshnessIndicator } from '@/components/DataFreshness';
 import {
   DollarOutlined,
   EyeOutlined,
@@ -55,9 +53,6 @@ const DashboardPage: React.FC = () => {
   const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_per_lead');
   // 趋势图粒度状态
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const navigate = useNavigate();
-  const freshnessRef = React.useRef<any>(null);
-
   // 使用自定义 Hooks
   const {
     filters,
@@ -68,10 +63,14 @@ const DashboardPage: React.FC = () => {
 
   const {
     coreMetrics,
-    wowChanges,
+    wowChanges: rawWowChanges,
     loading: coreMetricsLoading,
     fetchCoreMetrics,
   } = useCoreMetrics();
+
+  // "全部"日期范围（2020-01-01 起）无对比周期，环比 0.00% 会误导用户，此时不展示环比
+  const isAllTimeRange = filters.start_date === '2020-01-01';
+  const wowChanges = isAllTimeRange ? null : rawWowChanges;
 
   const {
     trendData,
@@ -216,17 +215,7 @@ const DashboardPage: React.FC = () => {
           onReset={handleReset}
         />
 
-        {/* v3.1 §七.2: Dashboard 顶部紧凑版数据新鲜度 */}
-        <div style={{ marginBottom: 16 }}>
-          <DataFreshnessIndicator
-            ref={freshnessRef}
-            compact
-            showActions
-            onUpdateClick={() => navigate('/system/data-import')}
-          />
-        </div>
-
-        {/* 前端投放指标卡片 */}
+{/* 前端投放指标卡片 */}
         <MetricSection
           title={
             <>

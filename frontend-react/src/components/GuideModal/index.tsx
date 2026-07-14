@@ -18,15 +18,23 @@ interface GuideModalProps {
   title?: string;
 }
 
-// 指南标题映射
+// 指南标题映射（v2 - 6 个新数据类型 + 7 个旧 v1 类型保留兜底）
 const GUIDE_TITLES: Record<string, string> = {
-  'tencent_ads_guide.md': '腾讯广告数据导入指南',
-  'douyin_ads_guide.md': '抖音广告数据导入指南',
-  'xiaohongshu_ads_guide.md': '小红书广告数据导入指南',
-  'xhs_notes_list_guide.md': '小红书笔记列表导入指南',
-  'xhs_notes_daily_guide.md': '小红书笔记投放数据导入指南',
-  'xhs_notes_content_guide.md': '小红书笔记运营数据导入指南',
-  'backend_conversion_guide.md': '后端转化数据导入指南',
+  // v2 新数据类型（v3.1.2 起支持）
+  'account_mapping_guide.md': '投放账号映射导入指南',
+  'conversion_content_guide.md': '内容平台加微链路导入指南',
+  'conversion_appmarket_guide.md': '应用市场下载链路导入指南',
+  'vendor_daily_guide.md': '厂商广告投放分析导入指南',
+  'xhs_note_guide.md': '小红书笔记导入指南',
+  'channel_open_guide.md': '渠道开户汇总导入指南',
+  // 旧 v1 类型（已 410 Gone，保留映射防止老用户点老入口炸）
+  'tencent_ads_guide.md': '腾讯广告数据导入指南（已下线）',
+  'douyin_ads_guide.md': '抖音广告数据导入指南（已下线）',
+  'xiaohongshu_ads_guide.md': '小红书广告数据导入指南（已下线）',
+  'xhs_notes_list_guide.md': '小红书笔记列表导入指南（已下线）',
+  'xhs_notes_daily_guide.md': '小红书笔记投放数据导入指南（已下线）',
+  'xhs_notes_content_guide.md': '小红书笔记运营数据导入指南（已下线）',
+  'backend_conversion_guide.md': '后端转化数据导入指南（已下线）',
 };
 
 const GuideModal: React.FC<GuideModalProps> = ({
@@ -52,8 +60,13 @@ const GuideModal: React.FC<GuideModalProps> = ({
 
     try {
       const response = await fetch(`/documents/${guideFile}`);
-      if (!response.ok) {
-        throw new Error('文档加载失败');
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('text/markdown')) {
+        throw new Error(
+          response.ok
+            ? '文档格式异常（可能尚未生成导入指南）'
+            : `文档加载失败（HTTP ${response.status}）`
+        );
       }
       const text = await response.text();
       setContent(text);

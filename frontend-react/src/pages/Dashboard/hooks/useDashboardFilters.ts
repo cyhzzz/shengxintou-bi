@@ -1,8 +1,10 @@
 /**
  * useDashboardFilters Hook
  * 管理数据概览筛选条件的自定义 Hook
+ * 桥接到全局 useFilterStore（持久化到 localStorage），确保跨页面导航后筛选条件不丢失。
  */
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useFilterStore } from '@/stores';
 
 export interface DashboardFilters {
   /** 开始日期 (YYYY-MM-DD) */
@@ -32,7 +34,7 @@ export interface UseDashboardFiltersResult {
   setAgencies: (agencies: string[]) => void;
   /** 设置业务模式筛选 */
   setBusinessModels: (businessModels: string[]) => void;
-  /** 获取默认日期范围（近30天） */
+  /** 获取默认日期范围（全部） */
   getDefaultDateRange: () => { start_date: string; end_date: string };
   /** 是否有激活的筛选条件 */
   hasActiveFilters: boolean;
@@ -61,81 +63,60 @@ const getDefaultDateRange = (): { start_date: string; end_date: string } => {
 /**
  * 管理数据概览筛选条件的自定义 Hook
  *
- * @example
- * ```tsx
- * const {
- *   filters,
- *   updateFilters,
- *   resetFilters,
- *   hasActiveFilters,
- * } = useDashboardFilters();
- *
- * // 更新筛选条件
- * updateFilters({ platforms: ['腾讯'] });
- *
- * // 重置筛选条件
- * resetFilters();
- * ```
+ * 桥接到 useFilterStore，筛选条件持久化到 localStorage，
+ * 跨页面导航后仍然保留，且与 FilterBar 组件共享同一状态源。
  */
 export const useDashboardFilters = (): UseDashboardFiltersResult => {
-  const defaultRange = getDefaultDateRange();
+  const {
+    dateRange,
+    selectedPlatforms,
+    selectedAgencies,
+    selectedBusinessModels,
+    setDateRange: storeSetDateRange,
+    setPlatforms: storeSetPlatforms,
+    setAgencies: storeSetAgencies,
+    setBusinessModels: storeSetBusinessModels,
+    resetAll,
+  } = useFilterStore();
 
-  const [filters, setFilters] = useState<DashboardFilters>({
-    start_date: defaultRange.start_date,
-    end_date: defaultRange.end_date,
-    platforms: [],
-    agencies: [],
-    business_models: [],
-  });
+  // 从 store 派生 Dashboard 筛选条件（单一数据源，避免本地/全局状态漂移）
+  const filters = useMemo<DashboardFilters>(() => ({
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    platforms: selectedPlatforms,
+    agencies: selectedAgencies,
+    business_models: selectedBusinessModels,
+  }), [dateRange, selectedPlatforms, selectedAgencies, selectedBusinessModels]);
 
   const updateFilters = useCallback((newFilters: Partial<DashboardFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...newFilters,
-    }));
-  }, []);
+    if (newFilters.start_date && newFilters.end_date) {
+      storeSetDateRange({ startDate: newFilters.start_date, endDate: newFilters.end_date });
+    }
+    if (newFilters.platforms !== undefined) storeSetPlatforms(newFilters.platforms);
+    if (newFilters.agencies !== undefined) storeSetAgencies(newFilters.agencies);
+    if (newFilters.business_models !== undefined) storeSetBusinessModels(newFilters.business_models);
+  }, [storeSetDateRange, storeSetPlatforms, storeSetAgencies, storeSetBusinessModels]);
 
   const resetFilters = useCallback(() => {
-    const defaultRange = getDefaultDateRange();
-    setFilters({
-      start_date: defaultRange.start_date,
-      end_date: defaultRange.end_date,
-      platforms: [],
-      agencies: [],
-      business_models: [],
-    });
-  }, []);
+    resetAll();
+  }, [resetAll]);
 
   const setDateRange = useCallback((start: string, end: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      start_date: start,
-      end_date: end,
-    }));
-  }, []);
+    storeSetDateRange({ startDate: start, endDate: end });
+  }, [storeSetDateRange]);
 
   const setPlatforms = useCallback((platforms: string[]) => {
-    setFilters((prev) => ({
-      ...prev,
-      platforms,
-    }));
-  }, []);
+    storeSetPlatforms(platforms);
+  }, [storeSetPlatforms]);
 
   const setAgencies = useCallback((agencies: string[]) => {
-    setFilters((prev) => ({
-      ...prev,
-      agencies,
-    }));
-  }, []);
+    storeSetAgencies(agencies);
+  }, [storeSetAgencies]);
 
   const setBusinessModels = useCallback((business_models: string[]) => {
-    setFilters((prev) => ({
-      ...prev,
-      business_models,
-    }));
-  }, []);
+    storeSetBusinessModels(business_models);
+  }, [storeSetBusinessModels]);
 
-  // 检查是否有激活的筛选条件
   const hasActiveFilters = useMemo(() => {
     return (
       filters.platforms.length > 0 ||

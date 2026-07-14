@@ -16,6 +16,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { sanitizeText } from '@/utils/sanitizeText';
 import { http } from '@/services/http';
 import styles from './Funnel.module.scss';
 
@@ -145,8 +146,8 @@ const LiveFunnelPage: React.FC = () => {
   ];
 
   const anchorColumns = [
-    { title: '平台', dataIndex: 'platform', width: 100, render: (v: string) => <Tag color="cyan">{v}</Tag> },
-    { title: '主播', dataIndex: 'anchor', width: 120, render: (v: string) => <strong>{v}</strong> },
+    { title: '平台', dataIndex: 'platform', width: 100, render: (v: string) => <Tag color="cyan">{sanitizeText(v)}</Tag> },
+    { title: '主播', dataIndex: 'anchor', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
     { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 90, sorter: (a: AnchorItem, b: AnchorItem) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
     { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
@@ -232,17 +233,17 @@ const LiveFunnelPage: React.FC = () => {
           />
         </MetricSection>
 
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={14}>
-            <Card title="5 阶段主播引流业务漏斗" size="small" extra={<Tooltip title="占比 = 该阶段人数 / 客户线索人数。对数缩放使各阶段漏斗宽度平滑。"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
+            <Card title="5 阶段主播引流业务漏斗" size="small" extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
               {funnelStages[0].count > 0 ? (
-                <FunnelChart data={funnelStages} height={420} />
+                <FunnelChart data={funnelStages} height={440} />
               ) : (
                 <Empty description="该日期区间内无主播引流记录" />
               )}
             </Card>
           </Col>
-          <Col span={10}>
+          <Col span={24}>
             <Card title="阶段转化明细" size="small">
               <div className={styles.stageList}>
                 {funnelStages.map((s, idx) => (
