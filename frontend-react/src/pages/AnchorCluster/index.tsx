@@ -1,5 +1,5 @@
 ﻿/**
- * 主播聚类页面 (Bug 6)
+ * 主播分析页面（v3.1.3 重构）
  *
  * 数据源: fact_conv_content.客户来源
  * 端点: POST /api/v1/leads-detail/anchor-clusters
@@ -13,6 +13,8 @@ import { ReloadOutlined, VideoCameraOutlined, UserOutlined, TeamOutlined, RiseOu
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceLeadsAnchor } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { ReportFooter } from '@/components/ReportFooter';
+import { sanitizeText, sanitizeList } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -20,9 +22,11 @@ const { RangePicker } = DatePicker;
 const AnchorClusterPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [totals, setTotals] = useState<any>({});
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const [anchors, setAnchors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const filters = useMemo(() => ({
@@ -39,6 +43,7 @@ const AnchorClusterPage: React.FC = () => {
         setItems(res.data.items || []);
         setTotals(res.data.totals || {});
         setPlatforms(res.data.platforms || []);
+        setAnchors(res.data.anchors || Array.from(new Set((res.data.items || []).map((i: any) => i.anchor))));
       }
     } finally {
       setLoading(false);
@@ -59,7 +64,7 @@ const AnchorClusterPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `主播聚类_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `主播分析_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -74,18 +79,22 @@ const AnchorClusterPage: React.FC = () => {
           <Select mode='multiple' allowClear placeholder='全部' value={platformFilter}
             onChange={setPlatformFilter} options={platforms.map((p) => ({ label: p, value: p }))}
             style={{ minWidth: 180 }} maxTagCount='responsive' />
+          <span className={styles.label}>主播</span>
+          <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
+            onChange={setAnchorFilter} options={anchors.map((a) => ({ label: a, value: a }))}
+            style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         </Space>
       </Card>
 
       <Spin spinning={loading}>
-        <MetricSection title="主播聚类概览" description="按客户来源引流模式聚合的主播获客表现">
+        <MetricSection title="主播分析概览" description="按客户来源引流模式聚合、同名主播按平台汇总的主播获客表现（顶部支持平台/主播筛选）">
           <MetricCard
             title="主播数量"
             value={totals.total_anchors || 0}
+            suffix="位"
             valueColor="var(--color-brand)"
             icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />}
-            description="按 客户来源 引流模式聚类"
             showWowChange={false}
           />
           <MetricCard
@@ -120,18 +129,45 @@ const AnchorClusterPage: React.FC = () => {
           />
         </MetricSection>
 
-        <Card title='主播聚类明细（按 客户来源 引流-主播名 聚合）' size='small'
+        <Card title='主播分析明细（同名主播按平台汇总，支持平台/主播筛选）' size='small'
           extra={<Tooltip title='导出为 CSV'><Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!items.length}>导出 CSV</Button></Tooltip>}>
-          {items.length ? (
-            <Table size='small' rowKey={(r: any) => `${r.platform}-${r.anchor}`}
-              dataSource={items} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }}
+          {(() => {
+            const filtered = items.filter((r: any) => {
+              if (platformFilter.length && !platformFilter.includes(r.platform)) return false;
+              if (anchorFilter.length && !anchorFilter.includes(r.anchor)) return false;
+              return true;
+            });
+            const grouped = new Map<string, any>();
+            for (const r of filtered) {
+              const k = r.anchor;
+              const g = grouped.get(k);
+              if (g) {
+                g.platforms = Array.from(new Set([...g.platforms, r.platform])).join(' / ');
+                g.leads += r.leads || 0;
+                g.mouth += r.mouth || 0;
+                g.valid_lead += r.valid_lead || 0;
+                g.opened += r.opened || 0;
+                g.valid += r.valid || 0;
+                g.assets += r.assets || 0;
+                g.sources = Array.from(new Set([...(g.sources || []), ...(r.sources || [])]));
+              } else {
+                grouped.set(k, { ...r, platforms: r.platform, sources: [...(r.sources || [])] });
+              }
+            }
+            const aggregated = Array.from(grouped.values()).map((g) => ({
+              ...g,
+              opening_rate: g.opened && g.leads ? (g.opened / g.leads) * 100 : 0,
+              valid_rate: g.valid && g.leads ? (g.valid / g.leads) * 100 : 0,
+            }));
+            if (!aggregated.length) return null;
+            return (
+            <Table size='small' rowKey={(r: any) => r.anchor}
+              dataSource={aggregated} pagination={false}
               scroll={{ x: 'max-content' }}
               columns={[
-                { title: '排名', width: 60, align: 'center', render: (_: any, __: any, idx: number) => (
-                  <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
-                ) },
-                { title: '主播平台', dataIndex: 'platform', width: 110, render: (v: string) => <Tag color='cyan'>{v}</Tag> },
-                { title: '主播名字', dataIndex: 'anchor', width: 120, render: (v: string) => <strong>{v}</strong> },
+                { title: '主播名字', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+                { title: '覆盖平台', dataIndex: 'platforms', width: 200, render: (v: string) => v.split(' / ').map((p: string) => <Tag key={p} color='cyan' style={{ marginBottom: 2 }}>{sanitizeText(p)}</Tag>) },
+                { title: '平台数', width: 80, align: 'center', render: (_: any, r: any) => <Tag color='blue'>{r.platforms.split(' / ').length}</Tag> },
                 { title: '线索量', dataIndex: 'leads', align: 'right', sorter: (a: any, b: any) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
                 { title: '开口量', dataIndex: 'mouth', align: 'right', render: (v: number) => v.toLocaleString() },
                 { title: '有效线索', dataIndex: 'valid_lead', align: 'right', render: (v: number) => v.toLocaleString() },
@@ -144,16 +180,18 @@ const AnchorClusterPage: React.FC = () => {
                   <Tag color={v > 15 ? 'green' : v > 5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
                 ) },
                 { title: '总资产', dataIndex: 'assets', align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
-                { title: '线索来源（原始）', dataIndex: 'sources', width: 280, render: (v: string[]) => (
-                  <Tooltip title={v.join(', ')}>
-                    <span style={{ color: 'var(--color-text-tertiary)' }}>{v.slice(0, 2).join(', ')}{v.length > 2 ? ` +${v.length - 2}` : ''}</span>
+                { title: '线索来源（原始）', dataIndex: 'sources', width: 280, render: (v: string[]) => {
+                  const cleaned = sanitizeList(v);
+                  return (
+                  <Tooltip title={cleaned.join(', ')}>
+                    <span style={{ color: 'var(--color-text-tertiary)' }}>{cleaned.slice(0, 2).join(', ')}{cleaned.length > 2 ? ` +${cleaned.length - 2}` : ''}</span>
                   </Tooltip>
-                ) },
+                );
+                } },
               ]}
             />
-          ) : (
-            <Empty description='暂无主播聚类数据（请检查日期范围是否覆盖有主播引流的时段）' />
-          )}
+            );
+          })()}
         </Card>
 
                 <ReportFooter
@@ -162,7 +200,7 @@ const AnchorClusterPage: React.FC = () => {
             { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
             { label: '默认 top_n', value: '100' },
           ]}
-          notes={'非引流类客户来源（如 广告投放-新客权益）不参与聚类。'}
+          notes={'非引流类客户来源（如 广告投放-新客权益）不参与聚类。同名主播按平台自动聚合（覆盖平台 + 平台数列展开）。'}
         />
       </Spin>
     </div>
@@ -170,3 +208,6 @@ const AnchorClusterPage: React.FC = () => {
 };
 
 export default AnchorClusterPage;
+
+
+

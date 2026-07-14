@@ -14,6 +14,7 @@ import { CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined, 
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceReports } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { ReportFooter } from '@/components/ReportFooter';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -176,6 +177,14 @@ const AppMarketCreativePage: React.FC = () => {
           />
         </Card>
       </Spin>
+        <ReportFooter
+          sources={[
+            { label: '数据源', value: 'fact_conv_appmarket（明细聚合） + agg_vendor_daily（创意效果）' },
+            { label: '端点', value: 'POST /api/v1/reports/app-market/creative' },
+            { label: '聚合粒度', value: '广告计划ID + 投放账号' },
+          ]}
+          notes={'按广告计划 ID + 投放账号聚合；表格展示 Top N（前 20/50/100/200）；激活→有效率为关键转化指标。'}
+        />
     </div>
   );
 };

@@ -602,8 +602,8 @@ const XhsNotesOperationPage: React.FC = () => {
       item.total_clicks,
       item.total_interactions,
       item.total_cost,
-      `${item.avg_click_rate.toFixed(2)}%`,
-      `${item.avg_interaction_rate.toFixed(2)}%`,
+      `${item.avg_click_rate != null ? item.avg_click_rate.toFixed(2) : '0.00'}%`,
+      `${item.avg_interaction_rate != null ? item.avg_interaction_rate.toFixed(2) : '0.00'}%`,
     ]);
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
@@ -1466,7 +1466,7 @@ const XhsNotesOperationPage: React.FC = () => {
       width: 90,
       ellipsis: true,
       align: 'right' as const,
-      render: (value: number) => <span className={value >= 5 ? styles.positive : ''}>{value?.toFixed(2)}%</span>,
+      render: (value: number) => value != null ? <span className={value >= 5 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
     },
     {
       title: '平均互动率',
@@ -1475,7 +1475,7 @@ const XhsNotesOperationPage: React.FC = () => {
       width: 90,
       ellipsis: true,
       align: 'right' as const,
-      render: (value: number) => <span className={value >= 10 ? styles.positive : ''}>{value?.toFixed(2)}%</span>,
+      render: (value: number) => value != null ? <span className={value >= 10 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
     },
   ];
 

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Layout, Menu, Tooltip } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -98,7 +98,7 @@ const menuItems: MenuProps['items'] = [
     label: '直播获客',
     children: [
       { key: '/live/funnel', label: '直播漏斗', icon: <FunnelPlotOutlined /> },
-      { key: '/anchor-clusters', label: '主播聚类', icon: <UserOutlined /> },
+      { key: '/anchor-clusters', label: '主播分析', icon: <UserOutlined /> },
     ],
   },
   { type: 'divider' },
@@ -132,7 +132,7 @@ const findLabel = (items: MenuProps['items'], key: string): string => {
       if (found) return found;
     }
   }
-  return '页面';
+  return '';  // falsy — prevents recursion short-circuit; caller falls back to '页面'
 };
 
 export default function MainLayout() {
@@ -190,7 +190,7 @@ export default function MainLayout() {
             <span className={styles.brand}>省心投</span>
             <span className={styles.separator}>/</span>
             <span className={styles.current}>
-              {findLabel(menuItems, location.pathname)}
+              {findLabel(menuItems, location.pathname) || '页面'}
             </span>
           </div>
           <div className={styles.headerRight}>

@@ -15,7 +15,8 @@ import {
   UserOutlined, TeamOutlined, DollarOutlined, RiseOutlined,
   DownloadOutlined, SearchOutlined, ReloadOutlined,
 } from '@ant-design/icons';
-import MetricCard from '@/pages/Dashboard/components/MetricCard';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { ReportFooter } from '@/components/ReportFooter';
 const { Text } = Typography;
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -271,32 +272,25 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       </Card>
 
       {/* 顶部核心指标 */}
-      <div className={styles.metricsRow} style={{ marginTop: 16 }}>
-        <MetricCard title='总线索' value={data?.core_metrics?.total_leads || 0} formatter='number' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} />
-        <MetricCard title='总开口' value={data?.core_metrics?.total_mouth || 0} formatter='number' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} />
-        <MetricCard title='总开户' value={data?.core_metrics?.total_opened || 0} formatter='number' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} />
-        <MetricCard title='总有效户' value={data?.core_metrics?.total_valid_customer || 0} formatter='number' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} />
-      </div>
+      <MetricSection title='员工转化核心指标' description='当前筛选条件下的员工线索、开口、开户、有效户总览'>
+        <MetricCard title='总线索' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
+        <MetricCard title='总开口' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
+        <MetricCard title='总开户' value={data?.core_metrics?.total_opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false} />
+        <MetricCard title='总有效户' value={data?.core_metrics?.total_valid_customer || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false} />
+      </MetricSection>
 
-      {/* 双源对比卡片 */}
+      {/* 双源对比卡 */}
       {channelOverview && (
-        <Card size='small' style={{ marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
-            <Text strong>📊 双源数据对比（员工明细 vs 渠道口径）</Text>
-            <Tag color='blue'>{channelOverview.detail_caliber?.source || 'fact_conv_content'}</Tag>
-            <Tag color='orange'>{channelOverview.channel_caliber?.source || 'agg_daily_channel_open'}</Tag>
-          </div>
-          <Row gutter={16}>
-            <Col span={5}><MetricCard title='明细·线索' value={channelOverview.detail_caliber?.leads || 0} formatter='number' icon={<UserOutlined />} /></Col>
-            <Col span={5}><MetricCard title='明细·开户' value={channelOverview.detail_caliber?.opened || 0} formatter='number' icon={<TeamOutlined />} /></Col>
-            <Col span={5}><MetricCard title='明细·有效户' value={channelOverview.detail_caliber?.valid || 0} formatter='number' icon={<RiseOutlined />} /></Col>
-            <Col span={5}><MetricCard title='渠道·总开户' value={channelOverview.channel_caliber?.opens || 0} formatter='number' icon={<DollarOutlined />} /></Col>
-            <Col span={4}><MetricCard title='渠道·总有效户' value={channelOverview.channel_caliber?.valid || 0} formatter='number' icon={<RiseOutlined />} /></Col>
-          </Row>
-          <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginTop: 8 }}>
-            {channelOverview.note || '两个口径数字不一致是正常的（按用户口径"独立数据源"），仅作参考并列展示。'}
-          </div>
-        </Card>
+        <MetricSection
+          title='双源数据对比（员工明细 vs 渠道口径）'
+          
+        >
+          <MetricCard title='明细·线索' value={channelOverview.detail_caliber?.leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false}  />
+          <MetricCard title='明细·开户' value={channelOverview.detail_caliber?.opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false}  />
+          <MetricCard title='明细·有效户' value={channelOverview.detail_caliber?.valid || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false}  />
+          <MetricCard title='渠道·总开户' value={channelOverview.channel_caliber?.opens || 0} suffix='人' valueColor='var(--chart-color-2)' icon={<DollarOutlined style={{ color: 'var(--chart-color-2)' }} />} showWowChange={false}  />
+          <MetricCard title='渠道·总有效户' value={channelOverview.channel_caliber?.valid || 0} suffix='人' valueColor='var(--chart-color-5)' icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />} showWowChange={false}  />
+        </MetricSection>
       )}
 
       <Spin spinning={loading}>
@@ -352,6 +346,14 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           />
         </Card>
       </Spin>
+
+      <ReportFooter
+        sources={[
+          { label: '数据源', value: 'fact_conv_content（员工明细口径）+ agg_daily_channel_open（渠道口径，独立数据源）' },
+          { label: '主端点', value: 'POST /api/v1/employee-conversion/{analysis, weekly, analysis-channel-overview}' },
+        ]}
+        notes={'员工明细口径与渠道口径是 v3.1 拆分的两条独立链路（详见 docs/v3.1_报表重梳方案.md §四.2），数字不一致是预期的。'}
+      />
     </div>
   );
 };
