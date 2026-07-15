@@ -220,7 +220,7 @@ const DatabaseBackupPage: React.FC = () => {
           <span>
             {formatFileSize(size)}
             {isCompressed && (
-              <span style={{ color: 'var(--color-success)', fontSize: 'var(--text-sm)', marginLeft: 8 }}>
+              <span className={`${styles.sizeTag}`} style={{ color: "var(--color-success)", fontSize: "var(--text-sm)" }}>
                 (压缩)
               </span>
             )}
@@ -268,7 +268,7 @@ const DatabaseBackupPage: React.FC = () => {
         </div>
 
         {/* 操作按钮 */}
-        <Space style={{ marginBottom: 24 }}>
+        <Space size="middle" wrap className={styles.actionsBar}>
           <Button
             type="primary"
             icon={<CloudUploadOutlined />}
@@ -302,8 +302,7 @@ const DatabaseBackupPage: React.FC = () => {
         )}
 
         {/* 备份列表 */}
-        <div style={{ marginTop: 24 }}>
-          <h4 style={{ marginBottom: 12 }}>备份历史</h4>
+        <div className={styles.backupHistoryBlock}><h4 className={styles.backupHistoryTitle}>备份历史</h4>
           <Table
             columns={columns}
             dataSource={backupList}
@@ -316,12 +315,11 @@ const DatabaseBackupPage: React.FC = () => {
         </div>
 
         {/* 使用说明 */}
-        <Alert
-          style={{ marginTop: 24 }}
+        <Alert className={styles.usageAlert}
           type="info"
           title="使用说明"
           description={
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
+            <ul className={styles.usageList}>
               <li>
                 <strong>备份数据库到坚果云</strong>：将整个数据库文件上传到坚果云网盘
               </li>

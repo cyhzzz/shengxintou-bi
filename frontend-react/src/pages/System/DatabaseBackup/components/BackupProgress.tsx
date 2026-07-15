@@ -1,8 +1,9 @@
 /**
- * 备份进度组件
+ * 备份进度组件（v3.1.6 design token 化：去除 inline style）
  */
 import React from 'react';
 import { Progress, Space } from 'antd';
+import styles from './BackupProgress.module.scss';
 
 interface BackupProgressProps {
   status: string;
@@ -39,19 +40,23 @@ const BackupProgress: React.FC<BackupProgressProps> = ({
   };
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div className={styles.backupProgress}>
       <Progress
         percent={progress}
         status={getProgressStatus()}
         strokeColor={{
-          '0%': '#108ee9',
-          '100%': '#87d068',
+          '0%': 'var(--color-brand)',
+          '100%': 'var(--color-success)',
         }}
       />
-      <Space style={{ marginTop: 12 }}>
-        <span>状态: <strong>{getStatusText()}</strong></span>
-        <span>进度: <strong>{progress}%</strong></span>
-        {message && <span style={{ color: 'var(--color-text-secondary)' }}>{message}</span>}
+      <Space size="middle" wrap className={styles.statusLine}>
+        <span className={styles.statusLabel}>
+          状态: <strong className={styles.statusValue}>{getStatusText()}</strong>
+        </span>
+        <span className={styles.statusLabel}>
+          进度: <strong className={styles.statusValue}>{progress}%</strong>
+        </span>
+        {message && <span className={styles.statusMessage}>{message}</span>}
       </Space>
     </div>
   );

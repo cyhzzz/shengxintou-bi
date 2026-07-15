@@ -10,11 +10,11 @@
 }
 
 .customTitleText {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .chartContainer {

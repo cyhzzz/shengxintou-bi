@@ -1,8 +1,10 @@
 /**
- * 版本更新提示弹窗
+ * 版本更新提示弹窗（v3.1.6 design token 化：去除 inline style + emoji 改 WarningOutlined）
  */
 import React from 'react';
 import { Modal, Button } from 'antd';
+import { WarningOutlined } from '@ant-design/icons';
+import styles from './VersionUpdateModal.module.scss';
 
 interface VersionUpdateModalProps {
   visible: boolean;
@@ -31,19 +33,18 @@ const VersionUpdateModal: React.FC<VersionUpdateModalProps> = ({
       centered
       width={400}
     >
-      <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-        <h3 style={{ marginBottom: 16 }}>版本更新提示</h3>
-        <p style={{ color: 'var(--color-text-secondary)', marginBottom: 16 }}>{message}</p>
+      <div className={styles.modalBody}>
+        <WarningOutlined
+          className={styles.warningIcon}
+          style={{ color: 'var(--color-warning)' }}
+        />
+        <h3 className={styles.title}>版本更新提示</h3>
+        <p className={styles.message}>{message}</p>
         {cloudVersion && (
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginBottom: 16 }}>
-            云端版本: v{cloudVersion}
-          </p>
+          <p className={styles.meta}>云端版本: v{cloudVersion}</p>
         )}
         {supportContact && (
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-            支持联系: {supportContact}
-          </p>
+          <p className={styles.metaLast}>支持联系: {supportContact}</p>
         )}
       </div>
     </Modal>

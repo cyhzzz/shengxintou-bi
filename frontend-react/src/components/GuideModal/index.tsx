@@ -1,10 +1,12 @@
 /**
- * Markdown 指南弹窗组件
- * 用于展示数据导入指南
+ * Markdown 指南弹窗组件（v3.1.6：加 remark-gfm 支持表格 + rehype-sanitize 兜底 XSS + content 走 sanitizeText）
  */
 import React, { useState, useEffect } from 'react';
 import { Modal, Spin, Alert } from 'antd';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSanitize from 'rehype-sanitize';
+import { sanitizeText } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
 
 interface GuideModalProps {
@@ -51,6 +53,7 @@ const GuideModal: React.FC<GuideModalProps> = ({
     if (open && guideFile) {
       loadGuide();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, guideFile]);
 
   const loadGuide = async () => {
@@ -59,7 +62,7 @@ const GuideModal: React.FC<GuideModalProps> = ({
     setContent('');
 
     try {
-      const response = await fetch(`/documents/${guideFile}`);
+      const response = await fetch(/documents/);
       const contentType = response.headers.get('content-type') || '';
       if (!response.ok || !contentType.includes('text/markdown')) {
         throw new Error(
@@ -69,7 +72,7 @@ const GuideModal: React.FC<GuideModalProps> = ({
         );
       }
       const text = await response.text();
-      setContent(text);
+      setContent(sanitizeText(text));
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
@@ -91,7 +94,9 @@ const GuideModal: React.FC<GuideModalProps> = ({
     >
       {loading && (
         <div className={styles.loading}>
-          <Spin description="加载中..." />
+          <Spin tip="加载中..." size="large">
+            <div style={{ minHeight: 120 }} />
+          </Spin>
         </div>
       )}
 
@@ -106,7 +111,9 @@ const GuideModal: React.FC<GuideModalProps> = ({
 
       {!loading && !error && content && (
         <div className={styles.markdownBody}>
-          <ReactMarkdown>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+            {content}
+          </ReactMarkdown>
         </div>
       )}
     </Modal>
