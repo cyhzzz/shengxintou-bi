@@ -35,6 +35,7 @@ import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import metricStyles from '@/components/MetricCard/MetricCard.module.scss';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
@@ -114,15 +115,21 @@ const OmniChannelPage: React.FC = () => {
   const [trendMetric, setTrendMetric] = useState<'opens' | 'valid'>('opens');
   const [trendCategory, setTrendCategory] = useState<string>('合作机构');
 
-  // v3.1 §二.5：所有 3 个端点（summary / daily-trend / by-channel）都接受渠道类别 + 子渠道筛选
-  const filters = useMemo(
+  // v3.1.11：summary 概览只受日期范围影响，trend + by-channel 才受全部筛选影响
+  const summaryFilters = useMemo(
     () => ({
       start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
       end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
+    }),
+    [dateRange]
+  );
+  const filters = useMemo(
+    () => ({
+      ...summaryFilters,
       ...(selectedCategories.length > 0 ? { channel_categories: selectedCategories } : {}),
       ...(selectedSubChannels.length > 0 ? { sub_channels: selectedSubChannels } : {}),
     }),
-    [dateRange, selectedCategories, selectedSubChannels]
+    [summaryFilters, selectedCategories, selectedSubChannels]
   );
 
   const activeCategories = useMemo(
@@ -137,7 +144,7 @@ const OmniChannelPage: React.FC = () => {
     setLoading(true);
     try {
       const [sumRes, trendRes, channelResponses] = await Promise.all([
-        dataServiceOmniChannel.getOmniChannelSummary({ filters }),
+        dataServiceOmniChannel.getOmniChannelSummary({ filters: summaryFilters }),
         dataServiceOmniChannel.getOmniChannelDailyTrend({ filters }),
         Promise.all(
           activeCategories.map((category) =>
@@ -164,7 +171,7 @@ const OmniChannelPage: React.FC = () => {
   useEffect(() => {
     load().catch((err) => { message.error('全渠道数据加载失败，请重试'); console.error('[OmniChannel] load failed:', err); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, activeCategories, byChannelFilters]);
+  }, [summaryFilters, filters, activeCategories, byChannelFilters]);
 
   const topCategory = summary?.top_category;
   // 前端 summary state 类型补 top_category 字段（TS 宽类型 any 等价兼容）
@@ -354,6 +361,10 @@ const OmniChannelPage: React.FC = () => {
     <div className={styles.page}>
       {/* 筛选条：仅日期区间 + 刷新 */}
       <Card className={styles.filterCard} size="small">
+        <div className={metricStyles.sectionHeader}>
+          <div className={metricStyles.sectionTitle}>筛选条件</div>
+          <div className={metricStyles.sectionDesc}>日期区间决定概览卡；渠道类别 / 子渠道仅作用于下方趋势与明细</div>
+        </div>
         <Space size="middle" wrap>
           <span className={styles.label}>日期区间</span>
           <RangePicker
@@ -390,8 +401,8 @@ const OmniChannelPage: React.FC = () => {
               <Select.Option key={s} value={s}>{s}</Select.Option>
             ))}
           </Select>
-          <Button icon={<ReloadOutlined />} onClick={load}>
-            刷新
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>
+            问询
           </Button>
         </Space>
       </Card>
@@ -455,38 +466,37 @@ const OmniChannelPage: React.FC = () => {
         {/* ② 趋势图：支持一级/二级渠道切换 + 开户/有效户 维度切换 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={24}>
-            <Card
-              title={trendCardTitle}
-              size="small"
-              extra={
-                <Space size="small" wrap>
-                  <Segmented
-                    value={trendLevel}
-                    onChange={(v) => setTrendLevel(v as 'L1' | 'L2')}
-                    options={[
-                      { label: '一级渠道', value: 'L1' },
-                      { label: '二级渠道', value: 'L2' },
-                    ]}
+            <Card size="small">
+              <div className={metricStyles.sectionHeader}>
+                <div className={metricStyles.sectionTitle}>{trendCardTitle}</div>
+                <div className={metricStyles.sectionDesc}>日级开户 / 有效户趋势</div>
+              </div>
+              <Space size="small" wrap style={{ marginBottom: "var(--spacer-12)" }}>
+                <Segmented
+                  value={trendLevel}
+                  onChange={(v) => setTrendLevel(v as 'L1' | 'L2')}
+                  options={[
+                    { label: '一级渠道', value: 'L1' },
+                    { label: '二级渠道', value: 'L2' },
+                  ]}
+                />
+                <Segmented
+                  value={trendMetric}
+                  onChange={(v) => setTrendMetric(v as 'opens' | 'valid')}
+                  options={[
+                    { label: '开户人数', value: 'opens' },
+                    { label: '有效户人数', value: 'valid' },
+                  ]}
+                />
+                {trendLevel === 'L2' && (
+                  <Select
+                    value={trendCategory}
+                    style={{ width: 140 }}
+                    onChange={setTrendCategory}
+                    options={CATEGORY_ORDER.map((c) => ({ label: c, value: c }))}
                   />
-                  <Segmented
-                    value={trendMetric}
-                    onChange={(v) => setTrendMetric(v as 'opens' | 'valid')}
-                    options={[
-                      { label: '开户人数', value: 'opens' },
-                      { label: '有效户人数', value: 'valid' },
-                    ]}
-                  />
-                  {trendLevel === 'L2' && (
-                    <Select
-                      value={trendCategory}
-                      style={{ width: 140 }}
-                      onChange={setTrendCategory}
-                      options={CATEGORY_ORDER.map((c) => ({ label: c, value: c }))}
-                    />
-                  )}
-                </Space>
-              }
-            >
+                )}
+              </Space>
               {chartData.series.length === 0 ? (
                 <Empty description="该渠道下暂无二级渠道明细" />
               ) : (
