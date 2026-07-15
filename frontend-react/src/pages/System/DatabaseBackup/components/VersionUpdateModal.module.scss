@@ -1,0 +1,37 @@
+@use '../../../../styles/mixins' as *;
+
+.modalBody {
+  text-align: center;
+  padding: var(--spacer-20) 0;
+}
+
+.warningIcon {
+  font-size: 48px;
+  margin-bottom: var(--spacer-16);
+  line-height: 1;
+}
+
+.title {
+  margin: 0 0 var(--spacer-16) 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.message {
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacer-16) 0;
+  line-height: var(--leading-base);
+}
+
+.meta {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--spacer-16) 0;
+}
+
+.metaLast {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin: 0;
+}

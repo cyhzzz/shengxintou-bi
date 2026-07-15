@@ -11,3 +11,38 @@
     }
   }
 }
+
+.actionsBar {
+  margin-bottom: var(--spacer-24);
+}
+
+.backupHistoryBlock {
+  margin-top: var(--spacer-24);
+}
+
+.backupHistoryTitle {
+  margin: 0 0 var(--spacer-12) 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.usageAlert {
+  margin-top: var(--spacer-24);
+}
+
+.usageList {
+  margin: 0;
+  padding-left: 20px;
+  line-height: var(--leading-lg);
+}
+
+// 列表内 操作列 inline 数字+标签 复合渲染
+.sizeCell {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.sizeTag {
+  margin-left: var(--spacer-8);
+}

@@ -46,7 +46,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
   const getCurrentTheme = useCallback((): 'light' | 'dark' => {
     if (theme) return theme;
     // 跟随 data-theme 属性
-    const dataTheme = document.body.getAttribute('data-theme');
+    const dataTheme = document.documentElement.getAttribute('data-theme');
     if (dataTheme === 'dark') return 'dark';
     return 'light';
   }, [theme]);
@@ -148,10 +148,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
       chartRef.current.setOption(mergedOption, { notMerge: true });
     });
 
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     return () => observer.disconnect();
   }, [option, theme, getCurrentTheme]);

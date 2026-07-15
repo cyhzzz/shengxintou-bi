@@ -1,11 +1,11 @@
-/* 开户日历热力图 - 蓝色主调 */
+/* 开户日历热力图 - 蓝色主调（v3.1.8 7 行 × N 列布局） */
 
 .wrap {
-  padding: 4px 0;
+  padding: 8px 0;
 }
 
 .statsRow {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-size: 13px;
   color: var(--color-text-secondary);
 }
@@ -26,52 +26,68 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.legendText {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.legendDot {
+  display: inline-block;
+  cursor: default;
 }
 
 .body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .monthRow {
   display: grid;
-  align-items: center;
+  gap: 3px;
   font-size: 11px;
   color: var(--color-text-tertiary);
+  margin-bottom: 4px;
   min-width: 600px;
+  align-items: center;
 }
 
 .monthLabel {
   white-space: nowrap;
+  padding-left: 2px;
 }
 
 .grid {
   display: grid;
-  gap: 6px;
+  gap: 3px;
+  grid-template-rows: repeat(7, 14px);
   min-width: 600px;
 }
 
-.weekLabels {
+/* 左列：周几 labels（周一-周日） */
+.weekLabelsCol {
+  grid-column: 1;
+  grid-row: 1 / -1;
   display: grid;
-  grid-template-rows: repeat(7, 1fr);
-  gap: 2px;
-  font-size: 10px;
-  color: var(--color-text-tertiary);
+  grid-template-rows: repeat(7, 14px);
+  gap: 3px;
+  align-items: center;
 }
 
 .weekLabel {
+  height: 14px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 2px;
-  height: 14px;
+  padding-right: 4px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
 }
 
 .cell {
-  width: 14px;
+  width: 100%;
   height: 14px;
   border-radius: 2px;
   background-color: var(--color-fill-quaternary, #f5f5f5);
@@ -82,15 +98,12 @@
 .cell:hover {
   transform: scale(1.25);
   outline: 1px solid var(--color-brand, #1677ff);
+  z-index: 1;
 }
 
 .future {
-  opacity: 0.25;
+  opacity: 0.2;
   cursor: default;
-}
-
-.legendDot {
-  display: inline-block;
 }
 
 /* 5 档 蓝色 fillScale */

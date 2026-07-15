@@ -145,3 +145,8 @@
     font-size: var(--text-2xl);
   }
 }
+
+[data-theme='dark'] .metricCard--asset {
+  background: linear-gradient(135deg, var(--color-brand-bg) 0%, rgba(106, 159, 255, 0.06) 100%);
+  border-left-color: var(--color-brand-hover);
+}

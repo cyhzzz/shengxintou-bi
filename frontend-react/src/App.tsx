@@ -73,12 +73,12 @@ const lightTheme = {
       itemSelectedColor: '#1890ff',
     },
     Sider: {
-      lightSiderBg: '#f5f5f5',
+      lightSiderBg: '#ffffff',  // 与 MainLayout.module.scss var(--bg-content) 对齐
     },
     Layout: {
       headerBg: '#ffffff',
       bodyBg: '#f5f5f5',
-      siderBg: '#f5f5f5',
+      siderBg: '#ffffff',  // 与 MainLayout.module.scss var(--bg-content) 对齐
     },
     DatePicker: {
       cellActiveWithRangeBg: 'rgba(24, 144, 255, 0.08)',

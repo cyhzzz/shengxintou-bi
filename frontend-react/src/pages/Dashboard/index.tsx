@@ -9,7 +9,7 @@
  * - 运营效率: 单线索成本、单开户成本、单有效户成本
  */
 import React, { useEffect, useCallback, useState } from 'react';
-import { Row, Col, Spin, Tooltip, Typography } from 'antd';
+import { Row, Col, Spin, Tooltip, Typography, message } from 'antd';
 import {
   DollarOutlined,
   EyeOutlined,
@@ -93,7 +93,7 @@ const DashboardPage: React.FC = () => {
         const rows = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
         setCalendarData(rows.map((r: any) => ({ date: r.date, value: Number(r.opens ?? r.value ?? 0) })));
       })
-      .catch(() => { if (alive) setCalendarData([]); })
+      .catch((err) => { if (alive) { setCalendarData([]); message.warning('开户日历热力图加载失败，已使用空数据兜底'); console.error('[Dashboard] daily-calendar load failed:', err); } })
       .finally(() => { if (alive) setCalendarLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -239,7 +239,7 @@ const DashboardPage: React.FC = () => {
         <MetricSection
           title={
             <>
-              📊 <Text type="secondary">前端投放</Text>
+              <AimOutlined style={{ color: 'var(--color-brand)' }} /> <Text type="secondary">前端投放</Text>
             </>
           }
           description="广告投放与获取效果"
@@ -296,7 +296,7 @@ const DashboardPage: React.FC = () => {
         <MetricSection
           title={
             <>
-              💼 <Text type="secondary">后端转化</Text>
+              <TrophyOutlined style={{ color: 'var(--color-success)' }} /> <Text type="secondary">后端转化</Text>
             </>
           }
           description="客户获取与价值创造"
@@ -377,7 +377,7 @@ const DashboardPage: React.FC = () => {
         <MetricSection
           title={
             <>
-              ⚡ <Text type="secondary">运营效率</Text>
+              <ThunderboltOutlined style={{ color: 'var(--color-warning)' }} /> <Text type="secondary">运营效率</Text>
             </>
           }
           description="单位成本分析"
@@ -438,12 +438,17 @@ const DashboardPage: React.FC = () => {
           </Col>
         </Row>
 
-        {/* 互联网渠道开户日历热力图 */}
-        <Row gutter={[16, 16]} className={styles.chartsRow}>
-          <Col xs={24} lg={24}>
-            <CalendarHeatmap data={calendarData} loading={calendarLoading} />
-          </Col>
-        </Row>
+        {/* 互联网渠道开户日历热力图（7 行 × N 列布局，表头与 Dashboard 其他卡组一致） */}
+        <MetricSection
+          title={
+            <>
+              🔥 <Text type="secondary">开户日历热力图</Text>
+            </>
+          }
+          description="过去一年每日互联网引流开户密度（蓝色越深 = 当日开户数越多）"
+        >
+          <CalendarHeatmap data={calendarData} loading={calendarLoading} />
+        </MetricSection>
       </Spin>
     </div>
   );
