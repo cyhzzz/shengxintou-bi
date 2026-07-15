@@ -203,6 +203,10 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 9. 修改守则
 
+- **React 运行时 XXX is not defined 错误排查**：这类错误通常不是 Ant Design 版本问题，而是：① Vite HMR 缓存导致旧模块未被及时替换（刷新页面或 
+pm run build 即可）；② const / let 定义在前（TDZ 暂存死区），但被前面定义的 useState/useCallback scope 内的函数在闭包中引用。修复方法：把 const loadData / const doSomething 提到组件的 useState 初始化之后、其它内部函数（pplyFilters / 
+esetFilters）之前。③ 使用 import { X } from 'antd' 时确保 X 确实从 antd 导出（如 Typography 在 antd v5 要从 ntd 而非独立路径导入）。④ 组件文件有 BOM（UTF-8 BOM）时 Vite 解析可能静默截断模块导出，在全体 TSX 文件中统一使用 UTF-8 without BOM。
+
 - 修改 `AGENTS.md` 或 `CLAUDE.md` 必须保持两者内容完全一致（SHA256 一致）。
 - 修改业务查询前，先确认端点当前使用的源表和口径，不要照搬 README 或旧文档的过期描述。
 - 不要改 `models_v2.py` 的中文列名来迎合前端字段；这些列名要与源表 / `to_sql` 结果对齐。
