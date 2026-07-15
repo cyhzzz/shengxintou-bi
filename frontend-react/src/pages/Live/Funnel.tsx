@@ -11,7 +11,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip } from 'antd';
-import { ReloadOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -63,6 +63,11 @@ const LiveFunnelPage: React.FC = () => {
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     platforms: platformFilter.length ? platformFilter : undefined,
   }), [dateRange, platformFilter]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setPlatformFilter([]);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -182,7 +187,8 @@ const LiveFunnelPage: React.FC = () => {
             disabled
             style={{ minWidth: 100 }}
           />
-          <a onClick={load}><ReloadOutlined /> 刷新</a>
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
 
@@ -193,42 +199,49 @@ const LiveFunnelPage: React.FC = () => {
             value={totals.anchors}
             valueColor="var(--color-brand)"
             icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`当前期间活跃主播数量·按客户来源聚合`}
             showWowChange={false}
           />
           <MetricCard
-            title="总线索"
+            title="线索量"
             value={totals.leads}
             valueColor="var(--color-success)"
             icon={<UserOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`主播引流客户线索总数`}
             showWowChange={false}
           />
           <MetricCard
-            title="开口"
+            title="客户开口"
             value={totals.mouth}
             valueColor="var(--chart-color-7)"
             icon={<RiseOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            description={`线索中已口头回复或沟通的客户`}
             showWowChange={false}
           />
           <MetricCard
             title="有效线索"
             value={totals.valid_lead}
             valueColor="var(--chart-color-5)"
+            icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            description={`已确认有意向的有效线索`}
             showWowChange={false}
           />
           <MetricCard
-            title="开户"
+            title="开户量"
             value={totals.opened}
             valueColor="var(--color-error)"
             icon={<FireOutlined style={{ color: 'var(--color-error)' }} />}
+            description={`有效线索中成功开户人数`}
             showWowChange={false}
           />
           <MetricCard
-            title="总资产"
+            title="引流资产"
             value={totals.assets}
             prefix="¥"
             formatter="currency"
             valueColor="var(--color-warning)"
             icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />}
+            description={`主播引流客户总资产`}
             showWowChange={false}
           />
         </MetricSection>

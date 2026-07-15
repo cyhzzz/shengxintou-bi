@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Select, DatePicker, Space, Spin, Tag, Button } from 'antd';
-import { BankOutlined, CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, TeamOutlined } from '@ant-design/icons';
+import { BankOutlined, CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -34,6 +34,11 @@ const AppMarketFunnelPage: React.FC = () => {
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     app_markets: appMarketFilter.length ? appMarketFilter : undefined,
   }), [dateRange, appMarketFilter]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setAppMarketFilter([]);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -65,7 +70,8 @@ const AppMarketFunnelPage: React.FC = () => {
           <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
             onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
             style={{ minWidth: 220 }} maxTagCount='responsive' />
-          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
       <Spin spinning={loading}>
@@ -76,6 +82,7 @@ const AppMarketFunnelPage: React.FC = () => {
             value={downloads}
             valueColor="var(--color-brand)"
             icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`激活 APP 数量 · 应用市场漏斗顶端基数`}
             showWowChange={false}
           />
           <MetricCard
@@ -83,6 +90,7 @@ const AppMarketFunnelPage: React.FC = () => {
             value={openCount}
             valueColor="var(--chart-color-7)"
             icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            description={`从激活成功开户人数 · 含提交开户、身份证、银行卡全流程`}
             showWowChange={false}
           />
           <MetricCard
@@ -90,6 +98,7 @@ const AppMarketFunnelPage: React.FC = () => {
             value={depositCount}
             valueColor="var(--chart-color-5)"
             icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            description={`开户后入金人数 · 含任意金额首笔入金`}
             showWowChange={false}
           />
           <MetricCard
@@ -97,14 +106,16 @@ const AppMarketFunnelPage: React.FC = () => {
             value={validCount}
             valueColor="var(--color-success)"
             icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`入金且资产达标有效户`}
             showWowChange={false}
           />
           <MetricCard
-            title="激活→有效"
+            title="整体转化率"
             value={overallRate}
             formatter="percent"
             valueColor="var(--color-error)"
             icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+            description={`激活 APP → 有效户整体转化率`}
             showWowChange={false}
           />
         </MetricSection>

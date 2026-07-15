@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Select, DatePicker, Space, Spin, Table, Tag, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
@@ -33,6 +33,11 @@ const AppMarketComparisonPage: React.FC = () => {
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     channel_types: channelType.length ? channelType : undefined,
   }), [dateRange, channelType]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setChannelType([]);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -121,7 +126,8 @@ const AppMarketComparisonPage: React.FC = () => {
             value={channelType} onChange={setChannelType}
             options={opts.channel_types.map((t) => ({ label: t, value: t }))}
             style={{ minWidth: 180 }} maxTagCount='responsive' />
-          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
       <Spin spinning={loading}>

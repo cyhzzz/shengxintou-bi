@@ -29,7 +29,7 @@ import {
   Select,
   message,
 } from 'antd';
-import { BankOutlined, CheckCircleOutlined, ReloadOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
+import { BankOutlined, CheckCircleOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
@@ -402,7 +402,7 @@ const OmniChannelPage: React.FC = () => {
             ))}
           </Select>
           <Button type="primary" icon={<SearchOutlined />} onClick={load}>
-            问询
+            查询
           </Button>
         </Space>
       </Card>
@@ -411,27 +411,30 @@ const OmniChannelPage: React.FC = () => {
         {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
         <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
           <MetricCard
-            title="总开户成功人数"
+            title="开户成功"
             value={totals.opens}
             suffix="人"
             valueColor="var(--color-brand)"
             icon={<TeamOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`累计开户成功人数 · 当前区间总开户 ${totals.opens.toLocaleString()} 人`}
             showWowChange={false}
           />
           <MetricCard
-            title="总入金户数"
+            title="入金户数"
             value={totals.deposit}
             suffix="人"
             valueColor="var(--chart-color-7)"
             icon={<BankOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            description={`累计入金户数 · 当前区间总入金 ${totals.deposit.toLocaleString()} 人`}
             showWowChange={false}
           />
           <MetricCard
-            title="总有效户数"
+            title="有效户数"
             value={totals.valid}
             suffix="人"
             valueColor="var(--color-success)"
             icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`累计有效户数 · 当前区间总有效 ${totals.valid.toLocaleString()} 人`}
             showWowChange={false}
           />
           {(() => {
@@ -451,12 +454,12 @@ const OmniChannelPage: React.FC = () => {
             const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
             return (
               <MetricCard
-                title="互联网渠道开户数"
+                title="渠道开户"
                 value={openedCount}
                 suffix="户"
                 valueColor="var(--chart-color-2)"
                 icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
-                description={`KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天） · 互联网引流入金 ${depositCnt.toLocaleString()} 户 / 有效 ${validCnt.toLocaleString()} 户`}
+                description={`互联网渠道开户 · KPI 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 年进度 ${(elapsedRatio * 100).toFixed(1)}%（${dayOfYear}/366） · 入金 ${depositCnt.toLocaleString()} / 有效 ${validCnt.toLocaleString()}`}
                 showWowChange={false}
               />
             );
