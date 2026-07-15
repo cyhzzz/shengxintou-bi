@@ -1,0 +1,29 @@
+@use '../../../../styles/mixins' as *;
+
+.backupProgress {
+  margin-bottom: var(--spacer-24);
+}
+
+.statusLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacer-12);
+  margin-top: var(--spacer-12);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.statusLabel {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+.statusValue {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.statusMessage {
+  color: var(--color-text-secondary);
+}
