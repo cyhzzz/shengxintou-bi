@@ -132,3 +132,16 @@
   margin-top: var(--spacer-16);
   border-top: 1px solid var(--border-default);
 }
+.githubVersionBlock {
+  margin-top: var(--spacer-8);
+  padding-top: var(--spacer-8);
+  border-top: 1px dashed var(--border-default);
+}
+
+.networkHint {
+  margin-top: var(--spacer-4);
+}
+
+.updateTip {
+  margin-top: var(--spacer-4);
+}
