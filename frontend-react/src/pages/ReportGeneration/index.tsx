@@ -19,6 +19,8 @@ import {
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
+  SettingOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import styles from './index.module.scss';
 import { generateWeeklyReportHTML } from './utils/weeklyReportTemplate';
@@ -341,7 +343,7 @@ const ReportGeneration: React.FC = () => {
       <div className={styles.controlPanel}>
         <div className={styles.panelHeader}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>⚙️ 报告配置</span>
+            <span className={styles.cardTitle}><SettingOutlined style={{ color: 'var(--color-brand)', marginRight: 8 }} />报告配置</span>
           </div>
         </div>
 
@@ -428,7 +430,7 @@ const ReportGeneration: React.FC = () => {
       <div className={`${styles.previewPanel} ${isFullscreen ? styles.fullscreen : ''}`} ref={previewRef}>
         <div className={styles.previewHeader}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>👁️ 报告预览</span>
+            <span className={styles.cardTitle}><EyeOutlined style={{ color: 'var(--color-brand)', marginRight: 8 }} />报告预览</span>
           </div>
           <div className={styles.previewActions}>
             <Button

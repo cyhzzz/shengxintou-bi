@@ -189,7 +189,7 @@ const AgencyAnalysisPage: React.FC = () => {
     });
     const platforms = Array.from(new Set(trend.series.map((s) => s.platform))).filter(Boolean);
     // 堆叠柱状图（按平台分色堆叠，按日期累加）
-    const PLATFORM_BAR_COLORS = ['#1677ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96', '#13c2c2', '#faad14', '#2f54eb'];
+    const PLATFORM_BAR_COLORS = ['var(--chart-color-1)','var(--chart-color-2)','var(--chart-color-3)','var(--chart-color-4)','var(--chart-color-5)','var(--chart-color-6)','var(--chart-color-7)','var(--chart-color-8)'];
     const seriesData = platforms.map((p, idx) => ({
       name: p,
       type: 'bar' as const,
