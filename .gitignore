@@ -93,7 +93,10 @@ htmlcov/
 # transient webdav tmp
 database/tmp_*.db.gz
 
-# transient scripts
+# transient scripts (one-shot patch / sync helpers — per AGENTS.md § 8 / § 10，不要入索引)
+scripts/_*.py
+
+
 
 tmp_*.py
 
