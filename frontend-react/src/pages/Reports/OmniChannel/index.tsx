@@ -13,6 +13,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { Typography } from 'antd';
 import {
   Card,
   Row,
@@ -29,7 +30,7 @@ import {
   Select,
   message,
 } from 'antd';
-import { BankOutlined, CheckCircleOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
+import { BankOutlined, CheckCircleOutlined, GlobalOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
@@ -172,6 +173,12 @@ const OmniChannelPage: React.FC = () => {
     load().catch((err) => { message.error('全渠道数据加载失败，请重试'); console.error('[OmniChannel] load failed:', err); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summaryFilters, filters, activeCategories, byChannelFilters]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setSelectedCategories([]);
+    setSelectedSubChannels([]);
+  };
 
   const topCategory = summary?.top_category;
   // 前端 summary state 类型补 top_category 字段（TS 宽类型 any 等价兼容）
@@ -361,10 +368,6 @@ const OmniChannelPage: React.FC = () => {
     <div className={styles.page}>
       {/* 筛选条：仅日期区间 + 刷新 */}
       <Card className={styles.filterCard} size="small">
-        <div className={metricStyles.sectionHeader}>
-          <div className={metricStyles.sectionTitle}>筛选条件</div>
-          <div className={metricStyles.sectionDesc}>日期区间决定概览卡；渠道类别 / 子渠道仅作用于下方趋势与明细</div>
-        </div>
         <Space size="middle" wrap>
           <span className={styles.label}>日期区间</span>
           <RangePicker
@@ -404,12 +407,13 @@ const OmniChannelPage: React.FC = () => {
           <Button type="primary" icon={<SearchOutlined />} onClick={load}>
             查询
           </Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
 
       <Spin spinning={loading}>
         {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
-        <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
+        <MetricSection title={<><GlobalOutlined style={{ color: 'var(--color-brand)' }} /> <Typography.Text type="secondary">全渠道获客概览</Typography.Text></>} description="开户、入金与有效户核心表现">
           <MetricCard
             title="开户成功"
             value={totals.opens}
