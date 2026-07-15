@@ -53,7 +53,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
     for (let i = 0; i < totalWeeks * 7; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       const isFuture = d.getTime() > endD.getTime();
       const v = isFuture ? 0 : (map.get(dateStr) || 0);
       let level = 0;
