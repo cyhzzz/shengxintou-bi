@@ -167,7 +167,7 @@ const ConversionFunnelPage: React.FC = () => {
               options={PLATFORM_OPTIONS}
               allowClear
             />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button type="primary" icon={<SearchOutlined />} onClick={loadData}>查询</Button>
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
             <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>
               当前只针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制。
