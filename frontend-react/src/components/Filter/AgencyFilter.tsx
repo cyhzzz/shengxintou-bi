@@ -28,7 +28,11 @@ const AgencyFilter: React.FC<AgencyFilterProps> = ({
     const loadAgencies = async () => {
       const response = await metadataService.getMetadata();
       if (response.success && response.data) {
-        setAgencyOptions(response.data.agencies);
+        setAgencyOptions(response.data.agencies.map((a) => ({
+          value: a.value,
+          label: a.label,
+          full_names: a.full_names || [a.value],
+        })));
       }
     };
     loadAgencies();

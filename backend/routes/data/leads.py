@@ -5,6 +5,7 @@ from sqlalchemy import func, and_, or_
 from backend.models_v2 import FactConvContent
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import expand_short_to_fulls
 
 bp = Blueprint('leads', __name__)
 
@@ -72,7 +73,7 @@ def get_leads_detail():
     if platforms:
         q = q.filter(FactConvContent.平台来源.in_(platforms))
     if agencies:
-        q = q.filter(FactConvContent.广告代理商.in_(agencies))
+        q = q.filter(FactConvContent.广告代理商.in_(expand_short_to_fulls(agencies)))
     if employee_name:
         q = q.filter(FactConvContent.添加员工姓名 == employee_name)
     if is_opened_account == 'true':
@@ -163,7 +164,7 @@ def get_anchor_clusters():
     if platforms_filter:
         base_q = base_q.filter(FactConvContent.平台来源.in_(platforms_filter))
     if agencies_filter:
-        base_q = base_q.filter(FactConvContent.广告代理商.in_(agencies_filter))
+        base_q = base_q.filter(FactConvContent.广告代理商.in_(expand_short_to_fulls(agencies_filter)))
 
     base_q = base_q.group_by(FactConvContent.客户来源, FactConvContent.平台来源)
     rows = base_q.all()

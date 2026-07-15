@@ -5,6 +5,7 @@ from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import enrich_items, expand_short_to_fulls, full_to_short
 
 bp = Blueprint('agency_analysis', __name__)
 
@@ -43,7 +44,7 @@ def get_agency_analysis():
     if start_date and end_date:
         q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
     if platforms: q = q.filter(AggVendorDaily.平台.in_(platforms))
-    if agencies: q = q.filter(AggVendorDaily.厂商.in_(agencies))
+    if agencies: q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls(agencies)))
     if business_models: q = q.filter(AggVendorDaily.业务模式.in_(business_models))
     q = q.group_by(AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商)
     rows = q.all()
@@ -117,7 +118,7 @@ def get_agency_analysis():
             'account_cost': round(grand['cost'] / grand['opened'], 2) if grand['opened'] > 0 else 0,
         }
     }
-    final_summary = summary + list(plat_sub.values()) + [grand_row]
+    final_summary = enrich_items(summary) + list(plat_sub.values()) + [grand_row]
 
     tq = db.session.query(
         AggVendorDaily.日期,
@@ -134,17 +135,19 @@ def get_agency_analysis():
     if start_date and end_date:
         tq = tq.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
     if platforms: tq = tq.filter(AggVendorDaily.平台.in_(platforms))
-    if agencies: tq = tq.filter(AggVendorDaily.厂商.in_(agencies))
+    if agencies: tq = tq.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls(agencies)))
     if business_models: tq = tq.filter(AggVendorDaily.业务模式.in_(business_models))
     tq = tq.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商).order_by(AggVendorDaily.日期)
     trend_rows = tq.all()
     series = []
     for r in trend_rows:
+        agency_full = r.厂商 or ''
         series.append({
             'date': str(r.日期),
             'platform': r.平台,
             'business_model': r.业务模式,
-            'agency': r.厂商,
+            'agency': agency_full,
+            'agency_short': full_to_short(agency_full) or agency_full,
             'metrics': {
                 'cost': round(f(r.cost), 2),
                 'impressions': i(r.impressions),
