@@ -192,6 +192,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **`POST /api/v1/employee-conversion/analysis`** 顶部核心指标不过滤，从 `agg_daily_channel_open` + `agg_vendor_daily` 平台概览计算。
 - **`POST /api/v1/employee-conversion/analysis-channel-overview`**：员工渠道概览，数据源 `agg_daily_channel_open`，**与 detail 端点是独立口径**。
 - **`POST /api/v1/reports/omni-channel/*`**：单一独立数据源 `agg_daily_channel_open`，**禁止混合** fact_conv_* / agg_vendor_daily。第 4 卡用 `internetRow.opens`（按 `channel_category=互联网引流` 拆），KPI 完成率按 `dayOfYear/366` 时间折算。
+- **代理商字段三态**：`DimVendor` 含 `agency_name`（全称，如“黑龙江广视科技有限公司”）、`agency_short`（简称/显示名，如“广视科技”）、`agency_letter`（拼音简称，如“gs”）。`agg_vendor_daily.厂商` 和 `fact_conv_content.广告代理商` 存的是**全称**。同一代理商在不同平台的全称可能有差异（如“量子” vs “量子科技”），但**简称是共同的**。前端代理商筛选目前用 `DimVendor.agency_name` + `AggVendorDaily.厂商` 全称做 value，有改进空间。`AbbreviationManagement`（DimVendor CRUD）是维护简称->全称映射的唯一入口。
 - **`POST /api/v1/reports/app-market/*`**：数据源 `fact_conv_appmarket`（明细）+ `agg_vendor_daily`（创意），双源。
 - **`POST /api/v1/reports/omni-channel/daily-calendar`**（v3.1.5+）：过去 N 天每日开户热力图数据（默认 365，范围 7..366）。
 - **`/api/v1/data-freshness`**：返回 5 张新表数据状态（`critical` >14d / `warning` >5d / `normal` ≤5d）。
