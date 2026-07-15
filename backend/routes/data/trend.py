@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """趋势数据接口（v2 - 查 agg_vendor_daily）"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
@@ -50,7 +50,7 @@ def get_trend():
     if filters.get('platforms'):
         q = q.filter(AggVendorDaily.平台.in_([str(p) for p in filters['platforms']]))
     if filters.get('agencies'):
-        q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls([str(a) for a in filters['agencies']])))
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in filters['agencies']]))
     if filters.get('business_models'):
         q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in filters['business_models']]))
     if granularity == 'daily':
@@ -100,7 +100,7 @@ def get_trend_daily():
     if platforms:
         q = q.filter(AggVendorDaily.平台.in_(platforms))
     if agencies:
-        q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls(agencies)))
+        q = q.filter(AggVendorDaily.厂商.in_(agencies))
     if business_models:
         q = q.filter(AggVendorDaily.业务模式.in_(business_models))
     q = q.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.厂商, AggVendorDaily.业务模式).order_by(AggVendorDaily.日期)
