@@ -20,7 +20,7 @@ import styles from './index.module.scss';
 const { RangePicker } = DatePicker;
 
 const AnchorClusterPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
   const [items, setItems] = useState<any[]>([]);

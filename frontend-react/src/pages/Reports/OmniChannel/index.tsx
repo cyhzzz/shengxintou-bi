@@ -36,23 +36,22 @@ import { EChartsComponent } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataServiceOmniChannel } from '@/services/dataService';
+import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
 
 // 4 大类颜色（按实际 SUM 开户降序：合作 > 自然 > 员工 > 互联网）
+// ⚠️ ECharts 不能解析 CSS var()，必须用真实 hex。JSX 用法仍然兼容（直接当 background）。
 const CATEGORY_COLORS: Record<string, string> = {
-  '合作机构': 'var(--chart-color-1)',
-  '自然流入': 'var(--chart-color-2)',
-  '员工开户': 'var(--chart-color-3)',
-  '互联网引流': 'var(--chart-color-4)',
+  '合作机构': ECHARTS_COLORS[0],
+  '自然流入': ECHARTS_COLORS[1],
+  '员工开户': ECHARTS_COLORS[2],
+  '互联网引流': ECHARTS_COLORS[3],
 };
 const CATEGORY_ORDER = ['合作机构', '自然流入', '员工开户', '互联网引流'];
 // 二级渠道（渠道名称）调色板，按出现顺序循环取色
-const SUBCHANNEL_PALETTE = [
-  'var(--chart-color-1)', 'var(--chart-color-2)', 'var(--chart-color-3)', 'var(--chart-color-4)',
-  'var(--chart-color-5)', 'var(--chart-color-6)', 'var(--chart-color-7)', 'var(--chart-color-8)',
-];
+const SUBCHANNEL_PALETTE = ECHARTS_COLORS;
 
 interface SubRow {
   channel_category: string;
@@ -84,7 +83,7 @@ interface TrendRow {
 }
 
 const OmniChannelPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
   const [summary, setSummary] = useState<{
     totals: { opens: number; deposit: number; valid: number };
     by_category: CategoryRow[];
@@ -201,7 +200,7 @@ const OmniChannelPage: React.FC = () => {
       type: 'line' as const,
       smooth: true,
       symbolSize: 6,
-      itemStyle: { color: isL1 ? CATEGORY_COLORS[k] : SUBCHANNEL_PALETTE[idx % 8] },
+      itemStyle: { color: isL1 ? CATEGORY_COLORS[k] : pickEChartsColor(idx) },
       data: dates.map((d) => Number(byDate.get(d)?.[k] || 0)),
     }));
     return { dates, series };

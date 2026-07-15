@@ -46,7 +46,7 @@ interface ApiShape {
 }
 
 const EmployeeConversionAnalysisPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
+  const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [leadType, setLeadType] = useState<string>('all');

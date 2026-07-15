@@ -7,6 +7,7 @@ import { Radio, Card, Spin } from 'antd';
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { TrendDataItem } from '@/types';
+import { pickEChartsColor } from '@/utils/echartsColors';
 import styles from './TrendChart.module.scss';
 
 // 扩展指标类型，支持更多指标
@@ -141,11 +142,11 @@ const TrendChart: React.FC<TrendChartProps> = ({
           symbol: 'circle',
           symbolSize: 6,
           itemStyle: {
-            color: 'rgb(24, 144, 255)',
+            color: pickEChartsColor(categories.indexOf(cat)),
           },
           connectNulls: true, // 连接空值
           lineStyle: {
-            color: 'rgb(24, 144, 255)',
+            color: pickEChartsColor(categories.indexOf(cat)),
             width: 2,
           },
           areaStyle: {
@@ -156,8 +157,8 @@ const TrendChart: React.FC<TrendChartProps> = ({
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
-                { offset: 1, color: 'rgba(24, 144, 255, 0)' },
+                { offset: 0, color: pickEChartsColor(categories.indexOf(cat)) + '4D' },
+                { offset: 1, color: pickEChartsColor(categories.indexOf(cat)) + '00' },
               ],
             },
           },
@@ -173,11 +174,11 @@ const TrendChart: React.FC<TrendChartProps> = ({
           symbol: 'circle',
           symbolSize: 6,
           itemStyle: {
-            color: 'rgb(24, 144, 255)',
+            color: pickEChartsColor(0),
           },
           connectNulls: true,
           lineStyle: {
-            color: 'rgb(24, 144, 255)',
+            color: pickEChartsColor(0),
             width: 2,
           },
           areaStyle: {
@@ -188,8 +189,8 @@ const TrendChart: React.FC<TrendChartProps> = ({
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
-                { offset: 1, color: 'rgba(24, 144, 255, 0)' },
+                { offset: 0, color: pickEChartsColor(0) + '4D' },
+                { offset: 1, color: pickEChartsColor(0) + '00' },
               ],
             },
           },
@@ -302,7 +303,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
   return (
     <Card
       className={styles.trendCard}
-      variant="borderless"
+      size="small"
     >
       <Spin spinning={loading}>
         {/* 图表标题和控制栏 */}

@@ -13,7 +13,7 @@ import styles from './index.module.scss';
 const { RangePicker } = DatePicker;
 
 const AppMarketDetailPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-06-30')]);
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
   const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
   const [channelType, setChannelType] = useState<string[]>([]);
   const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });

@@ -54,11 +54,8 @@ const XhsNotesListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(50);
 
   // 筛选状态
-  const [dataDateRange, setDataDateRange] = useState<[string, string]>(() => {
-    const today = dayjs();
-    const thirtyDaysAgo = today.subtract(30, 'day');
-    return [thirtyDaysAgo.format('YYYY-MM-DD'), today.format('YYYY-MM-DD')];
-  });
+  // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31
+  const [dataDateRange, setDataDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [publishDateRange, setPublishDateRange] = useState<[string, string]>(['', '']);
   const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
   const [selectedContentTypes, setSelectedContentTypes] = useState<string[]>([]);
