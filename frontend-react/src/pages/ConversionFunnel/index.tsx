@@ -191,6 +191,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={contentMetrics.leads}
                           valueColor="var(--color-brand)"
                           icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />}
+                          description={`内容平台引流线索数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -198,6 +199,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={contentMetrics.mouth}
                           valueColor="var(--chart-color-7)"
                           icon={<MessageOutlined style={{ color: 'var(--chart-color-7)' }} />}
+                          description={`线索中已沟通开口的客户数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -205,6 +207,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={contentMetrics.valid}
                           valueColor="var(--color-success)"
                           icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+                          description={`有效户数·入金且资产达标`}
                           showWowChange={false}
                         />
                       </MetricSection>
@@ -252,6 +255,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={appmarketMetrics.activate}
                           valueColor="var(--color-brand)"
                           icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
+                          description={`应用市场激活 APP 数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -259,6 +263,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={appmarketMetrics.opened}
                           valueColor="var(--chart-color-7)"
                           icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+                          description={`激活后成功开户人数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -266,6 +271,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={appmarketMetrics.deposit}
                           valueColor="var(--chart-color-5)"
                           icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
+                          description={`开户后首笔入金人数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -273,6 +279,7 @@ const ConversionFunnelPage: React.FC = () => {
                           value={appmarketMetrics.valid}
                           valueColor="var(--color-success)"
                           icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+                          description={`有效户数·入金且资产达标`}
                           showWowChange={false}
                         />
                       </MetricSection>
