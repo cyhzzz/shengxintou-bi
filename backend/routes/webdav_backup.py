@@ -149,11 +149,26 @@ def list_backups():
         })
 
     except Exception as e:
+        # v3.1.6: 区分上游不可达 vs. 代码异常。
+        # webdav_client._wrap_conn_err 已经把 SSL / 网络错误包装为可读中文 message。
+        # 这里用 502 Bad Gateway 标识 远端 WebDAV 上游不可达，便于前端按
+        # status code 区分 5xx 类别（5xx = 代码，502 = 上游/网络层）。
+        msg = str(e)
+        is_conn_err = (
+            ('无法连接' in msg) or
+            ('WebDAV' in msg and ('SSL' in msg or '握手' in msg or '重置' in msg or '拒绝' in msg))
+        )
+        if is_conn_err:
+            status_code = 502
+            error_code = 'UPSTREAM_UNAVAILABLE'
+        else:
+            status_code = 500
+            error_code = 'LIST_FAILED'
         return jsonify({
             'success': False,
-            'error': 'LIST_FAILED',
-            'message': f'获取备份列表失败: {str(e)}'
-        }), 500
+            'error': error_code,
+            'message': f'获取备份列表失败: {msg}'
+        }), status_code
 
 
 @bp.route('/test', methods=['GET'])
