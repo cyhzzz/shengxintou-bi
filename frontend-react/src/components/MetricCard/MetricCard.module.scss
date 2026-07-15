@@ -19,32 +19,21 @@
 }
 
 .metricGrid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacer-16);
-
-  > * {
-    // 默认 4 列基线（与 Dashboard 互联网渠道数据概览 Row/Col lg={6} 对齐）
-    flex: 1 1 calc(25% - var(--spacer-16));
-    min-width: var(--metric-card-min-width, 180px);
-  }
+  // grid items 默认 stretch，配合 .metricCard { height: 100%; } 自然等高（v3.1.11）
 
   @media (max-width: 1200px) {
-    > * {
-      flex: 1 1 calc(33.333% - var(--spacer-16));
-    }
+    grid-template-columns: repeat(3, 1fr);
   }
 
   @media (max-width: 768px) {
-    > * {
-      flex: 1 1 calc(50% - var(--spacer-16));
-    }
+    grid-template-columns: repeat(2, 1fr);
   }
 
   @media (max-width: 576px) {
-    > * {
-      flex: 1 1 100%;
-    }
+    grid-template-columns: 1fr;
   }
 }
 
