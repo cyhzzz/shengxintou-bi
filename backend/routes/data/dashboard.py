@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """仪表盘数据接口（v2.1 - 后端返 sums，前端可自计算 rates）
 
 v2.1 调整：
@@ -13,6 +13,7 @@ from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily, DimAccount
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import expand_short_to_fulls
 from datetime import datetime, timedelta
 
 bp = Blueprint('dashboard', __name__)
@@ -34,7 +35,7 @@ def _apply_filters(q, filters, model):
     if filters.get('platforms'):
         q = q.filter(model.平台.in_([str(p) for p in filters['platforms']]))
     if filters.get('agencies'):
-        q = q.filter(model.厂商.in_([str(a) for a in filters['agencies']]))
+        q = q.filter(model.厂商.in_(expand_short_to_fulls([str(a) for a in filters['agencies']])))
     if filters.get('business_models'):
         q = q.filter(model.业务模式.in_([str(b) for b in filters['business_models']]))
     return q

@@ -15,19 +15,14 @@
 
 ### v3.1.12 已落地（2026-07-15）
 
-- **筛选按钮统一**：OmniChannel / AnchorCluster / Live/Funnel / AppMarket×4 共 7 个报表筛选卡按钮改为「查询」(primary+SearchOutlined)+「重置」(default+ReloadOutlined，重置到 2026-01-01 ~ 2026-12-31 + 全部空筛选项)；每个文件新增 `resetFilters()` 函数。
-- **MetricCard 4-6 字标题 + icon + description**：OmniChannel(4)、AppMarket/Funnel(5)、AppMarket/Creative(5)、ConversionFunnel(7)、AgencyAnalysis(6)、Live/Funnel(6)、AnchorCluster(5) 共 38 张卡片统一适配，不满足 4-6 字的（如 激活APP→4 字保留、入金/有效户→4 字）加 description 小字说明。Dashboard 互联网渠道数据概览、XhsNotes/Operation 例外不动。
-- **AppMarket/Detail 字段补全**：表格 + Modal 浮窗补 应用市场名称 列；表头改为纯标题 + 小字说明字段；重置函数恢复默认日期 + 筛选。
-- **侧栏菜单滚动加固**：MainLayout.module.scss .menu 内层 :global(.ant-menu) height:100% + overflow-y:auto，全展开时底部菜单不再被遮挡；.sider overflow:hidden + min-height:0。
-- **Query 按钮文字修复**：OmniChannel 原笔误「问询」→「查询」（v3.1.11 的 commit message 写查询但代码写成了问询）。
-- **build**：`npm run build` 0 error（5988 modules，~27s）→ dist 已刷新 → 5000 端口同步。
-
-- **全渠道获客筛选卡 + 趋势图卡 表头样式与 Dashboard 互联网渠道数据概览统一**：筛选卡 / 趋势图卡顶部加 sectionHeader（title + desc），跟其他报表头视觉完全一致。
-- **全渠道获客概览 4 卡高度对齐**：MetricCard.module.scss .metricGrid flex 改 grid，grid items 默认 stretch 配合 .metricCard { height: 100%; } 自然等高；不再出现第 4 卡 description 超长拉高卡片。
-- **全渠道获客筛选解耦**：渠道类别 / 子渠道 2 个筛选只作用于下方趋势图与 4 Tabs 明细，不污染顶部 4 张概览数据卡；summary 端点只接 summaryFilters（仅日期），daily-trend / by-channel 仍接完整 filters。
-- **按钮：刷新 → 查询**：Button icon 换为 SearchOutlined，type="primary"，文案 刷新 改为 查询，功能与原刷新按钮等价（调 load()）。
-- **React import：OmniChannel/index.tsx 新增** `import metricStyles from '@/components/MetricCard/MetricCard.module.scss'`，供 sectionHeader / sectionTitle / sectionDesc 类名引用。
-- **同步：AGENTS.md / CLAUDE.md 字节一致 + version.json v3.1.11；npm run build 0 error（5988 modules，37.7s） → dist 刷新 → 5000 端口同步。
+- **代理商简称映射全链路（简称优先）**：新增 ackend/utils/agency_mapper.py 提供 get_all_shorts() / short_to_full() / ull_to_short() / enrich_items() / expand_short_to_fulls()；metadata 端点 agencies 改从 DimVendor.agency_short（简称）查询，返回 {value, label, full_names} object format；gency_full_map 透传前端用于标签提示。
+- **所有后端 .厂商/广告代理商 in_ 筛选展开简称→全称**：gency_analysis.py / cost_analysis.py / dashboard.py / external_analysis.py / leads.py / 	rend.py 共 6 个文件 .in_() 前调用 expand_short_to_fulls()，支持前端选简称匹配后端全称记录。
+- **简称 CRUD 调用 reset_cache**：bbreviation_mapping.py 在 create/update/delete 操作后调用 gency_mapper.reset_cache()，确保系统配置页修改 DimVendor 后缓存即时刷新。
+- **AgencyFilter 前端适配新格式**：metadata agencies 从 string[] → {value, label, full_names}[] 后，AgencyFilter.tsx 的 map() 和 metadataService.ts 接口类型同步更新。
+- **AgencyAnalysis 前端显示改 agency_short**：表格列 dataIndex 从 gency 改为 gency_short；CSV 导出兜底 gency_short || agency；rowKey 改用 gency_short||agency。
+- **OmniChannel 4 卡标题恢复短标题**：总开户成功人数→开户成功 / 总入金户数→入金户数 / 总有效户数→有效户数 / 互联网渠道开户数→互联网开户；删除未使用的 Typography import。
+- **build**：
+pm run build 0 error（~5988 modules）→ dist 已刷新 → 5000 端口同步。
 - **v3.1.10 变更说明**（2026-07-15 已落地）：
   - **ECharts 调色板统一**：新增 `frontend-react/src/utils/echartsColors.ts`（`ECHARTS_COLORS` 8 色 hex + `pickEChartsColor(idx)`），与 `tokens.css` `--chart-color-1` ~ `--chart-color-8` 字节对齐。**根因**：ECharts canvas/SVG 渲染不解析 CSS `var()`，原先传 `var(--chart-color-N)` 字符串会被静默 fallback 到默认色（灰色），导致 OmniChannel 4 类渠道日趋势、AgencyAnalysis 日级趋势、Dashboard TrendChart 多 series 全是同色或灰色。修复后全报表 ECharts 多 series 按索引自动取 8 色。
   - **TrendChart 边框对齐 + 间距**：`<Card variant="borderless">` → `<Card size="small">`；`.trendCard` 加 `margin-bottom: var(--spacer-16)`，与下方开户口历热力图间距 16px（之前无边距贴在一起）。

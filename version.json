@@ -1,7 +1,16 @@
 {
-  "version": "3.1.12",
+  "version": "3.1.13",
   "release_date": "2026-07-15",
   "changelog": [
+    "v3.1.13 代理商简称映射全链路 + OmniChannel 4 卡短标题还原",
+    "- 新增 backend/utils/agency_mapper.py：get_all_shorts/short_to_full/full_to_short/enrich_items/expand_short_to_fulls/reset_cache",
+    "- 6 个后端路由文件 .厂商/.广告代理商 in_ 筛选前调用 expand_short_to_fulls()（agency_analysis / cost_analysis / dashboard / external_analysis / leads / trend）",
+    "- metadata 端点 agencies 改从 DimVendor.agency_short（简称）查询，返回 {value,label,full_names}[] object 格式",
+    "- abbreviation_mapping CRUD 后调用 reset_cache() 使缓存即时刷新",
+    "- frontend AgencyFilter + metadataService 类型同步适配新 agencies object 格式",
+    "- AgencyAnalysis 表格 dataIndex 从 agency 改为 agency_short，CSV 导出兜底",
+    "- OmniChannel 4 卡标题恢复短标题（开户成功/入金户数/有效户数/互联网开户），删除 Typography import",
+    "- npm run build 0 error → dist 刷新 → 5000 端口同步",
     "v3.1.12 按钮统一 + MetricCard 4-6 字标题 + description + 侧栏滚动加固 + AppMarket/Detail 字段补全 + ConversionFunnel MetricCard 补齐",
     "- 筛选按钮统一：OmniChannel、AnchorCluster、Live/Funnel、AppMarket/Funnel/Comparison/Creative/Detail 共 7 个报表的操作按钮改为「查询」(primary+SearchOutlined)+「重置」(default+ReloadOutlined，还原筛选默认值并 reload)，每个文件新增 resetFilters() 函数",
     "- MetricCard 4-6 字标题 + icon + description：OmniChannel(4)、AppMarket/Funnel(5)、AppMarket/Creative(5)、ConversionFunnel(7)、AgencyAnalysis(6)、Live/Funnel(6)、AnchorCluster(5) 共 38 张卡片适配 icon + 4-6 字标题 + 小字 description 规范（Dashboard 互联网渠道数据概览、XhsNotes/Operation 除外）",
