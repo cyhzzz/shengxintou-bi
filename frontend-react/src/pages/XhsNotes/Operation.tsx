@@ -140,50 +140,17 @@ const XhsNotesOperationPage: React.FC = () => {
     },
   ];
 
-  // 获取默认日期范围的辅助函数（基于数据可用日期）
+  // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31（与所有报表保持一致）
   const getDefaultDateRangeFromData = (
-    _dataStart: string | null,
-    dataEnd: string | null,
-    fallbackDays: number = 30
-  ): [string, string] => {
-    // 如果有实际数据日期范围，使用数据结束日期往前30天
-    if (dataEnd) {
-      const endDate = new Date(dataEnd);
-      const startDate = new Date(endDate);
-      startDate.setDate(endDate.getDate() - fallbackDays);
-      return [
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      ];
-    }
-    // 否则使用当前日期往前30天
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - fallbackDays);
-    return [
-      startDate.toISOString().split('T')[0],
-      today.toISOString().split('T')[0]
-    ];
-  };
+    _dataStart?: string | null,
+    _dataEnd?: string | null,
+    _fallbackDays?: number
+  ): [string, string] => ['2026-01-01', '2026-12-31'];
 
-  const getDefaultDateRange = (days: number): [string, string] => {
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - days);
-    return [
-      startDate.toISOString().split('T')[0],
-      today.toISOString().split('T')[0]
-    ];
-  };
+  const getDefaultDateRange = (_days?: number): [string, string] =>
+    ['2026-01-01', '2026-12-31'];
 
-  const getDefaultYTDDateRange = (): [string, string] => {
-    const today = new Date();
-    const yearStart = new Date(today.getFullYear(), 0, 1);
-    return [
-      yearStart.toISOString().split('T')[0],
-      today.toISOString().split('T')[0]
-    ];
-  };
+  const getDefaultYTDDateRange = (): [string, string] => ['2026-01-01', '2026-12-31'];
 
   // 数据可用日期范围（从元数据获取）
   const [xhsDataDateRange, setXhsDataDateRange] = useState<{ start: string | null; end: string | null } | null>(null);

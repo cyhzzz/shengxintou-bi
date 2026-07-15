@@ -9,7 +9,12 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.9`（2026-07-15）。
+- 当前版本基线：`version.json` 为 `3.1.10`（2026-07-15）。下一站 `v3.1.11`（待规划：webdav 5xx 长尾专项排查 + 残存 UI 收口）。
+- **v3.1.10 变更说明**（2026-07-15 已落地）：
+  - **ECharts 调色板统一**：新增 `frontend-react/src/utils/echartsColors.ts`（`ECHARTS_COLORS` 8 色 hex + `pickEChartsColor(idx)`），与 `tokens.css` `--chart-color-1` ~ `--chart-color-8` 字节对齐。**根因**：ECharts canvas/SVG 渲染不解析 CSS `var()`，原先传 `var(--chart-color-N)` 字符串会被静默 fallback 到默认色（灰色），导致 OmniChannel 4 类渠道日趋势、AgencyAnalysis 日级趋势、Dashboard TrendChart 多 series 全是同色或灰色。修复后全报表 ECharts 多 series 按索引自动取 8 色。
+  - **TrendChart 边框对齐 + 间距**：`<Card variant="borderless">` → `<Card size="small">`；`.trendCard` 加 `margin-bottom: var(--spacer-16)`，与下方开户口历热力图间距 16px（之前无边距贴在一起）。
+  - **开户口历热力图年度总开户起算点改为 2026-01-01**：`CalendarHeatmap` 新增 `YEAR_START = '2026-01-01'`，`stats.sum` 仅累加 `date >= 2026-01-01` 的值（年度总开户）；`stats.max / activeDays` 仍取 365 天全量用于 level 颜色分类。
+  - **全局日期筛选器默认值统一为 2026-01-01 ~ 2026-12-31**：覆盖 7 个页面 `useState`（AnchorCluster / Live/Funnel / AppMarket×4 / OmniChannel）+ EmployeeConversion/Weekly 2 处 + ConversionFunnel（useState + resetFilters）+ XhsNotes/List + LeadsDetail（useState + filtersRef）+ EmployeeConversion/Analysis + XhsNotes/Operation 3 个函数 + `useFilterStore.getDefaultDateRange` + `useDashboardFilters.getDefaultDateRange`。全文已无残留 `2026-06-30` / `2020-01-01` 旧默认值。
 - 历史命名：仓库目录是「省心投 BI」，但数据库文件 `database/shengxintou.db`、模块名 `shengxintou-platform` 仍沿用旧名，禁止为了"统一命名"随意改路径或表名。
 
 ## 2. 产品与数据方向

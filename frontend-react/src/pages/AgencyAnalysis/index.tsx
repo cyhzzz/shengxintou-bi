@@ -20,6 +20,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
+import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
@@ -189,13 +190,13 @@ const AgencyAnalysisPage: React.FC = () => {
     });
     const platforms = Array.from(new Set(trend.series.map((s) => s.platform))).filter(Boolean);
     // 堆叠柱状图（按平台分色堆叠，按日期累加）
-    const PLATFORM_BAR_COLORS = ['var(--chart-color-1)','var(--chart-color-2)','var(--chart-color-3)','var(--chart-color-4)','var(--chart-color-5)','var(--chart-color-6)','var(--chart-color-7)','var(--chart-color-8)'];
+    // ⚠️ ECharts 不能解析 CSS var()，用真实 hex（ECHARTS_COLORS）循环取色
     const seriesData = platforms.map((p, idx) => ({
       name: p,
       type: 'bar' as const,
       stack: '总量',
       barMaxWidth: 36,
-      itemStyle: { color: PLATFORM_BAR_COLORS[idx % PLATFORM_BAR_COLORS.length] },
+      itemStyle: { color: pickEChartsColor(idx) },
       emphasis: { focus: 'series' as const },
       data: trend.dates.map((d) => byPlatform.get(d)?.get(p) || 0),
     }));

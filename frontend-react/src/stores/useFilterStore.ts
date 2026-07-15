@@ -48,10 +48,10 @@ interface FilterState {
   resetAll: () => void;
 }
 
-// 默认日期范围（全部日期：使用一个足够宽的范围）
+// 默认日期范围（v3.1.10: 全局统一 2026-01-01 ~ 2026-12-31）
 const getDefaultDateRange = (): DateRange => ({
-  startDate: '2020-01-01',  // 一个足够早的日期，表示"全部"
-  endDate: dayjs().format('YYYY-MM-DD'),
+  startDate: '2026-01-01',
+  endDate: '2026-12-31',
 });
 
 export const useFilterStore = create<FilterState>()(

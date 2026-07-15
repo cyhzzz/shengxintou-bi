@@ -46,7 +46,7 @@ interface FilterOptionsResponse {
 
 const LeadsDetailPage: React.FC = () => {
   // 筛选状态
-  const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
+  const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
   const [employeeName, setEmployeeName] = useState<string>('');  // 服务员工
@@ -81,7 +81,7 @@ const LeadsDetailPage: React.FC = () => {
   const filtersRef = useRef({
     page: 1,
     pageSize: 20,
-    dateRange: ['', ''] as [string, string],
+    dateRange: ['2026-01-01', '2026-12-31'] as [string, string],
     platform: '',
     employeeName: '',
     isOpenedAccount: '',

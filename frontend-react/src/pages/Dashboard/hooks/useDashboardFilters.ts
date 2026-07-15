@@ -51,12 +51,12 @@ const formatDate = (date: Date): string => {
 };
 
 /**
- * 获取默认日期范围（全部日期：使用一个足够宽的范围）
+ * 获取默认日期范围（v3.1.10: 全局统一 2026-01-01 ~ 2026-12-31）
  */
 const getDefaultDateRange = (): { start_date: string; end_date: string } => {
   return {
-    start_date: '2020-01-01',  // 一个足够早的日期，表示"全部"
-    end_date: formatDate(new Date()),
+    start_date: '2026-01-01',
+    end_date: '2026-12-31',
   };
 };
 
