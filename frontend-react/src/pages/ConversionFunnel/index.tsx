@@ -19,6 +19,7 @@ import { FunnelChart } from '@/components';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
+import { sanitizeText } from '@/utils/sanitizeText';
 import styles from './ConversionFunnel.module.scss';
 
 interface FunnelStage {
@@ -107,7 +108,7 @@ const ConversionFunnelPage: React.FC = () => {
   // 转换 stages 给 FunnelChart 组件 (期望 {name, count, rate})
   const contentFunnelData = useMemo(() => {
     return contentStages.map((s) => ({
-      name: s.step,
+      name: sanitizeText(s.step),
       count: s.value,
       rate: s.rate,
       conversionRate: s.rate,
@@ -116,7 +117,7 @@ const ConversionFunnelPage: React.FC = () => {
 
   const appmarketFunnelData = useMemo(() => {
     return appmarketStages.map((s) => ({
-      name: s.step,
+      name: sanitizeText(s.step),
       count: s.value,
       rate: s.rate,
       conversionRate: s.rate,

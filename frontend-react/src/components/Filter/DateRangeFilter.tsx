@@ -15,8 +15,10 @@ const { RangePicker } = DatePicker;
 const quickOptions = [
   { label: '全部', days: 0 },      // 0 表示全部日期
   { label: '近7天', days: 7 },
+  { label: '近14天', days: 14 },
   { label: '近30天', days: 30 },
   { label: '近90天', days: 90 },
+  { label: '近180天', days: 180 },
 ];
 
 interface DateRangeFilterProps {
@@ -37,7 +39,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
     const today = dayjs();
     const startDiff = today.diff(dayjs(dateRange.startDate), 'day');
     const endDiff = today.diff(dayjs(dateRange.endDate), 'day');
-    if (endDiff === 0 && [7, 30, 90].includes(startDiff)) return startDiff;
+    if (endDiff === 0 && [7, 14, 30, 90, 180].includes(startDiff)) return startDiff;
     return null; // 自定义范围
   });
 
@@ -73,7 +75,7 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   return (
     <div className={styles.dateRangeFilter}>
       {showQuickSelect && (
-        <Space size={4} className={styles.quickSelect}>
+        <Space size={8} className={styles.quickSelect}>
           {quickOptions.map((option) => (
             <Button
               key={option.days}

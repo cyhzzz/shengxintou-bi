@@ -22,6 +22,8 @@ import {
   AppstoreOutlined,
   GlobalOutlined,
   VideoCameraOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import { useAppStore } from '@/stores/useAppStore';
@@ -200,7 +202,7 @@ export default function MainLayout() {
                 onClick={toggleTheme}
                 aria-label="切换主题"
               >
-                {themeMode === 'dark' ? '☀️' : '🌙'}
+                {themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
               </button>
             </Tooltip>
             <HelpModal />
