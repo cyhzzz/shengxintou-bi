@@ -5,7 +5,7 @@ from sqlalchemy import func, and_, or_
 from backend.models_v2 import FactConvContent
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.utils.agency_mapper import expand_short_to_fulls
+from backend.utils.agency_mapper import expand_short_to_fulls, full_to_short
 
 bp = Blueprint('leads', __name__)
 
@@ -101,9 +101,10 @@ def get_filter_options():
     platforms = [r[0] for r in db.session.query(FactConvContent.平台来源).distinct()
                  .filter(FactConvContent.平台来源.isnot(None), FactConvContent.平台来源 != '')
                  .order_by(FactConvContent.平台来源).all()]
-    agencies = [r[0] for r in db.session.query(FactConvContent.广告代理商).distinct()
+    agencies_raw = [r[0] for r in db.session.query(FactConvContent.广告代理商).distinct()
                 .filter(FactConvContent.广告代理商.isnot(None), FactConvContent.广告代理商 != '')
                 .order_by(FactConvContent.广告代理商).all()]
+    agencies = sorted(set(full_to_short(a) for a in agencies_raw))
     employees = [r[0] for r in db.session.query(FactConvContent.添加员工姓名).distinct()
                  .filter(FactConvContent.添加员工姓名.isnot(None), FactConvContent.添加员工姓名 != '')
                  .order_by(FactConvContent.添加员工姓名).all()]

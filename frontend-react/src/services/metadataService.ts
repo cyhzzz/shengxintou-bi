@@ -23,6 +23,7 @@ export interface Metadata {
     account_name: string;
     platform: string;
     agency: string;
+    agency_short?: string;
   }>;
 }
 
@@ -33,6 +34,7 @@ export interface AccountMapping {
   account_name: string;
   main_account_id?: string;
   agency: string;
+    agency_short?: string;
   business_model: string;
   created_at: string;
   updated_at: string;
