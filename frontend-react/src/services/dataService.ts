@@ -130,6 +130,36 @@ export const dataService = {
   },
 
   // 获取版本信息
+  // Git 更新状态（git head / dirty / 远端 sha）
+  getGitStatus: async (): Promise<ApiResponse<{
+    available?: boolean;
+    branch?: string;
+    local_sha?: string;
+    remote_sha?: string;
+    dirty?: boolean;
+    checked_at?: string;
+    local_version?: string;
+    error?: string;
+  }>> => {
+    return http.get('/system/self-update/git-status');
+  },
+  // 启动一次自更新（git pull origin main）
+  selfUpdateStart: async (force = false): Promise<ApiResponse<{ task_id: string; message: string }>> => {
+    return http.post('/system/self-update/start', { force });
+  },
+  // 查询自更新任务状态（前端 1s 轮询）
+  selfUpdateStatus: async (taskId: string): Promise<ApiResponse<{
+    task_id: string;
+    status: string;
+    progress?: number;
+    message?: string;
+    error?: string;
+    before_version?: string;
+    after_version?: string;
+    log?: string[];
+  }>> => {
+    return http.get('/system/self-update/status', { task_id: taskId });
+  },
   getVersion: async (): Promise<ApiResponse<{
     version: string;
     release_date: string;
