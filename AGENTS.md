@@ -200,6 +200,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **`@ant-design/plots` 漏斗图**：通过 `ErrorBoundary` 降级到 CSS 横条漏斗；数据传入前 `clean.filter(d => typeof d.count === 'number' && Number.isFinite(d.count))`。
 - **打包**：`省心投启动器.exe`（gitignored，7.7MB，PyInstaller 产物）+ `python-3.9-embed/` + `lib/` 便携版结构；dev 环境双击 exe 自动 fallback 到 `.venv/Scripts/python.exe`。
 - **orval**：不要手改 `src/types/api.ts`，必须通过 `npm run generate:api` 重新生成。
+- **`d.toISOString()` 时区陷阱**：`+8` 时区下 `new Date(2026, 0, 1).toISOString()` 返回 `'2025-12-31T16:00:00.000Z'`（UTC 前一天的下午），`slice(0,10)` 会取到前一天的日期。构造本地日期字符串请使用 `d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')`。CalendarHeatmap 热力图已因此 bug 导致周几错位。
 - **数据源**：v2 上传识别 6 个新类型（account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open）→ 旧 7 个类型 → 410 Gone。
 - **Swagger**：`/apidocs` 可选（需装 flasgger，未列在 requirements.txt），app.py 已做 ImportError 容错。
 - **一次性脚本**：`scripts/_write_docs.py` / `_patch_creative.py` 等保留在 `scripts/` 下，不进 git 索引，使用时按需。
@@ -221,6 +222,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - `GuideModal` 必须校验 `content-type: text/markdown`，避免后端 SPA 兜底 `index.html` 被 ReactMarkdown 当 md 渲染成乱码；`GUIDE_TITLES` 增补 6 个 v2 新类型映射。
 - WebDAV 错误粒度：网络层 → 502 + UPSTREAM_UNAVAILABLE；其它 → 500 + LIST_FAILED。
 - 提交前确认：未把本地数据库 / 上传文件 / 备份文件 / `prototype/` / `tmp_*` / `logs/bug-fix-shots/` 加入索引；`.env` 与 `database/*.db` 已被 `.gitignore` 排除。
+- **前端 import 交叉验证（防 RuntimeError 黄金守则）**：向 React 文件新增任何 antd 组件或 @ant-design/icons 图标时，立即检查该文件的 import 区是否同步引入了这些 API；新增 JSX 中使用了 `Button`、`Typography`、`SearchOutlined` 等但 import 缺失会导致 dev server 运行时 `ReferenceError: X is not defined`。修改完成后手动 grep 或扫一遍文件头 20 行确认 import 齐全。
 - 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，**以代码和 `version.json` 为准**，并在文档中标注滞后点。
 
 ## 10. 验证建议
