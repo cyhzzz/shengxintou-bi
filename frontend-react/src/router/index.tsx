@@ -10,7 +10,6 @@ import EmployeeConversionAnalysisPage from '@/pages/EmployeeConversion/Analysis'
 import EmployeeConversionWeeklyPage from '@/pages/EmployeeConversion/Weekly';
 import DataImportPage from '@/pages/System/DataImport';
 import AccountManagementPage from '@/pages/System/AccountManagement';
-import AbbreviationManagementPage from '@/pages/System/AbbreviationManagement';
 import DatabaseBackupPage from '@/pages/System/DatabaseBackup';
 import OmniChannelReportPage from '@/pages/Reports/OmniChannel';
 
@@ -97,7 +96,6 @@ export const router = createBrowserRouter([
         children: [
           { path: 'data-import', element: <DataImportPage /> },
           { path: 'account-management', element: <AccountManagementPage /> },
-          { path: 'abbreviation-management', element: <AbbreviationManagementPage /> },
           { path: 'database-backup', element: <DatabaseBackupPage /> },
         ],
       },

@@ -1,7 +1,12 @@
 {
-  "version": "3.1.14",
+  "version": "3.1.15",
   "release_date": "2026-07-15",
   "changelog": [
+    "v3.1.15 菜单清理：删除简称管理 + 线索明细扁平化",
+    "- MainLayout 移除 /system/abbreviation-management 菜单项（账号管理已含 platform/agency/agency_short/business_model 等字段，简称管理冗余）",
+    "- 同步删除 pages/System/AbbreviationManagement.tsx + .module.scss；router 移除路由；移除 TagOutlined import",
+    "- 后端 abbreviation_mapping 路由保留（DimVendor CRUD 由 ETL/导入侧维护，前端不再提供 UI）",
+    "- MainLayout 线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail（仅一个子项时不再展开一二级）",
     "v3.1.14 修复 expand_short_to_fulls 导致所有筛选归零 + ConversionFunnel load 未定义",
     "- 6 个后端路由文件移除 expand_short_to_fulls() wrapper（dashboard/cost_analysis/agency_analysis/external_analysis/leads/trend），agg_vendor_daily.厂商 和 fact_conv_content.广告代理商 存的是简称，不应展开为全称",
     "- ConversionFunnel/index.tsx 重排序：loadData 定义移到 applyFilters/resetFilters 前，解决 const 块级作用域暂存死区导致的 load is not defined 运行时错误",

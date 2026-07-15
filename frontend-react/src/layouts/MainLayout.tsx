@@ -51,12 +51,9 @@ const menuItems: MenuProps['items'] = [
     label: '转化漏斗',
   },
   {
-    key: 'leads-detail-group',
+    key: '/leads-detail',
     icon: <UnorderedListOutlined />,
     label: '线索明细',
-    children: [
-      { key: '/leads-detail', label: '线索明细', icon: <UnorderedListOutlined /> },
-    ],
   },
   {
     key: '/agency-analysis',
@@ -116,7 +113,6 @@ const menuItems: MenuProps['items'] = [
     children: [
       { key: '/system/data-import', icon: <UploadOutlined />, label: '数据导入' },
       { key: '/system/account-management', icon: <UserOutlined />, label: '账号管理' },
-      { key: '/system/abbreviation-management', icon: <TagOutlined />, label: '简称管理' },
       { key: '/system/database-backup', icon: <SyncOutlined />, label: '数据同步' },
     ],
   },
