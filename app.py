@@ -282,6 +282,7 @@ def health_check():
 
 # 注册API路由
 from backend.routes import metadata, upload, config, webdav_backup, version
+from backend.routes.system import self_update as system
 
 # Import weekly_reports module
 from backend.routes import weekly_reports
@@ -329,6 +330,7 @@ app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
+app.register_blueprint(system.bp)
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 app.register_blueprint(app_market_report_blueprint.bp)
 app.register_blueprint(omni_channel_report_blueprint.bp)

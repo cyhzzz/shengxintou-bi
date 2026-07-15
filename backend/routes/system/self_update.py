@@ -1,0 +1,262 @@
+# -*- coding: utf-8 -*-
+"""
+系统自更新 API（v3.1.17）
+
+通过 subprocess 调用 git pull origin main，把 GitHub 最新代码同步到本地。
+
+设计原则：
+- 不在本进程热重载任何 Python 模块：调用方需要重启 Flask / Vite。
+- 后端只负责执行 git pull + 解析结果，不主动 build。
+- 前端版本比对 + 触发入口仍在 HelpModal（v3.1.16 接入）。
+- 全部路径经 `os.path.dirname(__file__)` 推导 project_root，兼容 PyInstaller 打包环境。
+"""
+
+import os
+import subprocess
+import threading
+import uuid
+import logging
+from datetime import datetime
+
+from flask import Blueprint, request, jsonify, current_app
+
+from backend.utils.decorators import handle_exceptions
+from backend.routes.version import get_local_version
+
+logger = logging.getLogger(__name__)
+
+bp = Blueprint("system", __name__, url_prefix="/api/v1/system")
+
+_update_tasks: dict = {}
+_update_lock = threading.Lock()
+
+
+def _project_root() -> str:
+    """获取项目根目录（backend/routes/system/self_update.py -> backend -> project_root）。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.dirname(here))
+
+
+def _run_git(args, cwd, timeout=60):
+    """执行 git 命令，返回 (returncode, stdout, stderr)。"""
+    try:
+        proc = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", "git " + " ".join(args) + " 超时（" + str(timeout) + "s）"
+    except FileNotFoundError:
+        return 127, "", "未找到 git 可执行文件，请先安装 Git 并加入 PATH"
+    except Exception as e:
+        logger.exception("git 执行失败")
+        return 1, "", "git 执行异常: " + str(e)
+
+
+def _read_version_json() -> dict:
+    """读项目根 version.json，纯函数版本（不依赖 Flask app context）。"""
+    import json
+    root = _project_root()
+    vf = os.path.join(root, "version.json")
+    try:
+        with open(vf, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("_read_version_json failed: %s", e)
+        return {}
+
+
+def _git_status_snapshot(project_root):
+    """读取 git 当前状态：HEAD hash、branch、dirty、remote HEAD。"""
+    rc, sha, err = _run_git(["rev-parse", "HEAD"], project_root)
+    if rc != 0:
+        return {"available": False, "error": err or "git rev-parse 失败"}
+
+    rc2, branch, _ = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], project_root)
+    branch = (branch or "").strip() or "main"
+
+    rc3, status_out, _ = _run_git(["status", "--porcelain"], project_root)
+    dirty = bool((status_out or "").strip())
+
+    rc4, remote_sha, _ = _run_git(["ls-remote", "origin", "HEAD"], project_root, timeout=30)
+    remote_head = ""
+    if rc4 == 0 and remote_sha:
+        parts = remote_sha.split()
+        remote_head = parts[0] if parts else ""
+
+    return {
+        "available": True,
+        "branch": branch,
+        "local_sha": (sha or "").strip(),
+        "remote_sha": remote_head,
+        "dirty": dirty,
+        "checked_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+
+
+@bp.route("/self-update/git-status", methods=["GET"])
+@handle_exceptions
+def git_status():
+    """读取本地 git 状态，供前端判断是否显示更新按钮。"""
+    project_root = _project_root()
+    snap = _git_status_snapshot(project_root)
+    local_version = get_local_version() or {}
+    snap["local_version"] = local_version.get("version", "")
+    return jsonify({"success": True, "data": snap})
+
+
+def _do_self_update(task_id, force):
+    """实际执行 self-update 的核心逻辑（被异步线程调用）。"""
+    project_root = _project_root()
+    log_lines = []
+
+    def log(msg):
+        ts = datetime.now().strftime("%H:%M:%S")
+        line = "[" + ts + "] " + msg
+        log_lines.append(line)
+        with _update_lock:
+            _update_tasks[task_id]["log"] = list(log_lines)
+            _update_tasks[task_id]["message"] = msg
+        logger.info("[self-update %s] %s", task_id, msg)
+
+    try:
+        before_version = (_read_version_json() or {}).get("version", "")
+        before_snap = _git_status_snapshot(project_root)
+        log("开始更新：本地 v" + before_version + " @ " + (before_snap.get("local_sha") or "?")[:8])
+
+        if before_snap.get("dirty") and not force:
+            log("工作区有未提交改动（force=False 拒绝覆盖）")
+            with _update_lock:
+                _update_tasks[task_id].update({
+                    "status": "failed",
+                    "error": "DIRTY_WORKTREE",
+                    "message": "工作区有未提交改动，未执行 git pull，避免覆盖本地修改。可重试 force=true 强制更新（自动 stash + pop）。",
+                })
+            return
+
+        if before_snap.get("dirty") and force:
+            log("工作区有改动，force=True 执行 git stash ...")
+            rc, out, err = _run_git(["stash", "push", "-u", "-m", "self-update-" + task_id], project_root)
+            if rc != 0:
+                log("git stash 失败: " + err)
+                with _update_lock:
+                    _update_tasks[task_id].update({
+                        "status": "failed",
+                        "error": "STASH_FAILED",
+                        "message": "git stash 失败: " + err,
+                    })
+                return
+            first_line = (out or "").strip().splitlines()
+            log("已 stash: " + (first_line[0] if first_line else "OK"))
+
+        log("执行 git fetch origin ...")
+        rc, out, err = _run_git(["fetch", "origin"], project_root, timeout=60)
+        if rc != 0:
+            log("git fetch 失败: " + err)
+            with _update_lock:
+                _update_tasks[task_id].update({
+                    "status": "failed",
+                    "error": "FETCH_FAILED",
+                    "message": "git fetch 失败: " + err,
+                })
+            return
+
+        log("执行 git pull --ff-only origin <branch> ...")
+        rc, out, err = _run_git(["pull", "--ff-only", "origin", before_snap.get("branch", "main")], project_root, timeout=120)
+        if rc != 0:
+            log("git pull 失败: " + (err or out))
+            with _update_lock:
+                _update_tasks[task_id].update({
+                    "status": "failed",
+                    "error": "PULL_FAILED",
+                    "message": "git pull 失败: " + (err or out),
+                    "log": log_lines,
+                })
+            return
+        log("git pull 完成：" + (out or "").strip()[:200])
+
+        after_snap = _git_status_snapshot(project_root)
+        after_version = (_read_version_json() or {}).get("version", "")
+        log("更新完成：v" + before_version + " -> v" + after_version + " @ " + (after_snap.get("local_sha") or "?")[:8])
+
+        if before_snap.get("dirty") and force:
+            log("尝试恢复 stash ...")
+            rc, out, err = _run_git(["stash", "pop"], project_root)
+            if rc != 0:
+                log("stash pop 冲突，需手动处理：" + err)
+                with _update_lock:
+                    _update_tasks[task_id].update({
+                        "status": "completed_with_conflicts",
+                        "error": "STASH_POP_CONFLICT",
+                        "message": "代码已更新，但本地改动与远端冲突。请手动处理冲突后删除多余的 stash。",
+                    })
+                return
+
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "success",
+                "progress": 100,
+                "message": "更新成功：v" + before_version + " -> v" + after_version,
+                "before_version": before_version,
+                "after_version": after_version,
+                "before_sha": before_snap.get("local_sha"),
+                "after_sha": after_snap.get("local_sha"),
+                "log": log_lines,
+            })
+    except Exception as e:
+        logger.exception("self-update 异常")
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "failed",
+                "error": "EXCEPTION",
+                "message": "更新异常: " + str(e),
+                "log": log_lines,
+            })
+
+
+@bp.route("/self-update/start", methods=["POST"])
+@handle_exceptions
+def start_self_update():
+    """
+    启动一次自更新（异步任务）。
+
+    Request:
+        { "force": true|false }
+
+    Response:
+        { "success": true, "task_id": "<uuid>" }
+    """
+    data = request.get_json(silent=True) or {}
+    force = bool(data.get("force", False))
+
+    task_id = str(uuid.uuid4())
+    with _update_lock:
+        _update_tasks[task_id] = {
+            "status": "running",
+            "progress": 5,
+            "message": "排队中...",
+            "log": [],
+            "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        }
+
+    thread = threading.Thread(target=_do_self_update, args=(task_id, force), daemon=True)
+    thread.start()
+
+    return jsonify({"success": True, "data": {"task_id": task_id, "message": "更新任务已启动"}})
+
+
+@bp.route("/self-update/status", methods=["GET"])
+@handle_exceptions
+def self_update_status():
+    """查询自更新任务状态。前端 1s 轮询。"""
+    task_id = request.args.get("task_id", "").strip()
+    if not task_id or task_id not in _update_tasks:
+        return jsonify({"success": False, "error": "TASK_NOT_FOUND", "message": "任务不存在或已过期"}), 404
+    with _update_lock:
+        return jsonify({"success": True, "data": {"task_id": task_id, **_update_tasks[task_id]}})
