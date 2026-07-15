@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.3`（2026-07-14）。下一站 `v3.1.4`（计划：WebDAV 500 长尾根因排查 + OmniChannel「TOP 合作机构」长尾排名）。
+- 当前版本基线：`version.json` 为 `3.1.5`（2026-07-15）。下一站 `v3.1.6`（计划：`webdav/list` 500 长尾根因排查 + OmniChannel「TOP 合作机构」长尾排名）。
 - 历史命名：仓库目录是「省心投 BI」，但数据库文件 `database/shengxintou.db`、模块名 `shengxintou-platform` 仍沿用旧名，禁止为了"统一命名"随意改路径或表名。
 
 ## 2. 产品与数据方向（重要）
@@ -93,6 +93,37 @@
 | 7 | 低 | omni_channel.py | 末尾重复 `from datetime import` 删除 + 函数体前后双空行 | v3.1.4 已落地 |
 | 8 | 低 | 数据同步报错 | `webdav/list` 500 长尾根因排查（v3.1.3 #11 未排项已转 v3.1.4 延后） | 延 v3.1.5 |
 | 9 | 中 | dist 滞后 | `npm run build` 0 error → 5000 端口同步（5889 modules） | v3.1.4 已落地 |
+### v3.1.5 落地清单（2026-07-15）
+
+- **6 个 v2 数据导入指南首行精确段位替换 + 关键短句加粗**：把 v3.1.4 的通用 `数据可从 省心投平台（公司内网站）X.X 名称 导出后二次导入到本 BI 进行分析` 替换为用户给的精确指向 + 关键类型名词 `**...**` 加粗：
+  - `account_mapping_guide.md` → **投放账号映射**，详见公司省心投平台 **1000.7 广告代理商映射表数据查询**。
+  - `conversion_content_guide.md` → **内容平台加微链路**，详见公司省心投平台 **4 线索明细**。
+  - `conversion_appmarket_guide.md` → **应用市场下载链路**，详见公司省心投平台 **8.1 应用市场归因明细**。
+  - `vendor_daily_guide.md` → **厂商广告投放分析**，详见公司省心投平台 **9.2 厂商广告投放分析**。
+  - `xhs_note_guide.md` → **小红书笔记**，由公司省心投平台 **6.1 小红书笔记表** 导出。
+  - `channel_open_guide.md` → **开户渠道分析**，详见公司省心投平台 **0.1 开户渠道分析明细**。
+- **v3.1.4 需求文档侧确认（非代码变更）**：用户报的 6 项 v3.1.3 落地后续问题中，1/2/3/4/6 已在 c250a6d (v3.1.4) 中落地，push 后实际可见；当前文件检查再次确认：
+  - OmniChannel 第 4 卡已 `internetRow.opens`（后端 by_category 真按 `channel_category=互联网引流` GROUP BY）
+  - ConversionFunnel 已加 `RangePicker` + `Select mode=multiple` 筛选器；KPI 从 `客户线索` 起步，移除了 `广告曝光`/`客户点击` 前置卡
+  - 小红书笔记默认 `sort_field=开户人数 desc`（底表 2339 行里 93 行 >0，max=166 sum=778）
+  - 主播分析 `g.assets` 只累加 `opened > 0` 行；`覆盖平台` 列用 `<Tag color=cyan>` 去重
+  - Dashboard 趋势图下方已嵌入蓝色 5 档 `CalendarHeatmap`，由后端 `/reports/omni-channel/daily-calendar` 端点供数
+- **`webdav/list` 500 报错（v3.1.3 #11 + v3.1.4 #8 延后项）**：保持延后至 v3.1.5+/未来版本重点排查；当前用户优先关注 1-6 项 BUG 落地。
+- **build + 推送**：`npm run build` 0 error → dist 时间戳刷新 → `git push origin main --tags` → GitHub 同步看到 v3.1.5。
+
+### v3.1.5 修复行动登记（2026-07-15）
+
+| # | 优先级 | 影响面 | 任务 | 状态 |
+|---|---|---|---|---|
+| 1 | 高 | 6 个 v2 数据导入指南 | 替换首行为用户给的精确段位（1000.7 / 4 / 8.1 / 9.2 / 6.1 / 0.1）+ 关键类型名词加粗 | v3.1.5 已落地 |
+| 2 | 中 | OmniChannel 第 4 卡 | 文档侧确认已用 `internetRow.opens`（v3.1.4 已修，c250a6d 可见） | v3.1.5 确认 |
+| 3 | 中 | ConversionFunnel 筛选器 | 文档侧确认已加 `RangePicker` + 平台 `Select` + KPI 从 `客户线索` 起步 | v3.1.5 确认 |
+| 4 | 中 | 小红书笔记排序 | 文档侧确认默认 `sort_field=开户人数 desc` | v3.1.5 确认 |
+| 5 | 中 | 主播分析总资产 | 文档侧确认 `g.assets` 只累加 `opened > 0` 行；`覆盖平台` Tag 去重 | v3.1.5 确认 |
+| 6 | 中 | Dashboard 日历热力图 | 文档侧确认 `<CalendarHeatmap>` 已嵌入 + 后端 `/daily-calendar` 端点供数 | v3.1.5 确认 |
+| 7 | 低 | `webdav/list` 500 | 长尾根因排查延后（v3.1.3 #11 未排） | 延 v3.1.5+ |
+| 8 | 中 | dist 滞后 | `npm run build` 0 error → 5000 端口 dist 时间戳刷新 + push v3.1.5 | v3.1.5 已落地 |
+
 ## 4. 共享组件清单
 
 | 组件 | 路径 | 职责 | 当前落地页 |
