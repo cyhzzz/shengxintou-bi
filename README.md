@@ -1,90 +1,91 @@
 # 省心投 BI
 
-券商财富管理场景下的互联网广告投放 + 开户转化数据分析平台。覆盖**内容平台**（抖音 / 腾讯 / 小红书 / 快手）与**应用市场**（小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果）两大类渠道，从广告投放、线索获取、私域转化到开户成功的全链路数据分析与可视化。
+> 券商财富管理场景下的互联网广告投放 + 开户转化数据分析平台。
 
-定位：**数据存储 + 查询聚合 + 可视化呈现**。原始数据的 mapping / 清洗 / 归一化 / 漏斗预计算由上游 ETL 完成，下游仅原样入库 + SELECT 聚合 + 报表展示。
+当前版本：`3.1.17`（2026-07-15），完整变更记录见 [version.json](version.json)。
 
----
+## 项目简介
+
+省心投 BI 定位为「数据存储 + 查询聚合 + 可视化呈现」。覆盖**内容平台**（抖音 / 腾讯 / 小红书 / 快手）与**应用市场**（小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果）两大类渠道，从广告投放、线索获取、私域转化到开户成功的全链路数据分析与可视化。
+
+原始数据的 mapping / 清洗 / 归一化 / 漏斗预计算由上游 ETL 完成，本项目仅做原样入库（`pandas.to_sql(if_exists='replace')`）+ SELECT 聚合 + 报表展示，不在下游引入业务口径修补逻辑。
+
+![省心投 BI 报表概览](frontend-react/src/assets/项目截图.png)
+
+### 业务价值
+
+- 一屏聚合跨渠道开户数据，避免在多个投放后台与 CRM 之间手工对账。
+- 双漏斗（内容平台 7 阶段 + 应用市场 8 阶段）独立呈现，定位转化卡点。
+- 互联网渠道开户日历热力图 + 年度 KPI 完成率时间折算，辅助进度管理。
+- 数据新鲜度监控 + 坚果云 WebDAV 自动备份，降低运维风险。
+
+## 目录
+
+- [核心能力](#核心能力)
+- [数据流与架构](#数据流与架构)
+- [快速开始](#快速开始)
+- [v2 数据导入](#v2-数据导入)
+- [项目结构](#项目结构)
+- [开发验证与文档](#开发验证与文档)
+- [项目边界与维护](#项目边界与维护)
 
 ## 核心能力
 
-### 双链路独立漏斗
-- **内容平台漏斗**：`广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 成功开户 → 有效户`（7 阶段，数据源 `fact_conv_content`）。
-- **应用市场漏斗**：`激活 APP → 开户成功 → 入金 → 有效户` 等 8 阶段（数据源 `fact_conv_appmarket`）。
-- 顶部筛选器：日期范围 + 平台多选（小红书 / 腾讯 / 抖音 / 快手 + 小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果）。
+1. **双链路转化漏斗**：内容平台（抖音 / 腾讯 / 小红书 / 快手）与应用市场（小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果）两套独立漏斗，支持日期与平台筛选联动。
+2. **全渠道获客概览**：跨渠道类别聚合 + 年度 KPI 完成率 + 互联网渠道开户日历热力图。
+3. **应用市场专项**：漏斗 / 对比 / 明细 / 创意四个子页，设备明细支持详情查看。
+4. **线索明细与主播分析**：线索行级数据详情查看；主播跨平台聚合分析。
+5. **小红书与厂商员工分析**：小红书笔记列表与运营分析；代理商投放对比；员工转化双源口径。
+6. **数据导入与运维**：6 类 v2 数据导入；数据新鲜度监控；坚果云自动备份；一键 GitHub 自更新。
 
-### 全渠道获客概览
-- 跨渠道类别（合作机构 / 自然流入 / 员工开户 / 互联网引流）+ 跨平台聚合。
-- KPI 完成率（年度 KPI 开 2 万户 / 1 万有效户，按 `dayOfYear / 366` 时间折算）。
-- 顶部 4 张 `MetricCard` + 4 Tab 详情表 + 日趋势 + **互联网渠道日历热力图**（过去 365 天每日开户密度，蓝色 5 档 `l0..l4`）。
+## 数据流与架构
 
-### 应用市场专项
-- 4 子页：漏斗 / 对比 / 明细 / 创意。
-- 设备明细支持行点击详情浮窗（`Modal + Descriptions column={2}`），参考 `LeadsDetail` 模式。
+```mermaid
+flowchart LR
+    A["上游 ETL<br/>mapping / 清洗 / 漏斗预计算"] -->|Excel xlsx| B["v2 原样导入<br/>pandas.to_sql(replace)"]
+    B --> C[("SQLite<br/>shengxintou.db")]
+    C --> D["Flask API<br/>/api/v1/*"]
+    D --> E["React 报表<br/>Ant Design + ECharts"]
+```
 
-### 转化漏斗 + 线索明细
-- 双漏斗并行（内容 + 应用市场），KPI 卡从 `客户线索` 起步。
-- 线索明细支持详情浮窗，列名 1:1 对齐 `fact_conv_content` 表。
+**技术栈**
 
-### 主播分析（直播获客）
-- 同名主播跨平台前端聚合（`platforms / leads / mouth / valid_lead / opened / valid / assets / sources`）。
-- 总创收资产 = 仅累加 `opened > 0` 行的 `assets`（"总创收资产（仅开户）"）。
-- 覆盖平台用 `<Tag color=cyan>` 去重展示。
-- 顶部 `平台` + `主播` 双 `Select` 筛选器，`pagination={false}` 一页呈现。
-
-### 小红书笔记
-- 笔记列表 + 运营分析。
-- 默认按 `开户人数 desc` 排序（白名单字段，避免 2246 行 =0 把 93 行有数笔记埋没）。
-- 4 个枚举筛选器 `{value, label}[]` object array（修复 antd `in` operator 报错）。
-
-### 厂商分析 + 员工转化
-- 代理商投放对比 + 自有员工开户与企微转化双口径分析。
-- 员工转化双源对比（`detail_caliber` / `channel_caliber`）独立标注。
-
-### 数据导入与新鲜度
-- 6 个 v2 数据导入类型：`account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open`。
-- 数据源自省心投系统（公司内网站）导出，二次导入分析；每个指南首行指明精确段位（`投放账号映射 → 1000.7`、`小红书笔记 → 6.1` 等）。
-- 数据新鲜度一屏可查（`/api/v1/data-freshness` 返回 5 张新表 `critical / warning / normal` 状态）。
-
-### 备份与错误粒度
-- 数据库自动备份到坚果云 WebDAV（保留最近 N 个 + 可选压缩）。
-- 错误粒度：网络层（SSL / 连接被重置 / 拒绝）→ **502 + UPSTREAM_UNAVAILABLE**；其它异常 → 500 + LIST_FAILED。
-
-### 设计统一
-- 公共 `MetricCard` + `MetricSection` 组件（响应式 4/3/2/1）。
-- 设计 token 体系（日/夜主题、品牌色、间距、圆角、阴影、功能色、图表色板）。
-- `ReportFooter` 底部弱化区集中展示 **数据源 / 端点 / 口径说明**。
-- `sanitizeText` 客户端文本清洗（剥 NUL / 控制字符 / `�` / 零宽）。
-- `FunnelChart` 基于 `@ant-design/plots` Funnel + `ErrorBoundary` CSS 横条降级。
-
----
-
-## 技术栈
-
-- **后端**：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
-- **前端**：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- **数据库**：SQLite（默认）/ 可切换 MySQL / PostgreSQL。
-- **架构原则**：本项目只做数据存储 + 可视化呈现；mapping / 清洗 / 预计算由上游 ETL 完成。
-
----
+- 后端：Python Flask 3.1 + SQLAlchemy 2.0 + SQLite + pandas 原样导入。
+- 前端：React 19 + TypeScript + Vite 7 + Ant Design 6 + @ant-design/plots / @ant-design/charts + ECharts 6 + Zustand。
+- 数据库：SQLite（默认 `database/shengxintou.db`，可由 `DATABASE_PATH` env 覆盖）。
 
 ## 快速开始
 
 ### 环境要求
 
 - Python 3.9 或更高版本
-- Node.js 18 或更高版本
+- Node.js 20 或更高版本（Vite 7 要求）
+
+### 配置
+
+复制 `.env.example` 为 `.env`（已 gitignored），按需填写配置：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+关键配置项（完整说明见 `.env.example`）：
+
+- `DATABASE_PATH` / `HOST` / `PORT`(5000) / `DEV_MODE`
+- `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_WEBHOOK_URL`
+- `WEBDAV_URL` / `WEBDAV_USERNAME` / `WEBDAV_PASSWORD` / `WEBDAV_BASE_PATH`
+
+数据库 / 上传 / 日志目录若不存在会在启动时自动创建。
 
 ### 后端启动
 
 ```powershell
-# 安装依赖
 pip install -r requirements.txt
 
 # 开发模式（5000 端口 Flask）
 $env:DEV_MODE='1'; python app.py
 
-# 重置数据库：删 database/shengxintou.db 后重启 Flask
+# 重置数据库：删 database/shengxintou.db 后重启会自动 db.create_all()
 ```
 
 ### 前端启动
@@ -92,68 +93,114 @@ $env:DEV_MODE='1'; python app.py
 ```powershell
 cd frontend-react
 npm install
-npm run dev          # Vite dev server :3000，自动代理 /api -> :5000
-npm run build        # tsc 类型检查 + vite build，产物到 dist/
-npm run preview
+npm run dev          # Vite dev server :3000，自动代理 /api -> 127.0.0.1:5000
 ```
 
-### 端到端测试
+### 生产构建
 
 ```powershell
 cd frontend-react
-npm run test
-npm run test:headed
-npm run test:report  # 打开 HTML 报告
+npm run build        # tsc 类型检查 + vite build，产物到 dist/
 ```
 
-> 生产前端没看到最新代码时 = `dist` 没构建，跑一次 `npm run build` 即可（5000 端口不需要重启 Flask，dist 文件被即时读取）。
+Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境直接访问 `http://127.0.0.1:5000` 读取 dist。改后端需重启 Flask；改前端重新 `npm run build` 即可，无需重启 Flask。
 
----
+> 生产前端看不到最新代码时 = dist 没构建，跑一次 `npm run build` 即可。
 
-## 目录结构
+## v2 数据导入
+
+所有新数据走 `POST /api/v1/upload` → `backend.processors.v2.raw_import.write_to_db` 原样落库。数据源自省心投系统（公司内网站）导出后二次导入分析，每个导入类型在 `frontend-react/public/documents/` 下配有详细指南。
+
+| 类型 | 说明 | 落库表 | 导入指南 |
+| --- | --- | --- | --- |
+| `account_mapping` | 投放账号映射 | `dim_account` | `account_mapping_guide.md` |
+| `conversion_content` | 内容平台加微链路（线索明细） | `fact_conv_content` | `conversion_content_guide.md` |
+| `conversion_appmarket` | 应用市场下载链路归因明细 | `fact_conv_appmarket` | `conversion_appmarket_guide.md` |
+| `vendor_daily` | 厂商广告投放分析 | `agg_vendor_daily` | `vendor_daily_guide.md` |
+| `xhs_note` | 小红书笔记 | `agg_xhs_note` | `xhs_note_guide.md` |
+| `channel_open` | 开户渠道分析明细 | `agg_daily_channel_open` | `channel_open_guide.md` |
+
+旧 v1 上传类型（tencent_ads / douyin_ads / xiaohongshu_ads / backend_conversion / xhs_* 等）已退役，请求返回 `410 Gone`。
+
+## 项目结构
 
 ```
-D:/AIproject/省心投BI/
+省心投BI/
 ├── app.py                          # Flask 入口
 ├── config.py                       # 配置（DB / WebDAV / 飞书）
 ├── requirements.txt
 ├── .env.example                    # 环境变量示例
+├── version.json                    # 当前版本与变更记录
+├── AGENTS.md / CLAUDE.md           # 项目工作说明（规则 + 守则 + 架构）
 ├── backend/
-│   ├── models.py / models_v2.py    # 9 张新表 ORM（列名 1:1 含中文）
-│   ├── routes/                     # API 蓝图（upload / metadata / data / reports / webdav）
-│   ├── processors/v2/              # v2 原样导入（pandas to_sql replace）
-│   └── utils/                      # 装饰器 / WebDAV 客户端 / 飞书同步
+│   ├── models.py / models_v2.py    # ORM（9 张新表，列名 1:1 含中文）
+│   ├── database.py                 # 单例 SQLAlchemy
+│   ├── processors/v2/raw_import.py # v2 原样导入
+│   ├── routes/
+│   │   ├── upload.py               # v2 上传入口
+│   │   ├── metadata.py             # 元数据 + 数据新鲜度
+│   │   ├── data/                   # 14 个查询蓝图
+│   │   ├── reports/                # omni_channel / app_market 报表蓝图
+│   │   ├── system/                 # self_update（git-status / start / status）
+│   │   └── webdav_backup.py        # 坚果云备份
+│   └── utils/                      # 装饰器 / WebDAV / 飞书 / 代理商映射
 ├── database/shengxintou.db         # SQLite（默认）
 ├── frontend-react/
 │   ├── src/
-│   │   ├── components/             # MetricCard / ReportFooter / Chart / GuideModal / Icon
-│   │   ├── pages/                  # Dashboard / OmniChannel / ConversionFunnel / AnchorCluster 等
-│   │   ├── services/               # http / dataService / uploadService
+│   │   ├── components/             # MetricCard / ReportFooter / Chart / Filter / GuideModal
+│   │   ├── pages/                  # Dashboard / OmniChannel / ConversionFunnel 等
+│   │   ├── services/               # http / dataService / metadataService / uploadService
 │   │   ├── stores/                 # zustand 状态管理
 │   │   ├── styles/                 # tokens.css / mixins.scss / variables.scss
 │   │   └── types/                  # orval 生成的 api.ts
 │   └── public/documents/           # 6 个 v2 数据导入指南 .md
-└── docs/
-    ├── v3.1_报表重梳方案.md
-    ├── 库表重构设计_v3.md
-    ├── 前端UI优化规划PRD.md
-    └── ...
+└── docs/                           # 设计文档与部署指南
 ```
 
----
+## 开发验证与文档
 
-## 文档索引
+### 验证命令
 
-- `AGENTS.md` / `CLAUDE.md`：项目工作说明（项目规则 + 修改守则 + 关键架构）。
-- `docs/v3.1_报表重梳方案.md`：v3.1 菜单 / 双漏斗 / 双源 / 应用市场 / 直播占位设计。
-- `docs/库表重构设计_v2.md` / `docs/库表重构设计_v3.md`：DIM/DWD/DWS 表设计。
-- `docs/前端UI优化规划PRD.md`：v3.1.1 设计 token / 日夜模式 / 样式治理规划。
-- `docs/数据库架构文档.md`：13 表说明（历史，新代码以 v2/v3 重构文档为准）。
-- `docs/部署指南.md`：开发、生产、Docker、性能优化、监控与故障排查。
+```powershell
+# 后端：启动后跑相关端点最小 smoke
+$env:DEV_MODE='1'; python app.py
 
----
+# 前端：类型检查 + lint + 构建
+cd frontend-react
+npm run typecheck
+npm run lint
+npm run build
 
-## 联系
+# 端到端测试（Playwright）
+cd frontend-react
+npm run test
+npm run test:headed
+npm run test:report
+```
+
+### 文档索引
+
+- [docs/v3.1_报表重梳方案.md](docs/v3.1_报表重梳方案.md)：v3.1 菜单 / 双漏斗 / 双源 / 应用市场设计。
+- [docs/库表重构设计_v2.md](docs/库表重构设计_v2.md) / [docs/库表重构设计_v3.md](docs/库表重构设计_v3.md)：DIM / DWD / DWS 表设计。
+- [docs/前端UI优化规划PRD.md](docs/前端UI优化规划PRD.md)：设计 token / 日夜模式 / 样式治理规划。
+- [docs/数据库架构文档.md](docs/数据库架构文档.md)：旧 13 表说明（新代码以 v2 / v3 重构文档为准）。
+- [docs/部署指南.md](docs/部署指南.md)：开发、生产、性能优化、监控与故障排查。
+
+## 项目边界与维护
+
+### 项目边界
+
+- **只做**：数据存储 + SELECT 聚合 + 可视化呈现。
+- **不做**：mapping / 清洗 / 归一化 / 字段补全（由上游 ETL 完成）；不在查询端点新增业务口径修补逻辑。
+- 数据库当前仅支持 SQLite，不宣称支持 MySQL / PostgreSQL 或现成 Docker 部署。
+- 新数据类型必须走 v2 原样导入入口，旧 v1 上传类型已 `410 Gone`。
+
+### 维护信息
 
 - 维护：产品经理 陈元昊
-- 仓库：`https://github.com/cyhzzz/shengxintou-bi`
+- 仓库：https://github.com/cyhzzz/shengxintou-bi
+- 版本与变更记录：[version.json](version.json)，README 不复制版本变更记录。
+
+### 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
