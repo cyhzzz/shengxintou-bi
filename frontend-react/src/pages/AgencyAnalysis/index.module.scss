@@ -45,3 +45,12 @@
   width: 100%;
   min-height: 200px;
 }
+.totalRow {
+  font-weight: var(--font-weight-semibold);
+  background: var(--bg-secondary);
+}
+
+.subtotalRow {
+  font-weight: var(--font-weight-medium);
+  background: var(--bg-hover);
+}

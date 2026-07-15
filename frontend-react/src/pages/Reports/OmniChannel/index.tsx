@@ -27,6 +27,7 @@ import {
   Button,
   Segmented,
   Select,
+  message,
 } from 'antd';
 import { BankOutlined, CheckCircleOutlined, ReloadOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
@@ -41,17 +42,16 @@ const { RangePicker } = DatePicker;
 
 // 4 大类颜色（按实际 SUM 开户降序：合作 > 自然 > 员工 > 互联网）
 const CATEGORY_COLORS: Record<string, string> = {
-  '合作机构': '#1677ff',
-  '自然流入': '#52c41a',
-  '员工开户': '#722ed1',
-  '互联网引流': '#fa8c16',
+  '合作机构': 'var(--chart-color-1)',
+  '自然流入': 'var(--chart-color-2)',
+  '员工开户': 'var(--chart-color-3)',
+  '互联网引流': 'var(--chart-color-4)',
 };
 const CATEGORY_ORDER = ['合作机构', '自然流入', '员工开户', '互联网引流'];
 // 二级渠道（渠道名称）调色板，按出现顺序循环取色
 const SUBCHANNEL_PALETTE = [
-  '#1677ff', '#52c41a', '#722ed1', '#fa8c16', '#eb2f96', '#13c2c2',
-  '#faad14', '#2f54eb', '#f5222d', '#a0d911', '#1890ff', '#531dab',
-  '#08979c', '#d4380d', '#389e0d', '#c41d7f',
+  'var(--chart-color-1)', 'var(--chart-color-2)', 'var(--chart-color-3)', 'var(--chart-color-4)',
+  'var(--chart-color-5)', 'var(--chart-color-6)', 'var(--chart-color-7)', 'var(--chart-color-8)',
 ];
 
 interface SubRow {
@@ -107,7 +107,7 @@ const OmniChannelPage: React.FC = () => {
         setChannelCategoryOptions(res.data.channel_categories || []);
         setSubChannelOptions(res.data.sub_channels || []);
       }
-    }).catch(() => {});
+    }).catch((err) => { message.warning('渠道类别选项加载失败，已使用兜底空列表'); console.error('[OmniChannel] filter options load failed:', err); });
   }, []);
 
   // 趋势图切换：一级/二级渠道 + 开户/有效户 维度
@@ -163,7 +163,7 @@ const OmniChannelPage: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    load().catch((err) => { message.error('全渠道数据加载失败，请重试'); console.error('[OmniChannel] load failed:', err); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, activeCategories, byChannelFilters]);
 
@@ -201,7 +201,7 @@ const OmniChannelPage: React.FC = () => {
       type: 'line' as const,
       smooth: true,
       symbolSize: 6,
-      itemStyle: { color: isL1 ? CATEGORY_COLORS[k] : SUBCHANNEL_PALETTE[idx % SUBCHANNEL_PALETTE.length] },
+      itemStyle: { color: isL1 ? CATEGORY_COLORS[k] : SUBCHANNEL_PALETTE[idx % 8] },
       data: dates.map((d) => Number(byDate.get(d)?.[k] || 0)),
     }));
     return { dates, series };

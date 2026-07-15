@@ -40,7 +40,6 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
     const endD = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const start = new Date(endD);
     start.setDate(endD.getDate() - (days - 1));
-    // 对齐到周一
     const startDow = (start.getDay() + 6) % 7;
     start.setDate(start.getDate() - startDow);
     const totalDays = Math.floor((endD.getTime() - start.getTime()) / 86400000) + 1;
@@ -65,7 +64,6 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
         dayIdx: i % 7,
       });
     }
-    // month labels：每个 week 的周一所属月份（仅展示从最新月份起的首周）
     const monthLabels: { weekIdx: number; label: string }[] = [];
     let lastMonth = -1;
     for (let w = 0; w < totalWeeks; w++) {
@@ -97,18 +95,10 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
           </Space>
         </div>
 
-        <div className={styles.legendRow}>
-          <span className={styles.legendText}>少</span>
-          {[0, 1, 2, 3, 4].map((lv) => (
-            <span key={lv} className={`${styles.cell} ${styles[`l${lv}`]} ${styles.legendDot}`} />
-          ))}
-          <span className={styles.legendText}>多</span>
-        </div>
-
         <div className={styles.body}>
           <div
             className={styles.monthRow}
-            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 1fr)` }}
+            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 12px)` }}
           >
             <span />
             {layout.monthLabels.map((m, i) => (
@@ -124,7 +114,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
 
           <div
             className={styles.grid}
-            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 1fr)` }}
+            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 12px)` }}
           >
             <div className={styles.weekLabelsCol}>
               {WEEK_LABELS.map((w, i) => (
@@ -143,6 +133,15 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
               />
             ))}
           </div>
+        </div>
+
+        {/* 图例：固定 12×12 正方形 + 放右下角 + 不拉伸 */}
+        <div className={styles.legendRow}>
+          <span className={styles.legendText}>少</span>
+          {[0, 1, 2, 3, 4].map((lv) => (
+            <span key={lv} className={`${styles.cell} ${styles[`l${lv}`]} ${styles.legendDot}`} />
+          ))}
+          <span className={styles.legendText}>多</span>
         </div>
       </div>
     </Spin>

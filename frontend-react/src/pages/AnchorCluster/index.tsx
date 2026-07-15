@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 主播分析页面（v3.1.3 重构）
  *
  * 数据源: fact_conv_content.客户来源
@@ -8,7 +8,7 @@
  * 例: 视频号引流-姚立琦、抖音引流-赵茜、财联社引流-谭记恩
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty } from 'antd';
+import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty, message } from 'antd';
 import { ReloadOutlined, VideoCameraOutlined, UserOutlined, TeamOutlined, RiseOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceLeadsAnchor } from '@/services/dataService';
@@ -44,8 +44,13 @@ const AnchorClusterPage: React.FC = () => {
         setTotals(res.data.totals || {});
         setPlatforms(res.data.platforms || []);
         setAnchors(res.data.anchors || Array.from(new Set((res.data.items || []).map((i: any) => i.anchor))));
-      }
-    } finally {
+        }
+      } catch (err) {
+        console.error('[AnchorCluster] load failed:', err);
+        message.error('主播分析数据加载失败，请重试');
+        setItems([]);
+        setTotals({});
+      } finally {
       setLoading(false);
     }
   };

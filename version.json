@@ -1,7 +1,13 @@
 {
-  "version": "3.1.8",
+  "version": "3.1.9",
   "release_date": "2026-07-15",
   "changelog": [
+    "✅ v3.1.9 热力图 cell 正方形：cell 从 width:100%/height:14px 拉伸式改为固定 12×12 正方形（grid-template-rows 也从 14px 改为 12px），legendDot 用 flex-shrink:0 防拉伸，hover transform scale(1.25) 保持原视觉",
+    "✅ v3.1.9 热力图横向滚动：grid 列宽从 repeat(N, 1fr) 改为 repeat(N, 12px) 固定列宽；body overflow-x:auto 让 365 天（约 53 周 × 12px + gap ≈ 700px）超出容器时显示横向滚动条，cell 不再被压缩",
+    "✅ v3.1.9 图例右下角：从 statsRow 之后的位置移到 body 下方，用 justify-content:flex-end 推到右侧；5 档色块固定 12×12 + flex-shrink:0 不被拉伸；与左侧 statsRow 形成上下分布",
+    "✅ v3.1.9 数据源确认：后端 /reports/omni-channel/daily-calendar 已按 AggDailyChannelOpen.渠道类别 == 互联网引流 过滤 + GROUP BY 时间区间 + SUM 开户成功人数，前端传 value 直接渲染。本轮确认无变更",
+    "🧹 v3.1.9 build：npm run build 0 error（37.8s）→ dist 时间戳刷新 → 5000 端口 dist 同步",
+    "🧹 v3.1.9 文档同步：AGENTS.md / CLAUDE.md 字节一致更新",
     "✅ v3.1.8 CalendarHeatmap 布局重写：7 行 × N 列布局，符合 GitHub-style contribution graph。每一列 = 一个星期（周一-周日，竖排），每一行 = 一个周几（横向）。横轴显示月份标签，纵轴显示周几标签（一/二/三/四/五/六/日）",
     "✅ v3.1.8 文案乱码修复：移除 JSX 文本节点里的 \\\\uXXXX 字面 escape（escape 在 JSX 文本节点里不会被解析，会原样显示 \\\\u5e74\\\\u5ea6...）。所有文案改为真实 CJK 字符（年度总开户 / 个有数据日 / 单日最高 / 少 / 多 / 互联网引流开户）",
     "✅ v3.1.8 表头样式对齐：CalendarHeatmap 不再自带 antd Card + title/extra；改用 Dashboard 的 MetricSection 包装（与 前端投放 / 后端转化 / 运营效率 等其他卡组表头完全一致）",
@@ -156,6 +162,7 @@
     }
   ],
   "upgrade_notes": [
+    "✅ v3.1.9 已落地：CalendarHeatmap cell 12×12 正方形 + body 横向滚动 + 图例右下角",
     "✅ v3.1.8 已落地：CalendarHeatmap 7×N 布局 + 真实 CJK 文案 + MetricSection 表头对齐；SCSS 路径 + GuideModal 错误处理预存 BUG 修复",
     "✅ v3.1.7 文档精简：AGENTS/CLAUDE -62% 字节、README 去版本说明只列能力",
     "✅ v3.1.6 已落地：webdav/list 网络层错误细分（502 UPSTREAM_UNAVAILABLE）；Flask 进程刷新",
@@ -202,6 +209,8 @@
     "completion_time": "2026-07-15"
   },
   "frontend_changes": [
+    "frontend-react/src/pages/Dashboard/components/CalendarHeatmap.tsx - 图例移到底部（右下角），移除 title/description 冗余 props",
+    "frontend-react/src/pages/Dashboard/components/CalendarHeatmap.module.scss - cell 12×12 正方形 + grid 列宽 12px 固定 + body overflow-x 横向滚动 + legendRow justify-content flex-end",
     "frontend-react/src/pages/Dashboard/components/CalendarHeatmap.tsx - 7×N 布局 + 真实 CJK 文案 + 纯内容（无 Card）",
     "frontend-react/src/pages/Dashboard/components/CalendarHeatmap.module.scss - 7 行 grid 模板 + 蓝色 5 档",
     "frontend-react/src/pages/Dashboard/index.tsx - CalendarHeatmap 用 MetricSection 包装，表头与其他卡组一致",
