@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 账号管理页面
  * 管理各平台账号与代理商的映射关系
  */
@@ -12,6 +12,7 @@ import styles from './AccountManagement.module.scss';
 const { Title } = Typography;
 
 interface AccountMappingForm extends Omit<AccountMapping, 'created_at' | 'updated_at'> {
+  agency_short?: string;
   platform: string;
   account_id?: string;
   account_name: string;
@@ -26,11 +27,21 @@ const AccountManagementPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AccountMapping | null>(null);
+  const [agencyOptions, setAgencyOptions] = useState<{value: string; label: string}[]>([]);
   const [currentPlatform, setCurrentPlatform] = useState<string>('腾讯');
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const loadAgencyOptions = useCallback(async () => {
+    try {
+      const response = await metadataService.getMetadata();
+      if (response.success && response.data) {
+        setAgencyOptions(response.data.agencies || []);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await metadataService.getAccountMappings();
@@ -67,6 +78,7 @@ const AccountManagementPage: React.FC = () => {
       account_name: record.account_name,
       main_account_id: record.main_account_id,
       agency: record.agency,
+      agency_short: record.agency_short,
       business_model: record.business_model,
     });
     setModalVisible(true);
@@ -148,10 +160,17 @@ const AccountManagementPage: React.FC = () => {
         key: 'account_name',
       },
       {
-        title: '代理商',
+        title: '代理商（简称）',
+        dataIndex: 'agency_short',
+        key: 'agency_short',
+        render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
+      },
+      {
+        title: '代理商全称',
         dataIndex: 'agency',
         key: 'agency',
-        render: (v: string) => <Tag color="blue">{v}</Tag>,
+        width: 200,
+        render: (v: string) => v || '-',
       },
       {
         title: '业务模式',
@@ -238,7 +257,7 @@ const AccountManagementPage: React.FC = () => {
                 !searchText ||
                 item.account_id?.includes(searchText) ||
                 item.account_name?.includes(searchText) ||
-                item.agency?.includes(searchText)
+                item.agency?.includes(searchText) || item.agency_short?.includes(searchText)
             )}
             rowKey={(record) => `${record.platform}-${record.account_id}`}
             loading={loading}
