@@ -223,6 +223,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - WebDAV 错误粒度：网络层 → 502 + UPSTREAM_UNAVAILABLE；其它 → 500 + LIST_FAILED。
 - 提交前确认：未把本地数据库 / 上传文件 / 备份文件 / `prototype/` / `tmp_*` / `logs/bug-fix-shots/` 加入索引；`.env` 与 `database/*.db` 已被 `.gitignore` 排除。
 - **前端 import 交叉验证（防 RuntimeError 黄金守则）**：向 React 文件新增任何 antd 组件或 @ant-design/icons 图标时，立即检查该文件的 import 区是否同步引入了这些 API；新增 JSX 中使用了 `Button`、`Typography`、`SearchOutlined` 等但 import 缺失会导致 dev server 运行时 `ReferenceError: X is not defined`。修改完成后手动 grep 或扫一遍文件头 20 行确认 import 齐全。
+- **函数/变量名交叉验证**：`onClick`、`onChange` 等回调中引用的函数名（如 `load`、`resetFilters`、`handleSearch`）必须在文件同作用域内有 `const xxx =` 或 `function xxx()` 定义。新增按钮引用已有函数时，先 grep 确认函数名精确匹配。ConversionFunnel 曾因此类问题出现 `load is not defined`——函数实际名为 `loadData` 而非 `load`、按钮却写了 `onClick={load}`。
 - 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，**以代码和 `version.json` 为准**，并在文档中标注滞后点。
 
 ## 10. 验证建议
