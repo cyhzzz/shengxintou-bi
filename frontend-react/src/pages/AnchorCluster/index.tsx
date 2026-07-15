@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty, message } from 'antd';
-import { ReloadOutlined, VideoCameraOutlined, UserOutlined, TeamOutlined, RiseOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, TeamOutlined, RiseOutlined, DollarOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceLeadsAnchor } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
@@ -34,6 +34,12 @@ const AnchorClusterPage: React.FC = () => {
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     platforms: platformFilter.length ? platformFilter : undefined,
   }), [dateRange, platformFilter]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setPlatformFilter([]);
+    setAnchorFilter([]);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -88,7 +94,8 @@ const AnchorClusterPage: React.FC = () => {
           <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
             onChange={setAnchorFilter} options={anchors.map((a) => ({ label: a, value: a }))}
             style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
-          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
 
@@ -100,36 +107,41 @@ const AnchorClusterPage: React.FC = () => {
             suffix="位"
             valueColor="var(--color-brand)"
             icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`当前期间活跃主播数`}
             showWowChange={false}
           />
           <MetricCard
-            title="总线索"
+            title="线索量"
             value={totals.total_leads || 0}
             valueColor="var(--color-success)"
             icon={<UserOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`主播引流客户线索总数`}
             showWowChange={false}
           />
           <MetricCard
-            title="总开户"
+            title="开户量"
             value={totals.total_opened || 0}
             valueColor="var(--chart-color-7)"
             icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+            description={`有效线索中成功开户人数`}
             showWowChange={false}
           />
           <MetricCard
-            title="总有效户"
+            title="有效户"
             value={totals.total_valid || 0}
             valueColor="var(--chart-color-5)"
             icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            description={`入金且资产达标有效户`}
             showWowChange={false}
           />
           <MetricCard
-            title="总创收资产"
+            title="创收资产"
             value={totals.total_assets || 0}
             prefix="¥"
             formatter="currency"
             valueColor="var(--color-error)"
             icon={<DollarOutlined style={{ color: 'var(--color-error)' }} />}
+            description={`已开户客户创收资产总额`}
             showWowChange={false}
           />
         </MetricSection>

@@ -269,47 +269,53 @@ const AgencyAnalysisPage: React.FC = () => {
 
       <MetricSection title="厂商投放概览" description="投放消耗、曝光点击与后端转化核心指标">
         <MetricCard
-          title="总花费"
+          title="投放花费"
           value={totals.cost}
           prefix="¥"
           formatter="currency"
           valueColor="var(--color-brand)"
           icon={<DollarOutlined style={{ color: 'var(--color-brand)' }} />}
+          description={`广告投放总花费额`}
           showWowChange={false}
         />
         <MetricCard
-          title="总曝光"
+          title="曝光量"
           value={totals.impressions}
           valueColor="var(--chart-color-2)"
           icon={<EyeOutlined style={{ color: 'var(--chart-color-2)' }} />}
+          description={`广告曝光总次数`}
           showWowChange={false}
         />
         <MetricCard
-          title="总点击"
+          title="点击量"
           value={totals.clicks}
           valueColor="var(--chart-color-3)"
           icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
+          description={`广告点击总次数`}
           showWowChange={false}
         />
         <MetricCard
-          title="总线索"
+          title="线索量"
           value={totals.lead_users}
           valueColor="var(--chart-color-4)"
           icon={<UserOutlined style={{ color: 'var(--chart-color-4)' }} />}
+          description={`投放产生的客户线索总数`}
           showWowChange={false}
         />
         <MetricCard
-          title="总开户"
+          title="开户量"
           value={totals.opened}
           valueColor="var(--chart-color-5)"
           icon={<TeamOutlined style={{ color: 'var(--chart-color-5)' }} />}
+          description={`线索中成功开户人数`}
           showWowChange={false}
         />
         <MetricCard
-          title="总有效户"
+          title="有效户"
           value={totals.valid}
           valueColor="var(--color-success)"
           icon={<TeamOutlined style={{ color: 'var(--color-success)' }} />}
+          description={`入金且资产达标有效户`}
           showWowChange={false}
         />
       </MetricSection>

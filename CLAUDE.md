@@ -13,6 +13,15 @@
 
 ### v3.1.11 已落地（2026-07-15）
 
+### v3.1.12 已落地（2026-07-15）
+
+- **筛选按钮统一**：OmniChannel / AnchorCluster / Live/Funnel / AppMarket×4 共 7 个报表筛选卡按钮改为「查询」(primary+SearchOutlined)+「重置」(default+ReloadOutlined，重置到 2026-01-01 ~ 2026-12-31 + 全部空筛选项)；每个文件新增 `resetFilters()` 函数。
+- **MetricCard 4-6 字标题 + icon + description**：OmniChannel(4)、AppMarket/Funnel(5)、AppMarket/Creative(5)、ConversionFunnel(7)、AgencyAnalysis(6)、Live/Funnel(6)、AnchorCluster(5) 共 38 张卡片统一适配，不满足 4-6 字的（如 激活APP→4 字保留、入金/有效户→4 字）加 description 小字说明。Dashboard 互联网渠道数据概览、XhsNotes/Operation 例外不动。
+- **AppMarket/Detail 字段补全**：表格 + Modal 浮窗补 应用市场名称 列；表头改为纯标题 + 小字说明字段；重置函数恢复默认日期 + 筛选。
+- **侧栏菜单滚动加固**：MainLayout.module.scss .menu 内层 :global(.ant-menu) height:100% + overflow-y:auto，全展开时底部菜单不再被遮挡；.sider overflow:hidden + min-height:0。
+- **Query 按钮文字修复**：OmniChannel 原笔误「问询」→「查询」（v3.1.11 的 commit message 写查询但代码写成了问询）。
+- **build**：`npm run build` 0 error（5988 modules，~27s）→ dist 已刷新 → 5000 端口同步。
+
 - **全渠道获客筛选卡 + 趋势图卡 表头样式与 Dashboard 互联网渠道数据概览统一**：筛选卡 / 趋势图卡顶部加 sectionHeader（title + desc），跟其他报表头视觉完全一致。
 - **全渠道获客概览 4 卡高度对齐**：MetricCard.module.scss .metricGrid flex 改 grid，grid items 默认 stretch 配合 .metricCard { height: 100%; } 自然等高；不再出现第 4 卡 description 超长拉高卡片。
 - **全渠道获客筛选解耦**：渠道类别 / 子渠道 2 个筛选只作用于下方趋势图与 4 Tabs 明细，不污染顶部 4 张概览数据卡；summary 端点只接 summaryFilters（仅日期），daily-trend / by-channel 仍接完整 filters。

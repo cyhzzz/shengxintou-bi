@@ -10,7 +10,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip } from 'antd';
-import { CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, TeamOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceReports } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
@@ -41,6 +41,13 @@ const AppMarketCreativePage: React.FC = () => {
     app_markets: appMarketFilter.length ? appMarketFilter : undefined,
     channel_types: channelTypeFilter.length ? channelTypeFilter : undefined,
   }), [dateRange, appMarketFilter, channelTypeFilter]);
+
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setAppMarketFilter([]);
+    setChannelTypeFilter([]);
+    setTopN(50);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -99,7 +106,8 @@ const AppMarketCreativePage: React.FC = () => {
             { value: 100, label: 'Top 100' },
             { value: 200, label: 'Top 200' },
           ]} style={{ width: 110 }} />
-          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
       <Spin spinning={loading}>

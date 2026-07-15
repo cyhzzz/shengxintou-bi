@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Empty, Modal, Descriptions } from 'antd';
-import { ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -35,6 +35,12 @@ const AppMarketDetailPage: React.FC = () => {
     channel_types: channelType.length ? channelType : undefined,
   }), [dateRange, appMarketFilter, channelType]);
 
+  const resetFilters = () => {
+    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+    setAppMarketFilter([]);
+    setChannelType([]);
+  };
+
   const load = async (page = 1, page_size = 50) => {
     setLoading(true);
     try {
@@ -63,10 +69,14 @@ const AppMarketDetailPage: React.FC = () => {
           <Select mode='multiple' allowClear placeholder='全部' value={channelType}
             onChange={setChannelType} options={opts.channel_types.map((t) => ({ label: t, value: t }))}
             style={{ minWidth: 180 }} maxTagCount='responsive' />
-          <Button icon={<ReloadOutlined />} onClick={() => load(1, detail.page_size)}>刷新</Button>
+          <Button type="primary" icon={<SearchOutlined />} onClick={() => load(1, detail.page_size)}>查询</Button>
+          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
         </Space>
       </Card>
-      <Card title={`设备明细（设备级，共 ${detail.total.toLocaleString()} 条）`} size='small' style={{ marginTop: 16 }}>
+      <Card title={`设备明细`} size='small' style={{ marginTop: 16 }}>
+        <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)', marginBottom: 8 }}>
+          设备级明细，共 {detail.total.toLocaleString()} 条 · 点击“详情”查看该行所有底表字段。
+        </div>
         <Spin spinning={loading}>
           <Table size='small' rowKey='id' dataSource={detail.rows}
             scroll={{ x: 'max-content' }}
@@ -82,6 +92,7 @@ const AppMarketDetailPage: React.FC = () => {
             columns={[
               { title: '下载日期', dataIndex: '下载日期', width: 110 },
               { title: '应用市场', dataIndex: '应用市场', width: 100 },
+              { title: '应用市场名称', dataIndex: '应用市场名称', width: 140, render: (v: any) => v || '-' },
               { title: '渠道类型', dataIndex: '渠道类型', width: 110 },
               { title: '设备号', dataIndex: '设备号', width: 180, ellipsis: true },
               { title: '资金账号', dataIndex: '资金账号', width: 180, render: (v: any) => v || '-' },
@@ -116,6 +127,7 @@ const AppMarketDetailPage: React.FC = () => {
           <Descriptions column={2} bordered size='small'>
             <Descriptions.Item label='下载日期'>{selectedRow['下载日期'] || '-'}</Descriptions.Item>
             <Descriptions.Item label='应用市场'>{selectedRow['应用市场'] || '-'}</Descriptions.Item>
+            <Descriptions.Item label='应用市场名称'>{selectedRow['应用市场名称'] || '-'}</Descriptions.Item>
             <Descriptions.Item label='渠道类型'>{selectedRow['渠道类型'] || '-'}</Descriptions.Item>
             <Descriptions.Item label='设备号'>{selectedRow['设备号'] || '-'}</Descriptions.Item>
             <Descriptions.Item label='资金账号'>{selectedRow['资金账号'] || '-'}</Descriptions.Item>
@@ -125,7 +137,7 @@ const AppMarketDetailPage: React.FC = () => {
             <Descriptions.Item label='入金'>{selectedRow['入金'] ? '是' : '否'}</Descriptions.Item>
             <Descriptions.Item label='有效户'>{selectedRow['有效户'] ? '是' : '否'}</Descriptions.Item>
             {Object.keys(selectedRow)
-              .filter((k) => !['下载日期','应用市场','渠道类型','设备号','资金账号','激活APP','开户成功','新开户','入金','有效户','id'].includes(k))
+              .filter((k) => !['下载日期','应用市场','应用市场名称','渠道类型','设备号','资金账号','激活APP','开户成功','新开户','入金','有效户','id'].includes(k))
               .map((k) => (
                 <Descriptions.Item key={k} label={k}>{selectedRow[k] ?? '-'}</Descriptions.Item>
               ))}

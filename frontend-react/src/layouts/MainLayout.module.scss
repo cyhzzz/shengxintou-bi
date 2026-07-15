@@ -9,8 +9,8 @@
   position: relative;
   z-index: 10;
   height: 100vh;
-  overflow-x: hidden;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -55,25 +55,26 @@
   border-right: none;
   flex: 1 1 0;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  height: 100%;
   padding-bottom: var(--spacer-16);
 
-  &::-webkit-scrollbar {
+  :global(.ant-menu) {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  :global(.ant-menu::-webkit-scrollbar) {
     width: 8px;
   }
 
-  &::-webkit-scrollbar-track {
+  :global(.ant-menu::-webkit-scrollbar-track) {
     background: transparent;
   }
 
-  &::-webkit-scrollbar-thumb {
+  :global(.ant-menu::-webkit-scrollbar-thumb) {
     background: var(--border-strong);
     border-radius: var(--radius-sm);
-
-    &:hover {
-      background: var(--color-text-tertiary);
-    }
   }
 }
 
