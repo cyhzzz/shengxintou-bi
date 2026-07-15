@@ -1,7 +1,14 @@
 {
-  "version": "3.1.10",
+  "version": "3.1.11",
   "release_date": "2026-07-15",
   "changelog": [
+    "v3.1.11 全渠道获客筛选卡 + 趋势图卡表头样式与 Dashboard 互联网渠道数据概览统一（sectionHeader = title + desc）：筛选条件卡 + 趋势图卡顶部加上 sectionHeader（标题 + 描述），跟 Dashboard 、趋势图、卡片组表头视觉完全一致；顶部按钮从 刷新 改为 查询（SearchOutlined + type=primary），功能与原刷新按钮等价",
+    "v3.1.11 全渠道获客概览 4 张数据卡高度对齐：MetricCard.module.scss .metricGrid flex 改 grid，grid items 默认 stretch 配合 .metricCard { height: 100%; } 自然等高（v3.1.11 前是 flex，第 4 卡 description 超长会拉高卡片，grid stretch 后统一高度）",
+    "v3.1.11 全渠道获客筛选解耦：渠道类别 / 子渠道 2 个筛选只作用于下方趋势图与 4 Tabs 明细，不污染顶部 4 张概览数据卡；summary 端点只接 summaryFilters（仅包含日期），daily-trend / by-channel 端点仍接完整 filters",
+    "v3.1.11 主端点变更：POST /api/v1/reports/omni-channel/summary 请求体 filters 参数收累到仅含 start_date / end_date；daily-trend 与 by-channel 仍接完整 filters（含 channel_categories / sub_channels）",
+    "v3.1.11 React import：OmniChannel/index.tsx 新增 import metricStyles from '@/components/MetricCard/MetricCard.module.scss'，供 sectionHeader / sectionTitle / sectionDesc 类名引用",
+    "v3.1.11 build：npm run build 0 error（5988 modules / 37.7s）→ dist 时间戳 11:28 刷新 → 5000 端口 dist 同步",
+    "v3.1.11 文档同步：AGENTS.md / CLAUDE.md 字节一致更新到 v3.1.11 落地态 + version.json changelog",
     "✅ v3.1.10 ECharts 调色板统一：新增 frontend-react/src/utils/echartsColors.ts，导出 ECHARTS_COLORS / pickEChartsColor(idx)，与 tokens.css --chart-color-1 ~ --chart-color-8 字节对齐（#1890ff / #52c41a / #faad14 / #f5222d / #722ed1 / #13c2c2 / #fa8c16 / #eb2f96）。原因：ECharts canvas/SVG 渲染不解析 CSS var()，原先传 var(--chart-color-N) 字符串会被静默 fallback 到默认色（灰色）",
     "✅ v3.1.10 全局日期默认值统一为 2026-01-01 ~ 2026-12-31：覆盖 7 个页面 useState（AnchorCluster / Live/Funnel / AppMarket×4 / OmniChannel）+ EmployeeConversion/Weekly 2 处 + ConversionFunnel（useState + resetFilters）+ XhsNotes/List + LeadsDetail（useState + filtersRef）+ EmployeeConversion/Analysis + XhsNotes/Operation 3 个函数 + useFilterStore.getDefaultDateRange + useDashboardFilters.getDefaultDateRange",
     "✅ v3.1.10 TrendChart Card 边框对齐 + 间距：<Card variant=borderless> → <Card size=small>，.trendCard 加 margin-bottom: var(--spacer-16) 与 MetricSection 对齐，与下方开户日历热力图间距 16px",

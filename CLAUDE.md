@@ -9,7 +9,16 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.10`（2026-07-15）。下一站 `v3.1.11`（待规划：webdav 5xx 长尾专项排查 + 残存 UI 收口）。
+- 当前版本基线：`version.json` 为 `3.1.11`（2026-07-15）。下一站 `v3.1.12`（待规划：webdav 5xx 长尾专项排查 + 趋势图 / 4 卡 / 筛选解耦 后续收口）。
+
+### v3.1.11 已落地（2026-07-15）
+
+- **全渠道获客筛选卡 + 趋势图卡 表头样式与 Dashboard 互联网渠道数据概览统一**：筛选卡 / 趋势图卡顶部加 sectionHeader（title + desc），跟其他报表头视觉完全一致。
+- **全渠道获客概览 4 卡高度对齐**：MetricCard.module.scss .metricGrid flex 改 grid，grid items 默认 stretch 配合 .metricCard { height: 100%; } 自然等高；不再出现第 4 卡 description 超长拉高卡片。
+- **全渠道获客筛选解耦**：渠道类别 / 子渠道 2 个筛选只作用于下方趋势图与 4 Tabs 明细，不污染顶部 4 张概览数据卡；summary 端点只接 summaryFilters（仅日期），daily-trend / by-channel 仍接完整 filters。
+- **按钮：刷新 → 查询**：Button icon 换为 SearchOutlined，type="primary"，文案 刷新 改为 查询，功能与原刷新按钮等价（调 load()）。
+- **React import：OmniChannel/index.tsx 新增** `import metricStyles from '@/components/MetricCard/MetricCard.module.scss'`，供 sectionHeader / sectionTitle / sectionDesc 类名引用。
+- **同步：AGENTS.md / CLAUDE.md 字节一致 + version.json v3.1.11；npm run build 0 error（5988 modules，37.7s） → dist 刷新 → 5000 端口同步。
 - **v3.1.10 变更说明**（2026-07-15 已落地）：
   - **ECharts 调色板统一**：新增 `frontend-react/src/utils/echartsColors.ts`（`ECHARTS_COLORS` 8 色 hex + `pickEChartsColor(idx)`），与 `tokens.css` `--chart-color-1` ~ `--chart-color-8` 字节对齐。**根因**：ECharts canvas/SVG 渲染不解析 CSS `var()`，原先传 `var(--chart-color-N)` 字符串会被静默 fallback 到默认色（灰色），导致 OmniChannel 4 类渠道日趋势、AgencyAnalysis 日级趋势、Dashboard TrendChart 多 series 全是同色或灰色。修复后全报表 ECharts 多 series 按索引自动取 8 色。
   - **TrendChart 边框对齐 + 间距**：`<Card variant="borderless">` → `<Card size="small">`；`.trendCard` 加 `margin-bottom: var(--spacer-16)`，与下方开户口历热力图间距 16px（之前无边距贴在一起）。
