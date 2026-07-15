@@ -1,7 +1,10 @@
 {
-  "version": "3.1.6",
+  "version": "3.1.7",
   "release_date": "2026-07-15",
   "changelog": [
+    "✅ v3.1.7 文档精简：AGENTS.md / CLAUDE.md 从 41995 字节精简到 15796 字节（约 -62%）。删除 v2.x ~ v3.1.6 全部 落地清单 与 修复行动登记 子段（已落地事实保留在 git log + version.json changelog），保留 11 个核心章节",
+    "✅ v3.1.7 README.md 重写：从 11212 字节精简到 7608 字节（-32%）。删除顶部版本号 / 更新日期 / 最新版本段，按用户要求只列示 核心能力（双链路漏斗 / 全渠道获客 / 应用市场专项 / 转化漏斗 / 主播分析 / 小红书 / 厂商员工 / 数据导入与新鲜度 / WebDAV / 设计统一）",
+    "🧹 v3.1.7 无代码改动：纯文档精简 + 版本号 bump；dist 无需重 build，Flask 无需重启",
     "✅ v3.1.6 webdav/list 错误粒度升级：网络层错误（SSL 握手/连接被重置/拒绝/超时）从笼统 500 升级为 502 Bad Gateway + error code UPSTREAM_UNAVAILABLE；其它代码异常仍 500 + LIST_FAILED。message 中保留 webdav_client._wrap_conn_err 包装的可读中文，便于前端按 status code 区分 上游不可达 vs 代码 bug",
     "✅ v3.1.6 Flask 进程刷新：上一轮 Flask 启动于 2026-07-10（v3.1.4/v3.1.5 commit 之前），导致 daily-calendar / 各报表修复一直未热加载到 5000 端口；本次 PID 68668 → 150056 → 165280 三次切换，最终 PID 165280 已加载 v3.1.5 + v3.1.6 代码",
     "🧹 v3.1.6 build：仅后端改动（webdav_backup.py list_backups 错误分类），前端代码无变化，dist 无需重 build",
@@ -145,6 +148,7 @@
     }
   ],
   "upgrade_notes": [
+    "✅ v3.1.7 文档精简：AGENTS/CLAUDE -62% 字节、README 去版本说明只列能力",
     "✅ v3.1.6 已落地：webdav/list 网络层错误细分（502 UPSTREAM_UNAVAILABLE）；Flask 进程刷新",
     "✅ v3.1.5 已落地：6 个 v2 数据导入指南首行精确定位替换（用户给的精确段位 + 关键类型名词加粗）",
     "✅ v3.1.4 已落地：OmniChannel #4 = 互联网渠道开户数 + KPI 完成率；转化漏斗筛选器 + 内容平台 KPI 从 客户线索起步；小红书笔记按开户数 desc 排序；主播分析总资产 = 仅累计已开户 + 覆盖平台 Tag；6 个 v2 数据导入指南加省心投平台导出位置；Dashboard 加蓝色 5 档开户日历热力图",
