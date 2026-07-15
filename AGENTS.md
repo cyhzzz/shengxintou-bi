@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.5`（2026-07-15）。下一站 `v3.1.6`（计划：`webdav/list` 500 长尾根因排查 + OmniChannel「TOP 合作机构」长尾排名）。
+- 当前版本基线：`version.json` 为 `3.1.6`（2026-07-15）。下一站 `v3.1.7`（计划：OmniChannel「TOP 合作机构」长尾排名；WebDAV 长尾已闭环为用户本机网络/VPN 问题）。
 - 历史命名：仓库目录是「省心投 BI」，但数据库文件 `database/shengxintou.db`、模块名 `shengxintou-platform` 仍沿用旧名，禁止为了"统一命名"随意改路径或表名。
 
 ## 2. 产品与数据方向（重要）
@@ -123,6 +123,30 @@
 | 6 | 中 | Dashboard 日历热力图 | 文档侧确认 `<CalendarHeatmap>` 已嵌入 + 后端 `/daily-calendar` 端点供数 | v3.1.5 确认 |
 | 7 | 低 | `webdav/list` 500 | 长尾根因排查延后（v3.1.3 #11 未排） | 延 v3.1.5+ |
 | 8 | 中 | dist 滞后 | `npm run build` 0 error → 5000 端口 dist 时间戳刷新 + push v3.1.5 | v3.1.5 已落地 |
+
+### v3.1.6 落地清单（2026-07-15）
+
+- **webdav/list 错误粒度升级（502 + UPSTREAM_UNAVAILABLE）**：上一轮 v3.1.3 把后端错误包装为可读中文 message，但所有网络层错误都回 `500 Internal Server Error`，前端 `loadBackupList` 看到 500 时无法区分「代码 bug」和「坚果云远端不可达」。
+  - v3.1.6 起：网络层错误（`无法连接` / `SSL` / `握手` / `重置` / `拒绝`）→ **`502 Bad Gateway` + `error: UPSTREAM_UNAVAILABLE`**
+  - 其它异常（凭证错、JSON parse 错、IO 异常等）→ 仍 `500` + `error: LIST_FAILED`
+  - 行为对前端是透明的：`DatabaseBackup` 的 `loadBackupList` 已经能从 response 拿到 `error` code + status code + message（v3.1.3 加了），现在 502 让用户更清楚是「远端 SSL 握手失败 / VPN 拦截」而非「程序出错」。
+- **Flask 进程刷新（关键闭环）**：之前 PID 68668 启动于 2026-07-10 10:45（v3.1.4/v3.1.5 commit 之前），用户报的所有「GitHub 没看到更新」/「日历热力图没显示」/「筛选器没生效」/「数据错」现象都是这个 stale 进程导致 — 后端路由代码从未热加载过。
+  - 本次 kill PID 68668 → 启动 dev mode Flask (PID 150056 → 165280) → 验证 `daily-calendar` 200 OK 返回真实 3 天数据 → `summary` 200 OK → `webdav/list` 502 UPSTREAM_UNAVAILABLE（v3.1.6 细分）。
+  - 用户现在刷新浏览器即可看到 v3.1.4 + v3.1.5 + v3.1.6 的所有修复生效。
+- **`webdav/list` 500 长尾根因（不是代码 bug）**：`dav.jianguoyun.com:443` SSL 握手被远端 reset/reject，复现于 `urllib3._ssl_wrap_socket_impl`，是本机网络/代理/VPN/服务端临时故障问题，不是本项目代码 bug。
+  - 当前前端提示已清晰：`获取备份列表失败（UPSTREAM_UNAVAILABLE）：无法连接坚果云 WebDAV（连接被远端重置/拒绝）。请检查本机网络、防火墙、代理或 VPN 是否能访问 dav.jianguoyun.com:443，必要时在 .env 设置 WEBDAV_VERIFY_SSL=false 或 WEBDAV_PROXY。`
+  - 解决路径：① 关闭 VPN / 切换网络；② 在 .env 配 `WEBDAV_VERIFY_SSL=false`；③ 配 `WEBDAV_PROXY`；④ 等待坚果云服务端恢复。
+
+### v3.1.6 修复行动登记（2026-07-15）
+
+| # | 优先级 | 影响面 | 任务 | 状态 |
+|---|---|---|---|---|
+| 1 | 高 | webdav/list 错误粒度 | 网络层错误细分：SSL/连接被重置 → 502 + UPSTREAM_UNAVAILABLE；其它 → 500 + LIST_FAILED | v3.1.6 已落地 |
+| 2 | 高 | Flask 进程刷新 | kill PID 68668 (2026-07-10 stale 进程) → 启 dev mode Flask 加载 v3.1.4/5/6 代码 | v3.1.6 已落地 |
+| 3 | 高 | `dav.jianguoyun.com:443` SSL 握手 | 长尾根因排查（v3.1.3 #11 / v3.1.4 #8 / v3.1.5 #7 三次延后）→ **不是代码 bug**，是远端/网络层；用户需关闭 VPN 或 .env 配 WEBDAV_VERIFY_SSL=false | 已闭环 |
+| 4 | 中 | 后端 daily-calendar 200 验证 | curl smoke：3 天真实数据返回（2026-07-09 84 / 2026-07-10 60 / 2026-07-13 76） | v3.1.6 已落地 |
+| 5 | 中 | OmniChannel summary 200 验证 | curl smoke：by_category 4 类齐全（合作机构 413754 / 自然流入 208264 / 员工开户 / 互联网引流） | v3.1.6 已落地 |
+| 6 | 中 | 文档 + 推送 | AGENTS.md / CLAUDE.md 字节一致升级到 v3.1.6 + commit + tag + push | v3.1.6 进行中 |
 
 ## 4. 共享组件清单
 
