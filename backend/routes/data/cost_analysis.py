@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """成本分析 + 转化漏斗（v2.1）
 
 每个 item 内：
@@ -45,7 +45,7 @@ def get_cost_analysis():
     if filters.get('platforms'):
         q = q.filter(AggVendorDaily.平台.in_([str(p) for p in filters['platforms']]))
     if filters.get('agencies'):
-        q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls([str(a) for a in filters['agencies']])))
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in filters['agencies']]))
     if filters.get('business_models'):
         q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in filters['business_models']]))
     q = q.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.厂商)
@@ -160,7 +160,7 @@ def get_conversion_funnel():
     if platforms:
         vq = vq.filter(AggVendorDaily.平台.in_([str(p) for p in platforms]))
     if agencies:
-        vq = vq.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls([str(a) for a in agencies])))
+        vq = vq.filter(AggVendorDaily.厂商.in_([str(a) for a in agencies]))
     if business_models:
         vq = vq.filter(AggVendorDaily.业务模式.in_([str(b) for b in business_models]))
     vr = vq.first()

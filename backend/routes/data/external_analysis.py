@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """外部数据分析接口（v2.1 - meta + sums 形态）
 
 - platform_comparison 每项 metrics：原 sums（SUM/count）+ 3 个派生 rate/cost
@@ -47,7 +47,7 @@ def get_external_data_analysis():
     if platforms:
         q = q.filter(AggVendorDaily.平台.in_([str(p) for p in platforms]))
     if agencies:
-        q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls([str(a) for a in agencies])))
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in agencies]))
     if business_models:
         q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in business_models]))
     q = q.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.厂商, AggVendorDaily.业务模式)

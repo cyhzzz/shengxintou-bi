@@ -52,6 +52,30 @@ const ConversionFunnelPage: React.FC = () => {
   ];
   // dateRange state 是 string[]，DatePicker 需要 dayjs，转换中间变量
   const dateRangeDayjs: [Dayjs, Dayjs] = [dayjs(dateRange[0]), dayjs(dateRange[1])];
+  const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
+    setLoading(true);
+    try {
+      const sd = override?.startDate ?? dateRange[0];
+      const ed = override?.endDate ?? dateRange[1];
+      const pls = override?.platforms ?? platforms;
+      const response: any = await dataService.getConversionFunnelSplit({
+        start_date: sd,
+        end_date: ed,
+        platforms: pls.length ? pls : undefined,
+      } as any);
+      if (response.success && response.data) {
+        const funnels = response.data.funnels || {};
+        setContentStages(funnels.content?.stages || []);
+        setAppmarketStages(funnels.appmarket?.stages || []);
+      } else {
+        message.error(response.message || '加载转化漏斗失败');
+      }
+    } catch (error) {
+      message.error('加载转化漏斗异常');
+    } finally {
+      setLoading(false);
+    }
+  };
   const applyFilters = (next: { start?: Dayjs; end?: Dayjs; pls?: string[] }) => {
     if (next.start && next.end) {
       setDateRange([next.start.format('YYYY-MM-DD'), next.end.format('YYYY-MM-DD')]);
@@ -67,33 +91,6 @@ const ConversionFunnelPage: React.FC = () => {
     setDateRange(['2026-01-01', '2026-12-31']);
     setPlatforms([]);
     loadData({ startDate: '2026-01-01', endDate: '2026-12-31', platforms: [] });
-  };
-
-  const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
-    setLoading(true);
-    try {
-      const sd = override?.startDate ?? dateRange[0];
-      const ed = override?.endDate ?? dateRange[1];
-      const pls = override?.platforms ?? platforms;
-      const response: any = await dataService.getConversionFunnelSplit({
-        start_date: sd,
-        end_date: ed,
-        platforms: pls.length ? pls : undefined,
-      } as any);
-      // 同步平台状态到 state（可选）
-      // 25: __syncPlatforms(pls);
-      if (response.success && response.data) {
-        const funnels = response.data.funnels || {};
-        setContentStages(funnels.content?.stages || []);
-        setAppmarketStages(funnels.appmarket?.stages || []);
-      } else {
-        message.error(response.message || '加载转化漏斗失败');
-      }
-    } catch (error) {
-      message.error('加载转化漏斗异常');
-    } finally {
-      setLoading(false);
-    }
   };
 
   useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);

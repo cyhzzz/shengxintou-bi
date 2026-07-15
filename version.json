@@ -1,7 +1,10 @@
 {
-  "version": "3.1.13",
+  "version": "3.1.14",
   "release_date": "2026-07-15",
   "changelog": [
+    "v3.1.14 修复 expand_short_to_fulls 导致所有筛选归零 + ConversionFunnel load 未定义",
+    "- 6 个后端路由文件移除 expand_short_to_fulls() wrapper（dashboard/cost_analysis/agency_analysis/external_analysis/leads/trend），agg_vendor_daily.厂商 和 fact_conv_content.广告代理商 存的是简称，不应展开为全称",
+    "- ConversionFunnel/index.tsx 重排序：loadData 定义移到 applyFilters/resetFilters 前，解决 const 块级作用域暂存死区导致的 load is not defined 运行时错误",
     "v3.1.13 代理商简称映射全链路 + OmniChannel 4 卡短标题还原",
     "- 新增 backend/utils/agency_mapper.py：get_all_shorts/short_to_full/full_to_short/enrich_items/expand_short_to_fulls/reset_cache",
     "- 6 个后端路由文件 .厂商/.广告代理商 in_ 筛选前调用 expand_short_to_fulls()（agency_analysis / cost_analysis / dashboard / external_analysis / leads / trend）",

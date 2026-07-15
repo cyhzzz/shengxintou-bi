@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """代理商分析接口（v2 - 查 agg_vendor_daily）"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
@@ -44,7 +44,7 @@ def get_agency_analysis():
     if start_date and end_date:
         q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
     if platforms: q = q.filter(AggVendorDaily.平台.in_(platforms))
-    if agencies: q = q.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls(agencies)))
+    if agencies: q = q.filter(AggVendorDaily.厂商.in_(agencies))
     if business_models: q = q.filter(AggVendorDaily.业务模式.in_(business_models))
     q = q.group_by(AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商)
     rows = q.all()
@@ -135,7 +135,7 @@ def get_agency_analysis():
     if start_date and end_date:
         tq = tq.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
     if platforms: tq = tq.filter(AggVendorDaily.平台.in_(platforms))
-    if agencies: tq = tq.filter(AggVendorDaily.厂商.in_(expand_short_to_fulls(agencies)))
+    if agencies: tq = tq.filter(AggVendorDaily.厂商.in_(agencies))
     if business_models: tq = tq.filter(AggVendorDaily.业务模式.in_(business_models))
     tq = tq.group_by(AggVendorDaily.日期, AggVendorDaily.平台, AggVendorDaily.业务模式, AggVendorDaily.厂商).order_by(AggVendorDaily.日期)
     trend_rows = tq.all()
