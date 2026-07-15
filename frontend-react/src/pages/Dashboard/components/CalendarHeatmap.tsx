@@ -21,13 +21,19 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
     return m;
   }, [data]);
 
+  // v3.1.10: 年度统计起点对齐 2026-01-01
+  // max / activeDays 取 365 天全量（用于 level 颜色分类）
+  // sum 仅累加 2026-01-01 及之后的值（年度总开户）
+  const YEAR_START = '2026-01-01';
   const stats = useMemo(() => {
-    const values = Array.from(map.values());
-    if (values.length === 0) return { max: 0, sum: 0, activeDays: 0 };
+    const entries = Array.from(map.entries());
+    if (entries.length === 0) return { max: 0, sum: 0, activeDays: 0 };
+    const allValues = entries.map(([, v]) => v);
+    const yearValues = entries.filter(([date]) => date >= YEAR_START).map(([, v]) => v);
     return {
-      max: Math.max(...values, 0),
-      sum: values.reduce((s, v) => s + v, 0),
-      activeDays: values.filter((v) => v > 0).length,
+      max: Math.max(...allValues, 0),
+      sum: yearValues.reduce((s, v) => s + v, 0),
+      activeDays: allValues.filter((v) => v > 0).length,
     };
   }, [map]);
 

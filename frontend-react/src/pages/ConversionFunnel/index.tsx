@@ -33,12 +33,8 @@ const ConversionFunnelPage: React.FC = () => {
   const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
   const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
 
-  const [dateRange, setDateRange] = useState<[string, string]>(() => {
-    const today = new Date();
-    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    return [fmt(sixMonthsAgo), fmt(today)];
-  });
+  // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31
+  const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [platforms, setPlatforms] = useState<string[]>([]);
   // 筛选器可选平台：内容平台 + 应用市场
   const PLATFORM_OPTIONS = [
@@ -67,12 +63,9 @@ const ConversionFunnelPage: React.FC = () => {
     });
   };
   const resetFilters = () => {
-    const today = new Date();
-    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 6, 1);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    setDateRange([fmt(sixMonthsAgo), fmt(today)]);
+    setDateRange(['2026-01-01', '2026-12-31']);
     setPlatforms([]);
-    loadData({ startDate: fmt(sixMonthsAgo), endDate: fmt(today), platforms: [] });
+    loadData({ startDate: '2026-01-01', endDate: '2026-12-31', platforms: [] });
   };
 
   const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {

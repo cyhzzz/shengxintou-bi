@@ -52,10 +52,10 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
         if (start && end) {
           setDateRange([start, end]);
         } else {
-          setDateRange(['2026-01-01', '2026-06-30']);
+          setDateRange(['2026-01-01', '2026-12-31']);
         }
       })
-      .catch(() => setDateRange(['2026-01-01', '2026-06-30']));
+      .catch(() => setDateRange(['2026-01-01', '2026-12-31']));
   }, []);
 
   // 生成周报
