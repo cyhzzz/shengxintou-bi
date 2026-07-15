@@ -104,7 +104,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
         <div className={styles.body}>
           <div
             className={styles.monthRow}
-            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 12px)` }}
+            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 18px)` }}
           >
             <span />
             {layout.monthLabels.map((m, i) => (
@@ -120,7 +120,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
 
           <div
             className={styles.grid}
-            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 12px)` }}
+            style={{ gridTemplateColumns: `40px repeat(${layout.totalWeeks}, 18px)` }}
           >
             <div className={styles.weekLabelsCol}>
               {WEEK_LABELS.map((w, i) => (
