@@ -12,6 +12,7 @@
  * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty, DatePicker, Select, Button } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { AimOutlined, BankOutlined, CheckCircleOutlined, EyeOutlined, MessageOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
@@ -166,7 +167,8 @@ const ConversionFunnelPage: React.FC = () => {
               options={PLATFORM_OPTIONS}
               allowClear
             />
-            <Button onClick={resetFilters}>重置</Button>
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
             <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>
               当前只针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制。
             </span>
