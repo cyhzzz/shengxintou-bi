@@ -229,7 +229,7 @@ const AgencyAnalysisPage: React.FC = () => {
   const columns: ColumnsType<FlattenedSummaryItem> = useMemo(() => [
     { title: '平台', dataIndex: 'platform', key: 'platform', width: 100, fixed: 'left' },
     { title: '业务模式', dataIndex: 'business_model', key: 'business_model', width: 100, render: (v: string) => v === '直播' ? <Tag color="magenta">{v}</Tag> : (v || '-') },
-    { title: '代理商', dataIndex: 'agency', key: 'agency', width: 160, render: (v: string, r) => {
+    { title: '代理商', dataIndex: 'agency_short', key: 'agency_short', width: 160, render: (v: string, r) => {
       if (r.is_total) return <strong style={{ color: 'var(--color-brand)' }}>{v}</strong>;
       if (r.is_subtotal) return <strong style={{ color: 'var(--chart-color-5)' }}>{v}</strong>;
       return v || '-';
@@ -249,7 +249,7 @@ const AgencyAnalysisPage: React.FC = () => {
     if (!visibleSummary.length) return;
     const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', '有效户', '开户资产', '线索成本', '开户成本'];
     const rows = visibleSummary.map((r) => [
-      r.platform, r.business_model, r.agency, r.cost, r.impressions, r.clicks,
+      r.platform, r.business_model, r.agency_short || r.agency, r.cost, r.impressions, r.clicks,
       r.lead_users, r.opened_account_users, r.valid_customer_users,
       r.opened_account_assets, r.lead_cost, r.account_cost,
     ]);
@@ -354,7 +354,7 @@ const AgencyAnalysisPage: React.FC = () => {
           <Table
             columns={columns}
             dataSource={visibleSummary}
-            rowKey={(r) => `${r.platform}-${r.business_model}-${r.agency}-${r.is_total ? 'T' : r.is_subtotal ? 'S' : 'D'}`}
+            rowKey={(r) => `${r.platform}-${r.business_model}-${r.agency_short||r.agency}-${r.is_total ? 'T' : r.is_subtotal ? 'S' : 'D'}`}
             scroll={{ x: 1200 }}
             pagination={false}
             size="small"

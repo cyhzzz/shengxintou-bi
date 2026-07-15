@@ -6,6 +6,7 @@ from sqlalchemy import distinct, func
 from datetime import datetime, date
 import logging
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import get_all_shorts, expand_short_to_fulls
 
 bp = Blueprint('metadata', __name__)
 logger = logging.getLogger(__name__)
@@ -24,13 +25,7 @@ def get_metadata():
         platforms = ['腾讯', '抖音', '小红书']
 
     try:
-        ag = set(r[0] for r in db.session.query(distinct(DimVendor.agency_name))
-                 .filter(DimVendor.agency_name.isnot(None), DimVendor.agency_name != '').all())
-        ag |= set(r[0] for r in db.session.query(distinct(AggVendorDaily.厂商))
-                  .filter(AggVendorDaily.厂商.isnot(None), AggVendorDaily.厂商 != '').all())
-        ag |= set([r[0] for r in db.session.query(distinct(FactConvContent.广告代理商))
-                   .filter(FactConvContent.广告代理商.isnot(None), FactConvContent.广告代理商 != '').all()])
-        agencies = sorted(ag)
+        agencies = get_all_shorts()
     except Exception:
         agencies = []
 
@@ -63,7 +58,8 @@ def get_metadata():
         'success': True,
         'data': {
             'platforms': [{'value': p, 'label': p} for p in platforms],
-            'agencies': [{'value': a, 'label': a} for a in agencies],
+            'agencies': [{'value': a, 'label': a, 'full_names': expand_short_to_fulls([a])} for a in agencies],
+            'agency_full_map': {s: expand_short_to_fulls([s]) for s in agencies},
             'business_models': [{'value': b, 'label': b} for b in business_models],
             'date_range': date_range,
             'xhs_notes_date_range': xhs_notes_date_range,

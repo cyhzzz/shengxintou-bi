@@ -116,3 +116,6 @@ frontend-react/logs/
 frontend-react/_compare_shots.cjs
 
 frontend-react/tmp_*.cjs
+
+# node_modules at root (accidental)
+node_modules/

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 元数据 API 服务
  * 提供平台、代理商、业务模式等元数据接口
  */
@@ -9,7 +9,7 @@ import type { ApiResponse } from '@/types';
 export interface Metadata {
   platforms: string[];
   business_models: string[];
-  agencies: string[];
+  agencies: {value: string; label: string; full_names?: string[]}[];
   date_range: {
     start: string | null;
     end: string | null;

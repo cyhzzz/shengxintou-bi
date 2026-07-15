@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify
 from backend.models_v2 import DimVendor
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import reset_cache
 
 bp = Blueprint('abbreviation_mapping', __name__)
 
@@ -40,6 +41,7 @@ def create_abbreviation_mapping():
     )
     db.session.add(row)
     db.session.commit()
+    reset_cache()
     return jsonify({'success': True, 'message': '创建成功', 'data': {'id': new_id}})
 
 
@@ -57,6 +59,7 @@ def update_abbreviation_mapping(id):
     if 'abbreviation' in body:
         row.agency_letter = body['abbreviation']
     db.session.commit()
+    reset_cache()
     return jsonify({'success': True, 'message': '更新成功'})
 
 
@@ -68,4 +71,5 @@ def delete_abbreviation_mapping(id):
         return jsonify({'success': False, 'error': '记录不存在'}), 404
     db.session.delete(row)
     db.session.commit()
+    reset_cache()
     return jsonify({'success': True, 'message': '删除成功'})

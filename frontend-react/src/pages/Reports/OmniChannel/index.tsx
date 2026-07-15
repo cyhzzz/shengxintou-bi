@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 全渠道获客 (v3.1 §二.5 重构)
  * 数据源：agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket 独立）
  *
@@ -13,7 +13,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Typography } from 'antd';
+
 import {
   Card,
   Row,
@@ -415,7 +415,7 @@ const OmniChannelPage: React.FC = () => {
         {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
         <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
           <MetricCard
-            title="总开户成功人数"
+            title="开户成功"
             value={totals.opens}
             suffix="人"
             valueColor="var(--color-brand)"
@@ -423,7 +423,7 @@ const OmniChannelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title="总入金户数"
+            title="入金户数"
             value={totals.deposit}
             suffix="人"
             valueColor="var(--chart-color-7)"
@@ -431,7 +431,7 @@ const OmniChannelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title="总有效户数"
+            title="有效户数"
             value={totals.valid}
             suffix="人"
             valueColor="var(--color-success)"
@@ -455,7 +455,7 @@ const OmniChannelPage: React.FC = () => {
             const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
             return (
               <MetricCard
-                title="互联网渠道开户数"
+                title="互联网开户"
                 value={openedCount}
                 suffix="户"
                 valueColor="var(--chart-color-2)"
