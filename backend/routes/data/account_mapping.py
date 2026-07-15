@@ -21,6 +21,7 @@ def get_account_mapping():
             'main_account_id': r.main_account_id,
             'sub_account_name': r.sub_account_name,
             'agency': r.agency_name,
+            'agency_short': r.agency_short or '',
             'business_model': r.business_model,
         })
     return jsonify({'success': True, 'data': data, 'total': len(data)})
