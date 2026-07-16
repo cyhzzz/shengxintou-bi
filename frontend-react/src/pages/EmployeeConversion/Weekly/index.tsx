@@ -9,6 +9,7 @@ import WeeklyReportPreview from './components/WeeklyReportPreview';
 import PosterModal from './components/PosterModal';
 import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
 import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
+import { ReportFooter } from '@/components/ReportFooter';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
@@ -301,6 +302,15 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
           <WeeklyReportPreview content={reportContent} loading={loading} mode="text" />
         )}
       </Card>
+
+      <ReportFooter
+        sources={[
+          { label: '口径', value: '内容平台（小红书 / 腾讯 / 抖音 / 快手 / 财联社）—— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },
+          { label: '数据源', value: 'fact_conv_content（员工明细口径）' },
+          { label: '主端点', value: 'POST /api/v1/employee-conversion/weekly' },
+        ]}
+        notes={'周报榜单仅统计内容平台中已填写员工姓名的线索；内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
+      />
     </div>
   );
 };

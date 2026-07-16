@@ -370,11 +370,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
       <ReportFooter
         sources={[
-          { label: '口径', value: '内容平台' + (defaultPlatforms.length ? '（' + defaultPlatforms.join(' / ') + '）' : '') + ' —— 业务实质：内容平台客户由员工承接营销转化' },
+          { label: '口径', value: '内容平台' + (defaultPlatforms.length ? '（' + defaultPlatforms.join(' / ') + '）' : '') + ' —— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },
           { label: '数据源', value: 'fact_conv_content（员工明细口径）+ agg_daily_channel_open（渠道口径，独立数据源）' },
           { label: '主端点', value: 'POST /api/v1/employee-conversion/{analysis, weekly, analysis-channel-overview}' },
         ]}
-        notes={'员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。'}
+        notes={'员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
       />
     </div>
   );

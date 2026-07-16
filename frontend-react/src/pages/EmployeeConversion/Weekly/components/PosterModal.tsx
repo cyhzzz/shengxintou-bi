@@ -17,6 +17,8 @@ interface PosterModalProps {
     total: EmployeeConversionWeeklyRankings[];
     existing: EmployeeConversionWeeklyRankings[];
     new: EmployeeConversionWeeklyRankings[];
+    // v3.1.30: 存量线索新开户榜 — 线索日期在区间前 + 开户时间落在区间内
+    existing_new_open?: EmployeeConversionWeeklyRankings[];
   };
   onCancel?: () => void;
   // v3.1.25: 'modal' = 原貌 Modal 包装（PosterExportButtons 调用）；'inline' = 直接渲染与主页面作为海报视图（Weekly 主页面调用）
@@ -94,7 +96,7 @@ const renderTableRow = (
 const renderRankingTable = (
   data: EmployeeConversionWeeklyRankings[],
   title: string,
-  icon: string,
+  indexLabel: string,
   platform: string
 ) => {
   // 计算合计
@@ -118,26 +120,27 @@ const renderRankingTable = (
   return (
     <div className={styles.rankingSection}>
       <div className={styles.rankingHeader}>
-        <span className={styles.rankingIcon}>{icon}</span>
+        <span className={styles.rankingIndex}>{indexLabel}</span>
         <span className={styles.rankingTitle}>{title}</span>
+        <span className={styles.rankingMeta}>{data.length} 名员工</span>
       </div>
       <table className={styles.rankingTable}>
         <thead>
           <tr>
-            <th style={{ width: '60px' }}>排名</th>
-            <th style={{ width: '100px' }}>员工姓名</th>
-            <th style={{ width: '90px' }}>线索数</th>
-            <th style={{ width: '70px' }}>开户数</th>
-            <th style={{ width: '70px' }}>有效户</th>
-            <th style={{ width: '100px' }}>引入资产</th>
-            <th style={{ width: '80px' }}>开户率</th>
-            <th style={{ width: '80px' }}>有效率</th>
+            <th style={{ width: '48px' }}>#</th>
+            <th style={{ width: '110px' }}>员工</th>
+            <th>线索</th>
+            <th>开户</th>
+            <th>有效户</th>
+            <th>资产(万)</th>
+            <th>开户率</th>
+            <th>有效率</th>
           </tr>
         </thead>
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={8} style={{ padding: '30px', color: '#999' }}>
+              <td colSpan={8} style={{ padding: '24px 6px', color: '#8c8c8c', textAlign: 'center' }}>
                 暂无数据
               </td>
             </tr>
@@ -156,19 +159,20 @@ const renderRankingTable = (
 // 渲染底部说明
 const renderFooterNote = (platform: string) => {
   const notes = [
-    '① 微信线索数指添加企业微信后留存线索量',
-    '② 开户数据指开户营业部归属为10/30（即成都天府四街/二营业部）',
-    '③ 开户率 = 开户数 / 微信线索数；有效率 = 有效户数 / 开户数',
-    '④ 资产单位：万元',
+    '微信线索数指添加企业微信后留存线索量',
+    '开户数据指开户营业部归属为 10 / 30（即成都天府四街 / 二营业部）',
+    '开户率 = 开户数 / 微信线索数；有效率 = 有效户数 / 开户数',
+    '资产单位：万元',
+    '存量线索新开户榜：线索日期在统计周期前 + 开户时间落在周期内的户数',
   ];
 
   if (platform === '小红书') {
-    notes.push('⑤ 存量开户线索指添加企业微信时间在统计周期开始前');
+    notes.push('存量开户线索指添加企业微信时间在统计周期开始前');
   }
 
   return (
     <div className={styles.footerNote}>
-      <div className={styles.footerNoteTitle}>📋 数据说明</div>
+      <div className={styles.footerNoteTitle}>Notes · 数据说明</div>
       <ul>
         {notes.map((note, index) => (
           <li key={index}>{note}</li>
@@ -341,7 +345,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
           onClick={handleExportImage}
           disabled={exporting !== null}
         >
-          {exporting === 'image' ? <Spin size="small" /> : '📷'}
+          {exporting === 'image' ? <Spin size="small" /> : null}
           <span>导出图片</span>
         </button>
         <button
@@ -349,38 +353,49 @@ const PosterModal: React.FC<PosterModalProps> = ({
           onClick={handleExportPDF}
           disabled={exporting !== null}
         >
-          {exporting === 'pdf' ? <Spin size="small" /> : '📄'}
-          <span>导出PDF</span>
+          {exporting === 'pdf' ? <Spin size="small" /> : null}
+          <span>导出 PDF</span>
         </button>
       </div>
 
       {/* 海报内容 */}
       <div className={styles.posterWrapper}>
         <div ref={posterRef} className={`${styles.posterContainer} ${getPlatformClass()}`}>
-          {/* 头部 */}
+          {/* 头部 — masthead */}
           <div className={styles.header}>
-            <div className={styles.platformTitle}>{getPlatformTitle()}</div>
-            <div className={styles.subTitle}>开户榜</div>
+            <div className={styles.platformLabel}>{platform} · Weekly Report</div>
+            <h1 className={styles.platformTitle}>{getPlatformTitle()} · 开户榜</h1>
+            <div className={styles.subTitle}>员工转化周报 · Employee Conversion Weekly Ranking</div>
             <div className={styles.dateRange}>
-              {formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}
+              <span className={styles.label}>Period</span>
+              <span className={styles.value}>
+                {formatDateDisplay(startDate)} — {formatDateDisplay(endDate)}
+              </span>
             </div>
-            {platform === '小红书' && <div className={styles.waveDecoration}></div>}
           </div>
 
           {/* 内容区域 */}
           <div className={styles.content}>
-            {renderRankingTable(rankings.total, `${getRankingPrefix()}开户总榜`, '👑', platform)}
+            {renderRankingTable(rankings.total, `${getRankingPrefix()}开户总榜`, '01', platform)}
             {renderRankingTable(
               rankings.existing,
               `${getRankingPrefix()}存量线索开户周榜`,
-              '📊',
+              '02',
               platform
             )}
             {renderRankingTable(
               rankings.new,
               `${getRankingPrefix()}新增线索开户周榜`,
-              '🆕',
+              '03',
               platform
+            )}
+            {rankings.existing_new_open && rankings.existing_new_open.length > 0 && (
+              renderRankingTable(
+                rankings.existing_new_open,
+                `${getRankingPrefix()}存量线索新开户周榜`,
+                '04',
+                platform
+              )
             )}
             {renderFooterNote(platform)}
           </div>

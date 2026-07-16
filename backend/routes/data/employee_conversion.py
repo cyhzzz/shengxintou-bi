@@ -83,6 +83,8 @@ def get_weekly_data():
                 'total': get_employee_conversion_ranking([p], start_date, end_date, 'all')[:top_count],
                 'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing')[:top_count],
                 'new': get_employee_conversion_ranking([p], start_date, end_date, 'new')[:top_count],
+                # v3.1.30: 存量线索新开户榜 — 线索日期在区间前 + 开户时间落在区间内
+                'existing_new_open': get_employee_conversion_ranking([p], start_date, end_date, 'existing_new_open')[:top_count],
             } for p in platforms},
             'overview': get_platform_overview(platforms, start_date, end_date),
             'trend': get_weekly_trend_data(platforms, start_date, end_date),
