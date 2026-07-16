@@ -449,3 +449,13 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 - **冒烟测试基础设施**：`tests/route-health.spec.ts` 是 v3.1.25 起每个版本提交前的硬性验收（`npm run test`），跑通才允许 commit；后续 lazy 路由改动必须保证这个 spec 绿灯。
 
+
+## 12. 开发服务器一键启停（v3.1.25+）
+
+- **启动**：`scripts/start-dev.bat`（双击或 PowerShell 调）。脚本会先 netstat 检查 :5000/:3000 是否被占，被占用直接退出提示先 stop，避免端口冲突。
+- **停止**：`scripts/stop-dev.bat`。优先读 `logs/dev-pids/*.pid`，找不到 PID 文件时回退到按端口找进程并 kill。
+- **日志**：`logs/app.log`（Flask）、`logs/vite-dev.log`（Vite）。PID 落到 `logs/dev-pids/`。
+- **生产前端看不到最新代码**：先 `cd frontend-react && npm run build`，5000 端口不需要重启 Flask；然后**重启 Vite**（用 `stop-dev.bat` + `start-dev.bat`），让 :3000 走最新 dist 的代理配置。
+- **背景**：v3.1.23~v3.1.25 期间多次出现"3000/5000 同时不可用"问题——根因是 `Start-Process -WindowStyle Hidden` 启的 Python Flask 进程在父窗口关闭时被带跑，Vite node 子进程 HMR 链断后未重新 listen。一键 .bat 把启动方式固化，避免脚本一关就掉。
+- **不使用 .bat 的情况**：临时调试可用 `Start-Process python app.py -WindowStyle Hidden` 启 Flask，临时启 Vite 用 `cd frontend-react && npm run dev`，但要意识到窗口关闭 = 进程终止。
+
