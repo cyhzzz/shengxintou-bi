@@ -15,7 +15,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty, DatePicker, Select, Button } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
-import { AimOutlined, BankOutlined, CheckCircleOutlined, EyeOutlined, MessageOutlined, MobileOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, MobileOutlined, RiseOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
@@ -32,7 +32,10 @@ interface FunnelStage {
 const ConversionFunnelPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
+  const [extraNewOpened, setExtraNewOpened] = useState<number>(0);
+  const [contentNewOpenAssets, setContentNewOpenAssets] = useState<number>(0);
   const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
+  const [appmarketNewOpenAssets, setAppmarketNewOpenAssets] = useState<number>(0);
 
   // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31
   const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
@@ -67,6 +70,9 @@ const ConversionFunnelPage: React.FC = () => {
         const funnels = response.data.funnels || {};
         setContentStages(funnels.content?.stages || []);
         setAppmarketStages(funnels.appmarket?.stages || []);
+        setExtraNewOpened(funnels.content?.extra_new_opened || 0);
+        setContentNewOpenAssets(funnels.content?.new_open_assets || 0);
+        setAppmarketNewOpenAssets(funnels.appmarket?.new_open_assets || 0);
       } else {
         message.error(response.message || '加载转化漏斗失败');
       }
@@ -125,8 +131,12 @@ const ConversionFunnelPage: React.FC = () => {
       leads: find('客户线索'),
       mouth: find('客户开口'),
       validLead: find('有效线索'),
+      newValidLead: find('有效线索(剔除存量)'),
+      // 成功开户阶段已经是非存量口径（cq_new 查询）
       opened: find('成功开户'),
+      newOpened: find('成功开户'),
       valid: find('有效户'),
+      newValid: find('有效户'),
     };
   }, [contentStages]);
 
@@ -136,6 +146,7 @@ const ConversionFunnelPage: React.FC = () => {
     return {
       activate: find('激活APP'),
       opened: find('开户成功'),
+      newOpened: find('新开户'),
       deposit: find('入金'),
       valid: find('有效户'),
     };
@@ -178,40 +189,41 @@ const ConversionFunnelPage: React.FC = () => {
               label: <span><Tag color="blue">内容平台漏斗</Tag> (小红书/腾讯/抖音/快手)</span>,
               children: (
                 <Row gutter={[16, 16]}>
-                  {/* 核心指标 */}
+                  {/* v3.1.26 问题3: 核心指标参考应用市场概览 4 卡（线索/新开户/有效户/新开户引进资产） */}
                   {contentMetrics && (
                     <Col span={24}>
-                      <MetricSection title="内容平台核心指标" description="线索、开口、成功开户到有效户的核心转化表现（v3.1.4 起从客户线索起步；曝光 / 点击仍见下方漏斗 7 阶段）">
+                      <MetricSection title="内容平台获客概览" description="线索 / 新开户 / 有效户 / 新开户引进资产（核心业务产出，与应用市场获客概览口径对齐）">
                         <MetricCard
                           title="客户线索"
                           value={contentMetrics.leads}
                           valueColor="var(--color-brand)"
                           icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />}
-                          description={`内容平台引流线索数`}
+                          description={`内容平台引流线索数（企微号）· 漏斗顶端基数`}
                           showWowChange={false}
                         />
                         <MetricCard
-                          title="客户开口"
-                          value={contentMetrics.mouth}
+                          title="新开户"
+                          value={contentMetrics.newOpened}
                           valueColor="var(--chart-color-7)"
-                          icon={<MessageOutlined style={{ color: 'var(--chart-color-7)' }} />}
-                          description={`线索中已沟通开口的客户数`}
-                          showWowChange={false}
-                        />
-                        <MetricCard
-                          title="成功开户"
-                          value={contentMetrics.opened}
-                          valueColor="var(--chart-color-3)"
-                          icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
-                          description={`客户开口后成功开户人数`}
+                          icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+                          description={`非存量且成功开户人数 · 剔除存量，核心获客产出`}
                           showWowChange={false}
                         />
                         <MetricCard
                           title="有效户"
-                          value={contentMetrics.valid}
+                          value={contentMetrics.newValid}
                           valueColor="var(--color-success)"
                           icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
-                          description={`有效户数·入金且资产达标`}
+                          description={`非存量且有效户人数 · 入金且资产达标`}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="新开户引进资产"
+                          value={contentNewOpenAssets}
+                          formatter="currency"
+                          valueColor="var(--color-error)"
+                          icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+                          description={`非存量且开户成功客户的总资产 · 引进资产是核心业务产出`}
                           showWowChange={false}
                         />
                       </MetricSection>
@@ -219,9 +231,9 @@ const ConversionFunnelPage: React.FC = () => {
                   )}
                   {/* 漏斗图 + 阶段明细 左右等高布局（v3.1.23） */}
                   <Col span={24}>
-                    <Row gutter={[16, 16]} align="stretch" className={styles.funnelSplitRow}>
+                    <Row className={styles.funnelSplitRow}>
                       <Col span={12} className={styles.funnelSplitCol}>
-                        <Card title="7 阶段转化漏斗" size="small" className={styles.h100Card}>
+                        <Card title="8 阶段转化漏斗" size="small" className={styles.h100Card}>
                           {contentStages.length ? (
                             <FunnelChart data={contentFunnelData} height={520} useLogScale />
                           ) : (
@@ -273,31 +285,24 @@ const ConversionFunnelPage: React.FC = () => {
               label: <span><Tag color="purple">应用市场漏斗</Tag> (小米/华为/OPPO/VIVO/荣耀/苹果)</span>,
               children: (
                 <Row gutter={[16, 16]}>
+                  {/* v3.1.26 问题3: 应用市场核心指标参考应用市场-获客漏斗概览 4 卡 */}
                   {appmarketMetrics && (
                     <Col span={24}>
-                      <MetricSection title="应用市场核心指标" description="激活、开户、入金与有效户核心表现">
+                      <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出，与应用市场-获客漏斗页口径一致）">
                         <MetricCard
                           title="激活APP"
                           value={appmarketMetrics.activate}
                           valueColor="var(--color-brand)"
                           icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
-                          description={`应用市场激活 APP 数`}
+                          description={`激活 APP 数量 · 应用市场漏斗顶端基数`}
                           showWowChange={false}
                         />
                         <MetricCard
-                          title="开户成功"
-                          value={appmarketMetrics.opened}
+                          title="新开户"
+                          value={appmarketMetrics.newOpened}
                           valueColor="var(--chart-color-7)"
                           icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
-                          description={`激活后成功开户人数`}
-                          showWowChange={false}
-                        />
-                        <MetricCard
-                          title="入金"
-                          value={appmarketMetrics.deposit}
-                          valueColor="var(--chart-color-5)"
-                          icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
-                          description={`开户后首笔入金人数`}
+                          description={`首次开户客户数 · 剔除存量，核心获客产出`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -305,16 +310,25 @@ const ConversionFunnelPage: React.FC = () => {
                           value={appmarketMetrics.valid}
                           valueColor="var(--color-success)"
                           icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
-                          description={`有效户数·入金且资产达标`}
+                          description={`入金且资产达标有效户`}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="新开户引进资产"
+                          value={appmarketNewOpenAssets}
+                          formatter="currency"
+                          valueColor="var(--color-error)"
+                          icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+                          description={`新开户客户对应的总资产 · 引进资产是核心业务产出`}
                           showWowChange={false}
                         />
                       </MetricSection>
                     </Col>
                   )}
                   <Col span={24}>
-                    <Row gutter={[16, 16]} align="stretch" className={styles.funnelSplitRow}>
+                    <Row className={styles.funnelSplitRow}>
                       <Col span={12} className={styles.funnelSplitCol}>
-                        <Card title="8 阶段转化漏斗（应用市场口径）" size="small" className={styles.h100Card}>
+                        <Card title="9 阶段转化漏斗（应用市场口径）" size="small" className={styles.h100Card}>
                           {appmarketStages.length ? (
                             <FunnelChart data={appmarketFunnelData} height={520} useLogScale />
                           ) : (
@@ -366,11 +380,11 @@ const ConversionFunnelPage: React.FC = () => {
 
         <ReportFooter
           sources={[
-            { label: '内容平台漏斗', value: 'agg_vendor_daily(平台∈内容平台) + fact_conv_content（7 阶段：广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 成功开户 → 有效户）' },
-            { label: '应用市场漏斗', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
+            { label: '内容平台漏斗', value: 'agg_vendor_daily(平台∈内容平台) + fact_conv_content（8 阶段：广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户 → 有效户）' },
+            { label: '应用市场漏斗', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },
             { label: '端点', value: 'POST /api/v1/conversion-funnel/split' },
           ]}
-          notes={`选中平台仅受后端现有 platforms 参数限制。内容平台漏斗仅看新开户（排除存量客户，FactConvContent.是否为存量客户=0）；应用市场漏斗限渠道类型=互联网引流 + 是否新开户=1。漏斗采用对数尺度 (log10) 映射缓解各级数据偏差过大问题；表格与 tooltip 仍显示原始人数。 stage.rate =此阶段/上一阶段、stage.step_rate =此阶段/顶端。`}
+          notes={`内容平台漏斗在有效线索后剔除存量客户（是否为存量客户≠1），后续成功开户/有效户仅统计新客户；应用市场漏斗限渠道类型=互联网引流，「新开户」作为开户成功之后的阶段呈现。${extraNewOpened > 0 ? `本周期有 ${extraNewOpened} 位「非有效线索但新开户」客户（未标记有效线索但实际开户成功），导致成功开户数可能大于有效线索(剔除存量)，属业务正常现象。` : ''}漏斗采用对数尺度 (log10) 映射缓解各级数据偏差过大问题；表格与 tooltip 仍显示原始人数。stage.rate = 此阶段/上一阶段、stage.step_rate = 此阶段/顶端。`}
         />
       </Spin>
     </div>

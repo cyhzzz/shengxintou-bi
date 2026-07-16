@@ -1,17 +1,21 @@
-﻿/**
+/**
  * 直播获客 · 业务漏斗 (v3.2)
  * 数据源: fact_conv_content.客户来源（识别 [平台]引流-[主播] 模式的主播引流量）
  * 端点: POST /api/v1/leads-detail/anchor-clusters
  *
- * 5 阶段漏斗（业务口径，主播引流链路）:
- *   客户线索 → 客户开口 → 有效线索 → 成功开户 → 有效户
+ * 6 阶段漏斗（v3.1.26 业务口径，与内容平台漏斗对齐的存量剔除口径）:
+ *   客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户(新) → 有效户(新)
+ *
+ * 「成功开户(新)」与「有效户(新)」仅统计非存量客户（是否为存量客户=0 或 NULL），
+ * 与 cost_analysis/conversion-funnel/split 一致。存量客户在「有效线索」之后剔除，
+ * 漏斗呈现新开户作为核心获客产出。
  *
  * 直播明细表数据源暂未接入（v3.1 占位已下线，v3.2 接入后补 观看UV 阶段）
  * 当前以主播引流链路作为"直播业务漏斗"的替代口径。
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip } from 'antd';
-import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -26,11 +30,20 @@ interface AnchorItem {
   platform: string;
   anchor: string;
   leads: number;
+  existing_leads: number;
+  new_leads: number;
   mouth: number;
   valid_lead: number;
+  new_valid_lead: number;
   opened: number;
+  new_opened: number;
+  existing_opened: number;
   valid: number;
+  new_valid: number;
+  existing_valid: number;
   assets: number;
+  new_assets: number;
+  existing_assets: number;
   opening_rate: number;
   valid_rate: number;
   sources: string[];
@@ -40,15 +53,50 @@ interface PlatformRow {
   platform: string;
   anchors: number;
   leads: number;
+  existing_leads: number;
+  new_leads: number;
   mouth: number;
   valid_lead: number;
+  new_valid_lead: number;
   opened: number;
+  new_opened: number;
+  existing_opened: number;
   valid: number;
+  new_valid: number;
+  existing_valid: number;
   assets: number;
+  new_assets: number;
+  existing_assets: number;
   mouth_rate: number;
   valid_lead_rate: number;
+  new_opening_rate: number;
+  opening_rate: number;
+  new_valid_rate: number;
+  valid_rate: number;
+}
+
+// 同名主播跨平台聚合行（v3.1.26 问题2）
+interface AnchorAggRow {
+  anchor: string;
+  platforms: string[];
+  leads: number;
+  existing_leads: number;
+  new_leads: number;
+  mouth: number;
+  valid_lead: number;
+  new_valid_lead: number;
+  opened: number;
+  new_opened: number;
+  existing_opened: number;
+  valid: number;
+  new_valid: number;
+  existing_valid: number;
+  assets: number;
+  new_assets: number;
+  existing_assets: number;
   opening_rate: number;
   valid_rate: number;
+  sources: string[];
 }
 
 const LiveFunnelPage: React.FC = () => {
@@ -84,83 +132,192 @@ const LiveFunnelPage: React.FC = () => {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
-  // 5 阶段漏斗（按口径聚合: 线索 → 开口 → 有效线索 → 开户 → 有效户）
+  // 6 阶段漏斗（v3.1.26 业务口径: 线索 → 开口 → 有效线索 → 有效线索(剔除存量) → 成功开户(新) → 有效户(新)）
+  // stage.rate = 阶段转化率（此阶段 / 上一阶段）；stage.step_rate = 累计转化率（此阶段 / 顶端线索）
   const funnelStages = useMemo(() => {
     const total = items.reduce((acc, it) => ({
       leads: acc.leads + it.leads,
       mouth: acc.mouth + it.mouth,
       valid_lead: acc.valid_lead + it.valid_lead,
-      opened: acc.opened + it.opened,
-      valid: acc.valid + it.valid,
-    }), { leads: 0, mouth: 0, valid_lead: 0, opened: 0, valid: 0 });
-    return [
-      { name: '客户线索', count: total.leads, rate: 100 },
-      { name: '客户开口', count: total.mouth, rate: total.leads ? +(total.mouth / total.leads * 100).toFixed(2) : 0 },
-      { name: '有效线索', count: total.valid_lead, rate: total.leads ? +(total.valid_lead / total.leads * 100).toFixed(2) : 0 },
-      { name: '成功开户', count: total.opened, rate: total.leads ? +(total.opened / total.leads * 100).toFixed(2) : 0 },
-      { name: '有效户', count: total.valid, rate: total.leads ? +(total.valid / total.leads * 100).toFixed(2) : 0 },
+      new_valid_lead: acc.new_valid_lead + (it.new_valid_lead || 0),
+      new_opened: acc.new_opened + (it.new_opened || 0),
+      new_valid: acc.new_valid + (it.new_valid || 0),
+    }), { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 });
+    const top = total.leads || 1;
+    const pct = (v: number, base: number) => (base > 0 ? +(v / base * 100).toFixed(2) : 0);
+    const stages = [
+      { step: '客户线索', value: total.leads },
+      { step: '客户开口', value: total.mouth },
+      { step: '有效线索', value: total.valid_lead },
+      { step: '有效线索(剔除存量)', value: total.new_valid_lead },
+      { step: '成功开户(新)', value: total.new_opened },
+      { step: '有效户(新)', value: total.new_valid },
     ];
+    let prev = total.leads;
+    return stages.map((s) => {
+      const rate = pct(s.value, prev);
+      const step_rate = pct(s.value, top);
+      const out = { ...s, rate, step_rate };
+      prev = s.value;
+      return out;
+    });
   }, [items]);
 
-  const totals = useMemo(() => ({
-    anchors: items.length,
-    leads: items.reduce((s, i) => s + i.leads, 0),
-    mouth: items.reduce((s, i) => s + i.mouth, 0),
-    valid_lead: items.reduce((s, i) => s + i.valid_lead, 0),
-    opened: items.reduce((s, i) => s + i.opened, 0),
-    valid: items.reduce((s, i) => s + i.valid, 0),
-    assets: items.reduce((s, i) => s + i.assets, 0),
-  }), [items]);
+  // FunnelChart 组件期望 {name, count, rate, conversionRate}
+  const funnelChartData = useMemo(() => funnelStages.map((s) => ({
+    name: sanitizeText(s.step),
+    count: s.value,
+    rate: s.rate,
+    conversionRate: s.rate,
+  })), [funnelStages]);
+
+  const totals = useMemo(() => {
+    const sum = (sel: (i: AnchorItem) => number) => items.reduce((s, i) => s + (sel(i) || 0), 0);
+    return {
+      anchors: items.length,
+      leads: sum((i) => i.leads),
+      existing_leads: sum((i) => i.existing_leads || 0),
+      new_leads: sum((i) => i.new_leads || 0),
+      mouth: sum((i) => i.mouth),
+      valid_lead: sum((i) => i.valid_lead),
+      new_valid_lead: sum((i) => i.new_valid_lead || 0),
+      opened: sum((i) => i.opened),
+      new_opened: sum((i) => i.new_opened || 0),
+      existing_opened: sum((i) => i.existing_opened || 0),
+      valid: sum((i) => i.valid),
+      new_valid: sum((i) => i.new_valid || 0),
+      existing_valid: sum((i) => i.existing_valid || 0),
+      assets: sum((i) => i.assets),
+      new_assets: sum((i) => i.new_assets || 0),
+      existing_assets: sum((i) => i.existing_assets || 0),
+    };
+  }, [items]);
 
   const platformRows: PlatformRow[] = useMemo(() => {
     const map = new Map<string, PlatformRow>();
     items.forEach((it) => {
-      const r = map.get(it.platform) || { platform: it.platform, anchors: 0, leads: 0, mouth: 0, valid_lead: 0, opened: 0, valid: 0, assets: 0, mouth_rate: 0, valid_lead_rate: 0, opening_rate: 0, valid_rate: 0 };
+      const r = map.get(it.platform) || {
+        platform: it.platform, anchors: 0, leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
+        valid_lead: 0, new_valid_lead: 0,
+        opened: 0, new_opened: 0, existing_opened: 0,
+        valid: 0, new_valid: 0, existing_valid: 0,
+        assets: 0, new_assets: 0, existing_assets: 0,
+        mouth_rate: 0, valid_lead_rate: 0,
+        new_opening_rate: 0, opening_rate: 0,
+        new_valid_rate: 0, valid_rate: 0,
+      };
       r.anchors += 1;
       r.leads += it.leads;
+      r.existing_leads += it.existing_leads || 0;
+      r.new_leads += it.new_leads || 0;
       r.mouth += it.mouth;
       r.valid_lead += it.valid_lead;
+      r.new_valid_lead += it.new_valid_lead || 0;
       r.opened += it.opened;
+      r.new_opened += it.new_opened || 0;
+      r.existing_opened += it.existing_opened || 0;
       r.valid += it.valid;
+      r.new_valid += it.new_valid || 0;
+      r.existing_valid += it.existing_valid || 0;
       r.assets += it.assets;
+      r.new_assets += it.new_assets || 0;
+      r.existing_assets += it.existing_assets || 0;
       map.set(it.platform, r);
     });
     const rows = Array.from(map.values());
     rows.forEach((r) => {
       r.mouth_rate = r.leads ? +(r.mouth / r.leads * 100).toFixed(2) : 0;
       r.valid_lead_rate = r.leads ? +(r.valid_lead / r.leads * 100).toFixed(2) : 0;
+      r.new_opening_rate = r.leads ? +(r.new_opened / r.leads * 100).toFixed(2) : 0;
       r.opening_rate = r.leads ? +(r.opened / r.leads * 100).toFixed(2) : 0;
+      r.new_valid_rate = r.leads ? +(r.new_valid / r.leads * 100).toFixed(2) : 0;
       r.valid_rate = r.leads ? +(r.valid / r.leads * 100).toFixed(2) : 0;
     });
     rows.sort((a, b) => b.leads - a.leads);
     return rows;
   }, [items]);
 
+  // v3.1.26 问题2: 同名主播跨平台聚合（支持平台多选筛选）
+  const anchorAggRows: AnchorAggRow[] = useMemo(() => {
+    const map = new Map<string, AnchorAggRow>();
+    items.forEach((it) => {
+      // 平台筛选：选中平台时只聚合命中平台的主播行
+      if (platformFilter.length && !platformFilter.includes(it.platform)) return;
+      const r = map.get(it.anchor) || {
+        anchor: it.anchor, platforms: [], leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
+        valid_lead: 0, new_valid_lead: 0,
+        opened: 0, new_opened: 0, existing_opened: 0,
+        valid: 0, new_valid: 0, existing_valid: 0,
+        assets: 0, new_assets: 0, existing_assets: 0,
+        opening_rate: 0, valid_rate: 0, sources: [],
+      };
+      if (!r.platforms.includes(it.platform)) r.platforms.push(it.platform);
+      r.leads += it.leads;
+      r.existing_leads += it.existing_leads || 0;
+      r.new_leads += it.new_leads || 0;
+      r.mouth += it.mouth;
+      r.valid_lead += it.valid_lead;
+      r.new_valid_lead += it.new_valid_lead || 0;
+      r.opened += it.opened;
+      r.new_opened += it.new_opened || 0;
+      r.existing_opened += it.existing_opened || 0;
+      r.valid += it.valid;
+      r.new_valid += it.new_valid || 0;
+      r.existing_valid += it.existing_valid || 0;
+      r.assets += it.assets;
+      r.new_assets += it.new_assets || 0;
+      r.existing_assets += it.existing_assets || 0;
+      r.sources = Array.from(new Set([...r.sources, ...(it.sources || [])]));
+      map.set(it.anchor, r);
+    });
+    const rows = Array.from(map.values());
+    rows.forEach((r) => {
+      r.opening_rate = r.leads ? +(r.new_opened / r.leads * 100).toFixed(2) : 0;
+      r.valid_rate = r.leads ? +(r.new_valid / r.leads * 100).toFixed(2) : 0;
+    });
+    rows.sort((a, b) => b.leads - a.leads);
+    return rows;
+  }, [items, platformFilter]);
+
   const platformColumns = [
     { title: '平台', dataIndex: 'platform', width: 120, render: (v: string) => <Tag color="cyan">{v}</Tag> },
     { title: '主播数', dataIndex: 'anchors', align: 'right' as const, width: 100, sorter: (a: PlatformRow, b: PlatformRow) => a.anchors - b.anchors, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
     { title: '线索', dataIndex: 'leads', align: 'right' as const, width: 110, sorter: (a: PlatformRow, b: PlatformRow) => a.leads - b.leads, render: (v: number) => v.toLocaleString() },
+    { title: '存量客户', dataIndex: 'existing_leads', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
+    { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '开口', dataIndex: 'mouth', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
-    { title: '开户', dataIndex: 'opened', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
-    { title: '有效户', dataIndex: 'valid', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+    { title: '有效线索(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 130, render: (v: number) => v.toLocaleString() },
+    { title: '新开户', dataIndex: 'new_opened', align: 'right' as const, width: 100, sorter: (a: PlatformRow, b: PlatformRow) => a.new_opened - b.new_opened, render: (v: number) => v.toLocaleString() },
+    { title: '新有效户', dataIndex: 'new_valid', align: 'right' as const, width: 100, sorter: (a: PlatformRow, b: PlatformRow) => a.new_valid - b.new_valid, render: (v: number) => v.toLocaleString() },
     { title: '开口率', dataIndex: 'mouth_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 60 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
-    { title: '开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
-    { title: '有效率', dataIndex: 'valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
-    { title: '总资产', dataIndex: 'assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+    { title: '新开户率', dataIndex: 'new_opening_rate', align: 'right' as const, width: 100, sorter: (a: PlatformRow, b: PlatformRow) => a.new_opening_rate - b.new_opening_rate, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+    { title: '新有效率', dataIndex: 'new_valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+    { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, sorter: (a: PlatformRow, b: PlatformRow) => a.new_assets - b.new_assets, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+    { title: '存量资产', dataIndex: 'existing_assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
   ];
 
-  const anchorColumns = [
-    { title: '平台', dataIndex: 'platform', width: 100, render: (v: string) => <Tag color="cyan">{sanitizeText(v)}</Tag> },
-    { title: '主播', dataIndex: 'anchor', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
-    { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 90, sorter: (a: AnchorItem, b: AnchorItem) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
+  // v3.1.26 问题2: 主播详情表改为同名跨平台聚合，"平台"列改为"覆盖平台"多 Tag
+  const anchorAggColumns = [
+    { title: '主播', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+    { title: '覆盖平台', dataIndex: 'platforms', width: 200, render: (v: string[]) => (
+      <Space size={[4, 4]} wrap>
+        {v.map((p) => <Tag key={p} color="cyan">{sanitizeText(p)}</Tag>)}
+      </Space>
+    ) },
+    { title: '平台数', width: 80, align: 'center' as const, render: (_: any, r: AnchorAggRow) => <Tag color="blue">{r.platforms.length}</Tag> },
+    { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
+    { title: '存量客户', dataIndex: 'existing_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+    { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
-    { title: '开户量', dataIndex: 'opened', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
-    { title: '有效户', dataIndex: 'valid', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
-    { title: '开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 100, sorter: (a: AnchorItem, b: AnchorItem) => a.opening_rate - b.opening_rate, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
-    { title: '有效率', dataIndex: 'valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
-    { title: '总资产', dataIndex: 'assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+    { title: '有效(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
+    { title: '新开户', dataIndex: 'new_opened', align: 'right' as const, width: 90, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_opened - b.new_opened, render: (v: number) => v.toLocaleString() },
+    { title: '新有效户', dataIndex: 'new_valid', align: 'right' as const, width: 90, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_valid - b.new_valid, render: (v: number) => v.toLocaleString() },
+    { title: '新开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.opening_rate - b.opening_rate, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+    { title: '新有效率', dataIndex: 'valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+    { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_assets - b.new_assets, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+    { title: '存量资产', dataIndex: 'existing_assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
   ];
 
   return (
@@ -193,13 +350,13 @@ const LiveFunnelPage: React.FC = () => {
       </Card>
 
       <Spin spinning={loading}>
-        <MetricSection title="直播获客概览" description="主播引流链路的线索、开口、开户与资产表现">
+        <MetricSection title="直播获客概览" description="主播引流链路的线索、开口、有效线索与成功开户核心表现（v3.1.26 起新开户作为核心获客产出，存量客户线索与资产分项辅助呈现）">
           <MetricCard
             title="主播数"
             value={totals.anchors}
             valueColor="var(--color-brand)"
             icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />}
-            description={`当前期间活跃主播数量·按客户来源聚合`}
+            description={`当前期间活跃主播数量·按客户来源聚合（同名跨平台去重）`}
             showWowChange={false}
           />
           <MetricCard
@@ -208,6 +365,22 @@ const LiveFunnelPage: React.FC = () => {
             valueColor="var(--color-success)"
             icon={<UserOutlined style={{ color: 'var(--color-success)' }} />}
             description={`主播引流客户线索总数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="存量客户"
+            value={totals.existing_leads}
+            valueColor="var(--color-text-tertiary)"
+            icon={<UserOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
+            description={`线索中已在他处开户的存量客户数·辅助指标`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="新客户"
+            value={totals.new_leads}
+            valueColor="var(--color-brand)"
+            icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`非存量客户线索数·核心获客容量`}
             showWowChange={false}
           />
           <MetricCard
@@ -223,55 +396,97 @@ const LiveFunnelPage: React.FC = () => {
             value={totals.valid_lead}
             valueColor="var(--chart-color-5)"
             icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />}
-            description={`已确认有意向的有效线索`}
+            description={`已确认有意向的有效线索（含存量）`}
             showWowChange={false}
           />
           <MetricCard
-            title="开户量"
-            value={totals.opened}
+            title="有效线索(剔除存量)"
+            value={totals.new_valid_lead}
+            valueColor="var(--color-brand)"
+            icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`剔除存量客户后的有效线索·核心获客产出`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="新开户"
+            value={totals.new_opened}
             valueColor="var(--color-error)"
-            icon={<FireOutlined style={{ color: 'var(--color-error)' }} />}
-            description={`有效线索中成功开户人数`}
+            icon={<AimOutlined style={{ color: 'var(--color-error)' }} />}
+            description={`非存量且成功开户人数·主指标（存量客户已在别处开户，通常=0）`}
             showWowChange={false}
           />
           <MetricCard
-            title="引流资产"
-            value={totals.assets}
+            title="新有效户"
+            value={totals.new_valid}
+            valueColor="var(--color-success)"
+            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`非存量且有效户人数·主指标`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="新开户资产"
+            value={totals.new_assets}
             prefix="¥"
             formatter="currency"
             valueColor="var(--color-warning)"
             icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />}
-            description={`主播引流客户总资产`}
+            description={`非存量且开户成功客户的总资产·主指标`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="存量资产"
+            value={totals.existing_assets}
+            prefix="¥"
+            formatter="currency"
+            valueColor="var(--color-text-tertiary)"
+            icon={<DollarOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
+            description={`存量客户资产·辅助指标（存量客户虽不再开户，但资产仍呈现）`}
             showWowChange={false}
           />
         </MetricSection>
 
-        <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <Card title="5 阶段主播引流业务漏斗" size="small" extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
-              {funnelStages[0].count > 0 ? (
-                <FunnelChart data={funnelStages} height={440} />
+        <Row className={styles.funnelSplitRow}>
+          <Col span={12} className={styles.funnelSplitCol}>
+            <Card title="6 阶段主播引流业务漏斗" size="small" className={styles.h100Card} extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
+              {funnelChartData.length > 0 && funnelChartData[0].count > 0 ? (
+                <FunnelChart data={funnelChartData} height={440} useLogScale />
               ) : (
                 <Empty description="该日期区间内无主播引流记录" />
               )}
             </Card>
           </Col>
-          <Col span={24}>
-            <Card title="阶段转化明细" size="small">
-              <div className={styles.stageList}>
-                {funnelStages.map((s, idx) => (
-                  <div key={s.name} className={styles.stageItem}>
-                    <div className={styles.stageRow}>
-                      <Tag color="blue">{idx + 1}. {s.name}</Tag>
-                      <span className={styles.stageValue}>{s.count.toLocaleString()} 人</span>
-                    </div>
-                    <div className={styles.stageRow}>
-                      <span className={styles.stageRateLabel}>累计转化率（对线索）</span>
-                      <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>{s.rate.toFixed(2)}%</Tag>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <Col span={12} className={styles.funnelSplitCol}>
+            <Card title="阶段转化明细" size="small" className={styles.h100Card}>
+              <table className={styles.stageTable}>
+                <thead>
+                  <tr>
+                    <th className={styles.colNum}>#</th>
+                    <th>阶段</th>
+                    <th className={styles.colNum}>累计人数</th>
+                    <th className={styles.colNum}>阶段转化率</th>
+                    <th className={styles.colNum}>累计转化率</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnelStages.map((s, idx) => (
+                    <tr key={s.step}>
+                      <td className={styles.colNum}>{idx + 1}</td>
+                      <td>{sanitizeText(s.step)}</td>
+                      <td className={styles.colNum}>{s.value.toLocaleString()}</td>
+                      <td className={styles.colNum}>
+                        <Tag color={s.rate > 50 ? 'green' : s.rate > 10 ? 'gold' : 'default'}>
+                          {s.rate.toFixed(2)}%
+                        </Tag>
+                      </td>
+                      <td className={styles.colNum}>
+                        <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
+                          {s.step_rate.toFixed(2)}%
+                        </Tag>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </Card>
           </Col>
         </Row>
@@ -280,9 +495,9 @@ const LiveFunnelPage: React.FC = () => {
           <Table<PlatformRow> size="small" rowKey="platform" dataSource={platformRows} pagination={false} columns={platformColumns as any} scroll={{ x: 'max-content' }} />
         </Card>
 
-        <Card title={"主播详情（Top " + items.length + "）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序</span>}>
-          {items.length > 0 ? (
-            <Table<AnchorItem> size="small" rowKey={(r) => `${r.platform}-${r.anchor}`} dataSource={items} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorColumns as any} scroll={{ x: 'max-content' }} />
+        <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{platformFilter.length ? '·已按选中平台筛选' : ''}</span>}>
+          {anchorAggRows.length > 0 ? (
+            <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
           ) : (
             <Empty description={'暂无主播聚类数据（请检查日期区间是否覆盖主播引流时段）'} />
           )}
@@ -293,8 +508,10 @@ const LiveFunnelPage: React.FC = () => {
             { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）' },
             { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
             { label: '粒度', value: 'Top 200 主播引流聚合' },
+            { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
+            { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台多选筛选' },
           ]}
-          notes={'直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
+          notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
         />
       </Spin>
     </div>

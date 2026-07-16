@@ -163,15 +163,19 @@
   }
 }
 
-// ---------- 漏斗 + 阶段转化详情 左右等高布局（v3.1.23） ----------
+// ---------- 漏斗 + 阶段转化详情 左右等高布局（v3.1.23，v3.1.25 改 grid 确保等高） ----------
 .funnelSplitRow {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
 
-  // 赊实等高：让 .ant-col 拉伸到同一高度，Card 以 .h100Card 内部填满
+  // antd Col 在 grid 容器内作为 grid item，覆盖 antd Col 的 max-width/flex 限制
   > [class*="ant-col"] {
     display: flex;
     flex-direction: column;
+    max-width: none;
+    flex: none;
 
     > .ant-card {
       flex: 1 1 auto;
@@ -180,7 +184,6 @@
 }
 
 .funnelSplitCol {
-  // 让 Col 拉伸、内部 Card 填满高度
   height: 100%;
 }
 

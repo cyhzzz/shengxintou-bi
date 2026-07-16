@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 应用市场 · 获客漏斗（v3.1 子报表 1/4）
  * 数据源: fact_conv_appmarket
  * 漏斗: 下载 → 激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户
@@ -56,9 +56,8 @@ const AppMarketFunnelPage: React.FC = () => {
   const funnel = data?.total_funnel || [];
   const downloads = total['激活APP'] || 0; // 用激活APP 作为漏斗顶端基数
   const validCount = total['有效户'] || 0;
-  const openCount = total['开户成功'] || 0;
-  const depositCount = total['入金'] || 0;
-  const overallRate = downloads > 0 ? (validCount / downloads * 100) : 0;
+  const newOpenCount = total['新开户'] || 0;
+  const newOpenAssets = total['新开户资产'] || 0;
 
   return (
     <div className={styles.page}>
@@ -75,8 +74,8 @@ const AppMarketFunnelPage: React.FC = () => {
         </Space>
       </Card>
       <Spin spinning={loading}>
-        {/* 5 阶段卡片 */}
-        <MetricSection title="应用市场获客概览" description="激活、开户、入金、有效户与整体转化率">
+        {/* v3.1.25: 4 卡片概览，核心业务产出导向 */}
+        <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出）">
           <MetricCard
             title="激活APP"
             value={downloads}
@@ -86,19 +85,11 @@ const AppMarketFunnelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title="开户成功"
-            value={openCount}
+            title="新开户"
+            value={newOpenCount}
             valueColor="var(--chart-color-7)"
             icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
-            description={`从激活成功开户人数 · 含提交开户、身份证、银行卡全流程`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="入金"
-            value={depositCount}
-            valueColor="var(--chart-color-5)"
-            icon={<BankOutlined style={{ color: 'var(--chart-color-5)' }} />}
-            description={`开户后入金人数 · 含任意金额首笔入金`}
+            description={`首次开户客户数 · 剔除存量，核心获客产出`}
             showWowChange={false}
           />
           <MetricCard
@@ -110,24 +101,24 @@ const AppMarketFunnelPage: React.FC = () => {
             showWowChange={false}
           />
           <MetricCard
-            title="整体转化率"
-            value={overallRate}
-            formatter="percent"
+            title="新开户引进资产"
+            value={newOpenAssets}
+            formatter="currency"
             valueColor="var(--color-error)"
             icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
-            description={`激活 APP → 有效户整体转化率`}
+            description={`新开户客户对应的总资产 · 引进资产是核心业务产出`}
             showWowChange={false}
           />
         </MetricSection>
 
-        <Row gutter={[16, 16]}>
-          <Col span={24}>
-            <Card title='9 阶段漏斗图' size='small'>
+        <Row className={styles.funnelSplitRow}>
+          <Col span={12} className={styles.funnelSplitCol}>
+            <Card title='9 阶段转化漏斗' size='small' className={styles.h100Card}>
               <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={520} useLogScale />
             </Card>
           </Col>
-          <Col span={24}>
-            <Card title='各阶段转化详情' size='small'>
+          <Col span={12} className={styles.funnelSplitCol}>
+            <Card title='各阶段转化详情' size='small' className={styles.h100Card}>
               <table className={styles.stageTable}>
                 <thead>
                   <tr>
@@ -165,10 +156,10 @@ const AppMarketFunnelPage: React.FC = () => {
         <ReportFooter
           sources={[
             { label: '数据源', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },
-            { label: '端点', value: 'POST /api/v1/reports/app-market/summary（v3.1.24 起走 _funnel_filters，业务限渠道类型=互联网引流 + 是否新开户=1）' },
+            { label: '端点', value: 'POST /api/v1/reports/app-market/summary（v3.1.24 起走 _funnel_filters，业务限渠道类型=互联网引流；新开户作为漏斗阶段呈现）' },
             { label: '漏斗顶端', value: '激活APP人数（衡量获客容量）' },
           ]}
-          notes={'v3.1.24 业务口径：仅统计 渠道类型=互联网引流 且 是否新开户=1 的设备，与转化漏斗页口径完全一致。rate = 此阶段/上一阶段，step_rate = 此阶段/顶端，漏斗采用 log10 映射缓解各级数据偏差过大问题。'}
+          notes={'v3.1.24 业务口径：仅统计 渠道类型=互联网引流；「新开户」作为漏斗阶段（开户成功→新开户）呈现存量剔除（不用 WHERE 过滤，否则是否新开户=1 的设备行前置阶段字段全=1，SUM 后漏斗变平），与转化漏斗页口径完全一致。rate = 此阶段/上一阶段，step_rate = 此阶段/顶端，漏斗采用 log10 映射缓解各级数据偏差过大问题。'}
         />
       </Spin>
     </div>
