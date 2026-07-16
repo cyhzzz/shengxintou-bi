@@ -1,4 +1,4 @@
-# 省心投 BI 项目文档（AGENTS / CLAUDE）
+﻿# 省心投 BI 项目文档（AGENTS / CLAUDE）
 
 > 本文件是仓库根目录的项目工作说明。`AGENTS.md` 与 `CLAUDE.md` 应保持同一内容；修改其中一份时必须同步另一份。
 > 本地工作目录：`D:/AIproject/省心投BI`，默认环境：Windows + PowerShell。
@@ -9,108 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.30`（2026-07-16）。下一站 `v3.1.31`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
-
-### v3.1.11 已落地（2026-07-15）
-
-### v3.1.12 已落地（2026-07-15）
-
-- **代理商简称映射全链路（简称优先）**：新增 ackend/utils/agency_mapper.py 提供 get_all_shorts() / short_to_full() / ull_to_short() / enrich_items() / expand_short_to_fulls()；metadata 端点 agencies 改从 DimVendor.agency_short（简称）查询，返回 {value, label, full_names} object format；gency_full_map 透传前端用于标签提示。
-
-- **所有后端 .厂商/广告代理商 in_ 筛选展开简称→全称**：gency_analysis.py / cost_analysis.py / dashboard.py / external_analysis.py / leads.py /     rend.py 共 6 个文件 .in_() 前调用 expand_short_to_fulls()，支持前端选简称匹配后端全称记录。
-
-- **简称 CRUD 调用 reset_cache**：bbreviation_mapping.py 在 create/update/delete 操作后调用 gency_mapper.reset_cache()，确保系统配置页修改 DimVendor 后缓存即时刷新。
-
-- **AgencyFilter 前端适配新格式**：metadata agencies 从 string[] → {value, label, full_names}[] 后，AgencyFilter.tsx 的 map() 和 metadataService.ts 接口类型同步更新。
-
-- **AgencyAnalysis 前端显示改 agency_short**：表格列 dataIndex 从 gency 改为 gency_short；CSV 导出兜底 gency_short || agency；rowKey 改用 gency_short||agency。
-
-- **OmniChannel 4 卡标题恢复短标题**：总开户成功人数→开户成功 / 总入金户数→入金户数 / 总有效户数→有效户数 / 互联网渠道开户数→互联网开户；删除未使用的 Typography import。
-
-- **build**：
-  pm run build 0 error（~5988 modules）→ dist 已刷新 → 5000 端口同步。
-
-- **v3.1.10 变更说明**（2026-07-15 已落地）：
-  
-  - **ECharts 调色板统一**：新增 `frontend-react/src/utils/echartsColors.ts`（`ECHARTS_COLORS` 8 色 hex + `pickEChartsColor(idx)`），与 `tokens.css` `--chart-color-1` ~ `--chart-color-8` 字节对齐。**根因**：ECharts canvas/SVG 渲染不解析 CSS `var()`，原先传 `var(--chart-color-N)` 字符串会被静默 fallback 到默认色（灰色），导致 OmniChannel 4 类渠道日趋势、AgencyAnalysis 日级趋势、Dashboard TrendChart 多 series 全是同色或灰色。修复后全报表 ECharts 多 series 按索引自动取 8 色。
-  - **TrendChart 边框对齐 + 间距**：`<Card variant="borderless">` → `<Card size="small">`；`.trendCard` 加 `margin-bottom: var(--spacer-16)`，与下方开户口历热力图间距 16px（之前无边距贴在一起）。
-  - **开户口历热力图年度总开户起算点改为 2026-01-01**：`CalendarHeatmap` 新增 `YEAR_START = '2026-01-01'`，`stats.sum` 仅累加 `date >= 2026-01-01` 的值（年度总开户）；`stats.max / activeDays` 仍取 365 天全量用于 level 颜色分类。
-  - **全局日期筛选器默认值统一为 2026-01-01 ~ 2026-12-31**：覆盖 7 个页面 `useState`（AnchorCluster / Live/Funnel / AppMarket×4 / OmniChannel）+ EmployeeConversion/Weekly 2 处 + ConversionFunnel（useState + resetFilters）+ XhsNotes/List + LeadsDetail（useState + filtersRef）+ EmployeeConversion/Analysis + XhsNotes/Operation 3 个函数 + `useFilterStore.getDefaultDateRange` + `useDashboardFilters.getDefaultDateRange`。全文已无残留 `2026-06-30` / `2020-01-01` 旧默认值。
-
-- 历史命名：仓库目录是「省心投 BI」，但数据库文件 `database/shengxintou.db`、模块名 `shengxintou-platform` 仍沿用旧名，禁止为了"统一命名"随意改路径或表名。
-  
-  ### v3.1.13 已落地（2026-07-15）
-
-- 新增 \ackend/utils/agency_mapper.py\：get_all_shorts / short_to_full / full_to_short / enrich_items / expand_short_to_fulls / reset_cache
-
-- 6 个后端路由文件 .厂商/.广告代理商 in_ 筛选前调用 expand_short_to_fulls()
-
-- metadata 端点 agencies 改从 DimVendor.agency_short（简称）查询，返回 {value, label, full_names}[] object 格式
-
-- abbreviation_mapping CRUD 后调用 reset_cache() 使缓存即时刷新
-
-- frontend AgencyFilter + metadataService 类型同步适配新 agencies object 格式
-
-- AgencyAnalysis 表格 dataIndex 从 agency 改为 agency_short，CSV 导出兜底
-
-- OmniChannel 4 卡标题恢复短标题
-
-- npm run build 0 error → dist 刷新 → 5000 端口同步
-
-### v3.1.14 已落地（2026-07-15）
-
-- **修复筛选归零**：6 个后端路由文件移除 expand_short_to_fulls() wrapper。根因：agg_vendor_daily.厂商 和 fact_conv_content.广告代理商 存的是简称（如 '量子'），expand_short_to_fulls('量子') 展开为 ['申万宏源-量子']，WHERE IN 匹配 0 行导致所有筛选返回 0。修复后简称直接查询，API 验证 agencies=['量子'] → 3769 leads。
-- **ConversionFunnel load is not defined**：const loadData 定义移到 applyFilters / resetFilters 之前，解决 TDZ（暂存死区）运行时 ReferenceError。
-
-### v3.1.16 已落地（2026-07-15）
-
-- **菜单清理：删除「简称管理」**：账号管理已包含 platform / agency / agency_short / business_model 全部字段，简称管理菜单冗余，移除 /system/abbreviation-management 菜单项 + pages/System/AbbreviationManagement.tsx + .module.scss + router 路由。后端 abbreviation_mapping 路由保留（DimVendor 由 ETL/导入侧维护）。
-- **线索明细菜单扁平化**：MainLayout 将线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail。
-- **npx tsc --noEmit + npm run build** 双通过。
-
-### v3.1.23 已落地（2026-07-16）
-
-- **转化漏斗报表优化**：
-  - **左右等高布局**：内容平台 / 应用市场 两个 Tab 下的漏斗图 + 阶段转化详情 Card 改为 `<Row align="stretch">` + `<Col span={12}>`，通过 `.funnelSplitRow / .funnelSplitCol / .h100Card` 三个 scss 类拉伸高度。
-  - **8×4 阶段明细表**：原 .stageList / .stageItem 简易渲染改为真 HTML `<table>`（table-layout: fixed）：表头 # / 阶段 / 累计人数 / 累计转化率 4 列；行高 hover 反色；数字列右对齐 + tabular-nums。
-  - **FunnelChart 新增 `useLogScale` 对数尺度**：传入后调用 `Math.log10(count + 1)` 映射缓解各级数据偏差过大（内容平台 5.86亿曝光 → 3099 有效户约 19万倍，线性下层几乎看不见）；CSS FallbackBars 也同步以 log 计算宽度；label / tooltip 始终以原始人数呈现。
-  - **ReportFooter 补选中平台受限说明**：原来塑在筛选卡里的说明“当前仅针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制”移至 ReportFooter.notes，筛选卡唯留提示 + 查询 / 重置按钮。
-- **校验**：Python smoke `POST /api/v1/conversion-funnel/split` 返回两套独立漏斗、content 7 阶段、appmarket 8 阶段；`npm run build` 0 error；`npx tsc --noEmit` 0 error。
-
-### v3.1.22 已落地（2026-07-16）
-
-- **跌涨颜色统一为中国股市惯例**（上升=红 / 下降=绿）：以前 v3.1.21 采用西方习惯（上升=绿下降=红），与中国股市及多数业务场景反转。调整后全竟指标均随方向上色。
-  - **后端**：dashboard.py `_w()` 函数去掉 inverse 参数与所有 inverse=True 调用；color 始终 = 'red' if is_up else 'green'。
-  - **前端 MetricCard**（全局 + Dashboard 本地两份） + **WowChangeIndicator**：getTrendColor 去掉 inverseTrend 反转分支，直接 color === 'green' → success / color === 'red' → error。
-  - **Dashboard/index.tsx**：3 个成本卡移除 inverseTrend 属性。
-  - **接口兼容**：inverseTrend prop 保留但逻辑废弃，避免外部 break。
-- **校验**：Python smoke 近 7 天区间、2026-07-10 ~ 2026-07-16、所有 12 个指标卡均走中国惯例颜色（down 的指标均绿，cost_per_* 上升也是红）。`npm run build` 0 error。
-
-### v3.1.21 已落地（2026-07-16）
-
-- **Dashboard 数据概览 12 张指标卡 wow_changes 修复**（后端）：
-  - **补齐 6 个缺失环比字段**：`prev_q` 拓展加上 impressions / clicks / existing_assets；wow 补 `total_impressions` / `total_clicks` / `existing_customers_assets` / `cost_per_lead` / `cost_per_account` / `cost_per_valid_account`（6 字段与前端 MetricCard 读取对齐）。cost_per_* 由分母 cost / 分母 leads/opened/valid 当期与上期各算后再比（inverse上升红下降绿）。
-  - **`_w()` 辅助函数**：trade 跟 curr/prev 大小走（up/down），color 随 trade 反转（默认上升绿下降红；inverse参数用于 cost 类，上升红下降绿）。修复前后端 `color: 'green'` 硬编码导致箭头翻转颜色不变的 bug。
-- **校验**：Python smoke `POST /api/v1/dashboard/core-metrics`（2026-01-01 ~ 2026-12-31）返回 12 字段；investment +113.5% up red、total_leads +27.84% up green、customer_contribution -29.86% down red、cost_per_lead +67.01% up red、cost_per_account -46.87% down green、全部随 trend/color 正确。`npm run build` 0 error。
-
-### v3.1.20 已落地（2026-07-16）
-
-- **应用市场设备明细（AppMarket/Detail）与线索明细同步**：两个表都是原样呈现底表源表（fact_conv_appmarket / fact_conv_content）。
-  - **后端 `app_market_detail` 从 16 字段扩充为 43 字段**：与 `models_v2.FactConvAppmarket` 1:1，表格列（下载日期 / 应用市场 / 应用市场名称 / 渠道类型 / 设备号 / 资金账号 / 激活APP / 开户成功 / 新开户 / 入金 / 有效户）保留短名 bool；详情浮7e7a5c5f33字段以源表中文列名完整返回（含数据更新日期 / 投放账号 / 广告计划ID / 注册手机号 / 是否注册身份证 / 注册身份证时间 / 是否注册银行卡 / 注册银行卡时间 / 是否激活APP / APP激活时间 / 是否开户注册 / 注册开户流程时间 / 是否提交开户 / 提交开户时间 / 是否开户成功 / 开户成功时间 / 开户时间 / 是否新开户 / 是否创建完资金账号 / 资金账号创建完成时间 / 是否入金 / 是否有效户 / 有效户时间 / 是否存量客户 / 总资产 / 累计创收 / 人均日创收）。
-  - **5 个 bool 列加 `dataIndex` + `key`**：原代码 `render: (v: any) => v ? ...` 没设 dataIndex，antd 把整行 record 当 v 传入（对象永远 truthy → 全"是"）。现在表格 5 个 bool 列均设 `dataIndex: '激活APP'` 等 + 统一 `renderBool`。
-  - **详情浮7e7a5c5f33 Descriptions（column=2）**：与 LeadsDetail 同款、`width=800` + `.detailModal` label 加宽 110px。
-  - **过滤/表格/模态三段样式对齐 LeadsDetail**：`filterRow / filterGroup / filterLabel / filterActions` + `tableCard / tableHeader / tableTitle / statText`；`.page` padding 16 -> 0（v3.1.19 同款修复）。
-- **校验**：`npm run build` 0 error（5988 modules）→ dist 刷新→ 5000 端口可访问；Python smoke `POST /api/v1/reports/app-market/detail` 返回 43 字段、bool 为 true/false、总行数 137,516。
-
-### v3.1.17 已落地（2026-07-15）
-
-- **HelpModal 资源修复**：`logo-hengban-C.png` → `public/icons/logo-横版.png`（实际文件存在）；`陈元晗肖像.svg` → `public/icons/陈元昊肖像.svg`；创建者姓名 2 处 `陈元晗` → `陈元昊`；tooltip typo `发珠投 BI` → `省心投 BI`；scss 类名 `创建者Avatar` / `创建者Info` → `creatorAvatar` / `creatorInfo`。
-- **HelpModal 一键 GitHub 自更新（v3.1.17 新能力）**：版本信息卡下方新增「从 GitHub 更新代码」按钮（脏工作区时显示「强制更新（stash 本地改动）」）。点击后调起后端 `git pull origin main`，实时显示进度条 / 阶段描述 / 日志；dirty 时自动用 `git stash push -u` 暂存。
-- **后端自更新 API**（`backend/routes/system/self_update.py` + `__init__.py`，蓝图 `/api/v1/system`）：3 端点 `GET /self-update/git-status`（读 HEAD/dirty/remote）、`POST /self-update/start`（后台线程跑 `git fetch + reset --hard` + 装 `version.json`，返回 task_id）、`GET /self-update/status?task_id=...`（1s 轮询）。`_read_version_json()` 纯函数，**后台线程不依赖 Flask current_app**（`app.py` 用 `app.register_blueprint(system.bp)`）。
-- **前端 dataService 扩 3 方法**：`dataService.getGitStatus()` / `selfUpdateStart(force)` / `selfUpdateStatus(taskId)`。
-- **HelpModal UI 集成**：`useEffect` 自动加载 `gitStatus` + 启动后 `setInterval(1000ms)` 轮询状态；Progress + 阶段描述 + 日志面板；结果区展示 `before_version → after_version`，失败弹错误信息。
-- **一次性脚本不进 git**：本次自更新实现保留了 `scripts/_fix_*.py` / `_patch_*.py` / `_poll_test.py` / `_sync_docs.py` 帮助脚本（`.gitignore` 已排除 `scripts/`，不要 commit）；README/AGENTS § 8 已有「一次性脚本不进 git」约定。
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（5988 modules）。
+- 当前版本基线：`version.json` 为 `3.2.0`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -463,109 +362,38 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 
-## v3.1.29 已落地（2026-07-16） 员工转化分析卡片口径修正
+## 13. 版本历史
 
-- **核心卡片限定内容平台员工承接线索**：`employee_conversion.py` 的 `analysis-channel-overview` 未传 `platforms` 时默认使用 `CONTENT_PLATFORMS`，与 `/analysis` 核心指标保持一致；前端四张核心卡改为员工线索 / 员工开口 / 员工开户 / 员工有效户，明确不含应用市场及非员工渠道。
-- **独立渠道参考限定互联网引流**：`agg_daily_channel_open` 没有平台字段，不能冒充员工内容平台转化；`analysis-channel-overview` 仅按 `渠道类别 = 互联网引流` 聚合，并将参考卡片命名为互联网开户 / 互联网有效户，不并入员工核心指标。
-- **口径说明收口**：页面标题、Alert、`ReportFooter` 和接口 `scope/note` 均说明内容平台员工承接线索是主口径，互联网引流是独立参考，避免“总开户 / 总有效户”造成全渠道误解。
+### v3.2.0 已落地（2026-07-17） 报告生成页数据周报·色系与排版优化
 
-## v3.1.28 已落地（2026-07-16） 员工转化周报·海报模式进页面自动生成
+- **堆叠图按大类色系分组**：内容平台统一红色系（8 档深浅）、应用市场统一蓝色系（8 档深浅）、本地生活绿色；同色系内按全年开户数降序分配深浅（越大越深）。
+- **渠道按大类排序堆叠**：channels 按「内容平台 → 应用市场 → 本地生活」分组排序，组内按开户数降序，同色系挨在一起不交错。
+- **自定义 3 大类图例**：ECharts legend 关闭（不再显示 14 个渠道名），layerHeader 右侧加 .catLegend 自定义图例（3 色块 + 文字），简洁明了。
+- **标题精简**：「开户数 · 本周按日堆叠」→「开户数 · 本周」；「开户数 · 全年按周次堆叠」→「开户数 · 全年」。
+- **KPI 环形图 + 占比拆本周/年度**：核心指标卡片右上角 3 个微型 SVG 环形图（开户数 / 有效户 / 资产），颜色按完成率分档；占比卡片改 3 列表格（指标 / 本周 / 全年累计）。
+- **数据周报纯数据化改造**：6 指标表格化（指标 / 本周 / 全年累计 / 环比），环比中国股市色（上升红下降绿）；两堆叠图（开户数本周按日 + 全年按周次）；互联网渠道占比 section。
+- **校验**：
+pm run build 0 错（~42s）；POST /api/v1/reports/weekly/data W28 14 渠道、全年合计 8556 一致。
 
-- **Weekly/index.tsx 自动生成 useEffect**：新增 `useRef(false)` 控住的 `didAutoGenRef` + 依赖 [viewMode, dateRange, reportData, loading, handleGenerateReport] 的 useEffect。逻辑：进页面 + viewMode == 'poster' + dateRange 两项都就绪 + 未在 loading + 未生成过，则调一次 handleGenerateReport() ，同时 didAutoGenRef.current = true 防重。作用：进页面默认即以最新一周 + 内容平台全量生成一张海报（参考 ReportGeneration 进页面默认调 generate 的习惯）。
-- **WeeklyReportPreview 新增 mode prop**：poster / text 两种空状态文案。poster 提示 本页进入后会自动生成一次默认海报；请点击上方【生成周报】；海报可切换平台 / 导出图片 ；text 保持原 点击「生成周报」按钮开始生成周报 。
-- **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
-- **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
+### v3.1.x 历史版本摘要
 
-## v3.1.36 已落地（2026-07-17） 报告生成页堆叠图色系改造（内容平台红 / 应用市场蓝 / 本地生活绿）
-
-- **后端堆叠图改回按具体渠道聚合**：`weekly_reports.py` 的 `_pivot_daily` / `_pivot_weekly` 不再按 3 大类压缩，恢复按 14 个具体渠道返回；保留 `CHANNEL_CATEGORY_MAP` 供前端色系分配使用；`channels` 按全年开户数降序。
-- **前端色系映射**：新增 `CHANNEL_CATEGORY_MAP`（与后端一致）+ `CONTENT_REDS` 8 档红色系（深红→浅红）+ `APPMARKET_BLUES` 8 档蓝色系（深蓝→浅蓝）+ `LOCAL_GREEN` 绿色；`buildChannelColorMap(channels)` 按渠道所属大类分配同色系内深浅（开户数越大颜色越深）。
-- **自定义 3 大类图例**：ECharts `legend.show = false`（不再显示 14 个渠道名），改用 `layerHeader` 右侧 `.catLegend` 自定义图例（3 个色块 + 文字：内容平台/应用市场/本地生活），与原 `layerTag` 占用空间相近。
-- **图表空间优化**：去掉 legend 后 grid top 从 36/10% 降到 8/5%，绘图区域更大。
-- **校验**：`npm run build` 0 错（43.76s）；`POST /api/v1/reports/weekly/data` W28 `channels=14`，全年合计 8556 与 YTD 一致。
-
-## v3.1.35 已落地（2026-07-17） 报告生成页 KPI 环形图 + 占比拆本周/年度
-
-- **后端 internet_ratio 拆本周/年度**：`weekly_reports.py` 从 2 字段（opens_ratio/valid_ratio）扩到 4 字段，新增 `year_opens_ratio`/`year_valid_ratio`（全年累计全渠道占比）。
-- **后端新增 kpi 对象**：`KPI_TARGETS = { opens: 20000, valid: 10000, assets: 5亿 }`；`time_progress = (ed_dt.date() - 当年1月1日).days + 1) / 全年天数`；`rate = 实际值 / (目标 × 时间进度) × 100%`。响应带 `kpi.time_progress` + 3 项 KPI（target/actual/rate）。
-- **前端 KpiRing 微型 SVG 环形图组件**：28x28 viewBox，r=10，`strokeDasharray + strokeDashoffset` 画进度环；颜色按 rate 分档（≥100绿 / ≥75蓝 / ≥50橙 / <50红）；核心指标卡片右上角 `layerTag`（原灰字"本周/全年累计/环比"）替换为 3 个 `KpiRing`（开户数/有效户/资产）+ 标签 + 完成率数字。
-- **占比卡片改为表格**：从 2 卡（开户占比/有效户占比）改为 `ratioTable` 3 列（指标/本周/全年累计），与核心指标表同款样式（table-layout:fixed + colgroup）。
-- **ReportFooter 补 KPI 口径说明**：时间进度、目标值、计算公式。
-- **修复**：`ed` 是 string，与 `_date` 相减报 `TypeError`；改用 `ed_dt.date()`。
-- **校验**：`npm run build` 0 错（42.45s）；`POST /api/v1/reports/weekly/data` W28 `internet_ratio` 4 字段（本周 opens_ratio=2.36%/valid_ratio=13.53%，年度 year_opens_ratio=1.82%/year_valid_ratio=6.62%）；`kpi.time_progress=53.97%`，`opens rate=79.26%`，`valid rate=76.17%`，`assets rate=243.56%`（超额完成）。
-
-## v3.1.34 已落地（2026-07-17） 报告生成页 UI 修复 + 堆叠图按 3 大类聚合
-
-- **Notes 数据说明移到底部**：`reportScroll` 从 `display:flex; justify-content:center`（水平排列）改为 `flex-direction:column; align-items:center`（垂直排列），footer 从 reportPage 右侧移到下方；`reportFooter` 加 `width:480px` 与 reportPage 同宽对齐。
-- **核心指标表第一列换行修复**：`metricTable` 加 `table-layout:fixed` + `<colgroup>`（第一列固定 130px，其余 3 列均分 `calc((100%-130px)/3)`）；`td/th` 加 `white-space:nowrap` + `word-break:keep-all`，第一列 `overflow:hidden + text-overflow:ellipsis` 兜底。根因：480px 宽的 reportPage 内 4 列无固定宽度，数字列把第一列挤窄导致"新增有效户数"等长标签换行变 3 倍行高。
-- **堆叠图渠道按 3 大类聚合**：后端 `weekly_reports.py` 新增 `CHANNEL_CATEGORY_MAP` 映射：
-  - **内容平台**：小红书 / 腾讯 / 抖音 / 快手 / 财联社 / yj / 云极 / 其他
-  - **应用市场**：华为 / 荣耀 / 小米 / oppo / vivo / 苹果 / 鸿蒙
-  - **本地生活**：高德
-  
-  `_pivot_daily` / `_pivot_weekly` 改用 `_map_channel()` 按大类聚合；`channels` 固定为 3 大类按全年开户数降序（应用市场 4557 > 内容平台 3929 > 本地生活 70）。
-- **顶部横线去重**：`masthead` 去掉 `border-bottom` + `margin-bottom:20px→0`，保留第一个 `layerCard` 的 `border-top:2px` 作为刊头与内容的单条分隔线（原先 masthead border-bottom + layerCard border-top 两条线紧挨）。
-- **校验**：`npm run build` 0 错（45.51s）；`POST /api/v1/reports/weekly/data` W28 `channels=['应用市场','内容平台','本地生活']`，`weekly_opens_stacked` 28 周，W01 `{内容平台:209, 本地生活:3}`，W28 `{内容平台:30, 应用市场:106}`，全年合计 8556 与 `current_week.opens` 一致。
-
-## v3.1.33 已落地（2026-07-16） 报告生成页数据周报线索数拆分 + 堆叠图改造
-
-- **后端 `_query_metrics` 线索数拆分**：原 `leads`（`agg_vendor_daily.线索数` 单值）拆为 2 项：
-  - **企微数 `leads_wx`**：`fact_conv_content COUNT(*)`，内容平台线索明细（1 行=1 企微），按 `线索日期 BETWEEN [sd, ed]` 过滤。
-  - **APP激活数 `leads_app`**：`agg_vendor_daily.APP激活人数 SUM`，应用市场线索。
-- **METRICS 从 6 项扩到 7 项**：消耗金额 / 品牌曝光 / **企微数** / **APP激活数** / 开户数 / 新增有效户数 / 新增客户资产。`week_over_week` keys 同步扩。
-- **堆叠图改造**：
-  - 移除 `daily_valid_stacked`（原有效户数按日堆叠）。
-  - 新增 `weekly_opens_stacked`：**全年按周次 × 渠道堆叠**，参考厂商分析报表样式。周次列表由 `get_all_fridays_in_year` + `get_week_info` 生成 W01..W28（仅保留 `wsd <= ed` 的周次，跨周末时 `wed = min(wed, ed)`），每个周次的日数据合并到周次（`_pivot_weekly`）。
-  - `channels` 改为按全年开户数总和降序（保持图例顺序稳定）。
-- **前端 `ReportGeneration/index.tsx`**：
-  - `METRICS` 拆为 7 项；`MetricSet` 接口 `leads` → `leads_wx` + `leads_app`。
-  - 两个图都画开户数堆叠：图 1 本周按日（`stack: 'opens'`）、图 2 全年按周次（`stack: '总量'`，参考 `AgencyAnalysis trendOption` 配置：`barMaxWidth=36` / `emphasis.focus='series'` / `legend.bottom type='scroll'` / `yAxis.axisLabel.formatter` w 单位）。
-  - `validChartRef` → `yearlyChartRef`，`validChartInstanceRef` → `yearlyChartInstanceRef`。
-- **脚注更新**：新增「企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）」与「两图均为开户数堆叠（按渠道分色）：左图本周按日，右图全年按周次」。
-- **校验**：`npm run build` 0 错（44.52s）；`POST /api/v1/reports/weekly/data` W28 返回 `current_week.leads_wx=296 / leads_app=5237`（vs v3.1.32 `leads=300`）；`year_to_date.leads_wx=28669 / leads_app=137180`；`weekly_opens_stacked` 28 周数据，W01 `{yj:44, 云极:66, 其他:9, 小红书:25, 抖音:38, 腾讯:27, 高德:3}`；`channels` 14 个渠道。
-
-## v3.1.32 已落地（2026-07-16） 报告生成页数据周报按业务维度重梳
-
-- **后端 `weekly_reports.py` `/data` 端点完全重写**：新增 `_query_metrics(sd, ed)` helper 函数复用于本周 / 全年累计 / 上周三套时间区间。返回结构改为：
-  - `current_week` / `year_to_date` / `prev_week`：各含 6 指标（消耗金额 `cost` / 品牌曝光 `impressions` / 线索数 `leads` / 开户数 `opens` / 新增有效户数 `valid` / 新增客户资产 `assets`）
-  - `week_over_week`：6 指标环比百分比（prev=0 时返回 `null`）
-  - `daily_opens_stacked` / `daily_valid_stacked`：按日 × 渠道名称 pivot 后的堆叠图数据
-  - `channels`：按开户数总和降序的渠道列表
-  - `internet_ratio`：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）的开户数与有效户数占比
-  - **线索数统一从 `agg_vendor_daily.线索数` 取**（不再从明细表）；开户数 / 有效户从 `agg_daily_channel_open` 取（仅 `渠道类别=互联网引流`）；新增客户资产从 `fact_conv_content`（`是否开户=1 AND 非存量`，按线索日期筛选）+ `fact_conv_appmarket`（`是否新开户=1 AND 渠道类型=互联网引流`，按下载日期筛选）取
-- **前端 `ReportGeneration/index.tsx` 完全重写**：
-  - 去掉 tab 切换（Segmented），两个堆叠图直接平铺（开户数 + 有效户数，按渠道堆叠日走势）
-  - 6 指标改为表格形式（指标 / 本周 / 全年累计 / 环比 4 列），环比单元格按中国股市惯例上色（上升红 `#c0392b` / 下降绿 `#27ae60`，null 显示 `—`）
-  - 加互联网渠道占公司开户占比 section（开户占比 + 有效户占比 2 卡，蓝色 accent 色条 + JetBrains Mono 等宽数字）
-  - ECharts 多 series 用 `ECHARTS_COLORS` 调色板（`pickEChartsColor(idx)`）
-- **样式 `index.module.scss` 追加**：`.metricTable`（4 列表格 + JetBrains Mono 等宽数字）+ `.wowCell`（`data-positive` 属性选择器上色）+ `.ratioGrid` / `.ratioCell` / `.ratioLabel` / `.ratioValue`（占比卡片样式）
-- **验证**：`npm run build` 0 错（35.83s）；PowerShell smoke `POST /api/v1/reports/weekly/data` W28（2026-07-10~07-16）返回 `current_week` cost=¥341K / imp=9.5M / leads=300 / opens=136 / valid=28 / assets=¥1.62M；`year_to_date` cost=¥1326万 / imp=366M / leads=27139 / opens=8556 / valid=4111 / assets=¥6.57亿；`prev_week` cost=¥91万 / imp=25.7M / leads=999 / opens=389 / valid=179 / assets=¥2046万；`week_over_week` 全部负增长（-62%~-92%）；`daily_opens_stacked` / `daily_valid_stacked` 各 2 条（10 渠道：oppo/华为/小米/vivo/荣耀/小红书/腾讯/抖音/其他/财联社）；`internet_ratio` opens_ratio=2.36% / valid_ratio=13.53%
-
-## v3.1.31 已落地（2026-07-16） 员工转化周报加存量线索新开户榜 + 报告生成页改造纯数据周报
-
-- **需求1：员工转化周报加「存量线索新开户」榜**：与原 `existing`（线索日期在区间内的存量客户）互补，新增第 4 榜统计「线索日期在区间前 + 开户时间落在区间内」的客户。
-  - **后端 `employee_conversion_helpers.py`**：`get_employee_conversion_ranking` 开头加 `lead_type == 'existing_new_open'` 分支，独立查询 `FactConvContent.线索日期 < start_date AND 开户时间 BETWEEN [start_date, end_date] AND 是否开户 == 1`，按 `opened_count` 降序。
-  - **后端 `employee_conversion.py`**：`/employee-conversion/weekly` 端点 `rankings` dict 加 `existing_new_open` 第 4 榜。
-  - **前端 `PosterModal.tsx`**：接口加 `existing_new_open?` 字段 + 条件渲染第 4 榜（仅有数据时显示）；`renderFooterNote` 加存量线索新开户口径说明。
-- **需求2：报告生成页改造为纯数据周报**（去文案 / 去 contenteditable / 去保存逻辑）。
-  - **后端 `weekly_reports.py` 新增 `POST /api/v1/reports/weekly/data`**：聚合 `agg_vendor_daily`（广告投放：展示/点击/花费/CPC/CPA/线索/新开户）+ `agg_daily_channel_open`（互联网渠道开户，仅 `互联网引流`：开户/入金/有效户）+ `fact_conv_content` / `fact_conv_appmarket`（漏斗整体转化率）+ 按日明细（两源按日合并用于堆叠柱状图）+ `by_platform` + `by_channel`；同时返回年初至今累计字段（`cumulative`）。
-  - **前端 `ReportGeneration/index.tsx` 完全重写**：去掉 iframe/contenteditable/key_works/saveReport 文案填空模式，改为纯数据周报布局：masthead 报刊头 + 6 个 section（广告投放汇总 / 渠道开户汇总 / 漏斗整体转化率 / 日走势图 / 按平台表 / 按渠道表）+ footer。ECharts 日走势堆叠柱状图（Segmented 切换 ad/channel：ad = 展示量+点击量 stack + 开户数 line 双轴，channel = 开户+入金+有效户 stack）。保留 PNG（html2canvas scale=2）+ PDF（jsPDF）两种导出。
-  - **样式 `ReportGeneration/index.module.scss`**：新增 `.reportScroll/.reportPage(480px 竖版)/.masthead/.kicker/.headline/.dateline/.layerCard/.layerHeader/.layerTitle/.layerTag/.metricGrid(3列)/.metricCell/.metricLabel/.metricValue/.metricCum/.funnelRow/.funnelCell/.funnelValue/.chartBox(220px)/.dataTable/.cellName/.cellNum/.reportFooter/.footerLabel` 样式块，与 PosterModal Editorial 风格对齐。
-- **需求3：员工转化周报 ReportFooter 加口径说明**：`Analysis.tsx` + `Weekly/index.tsx` 加 ReportFooter 标注「本报表仅统计内容平台（小红书/腾讯/抖音/快手/财联社），不含云极 yj/高德等非内容平台，故开户数小于转化漏斗的全平台口径」。
-- **需求4：PosterModal Editorial/Swiss Grid 风格重写**：去 emoji、去装饰渐变、灰阶配色 + 低饱和 accent 色、JetBrains Mono 等宽数字、tabular-nums、masthead 报刊头、layerCard 顶部 2px 黑线 + 16px accent 色条、rankingTable 去边框 tabular-nums、合计行黑底白字反色、footerNote 用 counter 编号。
-- **验证**：`npm run build` 0 错（46.77s）；PowerShell smoke `POST /api/v1/reports/weekly/data` W28（2026-07-10~07-16）返回 ad imp=9.56M / clicks=106K / cost=¥341K / cpc=3.21 / leads=300 / new_accounts=136；channel opens=136 / dep=38 / valid=28；funnel content_rate=3.72% / appmarket_rate=1.18%；daily 5 条 / by_platform 10 条 / by_channel 10 条；累计广告 366M 展示 / 4.2M 点击 / ¥1326 万花费 / 27K 线索 / 8556 新开户。
-
-## v3.1.30 已落地（2026-07-16） 周报海报 0 字节修复 + 日期范围选择器
-
-- **海报导出 0 字节修复（根因：窄视口下 flex 容器塌陷）**：`.posterWrapper` 是 `display: flex` 容器，`.posterContainer` 未设 `min-width` 时在 flex 布局中被挤压至 `width=0`，导致 html2canvas 生成 `canvas.width=0`，`toDataURL()` 返回 `"data:,"`（6 字节），下载后为 0 字节 PNG。修复：`PosterModal.module.scss` 的 `.posterContainer` 加 `min-width: 800px` + `flex-shrink: 0` 强制保持设计宽度；`PosterModal.tsx` 的 `handleExportImage` 加 `canvas.width === 0 || imageUrl.length < 100` 安全检查，异常时抛出明确错误信息而非静默下载 0 字节文件；`backgroundColor` 从 `null` 改为 `'#ffffff'`。
-- **转化周报日期选择改造**：`Weekly/index.tsx` 两个独立 DatePicker（周一日期 + 周日日期）合并为一个 RangePicker，与其他报表（ConversionFunnel / Dashboard / AppMarket 等）的日期范围选择器一致。RangePicker 的 onChange 返回 `dates: [Dayjs, Dayjs]`，更新 `dateRange` state。
-- **验证**：三平台海报导出全部通过（小红书 940KB / 腾讯 977KB / 抖音 978KB）；RangePicker 正常显示 2026-07-13 ~ 2026-07-19；`npm run build` 0 错（25.25s）。
-
-## v3.1.27 已落地（2026-07-16）
-
-- 内容平台口径显式化：`employee_conversion.py` 新增 「CONTENT_PLATFORMS = [小红书 / 腾讯 / 抖音 / 快手 / 财联社]」 常量，`/employee-conversion/analysis` 与 `/employee-conversion/weekly` 两个端点未传 platforms 默认全量内容平台；`/employee-conversion/filter-options` 返回增字段 `content_platform_label` + `default_platforms`，前端可以明确告知用户 本报表仅统计内容平台 业务口径。
-- 主播引流走势图：`backend/routes/data/leads.py` 新增 `POST /api/v1/leads-detail/anchor-clusters-trend` 端点，按 period × platform 聚合主播引流走势数据，支持 daily / weekly / monthly 三档粒度（周格式 2026-W22、月格式 YYYY-MM、日格式 YYYY-MM-DD）；new_opened / new_valid / new_assets 口径与 `anchor-clusters` 存量剖除一致。SQLite 无 lpad，周采用 `substr('0' || strftime('%W', date), -2)` 防位。
-- Analysis.tsx 口径说明 Alert：顶部加 「本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标」；加载时读取 default_platforms 赋值给 selectedPlatforms；fetchData 与 fetchChannelOverview 未选中时透传 defaultPlatforms，保证后端不被空数组谎导。ReportFooter 加 口径 标签。
-- Live/Funnel.tsx 主播引流走势图 Card：插在 6 阶段漏斗 SplitRow 上方，Segmented 切换 daily / weekly / monthly；EChartsOption 多 series 按平台拆（ECHARTS_COLORS 调色板）+ 合计虚线 series；ReportFooter 加 走势图端点 + 口径说明。
-- `dataService.ts` 新增 `dataServiceLeadsAnchor.getAnchorClustersTrend`，后端默认 `granularity=monthly`。
-- 验证：`npx tsc --noEmit` 0 错；`npm run build` 0 错；3000 / 5000 两端都 200；未选平台时后端默认仅返内容平台全量（跳过应用市场 / 其他渠道）。
+- **v3.1.36**：报告生成页堆叠图色系改造（内容红 / 应用蓝 / 本地绿）
+- **v3.1.35**：报告生成页 KPI 环形图 + 占比拆本周/年度
+- **v3.1.34**：报告生成页 UI 修复（Notes 移底、指标表换行、堆叠图 3 大类、刊头分隔线）
+- **v3.1.33**：数据周报线索数拆企微数 + APP激活数；堆叠图改全年按周次
+- **v3.1.32**：报告生成页数据周报按业务维度重梳
+- **v3.1.31**：员工转化周报加存量线索新开户榜；报告生成页改造纯数据周报
+- **v3.1.30**：周报海报 0 字节修复 + 日期范围选择器
+- **v3.1.29**：员工转化分析卡片口径修正
+- **v3.1.28**：员工转化周报海报模式进页面自动生成
+- **v3.1.27**：内容平台口径显式化 + 主播引流走势图
+- **v3.1.25**：开发服务器一键启停脚本（start-dev.bat / stop-dev.bat）
+- **v3.1.23**：转化漏斗报表优化（左右等高 + 阶段明细表 + log 尺度）
+- **v3.1.22**：涨跌颜色统一为中国股市惯例（上升红 / 下降绿）
+- **v3.1.21**：Dashboard 12 张指标卡 wow_changes 修复
+- **v3.1.20**：应用市场设备明细 43 字段 + bool 列修复
+- **v3.1.17**：HelpModal 资源修复 + 一键 GitHub 自更新
+- **v3.1.16**：菜单清理（删除简称管理）+ 线索明细扁平化
+- **v3.1.14**：筛选归零修复 + 漏斗 TDZ 修复
+- **v3.1.12**：代理商简称映射全链路
+- **v3.1.10**：ECharts 调色板统一 + 全局日期筛选器默认值 2026 全年
