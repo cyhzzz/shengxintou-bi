@@ -2,11 +2,11 @@
  * 员工转化周报页面
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, DatePicker, Button, Select, Space, message, Typography } from 'antd';
+import { Card, DatePicker, Button, Select, Space, message, Typography, Segmented } from 'antd';
 import { CopyOutlined, FileWordOutlined, FileExcelOutlined, PictureOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
-import PosterExportButtons from './components/PosterExportButtons';
+import PosterModal from './components/PosterModal';
 import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
 import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
 import styles from './index.module.scss';
@@ -41,6 +41,9 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<EmployeeConversionWeeklyData | null>(null);
   const [reportContent, setReportContent] = useState<string>('');
+  // v3.1.25: 默认以海报为主视图，文本为备选
+  const [viewMode, setViewMode] = useState<'poster' | 'text'>('poster');
+  const [posterPlatform, setPosterPlatform] = useState<string>('小红书');
 
   // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
   useEffect(() => {
@@ -251,19 +254,52 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
             </Space>
           )}
         </div>
-        {/* 海报导出按钮 */}
-        {reportData && (
-          <PosterExportButtons
-            reportData={reportData}
-            dateRange={dateRange}
-          />
-        )}
+        {/* v3.1.25: 视图切换 + 海报平台选择 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+          <Space size={12} wrap>
+            <Text type="secondary">视图：</Text>
+            <Segmented
+              options={[{ label: '海报视图', value: 'poster' }, { label: '文本模式', value: 'text' }]}
+              value={viewMode}
+              onChange={(v) => setViewMode(v as 'poster' | 'text')}
+            />
+            {viewMode === 'poster' && reportData && (
+              <Space size={8}>
+                <Text type="secondary">平台：</Text>
+                <Select
+                  value={posterPlatform}
+                  onChange={setPosterPlatform}
+                  options={Object.keys(reportData?.overview || {})
+                    .filter((p) => (reportData?.overview?.[p]?.leads || 0) > 0)
+                    .map((p) => ({ label: p, value: p }))}
+                  style={{ minWidth: 120 }}
+                />
+              </Space>
+            )}
+          </Space>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {viewMode === 'poster'
+              ? '海报视图 · 点击浪动工具栏【导出图片 / PDF】即可。'
+              : '文本模式 · 复制或导出 Word/Excel。'}
+          </Text>
+        </div>
 
-        {/* 周报正文 */}
-        <WeeklyReportPreview
-          content={reportContent}
-          loading={loading}
-        />
+        {/* v3.1.25: 视图主体 */}
+        {viewMode === 'poster' ? (
+          reportData && dateRange[0] && dateRange[1] && (reportData?.overview?.[posterPlatform]?.leads || 0) > 0 ? (
+            <PosterModal
+              mode="inline"
+              platform={posterPlatform}
+              startDate={dateRange[0]}
+              endDate={dateRange[1]}
+              rankings={reportData.rankings?.[posterPlatform] || { total: [], existing: [], new: [] }}
+            />
+          ) : (
+            <WeeklyReportPreview content="" loading={false} />
+          )
+        ) : (
+          <WeeklyReportPreview content={reportContent} loading={loading} />
+        )}
       </Card>
     </div>
   );

@@ -38,6 +38,8 @@
 }
 
 .metricCard {
+  min-width: 0;     // v3.1.25: 防止 grid items 被过宽 content 撑出容器
+  overflow: hidden;  // v3.1.25: 截断超长数字 / 描述
   height: 100%;
   border-radius: var(--radius-lg);
   transition: transform var(--transition-normal) ease, box-shadow var(--transition-normal) ease;
@@ -77,6 +79,19 @@
   color: var(--color-brand);
 }
 
+
+  .metricValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+  .metricNumber {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 .metricValue {
   display: flex;
   align-items: baseline;

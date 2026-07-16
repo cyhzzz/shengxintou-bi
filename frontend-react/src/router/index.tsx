@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 import { lazy, Suspense } from 'react';
 import MainLayout from '@/layouts/MainLayout';
 import DashboardPage from '@/pages/Dashboard';
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Navigate to="/omni-channel" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },

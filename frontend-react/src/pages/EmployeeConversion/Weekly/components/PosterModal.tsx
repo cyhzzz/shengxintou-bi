@@ -9,7 +9,7 @@ import type { EmployeeConversionWeeklyRankings } from '@/types/api.schemas';
 import styles from './PosterModal.module.scss';
 
 interface PosterModalProps {
-  open: boolean;
+  open?: boolean;
   platform: string;
   startDate: string;
   endDate: string;
@@ -18,7 +18,9 @@ interface PosterModalProps {
     existing: EmployeeConversionWeeklyRankings[];
     new: EmployeeConversionWeeklyRankings[];
   };
-  onCancel: () => void;
+  onCancel?: () => void;
+  // v3.1.25: 'modal' = 原貌 Modal 包装（PosterExportButtons 调用）；'inline' = 直接渲染与主页面作为海报视图（Weekly 主页面调用）
+  mode?: 'modal' | 'inline';
 }
 
 // 格式化数字
@@ -183,6 +185,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
   endDate,
   rankings,
   onCancel,
+  mode = 'modal',
 }) => {
   const posterRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<'image' | 'pdf' | null>(null);
@@ -318,17 +321,9 @@ const PosterModal: React.FC<PosterModalProps> = ({
     return platform === '小红书' ? '小助手' : '';
   };
 
-  return (
-    <Modal
-      open={open}
-      onCancel={onCancel}
-      footer={null}
-      width={900}
-      centered
-      className={styles.posterModal}
-      title={null}
-      closable={true}
-    >
+  // v3.1.25: mode='inline' 直接渲染与主页面合并；mode='modal' 保留 Modal 包装供 PosterExportButtons 使用
+  const inner = (
+    <>
       {/* 浮动工具栏 */}
       <div className={getToolbarClass()}>
         <button
@@ -381,6 +376,22 @@ const PosterModal: React.FC<PosterModalProps> = ({
           </div>
         </div>
       </div>
+    </>
+  );
+
+  if (mode === 'inline') return inner;
+  return (
+    <Modal
+      open={open}
+      onCancel={onCancel}
+      footer={null}
+      width={900}
+      centered
+      className={styles.posterModal}
+      title={null}
+      closable={true}
+    >
+      {inner}
     </Modal>
   );
 };
