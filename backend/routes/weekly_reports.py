@@ -564,21 +564,32 @@ def _safe_div(num, den, pct=False):
 
 
 def _query_metrics(sd, ed):
-    """v3.1.31 查询某时间区间的 6 个核心指标（复用于本周/全年/上周）
+    """v3.1.32 查询某时间区间的 7 个核心指标（复用于本周/全年/上周）
 
     1. 消耗金额 (agg_vendor_daily.花费)
     2. 品牌曝光 (agg_vendor_daily.展示量)
-    3. 线索数   (agg_vendor_daily.线索数)
-    4. 开户数   (agg_daily_channel_open.开户成功人数, 仅互联网引流)
-    5. 新增有效户数 (agg_daily_channel_open.有效户数, 仅互联网引流)
-    6. 新增客户资产 (fact_conv_content 新开户客户 SUM(资产) + fact_conv_appmarket 新开户客户 SUM(总资产))
+    3. 企微数   (fact_conv_content COUNT(*), 内容平台线索)
+    4. APP激活数 (agg_vendor_daily.APP激活人数, 应用市场线索)
+    5. 开户数   (agg_daily_channel_open.开户成功人数, 仅互联网引流)
+    6. 新增有效户数 (agg_daily_channel_open.有效户数, 仅互联网引流)
+    7. 新增客户资产 (fact_conv_content 新开户 SUM(资产) + fact_conv_appmarket 新开户 SUM(总资产))
+
+    v3.1.32 改动：线索数拆分为企微数（fact_conv_content COUNT）+ APP激活数（agg_vendor_daily.APP激活人数）
     """
-    # 1-3: 广告投放（agg_vendor_daily）
+    # 1-2: 广告投放（agg_vendor_daily）
     ad_r = db.session.query(
         func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
         func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+        func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
     ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed)).first()
+
+    # 3: 企微数（fact_conv_content COUNT）
+    leads_wx = db.session.query(
+        func.coalesce(func.count(FactConvContent.id), 0)
+    ).filter(and_(
+        FactConvContent.线索日期 >= sd,
+        FactConvContent.线索日期 <= ed,
+    )).scalar() or 0
 
     # 4-5: 渠道开户（agg_daily_channel_open，仅互联网引流）
     ch_r = db.session.query(
@@ -614,7 +625,8 @@ def _query_metrics(sd, ed):
     return {
         'cost': float(ad_r.cost or 0),
         'impressions': int(ad_r.impressions or 0),
-        'leads': int(ad_r.leads or 0),
+        'leads_wx': int(leads_wx),
+        'leads_app': int(ad_r.leads_app or 0),
         'opens': int(ch_r.opens or 0),
         'valid': int(ch_r.valid or 0),
         'assets': float(content_assets) + float(appmarket_assets),
@@ -694,11 +706,10 @@ def get_weekly_data():
     # 环比百分比
     week_over_week = {
         k: _calc_wow(current_week[k], prev_week[k]) for k in
-        ['cost', 'impressions', 'leads', 'opens', 'valid', 'assets']
+        ['cost', 'impressions', 'leads_wx', 'leads_app', 'opens', 'valid', 'assets']
     }
 
-    # ===== 堆叠图：按日 × 渠道名称（互联网引流）=====
-    # 开户数按日 × 渠道
+    # ===== 堆叠图 1：本周内按日 × 渠道（互联网引流开户数） =====
     opens_daily_rows = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
         AggDailyChannelOpen.渠道名称.label('channel'),
@@ -709,25 +720,49 @@ def get_weekly_data():
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
 
-    valid_daily_rows = db.session.query(
+    # ===== 堆叠图 2：全年内按周次 × 渠道（互联网引流开户数） =====
+    # 用 get_all_fridays_in_year 计算每周起止，再按周聚合
+    opens_yearly_rows = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
         AggDailyChannelOpen.渠道名称.label('channel'),
-        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('val'),
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('val'),
     ).filter(and_(
         AggDailyChannelOpen.渠道类别 == '互联网引流',
-        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 >= year_start,
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
 
-    # 收集所有日期 + 所有渠道名（按开户数总和降序）
-    all_dates = sorted(set([r.date for r in opens_daily_rows] + [r.date for r in valid_daily_rows]))
+    # 构造年内周次列表 [{week: 'W01', sd, ed}, ...]，仅保留有数据的周
+    fridays = get_all_fridays_in_year(report_year)
+    week_list = []
+    for i, f in enumerate(fridays, 1):
+        wi = get_week_info(f)
+        wsd = wi['start_date']
+        wed = wi['end_date']
+        # 跳过完全在数据范围之后的周（ed < wsd）或之前的周（wed < year_start 不可能）
+        if wsd > ed:
+            continue
+        # 截止到当前周末
+        if wed > ed:
+            wed = ed
+        week_list.append({'week': f'W{i:02d}', 'sd': wsd, 'ed': wed})
+
+    def _find_week(d_str):
+        for w in week_list:
+            if w['sd'] <= d_str <= w['ed']:
+                return w['week']
+        return None
+
+    # 收集所有渠道名（按全年开户数总和降序，保持图例顺序稳定）
     channel_set = {}
-    for r in opens_daily_rows:
-        channel_set[r.channel or '未分类'] = channel_set.get(r.channel or '未分类', 0) + int(r.val or 0)
+    for r in opens_yearly_rows:
+        ch = r.channel or '未分类'
+        channel_set[ch] = channel_set.get(ch, 0) + int(r.val or 0)
     channels = sorted(channel_set.keys(), key=lambda c: channel_set[c], reverse=True)
 
-    # 转 { date, <渠道名>: n, ... } 格式
-    def _pivot(rows):
+    # 图 1：按日 pivot
+    def _pivot_daily(rows):
+        all_dates = sorted(set([r.date for r in rows]))
         m = {}
         for r in rows:
             d = r.date
@@ -735,14 +770,25 @@ def get_weekly_data():
             if d not in m:
                 m[d] = {'date': d}
             m[d][ch] = int(r.val or 0)
-        # 确保所有日期都有（缺失日期补空）
-        result = []
-        for d in all_dates:
-            result.append(m.get(d, {'date': d}))
-        return result
+        return [m.get(d, {'date': d}) for d in all_dates]
 
-    daily_opens_stacked = _pivot(opens_daily_rows)
-    daily_valid_stacked = _pivot(valid_daily_rows)
+    daily_opens_stacked = _pivot_daily(opens_daily_rows)
+
+    # 图 2：按周 pivot —— 把同周同渠道的多日数据合并到周次
+    def _pivot_weekly(rows):
+        m = {}
+        for r in rows:
+            wk = _find_week(r.date)
+            if not wk:
+                continue
+            ch = r.channel or '未分类'
+            if wk not in m:
+                m[wk] = {'week': wk}
+            m[wk][ch] = m[wk].get(ch, 0) + int(r.val or 0)
+        # 确保所有周都有（缺失补空对象）
+        return [m.get(w['week'], {'week': w['week']}) for w in week_list]
+
+    weekly_opens_stacked = _pivot_weekly(opens_yearly_rows)
 
     # ===== 互联网渠道占公司开户占比（互联网引流 / 全渠道类别）=====
     all_opens = db.session.query(
@@ -781,7 +827,7 @@ def get_weekly_data():
             'prev_week': prev_week,
             'week_over_week': week_over_week,
             'daily_opens_stacked': daily_opens_stacked,
-            'daily_valid_stacked': daily_valid_stacked,
+            'weekly_opens_stacked': weekly_opens_stacked,
             'channels': channels,
             'internet_ratio': internet_ratio,
         }
