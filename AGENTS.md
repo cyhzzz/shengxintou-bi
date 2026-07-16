@@ -202,78 +202,52 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 8. 注意事项 / 踩坑记录
 
-- **不要动 `data.py.backup_20260211_174355`**
-- **后端详情接口与前端浮7e7a5c5f33字段对齐**：修改详情浮7e7a5c5f33前一定检查后端返回的字段集是否覆盖所有 Descriptions.Item 的 label；不覆盖则部分字段显示"-"。AppMarket/Detail 原只返 16 字段，前端浮7e7a5c5f33 33 字段，v3.1.20 后端扩为 43 字段与源表 1:1。
+### 代码规范
 
-：v0.9.1 拆分前的 4000 行单文件备份，仅留作对照。
 - **`models_v2.py` 列名含中文**（如 `AggVendorDaily.花费`、`FactConvContent.微信昵称`），SQLAlchemy 用 `Text`/`BigInteger`/`Float`，**禁止改列名以匹配业务字段**。
 - **报表头部数据卡片一律 `MetricCard + MetricSection`**；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表 XhsNotes/Operation 与 EmployeeConversion Weekly 周报海报子系统除外）。
 - **数据源 / 端点 / 口径说明一律放进 `ReportFooter`**，不要在 MetricCard description 或筛选卡里重复。
-- **乱码防御**：渲染 Excel 导入的脏字符字段（主播名 / 来源 / 备注等）前都要走 `sanitizeText()`，防止上游 GBK / 控制字符渲染成方块。
-- **`POST /api/v1/conversion-funnel` 拆两套漏斗**：内容平台走 `fact_conv_content`，应用市场走 `fact_conv_appmarket`，响应带 `channel_category` 字段。
-- **`POST /api/v1/employee-conversion/analysis`** 顶部核心指标不过滤，从 `agg_daily_channel_open` + `agg_vendor_daily` 平台概览计算。
-- **`POST /api/v1/employee-conversion/analysis-channel-overview`**：员工转化页的独立参考接口；`detail_caliber` 使用 `fact_conv_content` 且默认仅统计 `CONTENT_PLATFORMS` 中有员工姓名的线索，`channel_caliber` 使用 `agg_daily_channel_open` 且仅统计 `渠道类别 = 互联网引流`，后者不并入员工核心指标。
-- **`POST /api/v1/reports/omni-channel/*`**：单一独立数据源 `agg_daily_channel_open`，**禁止混合** fact_conv_* / agg_vendor_daily。第 4 卡用 `internetRow.opens`（按 `channel_category=互联网引流` 拆），KPI 完成率按 `dayOfYear/366` 时间折算。
-- **代理商字段三态**：`DimVendor` 含 `agency_name`（全称，如“黑龙江广视科技有限公司”）、`agency_short`（简称/显示名，如“广视科技”）、`agency_letter`（拼音简称，如“gs”）。`agg_vendor_daily.厂商` 和 `fact_conv_content.广告代理商` 存的是**全称**。同一代理商在不同平台的全称可能有差异（如“量子” vs “量子科技”），但**简称是共同的**。前端代理商筛选目前用 `DimVendor.agency_name` + `AggVendorDaily.厂商` 全称做 value，有改进空间。`AbbreviationManagement`（DimVendor CRUD）是维护简称->全称映射的唯一入口。
-- **`POST /api/v1/reports/app-market/*`**：数据源 `fact_conv_appmarket`（明细）+ `agg_vendor_daily`（创意），双源。
-- **`POST /api/v1/reports/omni-channel/daily-calendar`**（v3.1.5+）：过去 N 天每日开户热力图数据（默认 365，范围 7..366）。
-- **`/api/v1/data-freshness`**：返回 5 张新表数据状态（`critical` >14d / `warning` >5d / `normal` ≤5d）。
-- **bizModel 推断**：`backend_conversions` 的 `business_model` 用 `customer_source` 推断。
-- **代理商分析小计 / 合计行**：`agency_analysis.py` 响应里带 `is_subtotal`/`is_total` 字段，前端展示指标卡片需跳过。
-- **`@ant-design/plots` 漏斗图**：通过 `ErrorBoundary` 降级到 CSS 横条漏斗；数据传入前 `clean.filter(d => typeof d.count === 'number' && Number.isFinite(d.count))`。
-- **打包**：`省心投启动器.exe`（gitignored，7.7MB，PyInstaller 产物）+ `python-3.9-embed/` + `lib/` 便携版结构；dev 环境双击 exe 自动 fallback 到 `.venv/Scripts/python.exe`。
-- **orval**：不要手改 `src/types/api.ts`，必须通过 `npm run generate:api` 重新生成。
-- **`d.toISOString()` 时区陷阱**：`+8` 时区下 `new Date(2026, 0, 1).toISOString()` 返回 `'2025-12-31T16:00:00.000Z'`（UTC 前一天的下午），`slice(0,10)` 会取到前一天的日期。构造本地日期字符串请使用 `d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0')`。CalendarHeatmap 热力图已因此 bug 导致周几错位。
-- **数据源**：v2 上传识别 6 个新类型（account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open）→ 旧 7 个类型 → 410 Gone。
-- **Swagger**：`/apidocs` 可选（需装 flasgger，未列在 requirements.txt），app.py 已做 ImportError 容错。
-- **一次性脚本**：`scripts/_write_docs.py` / `_patch_creative.py` 等保留在 `scripts/` 下，不进 git 索引，使用时按需。
+- **代理商字段三态**：`DimVendor` 含 `agency_name`（全称）、`agency_short`（简称/显示名）、`agency_letter`（拼音简称）。`agg_vendor_daily.厂商` 和 `fact_conv_content.广告代理商` 存的是**全称**。同一代理商在不同平台全称可能不同，但**简称是共同的**。
 
-- **antd `Table` columns 缺 `dataIndex`**：列未设 dataIndex 时 `render(v)` 拿到的 `v` 是整行 record，对象恒 truthy → 全部返回"是"（AppMarket/Detail 5 个 bool 列出现过此 bug，v3.1.20 修复）。
-- **Flask 后台线程不能用 `current_app`**：自更新 `self_update.py` 的后台 `_do_self_update(task_id, force)` 跑在子线程，**Flask app context 不会自动继承**。要拿 `version` / `current_app.config` 时必须 `with app.app_context():`，否则抛 `RuntimeError: Working outside of application context`。当前实现已用纯函数 `_read_version_json()` / `_run_git()` 绕开，避免引入 context 依赖。
-- **`git pull` 前检测 dirty 工作区**：未 commit 的本地改动会让 `git pull` 直接报 `Your local changes would be overwritten` 失败；前端调 `start(force=true)` 时后端先 `git stash push -u -m self-update-<ts>` 暂存再 pull，更新成功后用 `git stash pop` 恢复（冲突时报错并保留 stash 供用户手动处理）。
-- **Windows `subprocess.run` 弹 cmd 黑窗**：默认 `creationflags=0` 会从父进程继承 console，每次 git 调用（`rev-parse / status / fetch / pull`）都会闪一个黑窗口，用户体验极差。**修复**：`_run_git` 显式传 `creationflags=0x08000000`（CREATE_NO_WINDOW），子进程静默执行、stdout/stderr 仍走 `capture_output=True` 收集。其它 Windows 子进程调用（备份、git hook、第三方 SDK）也按同样方式处理。
-- **报表 `.page` padding 全站统一为 0**（v3.1.19 fix）：早期 OmniChannel `index.module.scss` 用了 `padding: var(--spacer-16)` 让整页内容向右下偏移 16px，与 Dashboard / ConversionFunnel / AnchorCluster / Live/Funnel / AgencyAnalysis / LeadsDetail 等 padding:0 的页面不齐。后续新建 / 修改报表 `.page` 时禁止再加 padding，外层由 MainLayout / ConfigProvider 提供统一间距。
+### 前端踩坑
+
+- **antd `Table` columns 缺 `dataIndex`**：列未设 dataIndex 时 `render(v)` 拿到的 `v` 是整行 record，对象恒 truthy → bool 列全部显示"是"（AppMarket/Detail v3.1.20 修复）。
+- **`d.toISOString()` 时区陷阱**：+8 时区下 `new Date(2026, 0, 1).toISOString()` 返回 UTC 前一天，`slice(0,10)` 会取到前一天日期。构造本地日期串用 `d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())`。CalendarHeatmap 曾因此周几错位。
+- **`@ant-design/plots` 漏斗图**：通过 `ErrorBoundary` 降级到 CSS 横条漏斗；数据传入前需 `filter(d => typeof d.count === 'number' && Number.isFinite(d.count))`。
+- **报表 `.page` padding 全站统一为 0**（v3.1.19 fix）：外层由 MainLayout / ConfigProvider 提供统一间距，新建页面禁止再加 padding。
+- **React 运行时 `XXX is not defined` 排查**：通常不是 antd 版本问题，而是：① Vite HMR 缓存（刷新或 rebuild）；② const/let TDZ 暂存死区（把变量定义移到 useState 之后、内部函数之前）；③ UTF-8 BOM 导致 Vite 静默截断模块导出。
+- **乱码防御**：渲染 Excel 导入的脏字符字段（主播名 / 来源 / 备注等）前走 `sanitizeText()`，防止上游 GBK / 控制字符渲染成方块。
+
+### 后端踩坑
+
+- **Flask 后台线程不能用 `current_app`**：子线程不自动继承 app context，拿配置或 version 时必须 `with app.app_context():`，或用纯函数绕开（`_read_version_json()` / `_run_git()`）。
+- **`git pull` 前检测 dirty 工作区**：未 commit 的改动会让 pull 失败；force=true 时先 `git stash push -u` 暂存再 pull，成功后 `git stash pop` 恢复（冲突时保留 stash 供手动处理）。
+
+### Windows / 环境踩坑
+
+- **`subprocess.run` 弹 cmd 黑窗**：默认继承 console，git 调用每次闪黑窗。修复：`creationflags=0x08000000`（CREATE_NO_WINDOW），子进程静默执行。
+- **orval 生成的 API 类型**：不要手改 `src/types/api.ts`，必须通过 `npm run generate:api` 重新生成。
+- **一次性脚本不进 git**：`scripts/_*.py` 保留在本地，`.gitignore` 已排除。
 
 ## 9. 修改守则
 
-- **React 运行时 XXX is not defined 错误排查**：这类错误通常不是 Ant Design 版本问题，而是：① Vite HMR 缓存导致旧模块未被及时替换（刷新页面或 
-  pm run build 即可）；② const / let 定义在前（TDZ 暂存死区），但被前面定义的 useState/useCallback scope 内的函数在闭包中引用。修复方法：把 const loadData / const doSomething 提到组件的 useState 初始化之后、其它内部函数（pplyFilters / 
-  esetFilters）之前。③ 使用 import { X } from 'antd' 时确保 X 确实从 antd 导出（如 Typography 在 antd v5 要从 ntd 而非独立路径导入）。④ 组件文件有 BOM（UTF-8 BOM）时 Vite 解析可能静默截断模块导出，在全体 TSX 文件中统一使用 UTF-8 without BOM。
-
 - 修改 `AGENTS.md` 或 `CLAUDE.md` 必须保持两者内容完全一致（SHA256 一致）。
-
 - 修改业务查询前，先确认端点当前使用的源表和口径，不要照搬 README 或旧文档的过期描述。
-
 - 不要改 `models_v2.py` 的中文列名来迎合前端字段；这些列名要与源表 / `to_sql` 结果对齐。
-
 - 不要新增 mapping / 归一化 processor；确需处理新数据源时，优先补充上游 ETL 或 v2 原样导入映射。
-
 - 不要复活旧上传类型、旧 v1 表、旧原生前端目录或历史迁移脚本。
-
 - 不要手改生成文件，尤其是 orval 生成的 `src/types/api.ts`。
-
 - 报表头部数据卡片一律使用 `MetricCard + MetricSection`；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表与 EmployeeConversion 周报海报子系统除外）。
-
-- **数据源 / 端点 / 口径说明一律放进 `ReportFooter`**，不要在 MetricCard 的 `description` 或筛选卡里重复。
-
+- 数据源 / 端点 / 口径说明一律放进 `ReportFooter`，不要在 MetricCard 的 `description` 或筛选卡里重复。
 - 渲染 Excel 导入的脏字符字段前先走 `sanitizeText()`。
-
 - 设备明细 / 线索明细等行级数据支持详情浮窗（`Modal + Descriptions column={2}`），参考 `LeadsDetail` 模式。
-
 - 主播分析：同名主播按 anchor 跨平台前端聚合；总资产只累加 `opened > 0` 行的 `assets`；`pagination={false}` 一页呈现。
-
 - 侧栏菜单多时 `.sider` 用 `overflow-y: auto` 滚动，禁用 `overflow: hidden`。
-
-- `GuideModal` 必须校验 `content-type: text/markdown`，避免后端 SPA 兜底 `index.html` 被 ReactMarkdown 当 md 渲染成乱码；`GUIDE_TITLES` 增补 6 个 v2 新类型映射。
-
+- `GuideModal` 必须校验 `content-type: text/markdown`，避免后端 SPA 兜底 `index.html` 被 ReactMarkdown 当 md 渲染成乱码；`GUIDE_TITLES` 增补 v2 新类型映射。
 - WebDAV 错误粒度：网络层 → 502 + UPSTREAM_UNAVAILABLE；其它 → 500 + LIST_FAILED。
-
 - 提交前确认：未把本地数据库 / 上传文件 / 备份文件 / `prototype/` / `tmp_*` / `logs/bug-fix-shots/` 加入索引；`.env` 与 `database/*.db` 已被 `.gitignore` 排除。
-
-- **前端 import 交叉验证（防 RuntimeError 黄金守则）**：向 React 文件新增任何 antd 组件或 @ant-design/icons 图标时，立即检查该文件的 import 区是否同步引入了这些 API；新增 JSX 中使用了 `Button`、`Typography`、`SearchOutlined` 等但 import 缺失会导致 dev server 运行时 `ReferenceError: X is not defined`。修改完成后手动 grep 或扫一遍文件头 20 行确认 import 齐全。
-
-- **函数/变量名交叉验证**：`onClick`、`onChange` 等回调中引用的函数名（如 `load`、`resetFilters`、`handleSearch`）必须在文件同作用域内有 `const xxx =` 或 `function xxx()` 定义。新增按钮引用已有函数时，先 grep 确认函数名精确匹配。ConversionFunnel 曾因此类问题出现 `load is not defined`——函数实际名为 `loadData` 而非 `load`、按钮却写了 `onClick={load}`。
-
+- **前端 import 交叉验证（黄金守则）**：向 React 文件新增 antd 组件或图标时，立即检查 import 区是否同步引入；新增 JSX 中使用了 `Button`、`SearchOutlined` 等但 import 缺失会导致运行时 `ReferenceError: X is not defined`。
+- **函数/变量名交叉验证**：`onClick`、`onChange` 等回调中引用的函数名必须在同作用域内有 `const xxx =` 或 `function xxx()` 定义。ConversionFunnel 曾因此类问题出现 `load is not defined`——函数实际名为 `loadData`。
 - 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，**以代码和 `version.json` 为准**，并在文档中标注滞后点。
 
 ## 10. 验证建议
