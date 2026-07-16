@@ -563,27 +563,91 @@ def _safe_div(num, den, pct=False):
         return 0.0
 
 
+def _query_metrics(sd, ed):
+    """v3.1.31 查询某时间区间的 6 个核心指标（复用于本周/全年/上周）
+
+    1. 消耗金额 (agg_vendor_daily.花费)
+    2. 品牌曝光 (agg_vendor_daily.展示量)
+    3. 线索数   (agg_vendor_daily.线索数)
+    4. 开户数   (agg_daily_channel_open.开户成功人数, 仅互联网引流)
+    5. 新增有效户数 (agg_daily_channel_open.有效户数, 仅互联网引流)
+    6. 新增客户资产 (fact_conv_content 新开户客户 SUM(资产) + fact_conv_appmarket 新开户客户 SUM(总资产))
+    """
+    # 1-3: 广告投放（agg_vendor_daily）
+    ad_r = db.session.query(
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+    ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed)).first()
+
+    # 4-5: 渠道开户（agg_daily_channel_open，仅互联网引流）
+    ch_r = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
+        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
+    ).filter(and_(
+        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).first()
+
+    # 6: 新开户客户资产
+    # 内容平台：是否开户==1 AND 非存量 AND 线索日期在区间
+    content_assets = db.session.query(
+        func.coalesce(func.sum(FactConvContent.资产), 0)
+    ).filter(and_(
+        FactConvContent.是否开户 == 1,
+        or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)),
+        FactConvContent.线索日期 >= sd,
+        FactConvContent.线索日期 <= ed,
+    )).scalar() or 0
+
+    # 应用市场：是否新开户==1 AND 渠道类型==互联网引流 AND 下载日期在区间
+    appmarket_assets = db.session.query(
+        func.coalesce(func.sum(FactConvAppmarket.总资产), 0)
+    ).filter(and_(
+        FactConvAppmarket.是否新开户 == 1,
+        FactConvAppmarket.渠道类型 == '互联网引流',
+        FactConvAppmarket.下载日期 >= sd,
+        FactConvAppmarket.下载日期 <= ed,
+    )).scalar() or 0
+
+    return {
+        'cost': float(ad_r.cost or 0),
+        'impressions': int(ad_r.impressions or 0),
+        'leads': int(ad_r.leads or 0),
+        'opens': int(ch_r.opens or 0),
+        'valid': int(ch_r.valid or 0),
+        'assets': float(content_assets) + float(appmarket_assets),
+    }
+
+
+def _calc_wow(curr, prev):
+    """计算环比百分比，prev=0 或不可比时返回 None"""
+    if prev is None or prev == 0:
+        return None
+    return round((float(curr) - float(prev)) / float(prev) * 100, 2)
+
+
 @bp.route('/data', methods=['POST'])
 @handle_exceptions
 def get_weekly_data():
-    """v3.1.30 纯数据周报端点
+    """v3.1.31 纯数据周报端点（本周 + 全年累计 + 上周环比 + 两堆叠图 + 互联网占比）
 
     输入: { report_year, report_week } 或 { start_date, end_date }
     输出: {
-        period: { start_date, end_date, report_year, report_week, report_name },
-        summary: {
-            ad: { impressions, clicks, cost, leads, cpc, cpa, ... 累计 },
-            channel: { opens, deposits, valid_accounts, ... 累计 },
-            funnel: { content_rate, appmarket_rate, ... }
-        },
-        daily: [
-            { date, ad_impressions, ad_clicks, ad_cost, ad_leads, ch_opens, ch_deposits, ch_valid },
-            ...
-        ],
-        by_platform: [ { platform, impressions, clicks, cost, leads }, ... ],
-        by_channel: [ { channel, opens, deposits, valid_accounts }, ... ],
+        period: { start_date, end_date, prev_start, prev_end, report_year, report_week, ... },
+        current_week:   { cost, impressions, leads, opens, valid, assets },
+        year_to_date:   { ... },                 # 年初至周末累计
+        prev_week:      { ... },                 # 上一周（用于环比）
+        week_over_week: { cost, ..., assets },   # 环比百分比，null=不可比
+        daily_opens_stacked: [ { date, <渠道名>: n, ... }, ... ],  # 互联网引流开户数按渠道堆叠
+        daily_valid_stacked: [ { date, <渠道名>: n, ... }, ... ],  # 互联网引流有效户数按渠道堆叠
+        channels: [ '小红书', '腾讯', ... ],    # 堆叠图渠道列表
+        internet_ratio: { opens_ratio, valid_ratio },  # 互联网引流 / 全渠道类别
     }
     """
+    from datetime import datetime, timedelta
+
     data = request.get_json() or {}
     report_year = data.get('report_year')
     report_week = data.get('report_week')
@@ -610,182 +674,94 @@ def get_weekly_data():
         report_week = int(sd[5:7])
         report_name = f'{report_year}年第{report_week}周'
         report_sequence = report_week
-        week_info = {'start_date': sd, 'end_date': ed, 'report_year': report_year,
-                     'report_week': report_week, 'report_name': report_name,
-                     'report_sequence': report_sequence, 'report_month': int(sd[5:7]),
-                     'report_month_week': 1}
     else:
         return jsonify({'success': False, 'error': '需要 report_year+report_week 或 start_date+end_date'}), 400
 
-    # 累计范围：年初到周末
+    # 上一周范围（环比）
+    sd_dt = datetime.strptime(sd, '%Y-%m-%d')
+    ed_dt = datetime.strptime(ed, '%Y-%m-%d')
+    prev_sd = (sd_dt - timedelta(days=7)).strftime('%Y-%m-%d')
+    prev_ed = (ed_dt - timedelta(days=7)).strftime('%Y-%m-%d')
+
+    # 全年累计范围
     year_start = f'{report_year}-01-01'
-    cum_end = ed
 
-    # ===== 1. 广告投放汇总（agg_vendor_daily）=====
-    ad_q = db.session.query(
-        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
-        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
-        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('new_accounts'),
-    ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed))
-    ad_r = ad_q.first()
+    # ===== 三套时间区间 6 指标 =====
+    current_week = _query_metrics(sd, ed)
+    year_to_date = _query_metrics(year_start, ed)
+    prev_week = _query_metrics(prev_sd, prev_ed)
 
-    ad_cum = db.session.query(
-        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
-        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
-        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('new_accounts'),
-    ).filter(and_(AggVendorDaily.日期 >= year_start, AggVendorDaily.日期 <= cum_end)).first()
+    # 环比百分比
+    week_over_week = {
+        k: _calc_wow(current_week[k], prev_week[k]) for k in
+        ['cost', 'impressions', 'leads', 'opens', 'valid', 'assets']
+    }
 
-    ad_impressions = int(ad_r.impressions or 0)
-    ad_clicks = int(ad_r.clicks or 0)
-    ad_cost = float(ad_r.cost or 0)
-    ad_leads = int(ad_r.leads or 0)
-    ad_new_accounts = int(ad_r.new_accounts or 0)
-
-    ad_cum_impressions = int(ad_cum.impressions or 0)
-    ad_cum_clicks = int(ad_cum.clicks or 0)
-    ad_cum_cost = float(ad_cum.cost or 0)
-    ad_cum_leads = int(ad_cum.leads or 0)
-    ad_cum_new_accounts = int(ad_cum.new_accounts or 0)
-
-    # ===== 2. 互联网渠道开户汇总（agg_daily_channel_open，仅互联网引流）=====
-    ch_q = db.session.query(
-        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-        func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposits'),
-        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
-    ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
-        AggDailyChannelOpen.时间区间 >= sd,
-        AggDailyChannelOpen.时间区间 <= ed,
-    ))
-    ch_r = ch_q.first()
-
-    ch_cum = db.session.query(
-        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-        func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposits'),
-        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
-    ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
-        AggDailyChannelOpen.时间区间 >= year_start,
-        AggDailyChannelOpen.时间区间 <= cum_end,
-    )).first()
-
-    ch_opens = int(ch_r.opens or 0)
-    ch_deposits = int(ch_r.deposits or 0)
-    ch_valid = int(ch_r.valid or 0)
-    ch_cum_opens = int(ch_cum.opens or 0)
-    ch_cum_deposits = int(ch_cum.deposits or 0)
-    ch_cum_valid = int(ch_cum.valid or 0)
-
-    # ===== 3. 漏斗整体转化率（线索→开户）=====
-    # 内容平台漏斗
-    content_q = db.session.query(
-        func.count(FactConvContent.id).label('total'),
-        func.coalesce(func.sum(case((FactConvContent.是否开户 == 1, 1), else_=0)), 0).label('opened'),
-    ).filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
-    content_r = content_q.first()
-    content_total = int(content_r.total or 0)
-    content_opened = int(content_r.opened or 0)
-    content_rate = _safe_div(content_opened, content_total, pct=True)
-
-    # 应用市场漏斗（限互联网引流）
-    appmarket_q = db.session.query(
-        func.count(FactConvAppmarket.id).label('total'),
-        func.coalesce(func.sum(case((FactConvAppmarket.是否开户成功 == 1, 1), else_=0)), 0).label('opened'),
-    ).filter(and_(
-        FactConvAppmarket.渠道类型 == '互联网引流',
-        FactConvAppmarket.下载日期 >= sd,
-        FactConvAppmarket.下载日期 <= ed,
-    ))
-    appmarket_r = appmarket_q.first()
-    appmarket_total = int(appmarket_r.total or 0)
-    appmarket_opened = int(appmarket_r.opened or 0)
-    appmarket_rate = _safe_div(appmarket_opened, appmarket_total, pct=True)
-
-    # ===== 4. 每日明细（用于日走势堆叠柱状图）=====
-    # 广告投放按日
-    ad_daily_rows = db.session.query(
-        AggVendorDaily.日期.label('date'),
-        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
-        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
-        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('new_accounts'),
-    ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed)) \
-     .group_by(AggVendorDaily.日期).order_by(AggVendorDaily.日期).all()
-
-    # 渠道开户按日（互联网引流）
-    ch_daily_rows = db.session.query(
+    # ===== 堆叠图：按日 × 渠道名称（互联网引流）=====
+    # 开户数按日 × 渠道
+    opens_daily_rows = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
-        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-        func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposits'),
-        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
-    ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
-        AggDailyChannelOpen.时间区间 >= sd,
-        AggDailyChannelOpen.时间区间 <= ed,
-    )).group_by(AggDailyChannelOpen.时间区间).order_by(AggDailyChannelOpen.时间区间).all()
-
-    # 合并两源按日数据
-    ad_map = {r.date: r for r in ad_daily_rows}
-    ch_map = {r.date: r for r in ch_daily_rows}
-    all_dates = sorted(set(list(ad_map.keys()) + list(ch_map.keys())))
-    daily = []
-    for d in all_dates:
-        ad_row = ad_map.get(d)
-        ch_row = ch_map.get(d)
-        daily.append({
-            'date': d,
-            'ad_impressions': int(ad_row.impressions or 0) if ad_row else 0,
-            'ad_clicks': int(ad_row.clicks or 0) if ad_row else 0,
-            'ad_cost': float(ad_row.cost or 0) if ad_row else 0,
-            'ad_leads': int(ad_row.leads or 0) if ad_row else 0,
-            'ad_new_accounts': int(ad_row.new_accounts or 0) if ad_row else 0,
-            'ch_opens': int(ch_row.opens or 0) if ch_row else 0,
-            'ch_deposits': int(ch_row.deposits or 0) if ch_row else 0,
-            'ch_valid': int(ch_row.valid or 0) if ch_row else 0,
-        })
-
-    # ===== 5. 按平台拆分（广告投放）=====
-    platform_rows = db.session.query(
-        AggVendorDaily.平台.label('platform'),
-        func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-        func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
-        func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
-        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('new_accounts'),
-    ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed)) \
-     .group_by(AggVendorDaily.平台).order_by(func.sum(AggVendorDaily.花费).desc()).all()
-    by_platform = [{
-        'platform': r.platform or '未分类',
-        'impressions': int(r.impressions or 0),
-        'clicks': int(r.clicks or 0),
-        'cost': float(r.cost or 0),
-        'leads': int(r.leads or 0),
-        'new_accounts': int(r.new_accounts or 0),
-    } for r in platform_rows]
-
-    # ===== 6. 按渠道拆分（互联网开户）=====
-    channel_rows = db.session.query(
         AggDailyChannelOpen.渠道名称.label('channel'),
-        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-        func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposits'),
-        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('val'),
     ).filter(and_(
         AggDailyChannelOpen.渠道类别 == '互联网引流',
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
-    )).group_by(AggDailyChannelOpen.渠道名称) \
-     .order_by(func.sum(AggDailyChannelOpen.开户成功人数).desc()).all()
-    by_channel = [{
-        'channel': r.channel or '未分类',
-        'opens': int(r.opens or 0),
-        'deposits': int(r.deposits or 0),
-        'valid': int(r.valid or 0),
-    } for r in channel_rows]
+    )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
+
+    valid_daily_rows = db.session.query(
+        AggDailyChannelOpen.时间区间.label('date'),
+        AggDailyChannelOpen.渠道名称.label('channel'),
+        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('val'),
+    ).filter(and_(
+        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
+
+    # 收集所有日期 + 所有渠道名（按开户数总和降序）
+    all_dates = sorted(set([r.date for r in opens_daily_rows] + [r.date for r in valid_daily_rows]))
+    channel_set = {}
+    for r in opens_daily_rows:
+        channel_set[r.channel or '未分类'] = channel_set.get(r.channel or '未分类', 0) + int(r.val or 0)
+    channels = sorted(channel_set.keys(), key=lambda c: channel_set[c], reverse=True)
+
+    # 转 { date, <渠道名>: n, ... } 格式
+    def _pivot(rows):
+        m = {}
+        for r in rows:
+            d = r.date
+            ch = r.channel or '未分类'
+            if d not in m:
+                m[d] = {'date': d}
+            m[d][ch] = int(r.val or 0)
+        # 确保所有日期都有（缺失日期补空）
+        result = []
+        for d in all_dates:
+            result.append(m.get(d, {'date': d}))
+        return result
+
+    daily_opens_stacked = _pivot(opens_daily_rows)
+    daily_valid_stacked = _pivot(valid_daily_rows)
+
+    # ===== 互联网渠道占公司开户占比（互联网引流 / 全渠道类别）=====
+    all_opens = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0)
+    ).filter(and_(
+        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).scalar() or 0
+    all_valid = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0)
+    ).filter(and_(
+        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).scalar() or 0
+
+    internet_ratio = {
+        'opens_ratio': _safe_div(current_week['opens'], all_opens, pct=True) if all_opens else 0.0,
+        'valid_ratio': _safe_div(current_week['valid'], all_valid, pct=True) if all_valid else 0.0,
+    }
 
     return jsonify({
         'success': True,
@@ -793,52 +769,20 @@ def get_weekly_data():
             'period': {
                 'start_date': sd,
                 'end_date': ed,
+                'prev_start': prev_sd,
+                'prev_end': prev_ed,
                 'report_year': report_year,
                 'report_week': report_week,
                 'report_name': report_name,
                 'report_sequence': report_sequence,
             },
-            'summary': {
-                'ad': {
-                    'impressions': ad_impressions,
-                    'clicks': ad_clicks,
-                    'cost': round(ad_cost, 2),
-                    'leads': ad_leads,
-                    'new_accounts': ad_new_accounts,
-                    'cpc': round(ad_cost / ad_clicks, 2) if ad_clicks > 0 else 0,
-                    'cpa': round(ad_cost / ad_new_accounts, 2) if ad_new_accounts > 0 else 0,
-                    'ctr': _safe_div(ad_clicks, ad_impressions, pct=True),
-                    'cumulative': {
-                        'impressions': ad_cum_impressions,
-                        'clicks': ad_cum_clicks,
-                        'cost': round(ad_cum_cost, 2),
-                        'leads': ad_cum_leads,
-                        'new_accounts': ad_cum_new_accounts,
-                    },
-                },
-                'channel': {
-                    'opens': ch_opens,
-                    'deposits': ch_deposits,
-                    'valid': ch_valid,
-                    'deposit_rate': _safe_div(ch_deposits, ch_opens, pct=True),
-                    'valid_rate': _safe_div(ch_valid, ch_opens, pct=True),
-                    'cumulative': {
-                        'opens': ch_cum_opens,
-                        'deposits': ch_cum_deposits,
-                        'valid': ch_cum_valid,
-                    },
-                },
-                'funnel': {
-                    'content_total': content_total,
-                    'content_opened': content_opened,
-                    'content_rate': content_rate,
-                    'appmarket_total': appmarket_total,
-                    'appmarket_opened': appmarket_opened,
-                    'appmarket_rate': appmarket_rate,
-                },
-            },
-            'daily': daily,
-            'by_platform': by_platform,
-            'by_channel': by_channel,
+            'current_week': current_week,
+            'year_to_date': year_to_date,
+            'prev_week': prev_week,
+            'week_over_week': week_over_week,
+            'daily_opens_stacked': daily_opens_stacked,
+            'daily_valid_stacked': daily_valid_stacked,
+            'channels': channels,
+            'internet_ratio': internet_ratio,
         }
     })
