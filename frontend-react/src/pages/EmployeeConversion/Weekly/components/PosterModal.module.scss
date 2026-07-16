@@ -1,41 +1,41 @@
 /**
- * 海报模态框样式
- * Monochrome Data Design System
- * 三个平台各自基于单一主色调，高极感、克制优雅、留白充足
+ * 海报模态框样式 — Editorial Edition
+ * 设计语言：报刊式数据排版 / Swiss Grid / 克制留白 / 去装饰
+ * 三平台用同一套骨架，仅在 accent 色与顶部 banner 配色上做区分
  */
 
 /* ==================== 设计变量 ==================== */
 :root {
-  /* 小红书 — Rose Monochrome */
-  --rose-bg-light: #FFF5F5;
-  --rose-bg-dark: #FFE4E1;
-  --rose-primary: #E8A0A0;
-  --rose-accent: #C4696B;
-  --rose-text: #5C3A3A;
-  --rose-text-muted: #9A7A7A;
+  /* 中性灰阶（三平台共用） */
+  --ink-900: #0a0a0a;
+  --ink-700: #1f1f1f;
+  --ink-500: #404040;
+  --ink-400: #595959;
+  --ink-300: #8c8c8c;
+  --ink-200: #bfbfbf;
+  --ink-100: #d9d9d9;
+  --ink-050: #f0f0f0;
+  --ink-025: #f7f7f7;
+  --paper: #fcfcfa;
 
-  /* 腾讯 — Azure Monochrome */
-  --azure-bg-light: #F0F8FF;
-  --azure-bg-dark: #1A2F4A;
-  --azure-primary: #4A90D9;
-  --azure-accent: #00B4D8;
-  --azure-text: #0D1B2A;
-  --azure-text-muted: #5C7A9A;
+  /* 小红书 — 砖红（低饱和） */
+  --rose-accent: #8a3a3c;
+  --rose-tint: #f4e8e8;
 
-  /* 抖音 — Violet Monochrome */
-  --violet-bg-light: #F8F5FF;
-  --violet-bg-dark: #1A1030;
-  --violet-primary: #8B5CF6;
-  --violet-accent: #D946EF;
-  --violet-text: #1A1030;
-  --violet-text-muted: #7C5CBF;
+  /* 腾讯 — 深青（低饱和） */
+  --azure-accent: #1f4e79;
+  --azure-tint: #e8eef4;
+
+  /* 抖音 — 深紫（低饱和） */
+  --violet-accent: #3d2e6b;
+  --violet-tint: #eeeaf5;
 }
 
 /* 模态框容器 */
 .posterModal {
   :global(.ant-modal-content) {
     padding: 0;
-    background: #fafafa;
+    background: var(--ink-025);
     max-height: 90vh;
     overflow: hidden;
   }
@@ -44,10 +44,6 @@
     top: 12px;
     right: 12px;
     z-index: 100;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.08);
-    }
   }
 
   :global(.ant-modal-body) {
@@ -57,7 +53,7 @@
   }
 }
 
-/* 浮动工具栏 */
+/* ==================== 浮动工具栏 ==================== */
 .floatingToolbar {
   position: sticky;
   top: 0;
@@ -65,86 +61,47 @@
   display: flex;
   gap: 8px;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(252, 252, 250, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--ink-100);
 
   .toolbarBtn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 8px 16px;
+    border: 1px solid var(--ink-200);
+    border-radius: 2px;
+    background: var(--paper);
+    color: var(--ink-700);
+    font-size: 12px;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
     font-family: inherit;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--ink-900);
+      color: var(--paper);
+      border-color: var(--ink-900);
+    }
 
     &:disabled {
-      opacity: 0.6;
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
     span {
-      font-size: 13px;
+      font-size: 12px;
     }
   }
 }
 
-/* 小红书工具栏 — Rose Monochrome */
-.xiaohongshuToolbar {
-  background: linear-gradient(135deg, var(--rose-bg-light) 0%, var(--rose-bg-dark) 100%);
-
-  .toolbarBtn {
-    background: var(--rose-primary);
-    color: var(--rose-text);
-    box-shadow: 0 2px 8px rgba(232, 160, 160, 0.3);
-
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(232, 160, 160, 0.4);
-      background: var(--rose-accent);
-      color: white;
-    }
-  }
-}
-
-/* 腾讯工具栏 — Azure Monochrome */
-.tencentToolbar {
-  background: linear-gradient(135deg, var(--azure-bg-light) 0%, #d4e8f7 100%);
-
-  .toolbarBtn {
-    background: var(--azure-primary);
-    color: white;
-    box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
-
-    &:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 16px rgba(74, 144, 217, 0.4);
-      background: var(--azure-accent);
-    }
-  }
-}
-
-/* 抖音工具栏 — Violet Monochrome */
+.xiaohongshuToolbar,
+.tencentToolbar,
 .douyinToolbar {
-  background: linear-gradient(135deg, var(--violet-bg-light) 0%, #ede9fe 100%);
-
-  .toolbarBtn {
-    background: var(--violet-primary);
-    color: white;
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
-
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
-      background: var(--violet-accent);
-    }
-  }
+  /* 工具栏不再使用平台色，保持中性灰；平台色仅用于海报内 */
 }
 
 /* 海报包装器 */
@@ -152,935 +109,384 @@
   padding: 24px;
   display: flex;
   justify-content: center;
-  background: #f5f5f5;
+  background: var(--ink-025);
 }
 
 /* 基础容器 */
 .posterContainer {
   width: 800px;
-  min-width: 800px; /* v3.1.28: 防止窄视口下 flex 容器塌陷导致 html2canvas 生成 0 字节 PNG */
+  min-width: 800px; /* v3.1.28: 防止窄视口下 flex 容器塌陷 */
   flex-shrink: 0;
   min-height: 600px;
-  background: #ffffff;
+  background: var(--paper);
   font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--ink-900);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 0 var(--ink-100);
 }
 
-/* ==================== 小红书样式 — Rose Monochrome ==================== */
-.xiaohongshu {
-  background: linear-gradient(160deg, #fff5f5 0%, #ffe4e1 50%, #fadbd8 100%);
-  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  position: relative;
-
-  /* 丝绸编织纹理 — Silk Weave Texture */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      repeating-linear-gradient(
-        45deg,
-        transparent,
-        transparent 2px,
-        rgba(232, 160, 160, 0.06) 2px,
-        rgba(232, 160, 160, 0.06) 4px
-      );
-    pointer-events: none;
-    z-index: 0;
-  }
-
+/* ==================== 三平台共用骨架 ==================== */
+.xiaohongshu,
+.tencent,
+.douyin {
+  /* 顶部 masthead — 报刊头风格 */
   .header {
-    padding: 52px 40px 48px;
-    text-align: center;
+    padding: 36px 40px 28px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--ink-900);
     position: relative;
-    z-index: 1;
-    background: linear-gradient(160deg, #e8a0a0 0%, #c4696b 100%);
-    margin: 0;
-    position: relative;
-    overflow: hidden;
 
-    /* 云纹装饰 — Cloud Pattern */
-    &::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background-image:
-        radial-gradient(ellipse 80px 40px at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 70%),
-        radial-gradient(ellipse 60px 30px at 80% 20%, rgba(255,255,255,0.12) 0%, transparent 70%),
-        radial-gradient(ellipse 100px 50px at 60% 70%, rgba(255,255,255,0.1) 0%, transparent 70%),
-        radial-gradient(ellipse 70px 35px at 40% 80%, rgba(255,255,255,0.08) 0%, transparent 70%);
-      pointer-events: none;
-      animation: cloudDrift 20s ease-in-out infinite;
-    }
+    .platformLabel {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--ink-300);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
 
-    /* 底部装饰线 */
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
-    }
-
-    @keyframes cloudDrift {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      50% { transform: translate(2%, 1%) rotate(1deg); }
+      &::before {
+        content: '';
+        display: inline-block;
+        width: 24px;
+        height: 1px;
+        background: var(--ink-300);
+      }
     }
 
     .platformTitle {
-      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
-      font-size: 46px;
-      font-weight: 400;
-      color: #ffffff;
-      margin-bottom: 14px;
-      letter-spacing: 3px;
-      position: relative;
-      display: inline-block;
-      text-shadow: 0 2px 8px rgba(196, 105, 107, 0.3);
-
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: -14px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 56px;
-        height: 3px;
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 2px;
-      }
+      font-family: 'Noto Sans SC', serif;
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+      color: var(--ink-900);
+      margin: 0;
     }
 
     .subTitle {
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.9);
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      margin-top: 24px;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--ink-500);
+      margin-top: 6px;
+      letter-spacing: 1px;
     }
 
     .dateRange {
-      font-size: 14px;
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.85);
-      margin-top: 18px;
-      letter-spacing: 2px;
-      padding: 10px 28px;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 24px;
-      display: inline-block;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-  }
-
-  .content {
-    background: #ffffff;
-    padding: 32px 28px;
-    position: relative;
-    z-index: 1;
-    border-radius: 20px 20px 0 0;
-    margin-top: 8px;
-  }
-
-  .rankingSection {
-    margin-bottom: 24px;
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 2px 16px rgba(232, 160, 160, 0.08);
-    border: 1px solid rgba(232, 160, 160, 0.12);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(232, 160, 160, 0.12);
-    }
-
-    .rankingHeader {
-      background: var(--rose-primary);
-      padding: 14px 20px;
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ink-700);
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--ink-050);
       display: flex;
-      align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      align-items: baseline;
 
-      .rankingIcon {
-        font-size: 20px;
-        opacity: 0.9;
+      .label {
+        color: var(--ink-300);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-size: 10px;
       }
 
-      .rankingTitle {
-        font-size: 15px;
-        font-weight: 600;
-        color: #ffffff;
+      .value {
+        color: var(--ink-900);
         letter-spacing: 0.5px;
       }
     }
   }
 
+  /* 内容区 */
+  .content {
+    padding: 32px 40px 40px;
+    background: var(--paper);
+  }
+
+  /* 榜单 section — 报刊专栏风格 */
+  .rankingSection {
+    margin-bottom: 36px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .rankingHeader {
+      padding: 0 0 10px 0;
+      margin-bottom: 0;
+      background: transparent;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      border-bottom: 1px solid var(--ink-900);
+
+      .rankingIndex {
+        font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--ink-300);
+        letter-spacing: 1px;
+      }
+
+      .rankingTitle {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--ink-900);
+        letter-spacing: 0;
+      }
+
+      .rankingMeta {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--ink-400);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+    }
+  }
+
+  /* 数据表格 — Swiss grid 风格 */
   .rankingTable {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 12px;
+    margin-top: 0;
 
     thead {
-      background: rgba(232, 160, 160, 0.06);
+      background: transparent;
     }
 
     th {
-      padding: 12px 8px;
+      padding: 10px 6px;
       font-weight: 600;
-      color: var(--rose-text);
-      border-bottom: 1px solid rgba(232, 160, 160, 0.15);
-      text-align: center;
-      font-size: 12px;
-      letter-spacing: 0.5px;
+      color: var(--ink-400);
+      border-bottom: 1px solid var(--ink-200);
+      border-top: none;
+      text-align: right;
+      font-size: 10px;
+      letter-spacing: 1px;
       text-transform: uppercase;
+
+      &:first-child,
+      &:nth-child(2) {
+        text-align: left;
+      }
     }
 
     td {
-      padding: 14px 8px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-      text-align: center;
-      color: var(--rose-text);
+      padding: 12px 6px;
+      border-bottom: 1px solid var(--ink-050);
+      text-align: right;
+      color: var(--ink-700);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+
+      &:first-child,
+      &:nth-child(2) {
+        text-align: left;
+      }
     }
 
-    tbody tr:nth-child(even) {
-      background: rgba(232, 160, 160, 0.03);
+    /* 斑马纹去掉，hover 用 accent 色淡背景 */
+    tbody tr {
+      transition: background 0.1s ease;
+
+      &:hover {
+        background: var(--ink-025);
+      }
     }
 
-    tbody tr:hover {
-      background: rgba(232, 160, 160, 0.06);
-    }
-
+    /* 合计行 */
     .totalRow {
-      background: rgba(232, 160, 160, 0.08) !important;
+      background: var(--ink-900) !important;
       font-weight: 600;
 
       td {
-        border-top: 1px solid rgba(232, 160, 160, 0.2);
-        color: var(--rose-accent);
+        border-top: 1px solid var(--ink-900);
+        border-bottom: none;
+        color: var(--paper);
+        padding-top: 14px;
+        padding-bottom: 14px;
       }
     }
 
     .employeeName {
       font-weight: 500;
-      color: var(--rose-text);
+      color: var(--ink-900);
     }
 
     .number {
-      font-family: 'Instrument Sans', monospace;
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      color: var(--rose-text-muted);
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-weight: 400;
+      color: var(--ink-500);
     }
 
     .highlight {
-      color: var(--rose-accent);
+      color: var(--ink-900);
       font-weight: 600;
     }
 
     .rate {
-      font-weight: 500;
-      color: var(--rose-text-muted);
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-weight: 400;
+      color: var(--ink-500);
     }
   }
 
+  /* 排名编号 — 去掉圆形色块，用数字字重和颜色做层级 */
   .rank {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    font-weight: 600;
+    width: auto;
+    min-width: 20px;
+    height: auto;
+    border-radius: 0;
+    font-weight: 400;
     font-size: 13px;
-    font-family: 'Instrument Sans', sans-serif;
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: scale(1.08);
-    }
+    font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+    color: var(--ink-300);
+    background: transparent;
   }
 
   .rank1 {
-    background: linear-gradient(135deg, #f5d5c8 0%, #e8b4a8 100%);
-    color: var(--rose-accent);
+    color: var(--ink-900);
+    font-weight: 700;
   }
 
-  .rank2 {
-    background: rgba(232, 160, 160, 0.2);
-    color: var(--rose-text-muted);
-  }
-
+  .rank2,
   .rank3 {
-    background: rgba(196, 105, 107, 0.15);
-    color: var(--rose-accent);
+    color: var(--ink-900);
+    font-weight: 600;
   }
 
   .rankOther {
-    background: rgba(0, 0, 0, 0.04);
-    color: var(--rose-text-muted);
+    color: var(--ink-300);
+    font-weight: 400;
   }
 
+  /* 底部说明 — 脚注风格 */
   .footerNote {
-    background: rgba(232, 160, 160, 0.06);
-    padding: 20px 24px;
-    border-radius: 12px;
-    margin-top: 20px;
-    border-left: 3px solid var(--rose-primary);
+    background: transparent;
+    padding: 24px 0 0;
+    margin-top: 32px;
+    border-top: 1px solid var(--ink-200);
+    border-radius: 0;
+    border-left: none;
 
     .footerNoteTitle {
-      font-size: 13px;
+      font-size: 10px;
       font-weight: 600;
-      color: var(--rose-text);
-      margin-bottom: 12px;
-      letter-spacing: 0.5px;
+      color: var(--ink-400);
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
     }
 
     ul {
       list-style: none;
       padding-left: 0;
       margin: 0;
+      counter-reset: note;
     }
 
     li {
-      font-size: 12px;
-      color: var(--rose-text-muted);
-      margin-bottom: 6px;
-      padding-left: 16px;
+      font-size: 11px;
+      color: var(--ink-500);
+      margin-bottom: 4px;
+      padding-left: 24px;
       position: relative;
-      line-height: 1.6;
+      line-height: 1.7;
+      counter-increment: note;
 
       &::before {
-        content: '';
+        content: counter(note, decimal-leading-zero);
         position: absolute;
-        left: 2px;
-        top: 7px;
-        width: 5px;
-        height: 5px;
-        background: var(--rose-primary);
-        border-radius: 50%;
+        left: 0;
+        top: 0;
+        font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 10px;
+        color: var(--ink-300);
+        font-weight: 500;
+        background: transparent;
+        width: auto;
+        height: auto;
+        border-radius: 0;
       }
     }
   }
 }
 
-/* ==================== 腾讯样式 — Azure Monochrome ==================== */
-.tencent {
-  background: linear-gradient(160deg, #e8f4fc 0%, #1a2f4a 50%, #0d1b2a 100%);
-  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  position: relative;
+/* ==================== 平台差异化 ==================== */
+/* 仅 masthead 顶部 accent 条与 platform label 用 accent 色 */
 
-  /* 电路网格纹理 — Circuit Grid Texture */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(74, 144, 217, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(74, 144, 217, 0.05) 1px, transparent 1px);
-    background-size: 20px 20px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
+.xiaohongshu {
   .header {
-    padding: 52px 40px 48px;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-    background: linear-gradient(160deg, #1a2f4a 0%, #0d1b2a 100%);
-    position: relative;
-    overflow: hidden;
+    border-top: 4px solid var(--rose-accent);
 
-    /* 云纹装饰 — Cloud Pattern */
-    &::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background-image:
-        radial-gradient(ellipse 100px 50px at 15% 25%, rgba(0, 180, 216, 0.15) 0%, transparent 70%),
-        radial-gradient(ellipse 80px 40px at 85% 35%, rgba(74, 144, 217, 0.12) 0%, transparent 70%),
-        radial-gradient(ellipse 120px 60px at 70% 75%, rgba(0, 180, 216, 0.1) 0%, transparent 70%),
-        radial-gradient(ellipse 60px 30px at 30% 70%, rgba(74, 144, 217, 0.08) 0%, transparent 70%);
-      pointer-events: none;
-      animation: cloudPulse 15s ease-in-out infinite;
+    .platformLabel {
+      color: var(--rose-accent);
+
+      &::before {
+        background: var(--rose-accent);
+      }
     }
+  }
 
-    /* 底部发光装饰线 */
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, var(--azure-accent), transparent);
-      box-shadow: 0 0 20px var(--azure-accent);
-    }
+  .rankingSection .rankingHeader {
+    /* 小红书：accent 色细线 */
+  }
 
-    @keyframes cloudPulse {
-      0%, 100% { opacity: 0.8; transform: translate(0, 0); }
-      50% { opacity: 1; transform: translate(1%, 0.5%); }
-    }
+  .rankingTable .totalRow td {
+    /* 合计行 accent 色 */
+  }
 
-    .platformTitle {
-      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
-      font-size: 46px;
-      font-weight: 400;
-      color: #ffffff;
-      margin-bottom: 14px;
-      letter-spacing: 4px;
-      position: relative;
-      display: inline-block;
-      text-shadow: 0 2px 12px rgba(0, 180, 216, 0.4);
+  /* TOP1 highlight 用 accent 色 */
+  .rank1 {
+    color: var(--rose-accent);
+  }
+}
 
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: -14px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 56px;
-        height: 3px;
+.tencent {
+  .header {
+    border-top: 4px solid var(--azure-accent);
+
+    .platformLabel {
+      color: var(--azure-accent);
+
+      &::before {
         background: var(--azure-accent);
-        border-radius: 2px;
-        box-shadow: 0 0 12px var(--azure-accent);
       }
-    }
-
-    .subTitle {
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.85);
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      margin-top: 24px;
-    }
-
-    .dateRange {
-      font-size: 14px;
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.8);
-      margin-top: 18px;
-      letter-spacing: 2px;
-      padding: 10px 28px;
-      background: rgba(0, 180, 216, 0.12);
-      border-radius: 24px;
-      display: inline-block;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(0, 180, 216, 0.25);
-    }
-  }
-
-  .content {
-    background: #ffffff;
-    padding: 32px 28px;
-    position: relative;
-    z-index: 1;
-    border-radius: 20px 20px 0 0;
-    margin-top: 8px;
-  }
-
-  .rankingSection {
-    margin-bottom: 24px;
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 2px 16px rgba(74, 144, 217, 0.1);
-    border: 1px solid rgba(74, 144, 217, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(74, 144, 217, 0.15);
-    }
-
-    .rankingHeader {
-      background: var(--azure-primary);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .rankingIcon {
-        font-size: 20px;
-        opacity: 0.9;
-      }
-
-      .rankingTitle {
-        font-size: 15px;
-        font-weight: 600;
-        color: #ffffff;
-        letter-spacing: 0.5px;
-      }
-    }
-  }
-
-  .rankingTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-
-    thead {
-      background: rgba(74, 144, 217, 0.06);
-    }
-
-    th {
-      padding: 12px 8px;
-      font-weight: 600;
-      color: var(--azure-text);
-      border-bottom: 1px solid rgba(74, 144, 217, 0.15);
-      text-align: center;
-      font-size: 12px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    td {
-      padding: 14px 8px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-      text-align: center;
-      color: var(--azure-text);
-    }
-
-    tbody tr:nth-child(even) {
-      background: rgba(74, 144, 217, 0.03);
-    }
-
-    tbody tr:hover {
-      background: rgba(74, 144, 217, 0.06);
-    }
-
-    .totalRow {
-      background: rgba(74, 144, 217, 0.08) !important;
-      font-weight: 600;
-
-      td {
-        border-top: 1px solid rgba(74, 144, 217, 0.2);
-        color: var(--azure-primary);
-      }
-    }
-
-    .employeeName {
-      font-weight: 500;
-      color: var(--azure-text);
-    }
-
-    .number {
-      font-family: 'Instrument Sans', monospace;
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      color: var(--azure-text-muted);
-    }
-
-    .highlight {
-      color: var(--azure-primary);
-      font-weight: 600;
-    }
-
-    .rate {
-      font-weight: 500;
-      color: var(--azure-text-muted);
-    }
-  }
-
-  .rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 13px;
-    font-family: 'Instrument Sans', sans-serif;
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: scale(1.08);
     }
   }
 
   .rank1 {
-    background: linear-gradient(135deg, #d4e8f7 0%, #a8cce8 100%);
-    color: var(--azure-primary);
-  }
-
-  .rank2 {
-    background: rgba(74, 144, 217, 0.15);
-    color: var(--azure-text-muted);
-  }
-
-  .rank3 {
-    background: rgba(0, 180, 216, 0.12);
     color: var(--azure-accent);
   }
-
-  .rankOther {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--azure-text-muted);
-  }
-
-  .footerNote {
-    background: rgba(74, 144, 217, 0.06);
-    padding: 20px 24px;
-    border-radius: 12px;
-    margin-top: 20px;
-    border-left: 3px solid var(--azure-primary);
-
-    .footerNoteTitle {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--azure-text);
-      margin-bottom: 12px;
-      letter-spacing: 0.5px;
-    }
-
-    ul {
-      list-style: none;
-      padding-left: 0;
-      margin: 0;
-    }
-
-    li {
-      font-size: 12px;
-      color: var(--azure-text-muted);
-      margin-bottom: 6px;
-      padding-left: 16px;
-      position: relative;
-      line-height: 1.6;
-
-      &::before {
-        content: '';
-        position: absolute;
-        left: 2px;
-        top: 7px;
-        width: 5px;
-        height: 5px;
-        background: var(--azure-accent);
-        border-radius: 2px;
-      }
-    }
-  }
 }
 
-/* ==================== 抖音样式 — Violet Monochrome ==================== */
 .douyin {
-  background: linear-gradient(160deg, #f3e8ff 0%, #1a1030 50%, #0d0a1a 100%);
-  font-family: 'Instrument Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  position: relative;
-
-  /* 脉冲环纹理 — Pulse Rings Texture */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-      repeating-radial-gradient(
-        circle at 50% 0%,
-        transparent 0,
-        transparent 35px,
-        rgba(139, 92, 246, 0.04) 36px,
-        rgba(139, 92, 246, 0.04) 38px
-      );
-    pointer-events: none;
-    z-index: 0;
-  }
-
   .header {
-    padding: 52px 40px 48px;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-    background: linear-gradient(160deg, #1a1030 0%, #0d0a1a 100%);
-    position: relative;
-    overflow: hidden;
+    border-top: 4px solid var(--violet-accent);
 
-    /* 云纹装饰 — Cloud Pattern */
-    &::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background-image:
-        radial-gradient(ellipse 90px 45px at 20% 30%, rgba(139, 92, 246, 0.18) 0%, transparent 70%),
-        radial-gradient(ellipse 70px 35px at 80% 25%, rgba(217, 70, 239, 0.12) 0%, transparent 70%),
-        radial-gradient(ellipse 110px 55px at 65% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 70%),
-        radial-gradient(ellipse 50px 25px at 35% 75%, rgba(217, 70, 239, 0.08) 0%, transparent 70%);
-      pointer-events: none;
-      animation: violetGlow 18s ease-in-out infinite;
-    }
+    .platformLabel {
+      color: var(--violet-accent);
 
-    /* 底部霓虹装饰线 */
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, var(--violet-accent), var(--violet-primary), transparent);
-      box-shadow: 0 0 16px var(--violet-accent);
-    }
-
-    @keyframes violetGlow {
-      0%, 100% { opacity: 0.7; transform: translate(0, 0) scale(1); }
-      50% { opacity: 1; transform: translate(-1%, 0.5%) scale(1.02); }
-    }
-
-    .platformTitle {
-      font-family: 'Instrument Serif', 'Noto Sans SC', serif;
-      font-size: 46px;
-      font-weight: 400;
-      color: #ffffff;
-      margin-bottom: 14px;
-      letter-spacing: 4px;
-      position: relative;
-      display: inline-block;
-      text-shadow: 0 2px 16px rgba(139, 92, 246, 0.5);
-
-      &::after {
-        content: '';
-        position: absolute;
-        bottom: -14px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 56px;
-        height: 3px;
-        background: linear-gradient(90deg, var(--violet-primary), var(--violet-accent));
-        border-radius: 2px;
-        box-shadow: 0 0 12px var(--violet-accent);
+      &::before {
+        background: var(--violet-accent);
       }
-    }
-
-    .subTitle {
-      font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.85);
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      margin-top: 24px;
-    }
-
-    .dateRange {
-      font-size: 14px;
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.8);
-      margin-top: 18px;
-      letter-spacing: 2px;
-      padding: 10px 28px;
-      background: rgba(139, 92, 246, 0.15);
-      border-radius: 24px;
-      display: inline-block;
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(139, 92, 246, 0.3);
-    }
-  }
-
-  .content {
-    background: #ffffff;
-    padding: 32px 28px;
-    position: relative;
-    z-index: 1;
-    border-radius: 20px 20px 0 0;
-    margin-top: 8px;
-  }
-
-  .rankingSection {
-    margin-bottom: 24px;
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 2px 16px rgba(139, 92, 246, 0.1);
-    border: 1px solid rgba(139, 92, 246, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 24px rgba(139, 92, 246, 0.15);
-    }
-
-    .rankingHeader {
-      background: var(--violet-primary);
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-
-      .rankingIcon {
-        font-size: 20px;
-        opacity: 0.9;
-      }
-
-      .rankingTitle {
-        font-size: 15px;
-        font-weight: 600;
-        color: #ffffff;
-        letter-spacing: 0.5px;
-      }
-    }
-  }
-
-  .rankingTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-
-    thead {
-      background: rgba(139, 92, 246, 0.06);
-    }
-
-    th {
-      padding: 12px 8px;
-      font-weight: 600;
-      color: var(--violet-text);
-      border-bottom: 1px solid rgba(139, 92, 246, 0.15);
-      text-align: center;
-      font-size: 12px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    td {
-      padding: 14px 8px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-      text-align: center;
-      color: var(--violet-text);
-    }
-
-    tbody tr:nth-child(even) {
-      background: rgba(139, 92, 246, 0.03);
-    }
-
-    tbody tr:hover {
-      background: rgba(139, 92, 246, 0.06);
-    }
-
-    .totalRow {
-      background: rgba(139, 92, 246, 0.08) !important;
-      font-weight: 600;
-
-      td {
-        border-top: 1px solid rgba(139, 92, 246, 0.2);
-        color: var(--violet-primary);
-      }
-    }
-
-    .employeeName {
-      font-weight: 500;
-      color: var(--violet-text);
-    }
-
-    .number {
-      font-family: 'Instrument Sans', monospace;
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      color: var(--violet-text-muted);
-    }
-
-    .highlight {
-      color: var(--violet-primary);
-      font-weight: 600;
-    }
-
-    .rate {
-      font-weight: 500;
-      color: var(--violet-text-muted);
-    }
-  }
-
-  .rank {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-    font-family: 'Instrument Sans', sans-serif;
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: scale(1.08);
     }
   }
 
   .rank1 {
-    background: linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%);
-    color: var(--violet-primary);
-  }
-
-  .rank2 {
-    background: rgba(139, 92, 246, 0.15);
-    color: var(--violet-text-muted);
-  }
-
-  .rank3 {
-    background: rgba(217, 70, 239, 0.12);
     color: var(--violet-accent);
-  }
-
-  .rankOther {
-    background: rgba(0, 0, 0, 0.05);
-    color: var(--violet-text-muted);
-  }
-
-  .footerNote {
-    background: rgba(139, 92, 246, 0.06);
-    padding: 20px 24px;
-    border-radius: 12px;
-    margin-top: 20px;
-    border-left: 3px solid var(--violet-primary);
-
-    .footerNoteTitle {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--violet-text);
-      margin-bottom: 12px;
-      letter-spacing: 0.5px;
-    }
-
-    ul {
-      list-style: none;
-      padding-left: 0;
-      margin: 0;
-    }
-
-    li {
-      font-size: 12px;
-      color: var(--violet-text-muted);
-      margin-bottom: 6px;
-      padding-left: 16px;
-      position: relative;
-      line-height: 1.6;
-
-      &::before {
-        content: '';
-        position: absolute;
-        left: 2px;
-        top: 7px;
-        width: 5px;
-        height: 5px;
-        background: var(--violet-primary);
-        border-radius: 50%;
-      }
-    }
   }
 }

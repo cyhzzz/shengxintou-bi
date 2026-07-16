@@ -476,6 +476,20 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.31 已落地（2026-07-16） 员工转化周报加存量线索新开户榜 + 报告生成页改造纯数据周报
+
+- **需求1：员工转化周报加「存量线索新开户」榜**：与原 `existing`（线索日期在区间内的存量客户）互补，新增第 4 榜统计「线索日期在区间前 + 开户时间落在区间内」的客户。
+  - **后端 `employee_conversion_helpers.py`**：`get_employee_conversion_ranking` 开头加 `lead_type == 'existing_new_open'` 分支，独立查询 `FactConvContent.线索日期 < start_date AND 开户时间 BETWEEN [start_date, end_date] AND 是否开户 == 1`，按 `opened_count` 降序。
+  - **后端 `employee_conversion.py`**：`/employee-conversion/weekly` 端点 `rankings` dict 加 `existing_new_open` 第 4 榜。
+  - **前端 `PosterModal.tsx`**：接口加 `existing_new_open?` 字段 + 条件渲染第 4 榜（仅有数据时显示）；`renderFooterNote` 加存量线索新开户口径说明。
+- **需求2：报告生成页改造为纯数据周报**（去文案 / 去 contenteditable / 去保存逻辑）。
+  - **后端 `weekly_reports.py` 新增 `POST /api/v1/reports/weekly/data`**：聚合 `agg_vendor_daily`（广告投放：展示/点击/花费/CPC/CPA/线索/新开户）+ `agg_daily_channel_open`（互联网渠道开户，仅 `互联网引流`：开户/入金/有效户）+ `fact_conv_content` / `fact_conv_appmarket`（漏斗整体转化率）+ 按日明细（两源按日合并用于堆叠柱状图）+ `by_platform` + `by_channel`；同时返回年初至今累计字段（`cumulative`）。
+  - **前端 `ReportGeneration/index.tsx` 完全重写**：去掉 iframe/contenteditable/key_works/saveReport 文案填空模式，改为纯数据周报布局：masthead 报刊头 + 6 个 section（广告投放汇总 / 渠道开户汇总 / 漏斗整体转化率 / 日走势图 / 按平台表 / 按渠道表）+ footer。ECharts 日走势堆叠柱状图（Segmented 切换 ad/channel：ad = 展示量+点击量 stack + 开户数 line 双轴，channel = 开户+入金+有效户 stack）。保留 PNG（html2canvas scale=2）+ PDF（jsPDF）两种导出。
+  - **样式 `ReportGeneration/index.module.scss`**：新增 `.reportScroll/.reportPage(480px 竖版)/.masthead/.kicker/.headline/.dateline/.layerCard/.layerHeader/.layerTitle/.layerTag/.metricGrid(3列)/.metricCell/.metricLabel/.metricValue/.metricCum/.funnelRow/.funnelCell/.funnelValue/.chartBox(220px)/.dataTable/.cellName/.cellNum/.reportFooter/.footerLabel` 样式块，与 PosterModal Editorial 风格对齐。
+- **需求3：员工转化周报 ReportFooter 加口径说明**：`Analysis.tsx` + `Weekly/index.tsx` 加 ReportFooter 标注「本报表仅统计内容平台（小红书/腾讯/抖音/快手/财联社），不含云极 yj/高德等非内容平台，故开户数小于转化漏斗的全平台口径」。
+- **需求4：PosterModal Editorial/Swiss Grid 风格重写**：去 emoji、去装饰渐变、灰阶配色 + 低饱和 accent 色、JetBrains Mono 等宽数字、tabular-nums、masthead 报刊头、layerCard 顶部 2px 黑线 + 16px accent 色条、rankingTable 去边框 tabular-nums、合计行黑底白字反色、footerNote 用 counter 编号。
+- **验证**：`npm run build` 0 错（46.77s）；PowerShell smoke `POST /api/v1/reports/weekly/data` W28（2026-07-10~07-16）返回 ad imp=9.56M / clicks=106K / cost=¥341K / cpc=3.21 / leads=300 / new_accounts=136；channel opens=136 / dep=38 / valid=28；funnel content_rate=3.72% / appmarket_rate=1.18%；daily 5 条 / by_platform 10 条 / by_channel 10 条；累计广告 366M 展示 / 4.2M 点击 / ¥1326 万花费 / 27K 线索 / 8556 新开户。
+
 ## v3.1.30 已落地（2026-07-16） 周报海报 0 字节修复 + 日期范围选择器
 
 - **海报导出 0 字节修复（根因：窄视口下 flex 容器塌陷）**：`.posterWrapper` 是 `display: flex` 容器，`.posterContainer` 未设 `min-width` 时在 flex 布局中被挤压至 `width=0`，导致 html2canvas 生成 `canvas.width=0`，`toDataURL()` 返回 `"data:,"`（6 字节），下载后为 0 字节 PNG。修复：`PosterModal.module.scss` 的 `.posterContainer` 加 `min-width: 800px` + `flex-shrink: 0` 强制保持设计宽度；`PosterModal.tsx` 的 `handleExportImage` 加 `canvas.width === 0 || imageUrl.length < 100` 安全检查，异常时抛出明确错误信息而非静默下载 0 字节文件；`backgroundColor` 从 `null` 改为 `'#ffffff'`。
