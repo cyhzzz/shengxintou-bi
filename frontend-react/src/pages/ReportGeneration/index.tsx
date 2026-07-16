@@ -466,6 +466,12 @@ const ReportGeneration: React.FC = () => {
                     <span className={styles.layerTag}>本周 / 全年累计 / 环比</span>
                   </div>
                   <table className={styles.metricTable}>
+                    <colgroup>
+                      <col />
+                      <col />
+                      <col />
+                      <col />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>指标</th>
@@ -533,21 +539,21 @@ const ReportGeneration: React.FC = () => {
                   </div>
                   <div ref={yearlyChartRef} className={styles.chartBox} />
                 </section>
-
-                {/* 脚注 */}
-                <footer className={styles.reportFooter}>
-                  <div className={styles.footerLabel}>Notes · 数据说明</div>
-                  <ul>
-                    <li>消耗金额 / 品牌曝光 / APP激活数：来自 agg_vendor_daily（广告投放日聚合）</li>
-                    <li>企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）</li>
-                    <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
-                    <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
-                    <li>全年累计：年初至周末；环比：与上一周对比</li>
-                    <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）</li>
-                    <li>两图均为开户数堆叠（按渠道分色）：左图本周按日，右图全年按周次</li>
-                  </ul>
-                </footer>
               </div>
+
+              {/* 数据说明（海报外） */}
+              <footer className={styles.reportFooter}>
+                <div className={styles.footerLabel}>Notes · 数据说明</div>
+                <ul>
+                  <li>消耗金额 / 品牌曝光 / APP激活数：来自 agg_vendor_daily（广告投放日聚合）</li>
+                  <li>企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）</li>
+                  <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
+                  <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
+                  <li>全年累计：年初至周末；环比：与上一周对比</li>
+                  <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）</li>
+                  <li>两图均为开户数堆叠（按渠道分色）：上图本周按日，下图全年按周次</li>
+                </ul>
+              </footer>
             </div>
           ) : (
             <div className={styles.previewPlaceholder}>

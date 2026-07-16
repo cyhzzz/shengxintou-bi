@@ -198,7 +198,8 @@
 .reportScroll {
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: var(--spacer-24) var(--spacer-16);
 }
 
@@ -215,9 +216,8 @@
 
 /* 刊头 */
 .masthead {
-  margin-bottom: 20px;
+  margin-bottom: 0;
   padding-bottom: 14px;
-  border-bottom: 1px solid #1a1a1a;
   position: relative;
 }
 
@@ -401,18 +401,26 @@
 /* v3.1.31 核心指标表（6 指标 × 3 列：本周/全年/环比） */
 .metricTable {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 12px;
 
+  /* 第一列固定 130px，其余 3 列均分 */
+  colgroup col:nth-child(1) { width: 130px; }
+  colgroup col:nth-child(2),
+  colgroup col:nth-child(3),
+  colgroup col:nth-child(4) { width: calc((100% - 130px) / 3); }
+
   th {
     text-align: right;
-    padding: 10px 8px;
+    padding: 10px 6px;
     font-weight: 600;
     color: #8c8c8c;
     border-bottom: 1.5px solid #1a1a1a;
     font-size: 10px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    white-space: nowrap;
 
     &:first-child {
       text-align: left;
@@ -421,17 +429,22 @@
 
   td {
     text-align: right;
-    padding: 12px 8px;
+    padding: 12px 6px;
     border-bottom: 1px solid #f0f0f0;
     color: #1a1a1a;
     font-variant-numeric: tabular-nums;
     font-family: 'JetBrains Mono', 'SF Mono', monospace;
     font-size: 13px;
+    word-break: keep-all;
+    white-space: nowrap;
 
     &:first-child {
       text-align: left;
       font-family: 'Inter', sans-serif;
       font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 
@@ -495,8 +508,9 @@
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
-/* 脚注 */
+/* 脚注（海报外，底部） */
 .reportFooter {
+  width: 480px;
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid #d9d9d9;
