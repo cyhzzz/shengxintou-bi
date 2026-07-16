@@ -118,13 +118,10 @@ def get_dashboard_core_metrics():
             def _pct(a, b):
                 a, b = float(a or 0), float(b or 0)
                 return round((a - b) / b * 100, 2) if b > 0 else 0
-            # wow 构造：trade 跟 curr/prev 比较走，color 随 trade 反转（cost 类用 inverse=True）
-            def _w(curr, prev, inverse=False):
+            # wow 构造：中国股市惯例 上升=红 / 下降=绿（不区分成本还是业务量，只跟方向）
+            def _w(curr, prev):
                 is_up = float(curr or 0) > float(prev or 0)
-                if is_up:
-                    color = 'red' if inverse else 'green'
-                else:
-                    color = 'green' if inverse else 'red'
+                color = 'red' if is_up else 'green'
                 return {'value': _pct(curr, prev), 'trend': 'up' if is_up else 'down', 'color': color}
             # 前后 cost_per_* 派生值（分母是 leads/opened/valid）
             curr_cpl = round(cost / leads, 2) if leads > 0 else 0
@@ -134,7 +131,7 @@ def get_dashboard_core_metrics():
             prev_cpa = round(_f(prev_q.cost) / _i(prev_q.opened), 2) if _i(prev_q.opened) > 0 else 0
             prev_cpva = round(_f(prev_q.cost) / _i(prev_q.valid), 2) if _i(prev_q.valid) > 0 else 0
             wow = {
-                'investment': _w(main_q.cost, prev_q.cost, inverse=True),
+                'investment': _w(main_q.cost, prev_q.cost),
                 'total_impressions': _w(main_q.impressions, prev_q.impressions),
                 'total_clicks': _w(main_q.clicks, prev_q.clicks),
                 'total_leads': _w(main_q.leads, prev_q.leads),
@@ -143,9 +140,9 @@ def get_dashboard_core_metrics():
                 'customer_assets': _w(main_q.assets, prev_q.assets),
                 'customer_contribution': _w(main_q.contribution, prev_q.contribution),
                 'existing_customers_assets': _w(main_q.existing_assets, prev_q.existing_assets),
-                'cost_per_lead': _w(curr_cpl, prev_cpl, inverse=True),
-                'cost_per_account': _w(curr_cpa, prev_cpa, inverse=True),
-                'cost_per_valid_account': _w(curr_cpva, prev_cpva, inverse=True),
+                'cost_per_lead': _w(curr_cpl, prev_cpl),
+                'cost_per_account': _w(curr_cpa, prev_cpa),
+                'cost_per_valid_account': _w(curr_cpva, prev_cpva),
             }
     except Exception:
         pass

@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.21`（2026-07-16）。下一站 `v3.1.22`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.22`（2026-07-16）。下一站 `v3.1.23`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -67,6 +67,15 @@
 - **菜单清理：删除「简称管理」**：账号管理已包含 platform / agency / agency_short / business_model 全部字段，简称管理菜单冗余，移除 /system/abbreviation-management 菜单项 + pages/System/AbbreviationManagement.tsx + .module.scss + router 路由。后端 abbreviation_mapping 路由保留（DimVendor 由 ETL/导入侧维护）。
 - **线索明细菜单扁平化**：MainLayout 将线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail。
 - **npx tsc --noEmit + npm run build** 双通过。
+
+### v3.1.22 已落地（2026-07-16）
+
+- **跌涨颜色统一为中国股市惯例**（上升=红 / 下降=绿）：以前 v3.1.21 采用西方习惯（上升=绿下降=红），与中国股市及多数业务场景反转。调整后全竟指标均随方向上色。
+  - **后端**：dashboard.py `_w()` 函数去掉 inverse 参数与所有 inverse=True 调用；color 始终 = 'red' if is_up else 'green'。
+  - **前端 MetricCard**（全局 + Dashboard 本地两份） + **WowChangeIndicator**：getTrendColor 去掉 inverseTrend 反转分支，直接 color === 'green' → success / color === 'red' → error。
+  - **Dashboard/index.tsx**：3 个成本卡移除 inverseTrend 属性。
+  - **接口兼容**：inverseTrend prop 保留但逻辑废弃，避免外部 break。
+- **校验**：Python smoke 近 7 天区间、2026-07-10 ~ 2026-07-16、所有 12 个指标卡均走中国惯例颜色（down 的指标均绿，cost_per_* 上升也是红）。`npm run build` 0 error。
 
 ### v3.1.21 已落地（2026-07-16）
 

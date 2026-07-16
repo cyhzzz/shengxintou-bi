@@ -393,7 +393,6 @@ const DashboardPage: React.FC = () => {
                 } : undefined}
                 prefix="¥"
                 formatter="currency"
-                inverseTrend
                 icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
                           <MetricCard
@@ -406,7 +405,6 @@ const DashboardPage: React.FC = () => {
                 } : undefined}
                 prefix="¥"
                 formatter="currency"
-                inverseTrend
                 icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
                           <MetricCard
@@ -419,7 +417,6 @@ const DashboardPage: React.FC = () => {
                 } : undefined}
                 prefix="¥"
                 formatter="currency"
-                inverseTrend
                 icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
               />
         </MetricSection>

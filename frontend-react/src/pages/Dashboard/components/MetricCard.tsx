@@ -75,15 +75,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
     }
   };
 
-  const getTrendColor = (color?: WowChangeColor) => {
-    // 对于成本类指标（inverseTrend=true），颜色逻辑反转
-    // 成本下降是好事，应该显示绿色
-    const isPositive = color === 'green';
-    if (inverseTrend) {
-      return isPositive ? 'var(--color-error)' : 'var(--color-success)';
-    }
-    return isPositive ? 'var(--color-success)' : 'var(--color-error)';
-  };
+  // 中国股市惯例上升=红下降=绿，color 只标记方向，不再区分业务趋势。inverseTrend 已废弃。
+  const getTrendColor = (color?: WowChangeColor) =>
+    color === 'green' ? 'var(--color-success)' : 'var(--color-error)';
 
   const renderWowChange = () => {
     // 如果不需要显示环比区域，直接返回 null
