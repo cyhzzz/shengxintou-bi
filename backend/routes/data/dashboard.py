@@ -104,24 +104,48 @@ def get_dashboard_core_metrics():
             prev_q = _apply_filters(
                 db.session.query(
                     func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+                    func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+                    func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
                     func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
                     func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
                     func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
                     func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
                     func.coalesce(func.sum(AggVendorDaily.客户创收), 0).label('contribution'),
+                    func.coalesce(func.sum(AggVendorDaily.存量客户资产), 0).label('existing_assets'),
                 ),
                 pf, AggVendorDaily
             ).first()
             def _pct(a, b):
                 a, b = float(a or 0), float(b or 0)
                 return round((a - b) / b * 100, 2) if b > 0 else 0
+            # wow 构造：trade 跟 curr/prev 比较走，color 随 trade 反转（cost 类用 inverse=True）
+            def _w(curr, prev, inverse=False):
+                is_up = float(curr or 0) > float(prev or 0)
+                if is_up:
+                    color = 'red' if inverse else 'green'
+                else:
+                    color = 'green' if inverse else 'red'
+                return {'value': _pct(curr, prev), 'trend': 'up' if is_up else 'down', 'color': color}
+            # 前后 cost_per_* 派生值（分母是 leads/opened/valid）
+            curr_cpl = round(cost / leads, 2) if leads > 0 else 0
+            curr_cpa = round(cost / opened, 2) if opened > 0 else 0
+            curr_cpva = round(cost / valid, 2) if valid > 0 else 0
+            prev_cpl = round(_f(prev_q.cost) / _i(prev_q.leads), 2) if _i(prev_q.leads) > 0 else 0
+            prev_cpa = round(_f(prev_q.cost) / _i(prev_q.opened), 2) if _i(prev_q.opened) > 0 else 0
+            prev_cpva = round(_f(prev_q.cost) / _i(prev_q.valid), 2) if _i(prev_q.valid) > 0 else 0
             wow = {
-                'investment': {'value': _pct(main_q.cost, prev_q.cost), 'trend': 'up' if main_q.cost > prev_q.cost else 'down', 'color': 'red'},
-                'new_customers': {'value': _pct(main_q.opened, prev_q.opened), 'trend': 'up' if main_q.opened > prev_q.opened else 'down', 'color': 'green'},
-                'new_valid_accounts': {'value': _pct(main_q.valid, prev_q.valid), 'trend': 'up' if main_q.valid > prev_q.valid else 'down', 'color': 'green'},
-                'total_leads': {'value': _pct(main_q.leads, prev_q.leads), 'trend': 'up' if main_q.leads > prev_q.leads else 'down', 'color': 'green'},
-                'customer_assets': {'value': _pct(main_q.assets, prev_q.assets), 'trend': 'up' if main_q.assets > prev_q.assets else 'down', 'color': 'green'},
-                'customer_contribution': {'value': _pct(main_q.contribution, prev_q.contribution), 'trend': 'up' if main_q.contribution > prev_q.contribution else 'down', 'color': 'green'},
+                'investment': _w(main_q.cost, prev_q.cost, inverse=True),
+                'total_impressions': _w(main_q.impressions, prev_q.impressions),
+                'total_clicks': _w(main_q.clicks, prev_q.clicks),
+                'total_leads': _w(main_q.leads, prev_q.leads),
+                'new_customers': _w(main_q.opened, prev_q.opened),
+                'new_valid_accounts': _w(main_q.valid, prev_q.valid),
+                'customer_assets': _w(main_q.assets, prev_q.assets),
+                'customer_contribution': _w(main_q.contribution, prev_q.contribution),
+                'existing_customers_assets': _w(main_q.existing_assets, prev_q.existing_assets),
+                'cost_per_lead': _w(curr_cpl, prev_cpl, inverse=True),
+                'cost_per_account': _w(curr_cpa, prev_cpa, inverse=True),
+                'cost_per_valid_account': _w(curr_cpva, prev_cpva, inverse=True),
             }
     except Exception:
         pass
