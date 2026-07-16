@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.20`（2026-07-16）。下一站 `v3.1.21`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.21`（2026-07-16）。下一站 `v3.1.22`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -67,6 +67,13 @@
 - **菜单清理：删除「简称管理」**：账号管理已包含 platform / agency / agency_short / business_model 全部字段，简称管理菜单冗余，移除 /system/abbreviation-management 菜单项 + pages/System/AbbreviationManagement.tsx + .module.scss + router 路由。后端 abbreviation_mapping 路由保留（DimVendor 由 ETL/导入侧维护）。
 - **线索明细菜单扁平化**：MainLayout 将线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail。
 - **npx tsc --noEmit + npm run build** 双通过。
+
+### v3.1.21 已落地（2026-07-16）
+
+- **Dashboard 数据概览 12 张指标卡 wow_changes 修复**（后端）：
+  - **补齐 6 个缺失环比字段**：`prev_q` 拓展加上 impressions / clicks / existing_assets；wow 补 `total_impressions` / `total_clicks` / `existing_customers_assets` / `cost_per_lead` / `cost_per_account` / `cost_per_valid_account`（6 字段与前端 MetricCard 读取对齐）。cost_per_* 由分母 cost / 分母 leads/opened/valid 当期与上期各算后再比（inverse上升红下降绿）。
+  - **`_w()` 辅助函数**：trade 跟 curr/prev 大小走（up/down），color 随 trade 反转（默认上升绿下降红；inverse参数用于 cost 类，上升红下降绿）。修复前后端 `color: 'green'` 硬编码导致箭头翻转颜色不变的 bug。
+- **校验**：Python smoke `POST /api/v1/dashboard/core-metrics`（2026-01-01 ~ 2026-12-31）返回 12 字段；investment +113.5% up red、total_leads +27.84% up green、customer_contribution -29.86% down red、cost_per_lead +67.01% up red、cost_per_account -46.87% down green、全部随 trend/color 正确。`npm run build` 0 error。
 
 ### v3.1.20 已落地（2026-07-16）
 
