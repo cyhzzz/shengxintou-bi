@@ -1,7 +1,17 @@
 {
-  "version": "3.1.21",
+  "version": "3.1.22",
   "release_date": "2026-07-16",
   "changelog": [
+    "v3.1.22 以中国股市惯例统一跌涨颜色（上升=红 / 下降=绿）：后端 dashboard.py `_w()` 去掉 inverse 参数与 inverse=True；前端两个 MetricCard 组件与 WowChangeIndicator 去掉 inverseTrend 颜色反转分支；Dashboard 3 个成本卡移除 inverseTrend 属性；接口保留但逻辑废弃",
+    "v3.1.21 修复 Dashboard 12 张指标卡 wow_changes：后端补齐 6 个缺失的环比字段（total_impressions / total_clicks / existing_customers_assets / cost_per_lead / cost_per_account / cost_per_valid_account）；颜色从硬编码 '绿/红' 改为随 trend 自适应（cost 类用 inverse=True，上升红下降绿）",
+    "v3.1.20 应用市场设备明细与线索明细同步：后端从 16 字段扩充为 43 字段（与 models_v2.FactConvAppmarket 1:1）；详情浮7e7a5c5f33字段；表格 5 个 bool 列加 dataIndex + key 修复\"全部显示是\" bug；样式对齐 LeadsDetail（filter/table/modal 三段同款）",
+    "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16->0，对齐其它报表",
+    "v3.1.18 fix: 自更新 _run_git 加 CREATE_NO_WINDOW，不再弹 cmd 黑窗",
+    "v3.1.17 HelpModal 资源修复（logo-横版 + 陈元昪肖像 + 姓名/typo） + 一键 GitHub 自更新功能",
+    "v3.1.16 GitHub 版本对比 + 问号角标红点 + 静默失败",
+    "v3.1.15 菜单清理：删除简称管理 + 线索明细扁平化",
+    "v3.1.14 修复 expand_short_to_fulls 导致所有筛选归零 + ConversionFunnel load 未定义",
+    "v3.1.13 代理商简称映射全链路 + OmniChannel 4 卡短标题还原",
     "v3.1.21 修复 Dashboard 12 张指标卡 wow_changes：后端补齐 6 个缺失的环比字段（total_impressions / total_clicks / existing_customers_assets / cost_per_lead / cost_per_account / cost_per_valid_account）；颜色从硬编码 '绿/红' 改为随 trend 自适应（cost 类用 inverse=True，上升红下降绿）",
     "v3.1.20 应用市场设备明细与线索明细同步：后端从 16 字段扩充为 43 字段（与 models_v2.FactConvAppmarket 1:1）；详情浮7e7a5c5f33字段；表格 5 个 bool 列加 dataIndex + key 修复\"全部显示是\" bug；样式对齐 LeadsDetail（filter/table/modal 三段同款）",
     "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16->0，对齐其它报表",

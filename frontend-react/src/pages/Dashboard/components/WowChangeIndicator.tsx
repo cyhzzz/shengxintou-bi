@@ -30,10 +30,8 @@ const WowChangeIndicator: React.FC<WowChangeIndicatorProps> = ({
   const isUp = trend === 'up';
   const isGreen = color === 'green';
 
-  // 对于成本类指标（inverseTrend=true），颜色逻辑反转
-  const displayColor = inverseTrend
-    ? isGreen ? 'error' : 'success'
-    : isGreen ? 'success' : 'error';
+  // 中国股市惯例上升=红下降=绿：color 只标记方向，不再区分业务趋势。inverseTrend 已废弃。
+  const displayColor = isGreen ? 'success' : 'error';
 
   const Icon = isUp ? ArrowUpOutlined : ArrowDownOutlined;
 
