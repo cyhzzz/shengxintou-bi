@@ -637,10 +637,10 @@ const ReportGeneration: React.FC = () => {
                   </table>
                 </section>
 
-                {/* 3. 开户数 · 本周按日堆叠 */}
+                {/* 3. 开户数 · 本周按日 */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>开户数 · 本周按日堆叠</span>
+                    <span className={styles.layerTitle}>开户数 · 本周</span>
                     <div className={styles.catLegend}>
                       {['内容平台', '应用市场', '本地生活'].map((cat) => (
                         <span key={cat} className={styles.catLegendItem}>
@@ -656,10 +656,10 @@ const ReportGeneration: React.FC = () => {
                   <div ref={opensChartRef} className={styles.chartBox} />
                 </section>
 
-                {/* 4. 开户数 · 全年按周次堆叠 */}
+                {/* 4. 开户数 · 全年按周次 */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>开户数 · 全年按周次堆叠</span>
+                    <span className={styles.layerTitle}>开户数 · 全年</span>
                     <div className={styles.catLegend}>
                       {['内容平台', '应用市场', '本地生活'].map((cat) => (
                         <span key={cat} className={styles.catLegendItem}>
@@ -687,7 +687,7 @@ const ReportGeneration: React.FC = () => {
                   <li>全年累计：年初至周末；环比：与上一周对比</li>
                   <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入），分本周与全年累计两个口径</li>
                   <li>年度 KPI 完成率：年初至今实际值 / (年度目标 × 时间进度)，时间进度 = 当前周末日 / 全年天数（{weeklyData?.kpi?.time_progress.toFixed(0)}%）；目标：开户数 2 万、有效户 1 万、资产 5 亿</li>
-                  <li>两图均为开户数堆叠（按渠道分色，内容平台红色系/应用市场蓝色系/本地生活绿色系）：上图本周按日，下图全年按周次</li>
+                  <li>两图均为开户数堆叠（按渠道分色，内容平台红色系/应用市场蓝色系/本地生活绿色系，同大类渠道挨在一起）：上图本周按日，下图全年按周次</li>
                 </ul>
               </footer>
             </div>
