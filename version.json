@@ -1,7 +1,16 @@
 {
-  "version": "3.1.19",
+  "version": "3.1.20",
   "release_date": "2026-07-16",
   "changelog": [
+    "v3.1.20 应用市场设备明细与线索明细同步：后端从 16 字段扩充为 43 字段（与 models_v2.FactConvAppmarket 1:1）；详情浮7e7a5c5f33字段；表格 5 个 bool 列加 dataIndex + key 修复\"全部显示是\" bug；样式对齐 LeadsDetail（filter/table/modal 三段同款）",
+    "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16->0，对齐其它报表",
+    "v3.1.18 fix: 自更新 _run_git 加 CREATE_NO_WINDOW，不再弹 cmd 黑窗",
+    "v3.1.17 HelpModal 资源修复（logo-横版 + 陈元昪肖像 + 姓名/typo） + 一键 GitHub 自更新功能",
+    "v3.1.16 GitHub 版本对比 + 问号角标红点 + 静默失败",
+    "v3.1.15 菜单清理：删除简称管理 + 线索明细扁平化",
+    "v3.1.14 修复 expand_short_to_fulls 导致所有筛选归零 + ConversionFunnel load 未定义",
+    "v3.1.13 代理商简称映射全链路 + OmniChannel 4 卡短标题还原",
+    "v3.1.12 按钮统一 + MetricCard 4-6 字标题 + description + 侧栏滚动加固 + AppMarket/Detail 字段补全 + ConversionFunnel MetricCard 补齐",
     "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16->0，对齐其它报表",
     "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16→0，对齐其它报表",
     "v3.1.18 fix: 自更新 _run_git 加 CREATE_NO_WINDOW，不再弹 cmd 黑窗",

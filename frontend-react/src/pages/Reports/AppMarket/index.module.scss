@@ -1,7 +1,61 @@
 @use '../../../styles/mixins' as *;
 @use '../../../styles/variables' as *;
 
-.page { padding: var(--spacer-16); }
+.page { padding: 0; }
+
+.filterCard {
+  margin-bottom: var(--spacer-16);
+  @include card-base;
+}
+
+.filterRow {
+  @include filter-bar;
+}
+
+.filterGroup {
+  @include filter-group;
+}
+
+.filterLabel {
+  @include filter-label;
+}
+
+.filterActions {
+  @include filter-actions;
+}
+
+.tableCard {
+  margin-top: var(--spacer-16);
+  @include card-base;
+}
+
+.tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacer-16);
+}
+
+.tableTitle {
+  @include table-section-title;
+}
+
+.statText {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+
+.label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.detailModal {
+  :global(.ant-descriptions-item-label) {
+    width: 110px;
+    color: var(--color-text-secondary);
+  }
+}
 .filterCard {
   margin-bottom: var(--spacer-16);
   @include card-base;
