@@ -1,7 +1,7 @@
 @use '../../../styles/mixins' as *;
 @use '../../../styles/variables' as *;
 
-.page { padding: var(--spacer-16); }
+.page { padding: 0; }
 .filterCard {
   margin-bottom: var(--spacer-16);
   @include card-base;
