@@ -760,12 +760,17 @@ def get_weekly_data():
                 return w['week']
         return None
 
-    # 收集所有渠道名（按全年开户数总和降序）
+    # 收集所有渠道名（先按大类分组：内容平台→应用市场→本地生活，组内按全年开户数降序）
     channel_set = {}
     for r in opens_yearly_rows:
         ch = r.channel or '未分类'
         channel_set[ch] = channel_set.get(ch, 0) + int(r.val or 0)
-    channels = sorted(channel_set.keys(), key=lambda c: channel_set[c], reverse=True)
+    
+    CATEGORY_ORDER = {'内容平台': 0, '应用市场': 1, '本地生活': 2}
+    channels = sorted(
+        channel_set.keys(),
+        key=lambda c: (CATEGORY_ORDER.get(CHANNEL_CATEGORY_MAP.get(c, '内容平台'), 99), -channel_set[c])
+    )
 
     # 图 1：按日 pivot（按具体渠道）
     def _pivot_daily(rows):
