@@ -59,7 +59,18 @@ interface WeeklyData {
   daily_opens_stacked: Array<Record<string, number | string>>;
   weekly_opens_stacked: Array<Record<string, number | string>>;
   channels: string[];
-  internet_ratio: { opens_ratio: number; valid_ratio: number };
+  internet_ratio: {
+    opens_ratio: number;
+    valid_ratio: number;
+    year_opens_ratio: number;
+    year_valid_ratio: number;
+  };
+  kpi: {
+    time_progress: number;
+    opens: { target: number; actual: number; rate: number };
+    valid: { target: number; actual: number; rate: number };
+    assets: { target: number; actual: number; rate: number };
+  };
 }
 
 // 7 个核心指标定义（v3.1.32：线索数拆分为企微数 + APP激活数）
@@ -107,6 +118,41 @@ function fmtWow(n: number | null | undefined): { text: string; positive: boolean
   if (n === null || n === undefined) return { text: '—', positive: null };
   const sign = n >= 0 ? '+' : '';
   return { text: `${sign}${n.toFixed(2)}%`, positive: n >= 0 };
+}
+
+// v3.1.35 微型 KPI 环形图（SVG，尺寸 ~44x32，与原 layerTag 灰字占用空间相近）
+function KpiRing({ label, rate }: { label: string; rate: number }) {
+  // rate 为百分比，>100 时截断到 100 用于画环
+  const pct = Math.min(100, Math.max(0, rate || 0));
+  const r = 10;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - pct / 100);
+  const color = rate >= 100 ? '#27ae60' : rate >= 75 ? '#0052d9' : rate >= 50 ? '#d97706' : '#c0392b';
+  return (
+    <div className={styles.kpiRing}>
+      <svg width="28" height="28" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r={r} fill="none" stroke="#e8e8e8" strokeWidth="3" />
+        <circle
+          cx="14"
+          cy="14"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="3"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 14 14)"
+        />
+      </svg>
+      <div className={styles.kpiRingText}>
+        <div className={styles.kpiRingLabel}>{label}</div>
+        <div className={styles.kpiRingRate} style={{ color }}>
+          {rate.toFixed(0)}%
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const ReportGeneration: React.FC = () => {
@@ -459,11 +505,15 @@ const ReportGeneration: React.FC = () => {
                   </div>
                 </header>
 
-                {/* 1. 核心指标：6 指标 × 3 列（本周/全年/环比） */}
+                {/* 1. 核心指标：7 指标 × 3 列（本周/全年/环比） */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
                     <span className={styles.layerTitle}>核心指标</span>
-                    <span className={styles.layerTag}>本周 / 全年累计 / 环比</span>
+                    <div className={styles.kpiRow}>
+                      <KpiRing label="开户数" rate={weeklyData.kpi.opens.rate} />
+                      <KpiRing label="有效户" rate={weeklyData.kpi.valid.rate} />
+                      <KpiRing label="资产" rate={weeklyData.kpi.assets.rate} />
+                    </div>
                   </div>
                   <table className={styles.metricTable}>
                     <colgroup>
@@ -510,16 +560,32 @@ const ReportGeneration: React.FC = () => {
                     <span className={styles.layerTitle}>互联网渠道占公司开户占比</span>
                     <span className={styles.layerTag}>互联网引流 / 全渠道类别</span>
                   </div>
-                  <div className={styles.ratioGrid}>
-                    <div className={styles.ratioCell}>
-                      <div className={styles.ratioLabel}>开户占比</div>
-                      <div className={styles.ratioValue}>{weeklyData.internet_ratio.opens_ratio.toFixed(2)}%</div>
-                    </div>
-                    <div className={styles.ratioCell}>
-                      <div className={styles.ratioLabel}>有效户占比</div>
-                      <div className={styles.ratioValue}>{weeklyData.internet_ratio.valid_ratio.toFixed(2)}%</div>
-                    </div>
-                  </div>
+                  <table className={styles.ratioTable}>
+                    <colgroup>
+                      <col />
+                      <col />
+                      <col />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>指标</th>
+                        <th>本周</th>
+                        <th>全年累计</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className={styles.cellName}>开户占比</td>
+                        <td className={styles.cellNum}>{weeklyData.internet_ratio.opens_ratio.toFixed(2)}%</td>
+                        <td className={styles.cellNum}>{weeklyData.internet_ratio.year_opens_ratio.toFixed(2)}%</td>
+                      </tr>
+                      <tr>
+                        <td className={styles.cellName}>有效户占比</td>
+                        <td className={styles.cellNum}>{weeklyData.internet_ratio.valid_ratio.toFixed(2)}%</td>
+                        <td className={styles.cellNum}>{weeklyData.internet_ratio.year_valid_ratio.toFixed(2)}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </section>
 
                 {/* 3. 开户数 · 本周按日堆叠 */}
@@ -550,7 +616,8 @@ const ReportGeneration: React.FC = () => {
                   <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
                   <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
                   <li>全年累计：年初至周末；环比：与上一周对比</li>
-                  <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）</li>
+                  <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入），分本周与全年累计两个口径</li>
+                  <li>年度 KPI 完成率：年初至今实际值 / (年度目标 × 时间进度)，时间进度 = 当前周末日 / 全年天数（{weeklyData?.kpi?.time_progress.toFixed(0)}%）；目标：开户数 2 万、有效户 1 万、资产 5 亿</li>
                   <li>两图均为开户数堆叠（按渠道分色）：上图本周按日，下图全年按周次</li>
                 </ul>
               </footer>
