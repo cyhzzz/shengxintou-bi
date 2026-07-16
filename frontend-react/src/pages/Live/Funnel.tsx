@@ -350,99 +350,21 @@ const LiveFunnelPage: React.FC = () => {
       </Card>
 
       <Spin spinning={loading}>
-        <MetricSection title="直播获客概览" description="主播引流链路的线索、开口、有效线索与成功开户核心表现（v3.1.26 起新开户作为核心获客产出，存量客户线索与资产分项辅助呈现）">
-          <MetricCard
-            title="主播数"
-            value={totals.anchors}
-            valueColor="var(--color-brand)"
-            icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />}
-            description={`当前期间活跃主播数量·按客户来源聚合（同名跨平台去重）`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="线索量"
-            value={totals.leads}
-            valueColor="var(--color-success)"
-            icon={<UserOutlined style={{ color: 'var(--color-success)' }} />}
-            description={`主播引流客户线索总数`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="存量客户"
-            value={totals.existing_leads}
-            valueColor="var(--color-text-tertiary)"
-            icon={<UserOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
-            description={`线索中已在他处开户的存量客户数·辅助指标`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新客户"
-            value={totals.new_leads}
-            valueColor="var(--color-brand)"
-            icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />}
-            description={`非存量客户线索数·核心获客容量`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="客户开口"
-            value={totals.mouth}
-            valueColor="var(--chart-color-7)"
-            icon={<RiseOutlined style={{ color: 'var(--chart-color-7)' }} />}
-            description={`线索中已口头回复或沟通的客户`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="有效线索"
-            value={totals.valid_lead}
-            valueColor="var(--chart-color-5)"
-            icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />}
-            description={`已确认有意向的有效线索（含存量）`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="有效线索(剔除存量)"
-            value={totals.new_valid_lead}
-            valueColor="var(--color-brand)"
-            icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />}
-            description={`剔除存量客户后的有效线索·核心获客产出`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新开户"
-            value={totals.new_opened}
-            valueColor="var(--color-error)"
-            icon={<AimOutlined style={{ color: 'var(--color-error)' }} />}
-            description={`非存量且成功开户人数·主指标（存量客户已在别处开户，通常=0）`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新有效户"
-            value={totals.new_valid}
-            valueColor="var(--color-success)"
-            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
-            description={`非存量且有效户人数·主指标`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新开户资产"
-            value={totals.new_assets}
-            prefix="¥"
-            formatter="currency"
-            valueColor="var(--color-warning)"
-            icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />}
-            description={`非存量且开户成功客户的总资产·主指标`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="存量资产"
-            value={totals.existing_assets}
-            prefix="¥"
-            formatter="currency"
-            valueColor="var(--color-text-tertiary)"
-            icon={<DollarOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
-            description={`存量客户资产·辅助指标（存量客户虽不再开户，但资产仍呈现）`}
-            showWowChange={false}
-          />
+        <MetricSection title="直播获客核心产出" description="同名主播跨平台去重后的新客户获客主指标（仅统计非存量客户，v3.1.25 起坚持这一口径）">
+          <MetricCard title="主播数" value={totals.anchors} valueColor="var(--color-brand)" icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />} description={`同名主播跨平台去重后的活跃主播数量`} showWowChange={false} />
+          <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
+          <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
+          <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />
+          <MetricCard title="新开户资产" value={totals.new_assets} prefix="¥" formatter="currency" valueColor="var(--color-warning)" icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />} description={`非存量且开户成功客户总资产·主指标`} showWowChange={false} />
+        </MetricSection>
+
+        <MetricSection title="全量主播引流明细" description="含存量客户与资产分项呈现，仅作为辅助参考不取代上方产出指标">
+          <MetricCard title="线索量" value={totals.leads} valueColor="var(--color-success)" icon={<UserOutlined style={{ color: 'var(--color-success)' }} />} description={`主播引流客户线索总数（含存量）`} showWowChange={false} />
+          <MetricCard title="存量客户" value={totals.existing_leads} valueColor="var(--color-text-tertiary)" icon={<UserOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`线索中已在他处开户的存量客户数·辅助指标`} showWowChange={false} />
+          <MetricCard title="客户开口" value={totals.mouth} valueColor="var(--chart-color-7)" icon={<RiseOutlined style={{ color: 'var(--chart-color-7)' }} />} description={`线索中已口头回复或沟通的客户`} showWowChange={false} />
+          <MetricCard title="有效线索" value={totals.valid_lead} valueColor="var(--chart-color-5)" icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />} description={`已确认有意向的有效线索（含存量）`} showWowChange={false} />
+          <MetricCard title="有效线索(剔除存量)" value={totals.new_valid_lead} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`剔除存量客户后的有效线索·核心获客产出`} showWowChange={false} />
+          <MetricCard title="存量资产" value={totals.existing_assets} prefix="¥" formatter="currency" valueColor="var(--color-text-tertiary)" icon={<DollarOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`存量客户资产·辅助指标（存量客户虽不再开户，但资产仍呈现）`} showWowChange={false} />
         </MetricSection>
 
         <Row className={styles.funnelSplitRow}>

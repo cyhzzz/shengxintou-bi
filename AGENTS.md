@@ -438,3 +438,14 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
   - **ReportFooter 补口径说明**：加「存量剔除口径」「主播聚合」两项，notes 说明新开户作为核心获客产出。
 - **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（5988 modules，37s）；dist grep 命中「主播分析概览/有效线索(剔除存量)/新开户资产」。
 
+
+### v3.1.25 已落地（2026-07-16）
+
+- **4 项 UI/工程修复**：
+  - **直播获客漏斗卡片超出容器**：Live/Funnel.tsx 把 11 张 MetricCard 拆成两个 MetricSection — `直播获客核心产出`（主播数 / 新客户 / 新开户 / 新有效户 / 新开户资产）+ `全量主播引流明细`（含存量客户与存量资产作辅助参考）；同时给 `MetricCard.module.scss` 的 `.metricCard` 加 `min-width: 0; overflow: hidden` 防 grid item 被内容撑破容器，`.metricValue` 加 `text-overflow: ellipsis` + `.metricNumber` 同上保证数字溢出截断。4 列 grid 浏览器尺寸 < 1200 / < 768 / < 576 自动 3/2/1 列降级保持不变。
+  - **员工转化周报默认海报视图**：Weekly/index.tsx 加 `viewMode: 'poster' | 'text'` + `posterPlatform` 两个 useState（默认 poster / 小红书），工具栏加 Segmented 切换 + 平台 Select；PosterModal.tsx 加 `mode?: 'modal' | 'inline'` prop（默认 modal），用 `const inner = (<>...</>); if (mode === 'inline') return inner` 拆分，海报 DOM 与浮动 PNG/PDF 工具栏天然可在主页面内复用。原 PosterExportButtons 退化为可选 Modal 入口。
+  - **小红书运营报表导出修复**：Operation.tsx html2canvas 的 `backgroundColor: 'var(--bg-page)'` html2canvas 不解析 → 改用 `document.documentElement.classList.contains('dark') ? '#0f1419' : '#ffffff'` 实色，scale 2 降到 1.5 避 canvas 内存炸，`windowWidth/Height` 锁滚动尺寸，`allowTaint: false`；catch 块把 `error.name / message` 拼进 message 详情 6 秒 toast。
+  - **路由层 errorBoundary 兜底 + 冒烟测试自动化**：新建 `frontend-react/src/components/RouteErrorBoundary/index.tsx` 区分 404 / 5xx / `Failed to fetch dynamically imported module|ChunkLoadError|Importing a module script failed` 三类错误并提供刷新本页 / 返回首页两按钮；`router/index.tsx` 根路由加 `errorElement: <RouteErrorBoundary />`；新建 `frontend-react/tests/route-health.spec.ts` 遍历 19 个公开路由用 Playwright 兜底断言"页面进入后 RouteErrorBoundary 不可见、pageerror 列表无动态 import 失败"。
+
+- **冒烟测试基础设施**：`tests/route-health.spec.ts` 是 v3.1.25 起每个版本提交前的硬性验收（`npm run test`），跑通才允许 commit；后续 lazy 路由改动必须保证这个 spec 绿灯。
+
