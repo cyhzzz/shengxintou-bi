@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 员工转化分析页面 (Bug 4 修复)
  *
  * Bug 4 修复:
@@ -9,11 +9,11 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty,
+  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty, Alert,
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, DollarOutlined, RiseOutlined,
-  DownloadOutlined, SearchOutlined, ReloadOutlined,
+  DownloadOutlined, SearchOutlined, ReloadOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -53,6 +53,8 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const [rateTrendGranularity, setRateTrendGranularity] = useState<'weekly' | 'monthly'>('weekly');
 
   const [platformOptions, setPlatformOptions] = useState<string[]>([]);
+  const [contentPlatformLabel, setContentPlatformLabel] = useState<string>("");
+  const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
@@ -67,6 +69,12 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       if (res?.success && res.data) {
         setPlatformOptions(res.data.platforms || []);
         setEmployeeOptions(res.data.employees || []);
+        setContentPlatformLabel(res.data.content_platform_label || "");
+        const dp = res.data.default_platforms || res.data.platforms || [];
+        setDefaultPlatforms(dp);
+        if (!selectedPlatforms.length) {
+          setSelectedPlatforms(dp);
+        }
       }
     } catch (err) {
       console.error('load filter options failed', err);
@@ -92,6 +100,8 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       }
       if (selectedPlatforms.length > 0) params.platforms = selectedPlatforms;
       if (selectedEmployees.length > 0) params.employees = selectedEmployees;
+      // v3.1.27: 即使前端未选也透传 defaultPlatforms，让后端始终走内容平台默认
+      if (defaultPlatforms.length && !selectedPlatforms.length) params.platforms = defaultPlatforms;
 
       const res: any = await http.post('/employee-conversion/analysis', params);
       if (res?.success && res.data) {
@@ -105,7 +115,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity]);
+  }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity, defaultPlatforms]);
 
   const fetchChannelOverview = useCallback(async () => {
     try {
@@ -117,12 +127,13 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       if (selectedEmployees.length > 0) params.employees = selectedEmployees;
       // v3.1 §四：与 /analysis 端点对齐，前端 selectedPlatforms 也传给 channel-overview
       if (selectedPlatforms.length > 0) params.platforms = selectedPlatforms;
+      if (defaultPlatforms.length && !selectedPlatforms.length) params.platforms = defaultPlatforms;
       const res: any = await http.post('/employee-conversion/analysis-channel-overview', params);
       if (res?.success) setChannelOverview(res.data);
     } catch (err) {
       console.warn('channel overview fetch failed', err);
     }
-  }, [dateRange, selectedEmployees, selectedPlatforms, leadType]);
+  }, [dateRange, selectedEmployees, selectedPlatforms, leadType, defaultPlatforms]);
 
   // 初始加载 + 任何筛选项变化都重取
   useEffect(() => {
@@ -238,6 +249,19 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.employeeConversionPage}>
+      {/* v3.1.27: 口径说明 Alert — 业务实质是「内容平台」新开户营销转化 */}
+      <Alert
+        type="info"
+        showIcon
+        icon={<InfoCircleOutlined />}
+        message="本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标"
+        description={
+          <span>
+            内容平台 = {defaultPlatforms.join(' / ') || '抖音/小红书/腾讯/快手/财联社'} 、【{contentPlatformLabel || '默认平台筛选器 = 内容平台全集，清空后将自动恢复'}】。仅统计需要员工承接营销转化的核心口径。
+          </span>
+        }
+        style={{ marginBottom: 12 }}
+      />
       <Card className={styles.filterCard} size='small'>
         <div className={styles.filterRow}>
           <div className={styles.filterGroup}>
@@ -271,25 +295,22 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* 顶部核心指标 */}
-      <MetricSection title='员工转化核心指标' description='当前筛选条件下的员工线索、开口、开户、有效户总览'>
-        <MetricCard title='总线索' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
-        <MetricCard title='总开口' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
-        <MetricCard title='总开户' value={data?.core_metrics?.total_opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false} />
-        <MetricCard title='总有效户' value={data?.core_metrics?.total_valid_customer || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false} />
+      {/* 顶部核心指标：仅内容平台中已填写员工姓名的线索 */}
+      <MetricSection title='内容平台员工转化核心指标' description='仅统计内容平台的员工承接线索，不含应用市场及非员工渠道。'>
+        <MetricCard title='员工线索' description='内容平台' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
+        <MetricCard title='员工开口' description='内容平台' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
+        <MetricCard title='员工开户' description='内容平台' value={data?.core_metrics?.total_opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false} />
+        <MetricCard title='员工有效户' description='内容平台' value={data?.core_metrics?.total_valid_customer || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false} />
       </MetricSection>
 
-      {/* 双源对比卡 */}
+      {/* 独立渠道参考，不并入员工核心指标 */}
       {channelOverview && (
         <MetricSection
-          title='双源数据对比（员工明细 vs 渠道口径）'
-          
+          title='互联网引流渠道参考'
+          description='仅作独立渠道量级参考，不代表员工服务内容平台线索，也不纳入上方核心指标。'
         >
-          <MetricCard title='明细·线索' value={channelOverview.detail_caliber?.leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false}  />
-          <MetricCard title='明细·开户' value={channelOverview.detail_caliber?.opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false}  />
-          <MetricCard title='明细·有效户' value={channelOverview.detail_caliber?.valid || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false}  />
-          <MetricCard title='渠道·总开户' value={channelOverview.channel_caliber?.opens || 0} suffix='人' valueColor='var(--chart-color-2)' icon={<DollarOutlined style={{ color: 'var(--chart-color-2)' }} />} showWowChange={false}  />
-          <MetricCard title='渠道·总有效户' value={channelOverview.channel_caliber?.valid || 0} suffix='人' valueColor='var(--chart-color-5)' icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />} showWowChange={false}  />
+          <MetricCard title='互联网开户' description='渠道汇总' value={channelOverview.channel_caliber?.opens || 0} suffix='人' valueColor='var(--chart-color-2)' icon={<DollarOutlined style={{ color: 'var(--chart-color-2)' }} />} showWowChange={false}  />
+          <MetricCard title='互联网有效户' description='渠道汇总' value={channelOverview.channel_caliber?.valid || 0} suffix='人' valueColor='var(--chart-color-5)' icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />} showWowChange={false}  />
         </MetricSection>
       )}
 
@@ -349,10 +370,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
       <ReportFooter
         sources={[
+          { label: '口径', value: '内容平台' + (defaultPlatforms.length ? '（' + defaultPlatforms.join(' / ') + '）' : '') + ' —— 业务实质：内容平台客户由员工承接营销转化' },
           { label: '数据源', value: 'fact_conv_content（员工明细口径）+ agg_daily_channel_open（渠道口径，独立数据源）' },
           { label: '主端点', value: 'POST /api/v1/employee-conversion/{analysis, weekly, analysis-channel-overview}' },
         ]}
-        notes={'员工明细口径与渠道口径是 v3.1 拆分的两条独立链路（详见 docs/v3.1_报表重梳方案.md §四.2），数字不一致是预期的。'}
+        notes={'员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。'}
       />
     </div>
   );

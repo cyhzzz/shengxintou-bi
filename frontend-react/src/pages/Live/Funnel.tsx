@@ -14,10 +14,13 @@
  * 当前以主播引流链路作为"直播业务漏斗"的替代口径。
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip } from 'antd';
+import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
 import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
+import EChartsComponent from '@/components/Chart/ECharts';
+import type { EChartsOption } from 'echarts';
+import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { sanitizeText } from '@/utils/sanitizeText';
@@ -105,6 +108,9 @@ const LiveFunnelPage: React.FC = () => {
   const [items, setItems] = useState<AnchorItem[]>([]);
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [trendData, setTrendData] = useState<any>(null);
+  const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [trendLoading, setTrendLoading] = useState(false);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
@@ -130,7 +136,24 @@ const LiveFunnelPage: React.FC = () => {
     }
   };
 
+  // v3.1.27: 主播引流走势 — 按日/周/月聚合（与 /leads-detail/anchor-clusters 同口径）
+  const loadTrend = async () => {
+    setTrendLoading(true);
+    try {
+      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
+        filters,
+        granularity: trendGranularity,
+      });
+      if (res?.success && res.data) setTrendData(res.data);
+    } catch (err) {
+      console.warn('anchor trend load failed', err);
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { loadTrend(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
 
   // 6 阶段漏斗（v3.1.26 业务口径: 线索 → 开口 → 有效线索 → 有效线索(剔除存量) → 成功开户(新) → 有效户(新)）
   // stage.rate = 阶段转化率（此阶段 / 上一阶段）；stage.step_rate = 累计转化率（此阶段 / 顶端线索）
@@ -170,6 +193,45 @@ const LiveFunnelPage: React.FC = () => {
     rate: s.rate,
     conversionRate: s.rate,
   })), [funnelStages]);
+
+  // v3.1.27: 主播引流走势图选项 (多 series 按平台拆)
+  const trendOption: EChartsOption = useMemo(() => {
+    if (!trendData?.periods?.length || !trendData?.by_platform) return {};
+    const periods = trendData.periods as string[];
+    const platforms = (trendData.platforms || []) as string[];
+    const by_platform: Record<string, any> = trendData.by_platform;
+    const totals: Record<string, any> = trendData.totals || {};
+    const metric = (p: string, period: string, key: string) => by_platform?.[period]?.[p]?.[key] ?? 0;
+    const series = platforms.map((p, idx) => ({
+      name: p,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: pickEChartsColor(idx) },
+      lineStyle: { width: 2 },
+      areaStyle: { color: pickEChartsColor(idx), opacity: 0.08 },
+      data: periods.map((period) => metric(p, period, 'new_opened')),
+    }));
+    const totalSeries = {
+      name: '合计新开户',
+      type: 'line',
+      smooth: true,
+      symbol: 'diamond',
+      symbolSize: 8,
+      itemStyle: { color: ECHARTS_COLORS[7] },
+      lineStyle: { width: 3, type: 'dashed' },
+      data: periods.map((p) => totals[p]?.new_opened ?? 0),
+    };
+    return {
+      tooltip: { trigger: 'axis', valueFormatter: (v: any) => Number(v || 0).toLocaleString() },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },
+      yAxis: [{ type: 'value', name: '新开户(人)' }],
+      series: [...series, totalSeries],
+    };
+  }, [trendData, trendGranularity]);
 
   const totals = useMemo(() => {
     const sum = (sel: (i: AnchorItem) => number) => items.reduce((s, i) => s + (sel(i) || 0), 0);
@@ -367,7 +429,39 @@ const LiveFunnelPage: React.FC = () => {
           <MetricCard title="存量资产" value={totals.existing_assets} prefix="¥" formatter="currency" valueColor="var(--color-text-tertiary)" icon={<DollarOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`存量客户资产·辅助指标（存量客户虽不再开户，但资产仍呈现）`} showWowChange={false} />
         </MetricSection>
 
-        <Row className={styles.funnelSplitRow}>
+        {/* v3.1.27: 主播引流走势图 (daily/weekly/monthly) */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Row align="middle" gutter={12} style={{ marginBottom: 12 }}>
+            <Col flex="auto">
+              <Space size={8} align="center">
+                <RiseOutlined style={{ color: 'var(--color-brand)' }} />
+                <strong>主播引流走势图</strong>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  按 {trendData?.granularity || 'monthly'} 口径汇总，按平台拆多 series (新开户)
+                </span>
+              </Space>
+            </Col>
+            <Col>
+              <Segmented
+                size="small"
+                value={trendGranularity}
+                onChange={(v) => setTrendGranularity(v as 'daily' | 'weekly' | 'monthly')}
+                options={[
+                  { label: '按日', value: 'daily' },
+                  { label: '按周', value: 'weekly' },
+                  { label: '按月', value: 'monthly' },
+                ]}
+              />
+            </Col>
+          </Row>
+          {trendData?.periods?.length ? (
+            <EChartsComponent option={trendOption} height={320} loading={trendLoading} />
+          ) : (
+            <Empty description={trendLoading ? '加载中...' : '暂无走势数据'} />
+          )}
+        </Card>
+
+                <Row className={styles.funnelSplitRow}>
           <Col span={12} className={styles.funnelSplitCol}>
             <Card title="6 阶段主播引流业务漏斗" size="small" className={styles.h100Card} extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
               {funnelChartData.length > 0 && funnelChartData[0].count > 0 ? (
@@ -432,6 +526,8 @@ const LiveFunnelPage: React.FC = () => {
             { label: '粒度', value: 'Top 200 主播引流聚合' },
             { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
             { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台多选筛选' },
+          { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly）' },
+          { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
           ]}
           notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
         />

@@ -1,7 +1,7 @@
 /**
  * 员工转化周报页面
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, DatePicker, Button, Select, Space, message, Typography, Segmented } from 'antd';
 import { CopyOutlined, FileWordOutlined, FileExcelOutlined, PictureOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -44,24 +44,10 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
   // v3.1.25: 默认以海报为主视图，文本为备选
   const [viewMode, setViewMode] = useState<'poster' | 'text'>('poster');
   const [posterPlatform, setPosterPlatform] = useState<string>('小红书');
+  // v3.1.27: 进页面即自动生成一次海报，参考 ReportGeneration 进页面默认预览的模式
+  const didAutoGenRef = useRef(false);
 
-  // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
-  useEffect(() => {
-    getEmployeeConversionFilterOptions()
-      .then((res) => {
-        const defaultDates = res?.data as WeeklyDefaultDateOptions | undefined;
-        const start = defaultDates?.default_week_start;
-        const end = defaultDates?.default_week_end;
-        if (start && end) {
-          setDateRange([start, end]);
-        } else {
-          setDateRange(['2026-01-01', '2026-12-31']);
-        }
-      })
-      .catch(() => setDateRange(['2026-01-01', '2026-12-31']));
-  }, []);
-
-  // 生成周报
+  // 生成周报（必须在 useEffect 之前定义，否则 TDZ ReferenceError: Cannot access 'handleGenerateReport' before initialization）
   const handleGenerateReport = useCallback(async () => {
     if (!dateRange[0] || !dateRange[1]) {
       message.warning('请选择日期范围');
@@ -97,6 +83,32 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       setLoading(false);
     }
   }, [dateRange, platforms, topCount]);
+
+  // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
+  useEffect(() => {
+    getEmployeeConversionFilterOptions()
+      .then((res) => {
+        const defaultDates = res?.data as WeeklyDefaultDateOptions | undefined;
+        const start = defaultDates?.default_week_start;
+        const end = defaultDates?.default_week_end;
+        if (start && end) {
+          setDateRange([start, end]);
+        } else {
+          setDateRange(['2026-01-01', '2026-12-31']);
+        }
+      })
+      .catch(() => setDateRange(['2026-01-01', '2026-12-31']));
+  }, []);
+
+  // 进页面默认视图为海报时，dateRange 加载完后自动 generate 一次，以避免看到 Empty 空预览
+  useEffect(() => {
+    if (didAutoGenRef.current) return;
+    if (viewMode !== 'poster') return;
+    if (!dateRange[0] || !dateRange[1]) return;
+    if (reportData || loading) return;
+    didAutoGenRef.current = true;
+    handleGenerateReport();
+  }, [viewMode, dateRange, reportData, loading, handleGenerateReport]);
 
   // 复制报告
   const handleCopy = useCallback(async () => {
@@ -181,24 +193,12 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
         <div className={styles.configContent}>
           <Space wrap size={16}>
             <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>周一日期</label>
-              <DatePicker
-                value={dateRange[0] ? dayjs(dateRange[0]) : null}
-                onChange={(date) => {
-                  if (date) {
-                    setDateRange([date.format('YYYY-MM-DD'), dateRange[1]]);
-                  }
-                }}
-                format="YYYY-MM-DD"
-              />
-            </div>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>周日日期</label>
-              <DatePicker
-                value={dateRange[1] ? dayjs(dateRange[1]) : null}
-                onChange={(date) => {
-                  if (date) {
-                    setDateRange([dateRange[0], date.format('YYYY-MM-DD')]);
+              <label className={styles.filterLabel}>日期范围</label>
+              <RangePicker
+                value={dateRange[0] && dateRange[1] ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
+                onChange={(dates) => {
+                  if (dates && dates[0] && dates[1]) {
+                    setDateRange([dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]);
                   }
                 }}
                 format="YYYY-MM-DD"
@@ -270,7 +270,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
                   value={posterPlatform}
                   onChange={setPosterPlatform}
                   options={Object.keys(reportData?.overview || {})
-                    .filter((p) => (reportData?.overview?.[p]?.leads || 0) > 0)
+                    .filter((p) => (reportData?.overview?.[p]?.leads ?? reportData?.overview?.[p]?.total_leads ?? 0) > 0)
                     .map((p) => ({ label: p, value: p }))}
                   style={{ minWidth: 120 }}
                 />
@@ -279,14 +279,14 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {viewMode === 'poster'
-              ? '海报视图 · 点击浪动工具栏【导出图片 / PDF】即可。'
+              ? '海报视图 · 点击浮动工具栏【导出图片 / PDF】即可。'
               : '文本模式 · 复制或导出 Word/Excel。'}
           </Text>
         </div>
 
         {/* v3.1.25: 视图主体 */}
         {viewMode === 'poster' ? (
-          reportData && dateRange[0] && dateRange[1] && (reportData?.overview?.[posterPlatform]?.leads || 0) > 0 ? (
+          reportData && dateRange[0] && dateRange[1] && (reportData?.overview?.[posterPlatform]?.leads ?? reportData?.overview?.[posterPlatform]?.total_leads ?? 0) > 0 ? (
             <PosterModal
               mode="inline"
               platform={posterPlatform}
@@ -295,10 +295,10 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
               rankings={reportData.rankings?.[posterPlatform] || { total: [], existing: [], new: [] }}
             />
           ) : (
-            <WeeklyReportPreview content="" loading={false} />
+            <WeeklyReportPreview content="" loading={loading} mode="poster" />
           )
         ) : (
-          <WeeklyReportPreview content={reportContent} loading={loading} />
+          <WeeklyReportPreview content={reportContent} loading={loading} mode="text" />
         )}
       </Card>
     </div>

@@ -217,11 +217,21 @@ const PosterModal: React.FC<PosterModalProps> = ({
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null,
+        backgroundColor: '#ffffff',
         logging: false,
       });
 
       const imageUrl = canvas.toDataURL('image/png');
+
+      // v3.1.28 安全检查：canvas 宽度为 0 或 dataURL 异常时抛出明确错误，
+      // 避免静默下载 0 字节 PNG（典型触发场景：窄视口下 flex 容器塌陷）
+      if (canvas.width === 0 || imageUrl.length < 100) {
+        throw new Error(
+          `画布尺寸异常（canvasW=${canvas.width}, canvasH=${canvas.height}），` +
+            `请检查浏览器窗口是否过窄导致海报容器塌陷后重试。`
+        );
+      }
+
       const link = document.createElement('a');
       link.href = imageUrl;
       link.download = `${platform}开户榜_${startDate}_${endDate}.png`;
@@ -232,7 +242,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
       message.success(`${platform}海报导出成功`);
     } catch (error) {
       console.error('导出海报失败:', error);
-      message.error('导出海报失败，请重试');
+      message.error(`导出海报失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setExporting(null);
     }

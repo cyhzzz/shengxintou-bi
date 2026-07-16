@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 数据 API 服务
  * 提供数据查询相关接口
  */
@@ -249,6 +249,10 @@ export interface OmniChannelFilterOptions {
 export const dataServiceLeadsAnchor = {
   getAnchorClusters: async (params: { filters?: Record<string, unknown>; top_n?: number } = {}) => {
     return http.post('/leads-detail/anchor-clusters', params);
+  },
+  // v3.1.27: 主播引流走势 (daily/weekly/monthly, 按平台 series)
+  getAnchorClustersTrend: async (params: { filters?: Record<string, unknown>; granularity?: 'daily' | 'weekly' | 'monthly' } = {}) => {
+    return http.post('/leads-detail/anchor-clusters-trend', params);
   },
 };
 

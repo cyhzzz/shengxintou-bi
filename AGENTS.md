@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.23`（2026-07-16）。下一站 `v3.1.24`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.30`（2026-07-16）。下一站 `v3.1.31`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -313,7 +313,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **乱码防御**：渲染 Excel 导入的脏字符字段（主播名 / 来源 / 备注等）前都要走 `sanitizeText()`，防止上游 GBK / 控制字符渲染成方块。
 - **`POST /api/v1/conversion-funnel` 拆两套漏斗**：内容平台走 `fact_conv_content`，应用市场走 `fact_conv_appmarket`，响应带 `channel_category` 字段。
 - **`POST /api/v1/employee-conversion/analysis`** 顶部核心指标不过滤，从 `agg_daily_channel_open` + `agg_vendor_daily` 平台概览计算。
-- **`POST /api/v1/employee-conversion/analysis-channel-overview`**：员工渠道概览，数据源 `agg_daily_channel_open`，**与 detail 端点是独立口径**。
+- **`POST /api/v1/employee-conversion/analysis-channel-overview`**：员工转化页的独立参考接口；`detail_caliber` 使用 `fact_conv_content` 且默认仅统计 `CONTENT_PLATFORMS` 中有员工姓名的线索，`channel_caliber` 使用 `agg_daily_channel_open` 且仅统计 `渠道类别 = 互联网引流`，后者不并入员工核心指标。
 - **`POST /api/v1/reports/omni-channel/*`**：单一独立数据源 `agg_daily_channel_open`，**禁止混合** fact_conv_* / agg_vendor_daily。第 4 卡用 `internetRow.opens`（按 `channel_category=互联网引流` 拆），KPI 完成率按 `dayOfYear/366` 时间折算。
 - **代理商字段三态**：`DimVendor` 含 `agency_name`（全称，如“黑龙江广视科技有限公司”）、`agency_short`（简称/显示名，如“广视科技”）、`agency_letter`（拼音简称，如“gs”）。`agg_vendor_daily.厂商` 和 `fact_conv_content.广告代理商` 存的是**全称**。同一代理商在不同平台的全称可能有差异（如“量子” vs “量子科技”），但**简称是共同的**。前端代理商筛选目前用 `DimVendor.agency_name` + `AggVendorDaily.厂商` 全称做 value，有改进空间。`AbbreviationManagement`（DimVendor CRUD）是维护简称->全称映射的唯一入口。
 - **`POST /api/v1/reports/app-market/*`**：数据源 `fact_conv_appmarket`（明细）+ `agg_vendor_daily`（创意），双源。
@@ -459,3 +459,34 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **背景**：v3.1.23~v3.1.25 期间多次出现"3000/5000 同时不可用"问题——根因是 `Start-Process -WindowStyle Hidden` 启的 Python Flask 进程在父窗口关闭时被带跑，Vite node 子进程 HMR 链断后未重新 listen。一键 .bat 把启动方式固化，避免脚本一关就掉。
 - **不使用 .bat 的情况**：临时调试可用 `Start-Process python app.py -WindowStyle Hidden` 启 Flask，临时启 Vite 用 `cd frontend-react && npm run dev`，但要意识到窗口关闭 = 进程终止。
 
+
+
+
+
+## v3.1.29 已落地（2026-07-16） 员工转化分析卡片口径修正
+
+- **核心卡片限定内容平台员工承接线索**：`employee_conversion.py` 的 `analysis-channel-overview` 未传 `platforms` 时默认使用 `CONTENT_PLATFORMS`，与 `/analysis` 核心指标保持一致；前端四张核心卡改为员工线索 / 员工开口 / 员工开户 / 员工有效户，明确不含应用市场及非员工渠道。
+- **独立渠道参考限定互联网引流**：`agg_daily_channel_open` 没有平台字段，不能冒充员工内容平台转化；`analysis-channel-overview` 仅按 `渠道类别 = 互联网引流` 聚合，并将参考卡片命名为互联网开户 / 互联网有效户，不并入员工核心指标。
+- **口径说明收口**：页面标题、Alert、`ReportFooter` 和接口 `scope/note` 均说明内容平台员工承接线索是主口径，互联网引流是独立参考，避免“总开户 / 总有效户”造成全渠道误解。
+
+## v3.1.28 已落地（2026-07-16） 员工转化周报·海报模式进页面自动生成
+
+- **Weekly/index.tsx 自动生成 useEffect**：新增 `useRef(false)` 控住的 `didAutoGenRef` + 依赖 [viewMode, dateRange, reportData, loading, handleGenerateReport] 的 useEffect。逻辑：进页面 + viewMode == 'poster' + dateRange 两项都就绪 + 未在 loading + 未生成过，则调一次 handleGenerateReport() ，同时 didAutoGenRef.current = true 防重。作用：进页面默认即以最新一周 + 内容平台全量生成一张海报（参考 ReportGeneration 进页面默认调 generate 的习惯）。
+- **WeeklyReportPreview 新增 mode prop**：poster / text 两种空状态文案。poster 提示 本页进入后会自动生成一次默认海报；请点击上方【生成周报】；海报可切换平台 / 导出图片 ；text 保持原 点击「生成周报」按钮开始生成周报 。
+- **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
+- **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
+
+## v3.1.30 已落地（2026-07-16） 周报海报 0 字节修复 + 日期范围选择器
+
+- **海报导出 0 字节修复（根因：窄视口下 flex 容器塌陷）**：`.posterWrapper` 是 `display: flex` 容器，`.posterContainer` 未设 `min-width` 时在 flex 布局中被挤压至 `width=0`，导致 html2canvas 生成 `canvas.width=0`，`toDataURL()` 返回 `"data:,"`（6 字节），下载后为 0 字节 PNG。修复：`PosterModal.module.scss` 的 `.posterContainer` 加 `min-width: 800px` + `flex-shrink: 0` 强制保持设计宽度；`PosterModal.tsx` 的 `handleExportImage` 加 `canvas.width === 0 || imageUrl.length < 100` 安全检查，异常时抛出明确错误信息而非静默下载 0 字节文件；`backgroundColor` 从 `null` 改为 `'#ffffff'`。
+- **转化周报日期选择改造**：`Weekly/index.tsx` 两个独立 DatePicker（周一日期 + 周日日期）合并为一个 RangePicker，与其他报表（ConversionFunnel / Dashboard / AppMarket 等）的日期范围选择器一致。RangePicker 的 onChange 返回 `dates: [Dayjs, Dayjs]`，更新 `dateRange` state。
+- **验证**：三平台海报导出全部通过（小红书 940KB / 腾讯 977KB / 抖音 978KB）；RangePicker 正常显示 2026-07-13 ~ 2026-07-19；`npm run build` 0 错（25.25s）。
+
+## v3.1.27 已落地（2026-07-16）
+
+- 内容平台口径显式化：`employee_conversion.py` 新增 「CONTENT_PLATFORMS = [小红书 / 腾讯 / 抖音 / 快手 / 财联社]」 常量，`/employee-conversion/analysis` 与 `/employee-conversion/weekly` 两个端点未传 platforms 默认全量内容平台；`/employee-conversion/filter-options` 返回增字段 `content_platform_label` + `default_platforms`，前端可以明确告知用户 本报表仅统计内容平台 业务口径。
+- 主播引流走势图：`backend/routes/data/leads.py` 新增 `POST /api/v1/leads-detail/anchor-clusters-trend` 端点，按 period × platform 聚合主播引流走势数据，支持 daily / weekly / monthly 三档粒度（周格式 2026-W22、月格式 YYYY-MM、日格式 YYYY-MM-DD）；new_opened / new_valid / new_assets 口径与 `anchor-clusters` 存量剖除一致。SQLite 无 lpad，周采用 `substr('0' || strftime('%W', date), -2)` 防位。
+- Analysis.tsx 口径说明 Alert：顶部加 「本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标」；加载时读取 default_platforms 赋值给 selectedPlatforms；fetchData 与 fetchChannelOverview 未选中时透传 defaultPlatforms，保证后端不被空数组谎导。ReportFooter 加 口径 标签。
+- Live/Funnel.tsx 主播引流走势图 Card：插在 6 阶段漏斗 SplitRow 上方，Segmented 切换 daily / weekly / monthly；EChartsOption 多 series 按平台拆（ECHARTS_COLORS 调色板）+ 合计虚线 series；ReportFooter 加 走势图端点 + 口径说明。
+- `dataService.ts` 新增 `dataServiceLeadsAnchor.getAnchorClustersTrend`，后端默认 `granularity=monthly`。
+- 验证：`npx tsc --noEmit` 0 错；`npm run build` 0 错；3000 / 5000 两端都 200；未选平台时后端默认仅返内容平台全量（跳过应用市场 / 其他渠道）。

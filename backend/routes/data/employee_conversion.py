@@ -1,15 +1,19 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """员工转化接口（v2）"""
 from flask import Blueprint, request, jsonify
 import logging
 from backend.routes.data.employee_conversion_helpers import (
     get_employee_conversion_ranking, get_weekly_trend_data,
     get_employee_rate_trend, get_weekly_report_data,
-    get_employee_list, get_platform_overview, get_latest_data_week_range
+    get_employee_list, get_platform_overview, get_latest_data_week_range,
+    get_qualified_employees
 )
 from backend.utils.decorators import handle_exceptions
 
 logger = logging.getLogger(__name__)
+
+# v3.1.27 口径常量：员工转化分析仅统计「内容平台」客户（业务实质 = 内容平台新开户等需要员工承接营销转化）
+CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', '快手', '财联社']
 bp = Blueprint('employee_conversion', __name__)
 
 
@@ -17,7 +21,7 @@ bp = Blueprint('employee_conversion', __name__)
 @handle_exceptions
 def get_analysis_data():
     data = request.get_json() or {}
-    platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
+    platforms = data.get('platforms') or CONTENT_PLATFORMS  # v3.1.27：未传 platforms 默认全量内容平台，体现「只看内容平台」口径
     start_date = data.get('start_date')
     end_date = data.get('end_date')
     employees = data.get('employees', [])
@@ -63,7 +67,7 @@ def get_analysis_data():
 @handle_exceptions
 def get_weekly_data():
     data = request.get_json() or {}
-    platforms = data.get('platforms', ['小红书', '腾讯', '抖音'])
+    platforms = data.get('platforms') or CONTENT_PLATFORMS  # v3.1.27：未传 platforms 默认全量内容平台，体现「只看内容平台」口径
     start_date = data.get('start_date')
     end_date = data.get('end_date')
     # v3.1：接受前端 top_count（默认 10），不再硬编码 [:10]
@@ -99,7 +103,9 @@ def get_filter_options():
     return jsonify({
         'success': True,
         'data': {
-            'platforms': ['小红书', '腾讯', '抖音'],
+            'platforms': CONTENT_PLATFORMS,
+            'content_platform_label': '内容平台（抖音 / 小红书 / 腾讯 / 快手 / 财联社），员工承接营销转化的核心口径',
+            'default_platforms': CONTENT_PLATFORMS,
             'employees': get_employee_list(),
             'lead_types': [
                 {'value': 'all', 'label': '全部线索'},
@@ -128,8 +134,9 @@ def get_employee_analysis_channel_overview():
     ed = data.get('end_date')
     employees = data.get('employees') or []
     lead_type = data.get('lead_type', 'all')
-    # v3.1 §四：analysis-channel-overview 接受 platforms，仅作用于 detail_caliber（渠道口径 agg_daily_channel_open 不存在"平台"字段，保留全量）
-    platforms_param = data.get('platforms') or []
+    # v3.1.29：明细口径与 /analysis 对齐，未传平台时默认仅统计内容平台。
+    # agg_daily_channel_open 没有平台字段，因此渠道口径只作为互联网引流参考，不并入员工核心指标。
+    platforms_param = data.get('platforms') or CONTENT_PLATFORMS
     if isinstance(platforms_param, str):
         platforms_param = [s for s in platforms_param.split(',') if s.strip()]
 
@@ -146,6 +153,9 @@ def get_employee_analysis_channel_overview():
         detail_q = detail_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if employees:
         detail_q = detail_q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
+    qualified = get_qualified_employees(min_leads=5)
+    if qualified:
+        detail_q = detail_q.filter(FactConvContent.添加员工姓名.in_(qualified))
     if platforms_param:
         detail_q = detail_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms_param]))
     if lead_type == 'existing':
@@ -154,12 +164,12 @@ def get_employee_analysis_channel_overview():
         detail_q = detail_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
     dr = detail_q.first()
 
-    # 渠道口径（agg_daily_channel_open，全量）
+    # 渠道参考口径（agg_daily_channel_open，仅互联网引流）
     chan_q = db.session.query(
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
         func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposit'),
         func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
-    )
+    ).filter(AggDailyChannelOpen.渠道类别 == '互联网引流')
     if sd and ed:
         chan_q = chan_q.filter(and_(AggDailyChannelOpen.时间区间 >= sd, AggDailyChannelOpen.时间区间 <= ed))
     cr = chan_q.first()
@@ -169,7 +179,7 @@ def get_employee_analysis_channel_overview():
         'data': {
             'detail_caliber': {
                 'source': 'fact_conv_content',
-                'scope': '员工级（添加员工姓名 非空）',
+                'scope': '内容平台·员工级（添加员工姓名 非空）',
                 'leads': int(dr.leads or 0),
                 'mouth': int(dr.mouth or 0),
                 'valid_lead': int(dr.valid_lead or 0),
@@ -179,12 +189,12 @@ def get_employee_analysis_channel_overview():
             },
             'channel_caliber': {
                 'source': 'agg_daily_channel_open',
-                'scope': '渠道级（4 大类全量，含合作/员工/自然/互联网引流）',
+                'scope': '互联网引流·渠道级（仅互联网引流）',
                 'opens': int(cr.opens or 0),
                 'deposit': int(cr.deposit or 0),
                 'valid': int(cr.valid or 0),
             },
-            'note': '两个口径数字不一致是正常的（按用户口径"独立数据源"），仅作参考并列展示。',
+            'note': '核心指标只统计内容平台中已填写员工姓名的线索；互联网引流数据来自独立渠道汇总表，仅作外部参考，不纳入员工核心指标。',
         },
     })
 

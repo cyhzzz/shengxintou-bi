@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """线索明细接口（v2 - 查 fact_conv_content）"""
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_, or_, case
 from backend.models_v2 import FactConvContent
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -327,3 +327,96 @@ def get_anchor_clusters():
             'note': '按 客户来源 中"平台引流-主播"模式聚合；复合来源会拆分并分别归因给每个主播。v3.1.26 起新增 existing_leads/new_leads/new_valid_lead/new_valid 字段。存量客户(是否为存量客户==1)线索计入 existing_leads，但其开户/有效户通常=0(已在别处开户)，其资产计入 existing_assets；非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 对齐。',
         },
     })
+
+
+@bp.route('/leads-detail/anchor-clusters-trend', methods=['POST'])
+@handle_exceptions
+def get_anchor_clusters_trend():
+    """主播引流走势 (v3.1.27)"""
+    from collections import defaultdict
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    granularity = data.get('granularity', 'daily')
+    sd = filters.get('start_date')
+    ed = filters.get('end_date')
+    platforms_filter = filters.get('platforms') or []
+    agencies_filter = filters.get('agencies') or []
+    if granularity == 'weekly':
+        granularity = 'weekly'
+        period_expr = (
+            func.substr(FactConvContent.线索日期, 1, 4)
+            + '-W'
+            + func.substr(func.concat('0', func.strftime('%W', FactConvContent.线索日期)), -2)
+        )
+    elif granularity == 'monthly':
+        granularity = 'monthly'
+        period_expr = func.substr(FactConvContent.线索日期, 1, 7)
+    else:
+        granularity = 'daily'
+        period_expr = func.substr(FactConvContent.线索日期, 1, 10)
+    period_label = period_expr.label('period')
+    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+    q = db.session.query(
+        period_label,
+        FactConvContent.平台来源.label('platform'),
+        func.count(FactConvContent.id).label('leads'),
+        func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
+        func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), 1), else_=0)), 0).label('new_opened'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否为有效户 == 1, non_existing), 1), else_=0)), 0).label('new_valid'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), FactConvContent.资产), else_=0)), 0).label('new_assets'),
+    ).filter(and_(
+        FactConvContent.客户来源.isnot(None),
+        FactConvContent.客户来源 != '',
+        FactConvContent.客户来源.like('%引流-%'),
+    ))
+    if sd and ed:
+        q = q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms_filter:
+        q = q.filter(FactConvContent.平台来源.in_(platforms_filter))
+    if agencies_filter:
+        q = q.filter(FactConvContent.广告代理商.in_(agencies_filter))
+    rows = q.group_by('period', FactConvContent.平台来源).order_by('period', FactConvContent.平台来源).all()
+    pt = defaultdict(lambda: {'leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0})
+    pp = defaultdict(lambda: defaultdict(lambda: {'leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0}))
+    all_platforms = set()
+    for r in rows:
+        period = r.period
+        platform = r.platform or '未知'
+        all_platforms.add(platform)
+        b = pt[period]
+        b['leads'] += int(r.leads or 0)
+        b['mouth'] += int(r.mouth or 0)
+        b['valid_lead'] += int(r.valid_lead or 0)
+        b['new_opened'] += int(r.new_opened or 0)
+        b['new_valid'] += int(r.new_valid or 0)
+        b['new_assets'] += float(r.new_assets or 0)
+        bx = pp[period][platform]
+        bx['leads'] += int(r.leads or 0)
+        bx['mouth'] += int(r.mouth or 0)
+        bx['valid_lead'] += int(r.valid_lead or 0)
+        bx['new_opened'] += int(r.new_opened or 0)
+        bx['new_valid'] += int(r.new_valid or 0)
+        bx['new_assets'] += float(r.new_assets or 0)
+    periods = sorted(pt.keys())
+    return jsonify({
+        'success': True,
+        'data': {
+            'granularity': granularity,
+            'periods': periods,
+            'totals': {p: dict(pt[p]) for p in periods},
+            'by_platform': {
+                p: {pl: dict(pp[p][pl]) for pl in pp[p]}
+                for p in periods
+            },
+            'platforms': sorted(all_platforms),
+            'meta': {
+                'version': 'v3.1.27-anchor-trend',
+                'source': 'fact_conv_content.客户来源',
+                'pattern': '%引流-%',
+                'note': '按 (period, platform) 聚合，主播层面落到平台维度。period 由 granularity 决定：daily=YYYY-MM-DD，weekly=YYYY-Www，monthly=YYYY-MM。存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量，与 anchor-clusters 口径一致。',
+            }
+        }
+    })
+
+
