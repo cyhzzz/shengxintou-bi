@@ -1,16 +1,14 @@
 /**
- * 报告生成页面 — v3.1.30 纯数据周报
+ * 报告生成页面 — v3.1.31 纯数据周报（本周 + 全年 + 环比 + 两堆叠图 + 互联网占比）
  *
- * 改造点：
- * - 去除文案/重点工作（key_works）手工编辑
- * - 去除 contenteditable + 保存到 DB 逻辑
- * - 数据全部自动聚合（POST /api/v1/reports/weekly/data）
- * - 加日走势堆叠柱状图（ECharts）
- * - 保留 PNG + PDF 导出
- * - 保留 editorial 竖版报刊风格
+ * 改造点（相对 v3.1.30）：
+ * - 数据结构按业务维度重梳：6 指标 × 3 套时间区间（本周/全年累计/上周环比）
+ * - 去掉 tab 切换，两个堆叠图直接平铺（开户数 + 有效户数，按渠道堆叠日走势）
+ * - 加互联网渠道占公司开户占比（互联网引流 / 全渠道类别）
+ * - 6 指标：消耗金额 / 品牌曝光 / 线索数 / 开户数 / 新增有效户数 / 新增客户资产
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Button, Select, message, Spin, Segmented } from 'antd';
+import { Button, Select, message, Spin } from 'antd';
 import {
   FilePdfOutlined,
   FileImageOutlined,
@@ -18,6 +16,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import * as echarts from 'echarts';
+import { pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -32,124 +31,95 @@ interface PeriodOption {
   disabled_reason?: string;
 }
 
+interface MetricSet {
+  cost: number;          // 消耗金额
+  impressions: number;   // 品牌曝光
+  leads: number;         // 线索数
+  opens: number;         // 开户数
+  valid: number;         // 新增有效户数
+  assets: number;        // 新增客户资产
+}
+
 interface WeeklyData {
   period: {
     start_date: string;
     end_date: string;
+    prev_start: string;
+    prev_end: string;
     report_year: number;
     report_week: number;
     report_name: string;
     report_sequence: number;
   };
-  summary: {
-    ad: {
-      impressions: number;
-      clicks: number;
-      cost: number;
-      leads: number;
-      new_accounts: number;
-      cpc: number;
-      cpa: number;
-      ctr: number;
-      cumulative: {
-        impressions: number;
-        clicks: number;
-        cost: number;
-        leads: number;
-        new_accounts: number;
-      };
-    };
-    channel: {
-      opens: number;
-      deposits: number;
-      valid: number;
-      deposit_rate: number;
-      valid_rate: number;
-      cumulative: {
-        opens: number;
-        deposits: number;
-        valid: number;
-      };
-    };
-    funnel: {
-      content_total: number;
-      content_opened: number;
-      content_rate: number;
-      appmarket_total: number;
-      appmarket_opened: number;
-      appmarket_rate: number;
-    };
-  };
-  daily: Array<{
-    date: string;
-    ad_impressions: number;
-    ad_clicks: number;
-    ad_cost: number;
-    ad_leads: number;
-    ad_new_accounts: number;
-    ch_opens: number;
-    ch_deposits: number;
-    ch_valid: number;
-  }>;
-  by_platform: Array<{
-    platform: string;
-    impressions: number;
-    clicks: number;
-    cost: number;
-    leads: number;
-    new_accounts: number;
-  }>;
-  by_channel: Array<{
-    channel: string;
-    opens: number;
-    deposits: number;
-    valid: number;
-  }>;
+  current_week: MetricSet;
+  year_to_date: MetricSet;
+  prev_week: MetricSet;
+  week_over_week: { [K in keyof MetricSet]: number | null };
+  daily_opens_stacked: Array<Record<string, number | string>>;
+  daily_valid_stacked: Array<Record<string, number | string>>;
+  channels: string[];
+  internet_ratio: { opens_ratio: number; valid_ratio: number };
 }
 
+// 6 个核心指标定义
+const METRICS: Array<{ key: keyof MetricSet; label: string; fmt: (n: number) => string }> = [
+  { key: 'cost', label: '消耗金额', fmt: fmtMoney },
+  { key: 'impressions', label: '品牌曝光', fmt: fmtLarge },
+  { key: 'leads', label: '线索数', fmt: fmtNum },
+  { key: 'opens', label: '开户数', fmt: fmtNum },
+  { key: 'valid', label: '新增有效户数', fmt: fmtNum },
+  { key: 'assets', label: '新增客户资产', fmt: fmtMoney },
+];
+
 // 格式化数字（千分位）
-const fmtNum = (n: number | null | undefined): string => {
+function fmtNum(n: number | null | undefined): string {
   if (n === null || n === undefined) return '0';
   return Number(n).toLocaleString('zh-CN');
-};
+}
 
 // 格式化大数字（万为单位）
-const fmtLarge = (n: number | null | undefined): string => {
+function fmtLarge(n: number | null | undefined): string {
   if (!n) return '0';
   if (n >= 10000) return (n / 10000).toFixed(2) + '万';
   return fmtNum(n);
-};
+}
 
 // 格式化金额
-const fmtMoney = (n: number | null | undefined): string => {
-  if (!n) return '0';
+function fmtMoney(n: number | null | undefined): string {
+  if (!n) return '¥0';
   return '¥' + Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
-};
+}
 
 // 格式化日期
-const fmtDate = (s: string): string => {
+function fmtDate(s: string): string {
   if (!s) return '';
   const d = new Date(s);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}.${m}.${day}`;
-};
+}
+
+// 格式化环比（带正负号）
+function fmtWow(n: number | null | undefined): { text: string; positive: boolean | null } {
+  if (n === null || n === undefined) return { text: '—', positive: null };
+  const sign = n >= 0 ? '+' : '';
+  return { text: `${sign}${n.toFixed(2)}%`, positive: n >= 0 };
+}
 
 const ReportGeneration: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<'png' | 'pdf'>('png');
   const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
   const [weeklyData, setWeeklyData] = useState<WeeklyData | null>(null);
   const [loading, setLoading] = useState(false);
   const [periodsLoading, setPeriodsLoading] = useState(true);
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
-  // 图表类型：ad = 广告投放日走势，channel = 渠道开户日走势
-  const [chartType, setChartType] = useState<'ad' | 'channel'>('ad');
 
   const posterRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const opensChartRef = useRef<HTMLDivElement>(null);
+  const validChartRef = useRef<HTMLDivElement>(null);
+  const opensChartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const validChartInstanceRef = useRef<echarts.ECharts | null>(null);
 
   // 加载报告期选项
   const loadWeekOptions = useCallback(async () => {
@@ -159,7 +129,6 @@ const ReportGeneration: React.FC = () => {
       const result = await response.json();
       if (result.success) {
         setPeriodOptions(result.data || []);
-        // 默认选第一个可用周次
         const first = (result.data || []).find((o: PeriodOption) => !o.disabled);
         if (first) {
           setSelectedPeriod(first);
@@ -207,103 +176,81 @@ const ReportGeneration: React.FC = () => {
     loadWeekOptions();
   }, [loadWeekOptions]);
 
-  // 渲染日走势堆叠柱状图
+  // 渲染开户数堆叠柱状图
   useEffect(() => {
-    if (!weeklyData || !chartRef.current) return;
-
-    // 销毁旧实例
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.dispose();
-      chartInstanceRef.current = null;
+    if (!weeklyData || !opensChartRef.current) return;
+    if (opensChartInstanceRef.current) {
+      opensChartInstanceRef.current.dispose();
+      opensChartInstanceRef.current = null;
     }
+    const chart = echarts.init(opensChartRef.current);
+    opensChartInstanceRef.current = chart;
 
-    const chart = echarts.init(chartRef.current);
-    chartInstanceRef.current = chart;
+    const dates = weeklyData.daily_opens_stacked.map((d) => fmtDate(String(d.date)));
+    const channels = weeklyData.channels;
 
-    const dates = weeklyData.daily.map((d) => fmtDate(d.date));
-
-    let option: echarts.EChartsOption;
-    if (chartType === 'ad') {
-      // 广告投放日走势：展示量 + 点击量（双 series 堆叠）+ 开户数（折线）
-      option = {
-        tooltip: { trigger: 'axis' },
-        legend: { data: ['展示量', '点击量', '开户数'], top: 0, textStyle: { fontSize: 10 } },
-        grid: { top: 32, left: 40, right: 40, bottom: 24 },
-        xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
-        yAxis: [
-          { type: 'value', name: '展示/点击', axisLabel: { fontSize: 9 } },
-          { type: 'value', name: '开户数', axisLabel: { fontSize: 9 } },
-        ],
-        series: [
-          {
-            name: '展示量',
-            type: 'bar',
-            stack: 'ad',
-            data: weeklyData.daily.map((d) => d.ad_impressions),
-            itemStyle: { color: '#0052D9' },
-          },
-          {
-            name: '点击量',
-            type: 'bar',
-            stack: 'ad',
-            data: weeklyData.daily.map((d) => d.ad_clicks),
-            itemStyle: { color: '#409EFF' },
-          },
-          {
-            name: '开户数',
-            type: 'line',
-            yAxisIndex: 1,
-            data: weeklyData.daily.map((d) => d.ad_new_accounts),
-            itemStyle: { color: '#E8A0A0' },
-            lineStyle: { width: 2 },
-          },
-        ],
-      };
-    } else {
-      // 渠道开户日走势：开户 + 入金 + 有效户（堆叠）
-      option = {
-        tooltip: { trigger: 'axis' },
-        legend: { data: ['开户数', '入金户数', '有效户数'], top: 0, textStyle: { fontSize: 10 } },
-        grid: { top: 32, left: 40, right: 20, bottom: 24 },
-        xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
-        yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
-        series: [
-          {
-            name: '开户数',
-            type: 'bar',
-            stack: 'ch',
-            data: weeklyData.daily.map((d) => d.ch_opens),
-            itemStyle: { color: '#1f4e79' },
-          },
-          {
-            name: '入金户数',
-            type: 'bar',
-            stack: 'ch',
-            data: weeklyData.daily.map((d) => d.ch_deposits),
-            itemStyle: { color: '#4A90D9' },
-          },
-          {
-            name: '有效户数',
-            type: 'bar',
-            stack: 'ch',
-            data: weeklyData.daily.map((d) => d.ch_valid),
-            itemStyle: { color: '#8a3a3c' },
-          },
-        ],
-      };
-    }
-
+    const option: echarts.EChartsOption = {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { data: channels, top: 0, textStyle: { fontSize: 9 } },
+      grid: { top: 36, left: 36, right: 16, bottom: 24 },
+      xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
+      yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
+      series: channels.map((ch, idx) => ({
+        name: ch,
+        type: 'bar',
+        stack: 'opens',
+        data: weeklyData.daily_opens_stacked.map((d) => Number(d[ch] || 0)),
+        itemStyle: { color: pickEChartsColor(idx) },
+      })),
+    };
     chart.setOption(option);
 
-    // resize
     const handleResize = () => chart.resize();
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.dispose();
-      chartInstanceRef.current = null;
+      opensChartInstanceRef.current = null;
     };
-  }, [weeklyData, chartType]);
+  }, [weeklyData]);
+
+  // 渲染有效户数堆叠柱状图
+  useEffect(() => {
+    if (!weeklyData || !validChartRef.current) return;
+    if (validChartInstanceRef.current) {
+      validChartInstanceRef.current.dispose();
+      validChartInstanceRef.current = null;
+    }
+    const chart = echarts.init(validChartRef.current);
+    validChartInstanceRef.current = chart;
+
+    const dates = weeklyData.daily_valid_stacked.map((d) => fmtDate(String(d.date)));
+    const channels = weeklyData.channels;
+
+    const option: echarts.EChartsOption = {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { data: channels, top: 0, textStyle: { fontSize: 9 } },
+      grid: { top: 36, left: 36, right: 16, bottom: 24 },
+      xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
+      yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
+      series: channels.map((ch, idx) => ({
+        name: ch,
+        type: 'bar',
+        stack: 'valid',
+        data: weeklyData.daily_valid_stacked.map((d) => Number(d[ch] || 0)),
+        itemStyle: { color: pickEChartsColor(idx) },
+      })),
+    };
+    chart.setOption(option);
+
+    const handleResize = () => chart.resize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.dispose();
+      validChartInstanceRef.current = null;
+    };
+  }, [weeklyData]);
 
   // 处理报告期选择
   const handlePeriodChange = useCallback(
@@ -317,9 +264,8 @@ const ReportGeneration: React.FC = () => {
     [periodOptions, handleLoadData]
   );
 
-  // 动态加载 html2canvas
+  // 动态加载 html2canvas / jspdf
   const loadHtml2Canvas = async () => (await import('html2canvas')).default;
-  // 动态加载 jspdf
   const loadJsPdf = async () => (await import('jspdf')).jsPDF;
 
   // 导出 PNG
@@ -412,7 +358,6 @@ const ReportGeneration: React.FC = () => {
         </div>
 
         <div className={styles.panelBody}>
-          {/* 报告期选择 */}
           <div className={styles.controlGroup}>
             <label className={styles.controlLabel}>报告期</label>
             <Select
@@ -435,12 +380,10 @@ const ReportGeneration: React.FC = () => {
             )}
           </div>
 
-          {/* 导出格式选择 */}
           <div className={styles.controlGroup}>
             <label className={styles.controlLabel}>导出格式</label>
             <div className={styles.controlActions}>
               <Button
-                type={selectedFormat === 'png' ? 'primary' : 'default'}
                 icon={<FileImageOutlined />}
                 onClick={handleExportPNG}
                 loading={exporting === 'png'}
@@ -450,7 +393,6 @@ const ReportGeneration: React.FC = () => {
                 导出 PNG
               </Button>
               <Button
-                type={selectedFormat === 'pdf' ? 'primary' : 'default'}
                 icon={<FilePdfOutlined />}
                 onClick={handleExportPDF}
                 loading={exporting === 'pdf'}
@@ -465,7 +407,7 @@ const ReportGeneration: React.FC = () => {
       </div>
 
       {/* 右侧预览画布 */}
-      <div className={`${styles.previewPanel}`}>
+      <div className={styles.previewPanel}>
         <div className={styles.previewHeader}>
           <div className={styles.cardHeader}>
             <span className={styles.cardTitle}>
@@ -494,178 +436,90 @@ const ReportGeneration: React.FC = () => {
                   </div>
                 </header>
 
-                {/* 1. 广告投放层 */}
+                {/* 1. 核心指标：6 指标 × 3 列（本周/全年/环比） */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>广告投放</span>
-                    <span className={styles.layerTag}>agg_vendor_daily</span>
+                    <span className={styles.layerTitle}>核心指标</span>
+                    <span className={styles.layerTag}>本周 / 全年累计 / 环比</span>
                   </div>
-                  <div className={styles.metricGrid}>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>展示量</div>
-                      <div className={styles.metricValue}>{fmtLarge(weeklyData.summary.ad.impressions)}</div>
-                      <div className={styles.metricCum}>累计 {fmtLarge(weeklyData.summary.ad.cumulative.impressions)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>点击量</div>
-                      <div className={styles.metricValue}>{fmtLarge(weeklyData.summary.ad.clicks)}</div>
-                      <div className={styles.metricCum}>累计 {fmtLarge(weeklyData.summary.ad.cumulative.clicks)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>花费</div>
-                      <div className={styles.metricValue}>{fmtMoney(weeklyData.summary.ad.cost)}</div>
-                      <div className={styles.metricCum}>累计 {fmtMoney(weeklyData.summary.ad.cumulative.cost)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>线索数</div>
-                      <div className={styles.metricValue}>{fmtNum(weeklyData.summary.ad.leads)}</div>
-                      <div className={styles.metricCum}>累计 {fmtNum(weeklyData.summary.ad.cumulative.leads)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>开户数</div>
-                      <div className={styles.metricValue}>{fmtNum(weeklyData.summary.ad.new_accounts)}</div>
-                      <div className={styles.metricCum}>累计 {fmtNum(weeklyData.summary.ad.cumulative.new_accounts)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>CPC</div>
-                      <div className={styles.metricValue}>{fmtMoney(weeklyData.summary.ad.cpc)}</div>
-                      <div className={styles.metricCum}>CTR {weeklyData.summary.ad.ctr}%</div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 2. 渠道开户层 */}
-                <section className={styles.layerCard}>
-                  <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>互联网渠道开户</span>
-                    <span className={styles.layerTag}>agg_daily_channel_open · 互联网引流</span>
-                  </div>
-                  <div className={styles.metricGrid}>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>开户数</div>
-                      <div className={styles.metricValue}>{fmtNum(weeklyData.summary.channel.opens)}</div>
-                      <div className={styles.metricCum}>累计 {fmtNum(weeklyData.summary.channel.cumulative.opens)}</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>入金户数</div>
-                      <div className={styles.metricValue}>{fmtNum(weeklyData.summary.channel.deposits)}</div>
-                      <div className={styles.metricCum}>入金率 {weeklyData.summary.channel.deposit_rate}%</div>
-                    </div>
-                    <div className={styles.metricCell}>
-                      <div className={styles.metricLabel}>有效户数</div>
-                      <div className={styles.metricValue}>{fmtNum(weeklyData.summary.channel.valid)}</div>
-                      <div className={styles.metricCum}>有效率 {weeklyData.summary.channel.valid_rate}%</div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 3. 漏斗转化率 */}
-                <section className={styles.layerCard}>
-                  <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>漏斗整体转化率</span>
-                    <span className={styles.layerTag}>线索 → 开户</span>
-                  </div>
-                  <div className={styles.funnelRow}>
-                    <div className={styles.funnelCell}>
-                      <div className={styles.funnelLabel}>内容平台</div>
-                      <div className={styles.funnelValue}>{weeklyData.summary.funnel.content_rate}%</div>
-                      <div className={styles.funnelMeta}>
-                        {fmtNum(weeklyData.summary.funnel.content_opened)} / {fmtNum(weeklyData.summary.funnel.content_total)}
-                      </div>
-                    </div>
-                    <div className={styles.funnelCell}>
-                      <div className={styles.funnelLabel}>应用市场</div>
-                      <div className={styles.funnelValue}>{weeklyData.summary.funnel.appmarket_rate}%</div>
-                      <div className={styles.funnelMeta}>
-                        {fmtNum(weeklyData.summary.funnel.appmarket_opened)} / {fmtNum(weeklyData.summary.funnel.appmarket_total)}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 4. 日走势堆叠柱状图 */}
-                <section className={styles.layerCard}>
-                  <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>日走势</span>
-                    <Segmented
-                      size="small"
-                      value={chartType}
-                      onChange={(v) => setChartType(v as 'ad' | 'channel')}
-                      options={[
-                        { label: '广告投放', value: 'ad' },
-                        { label: '渠道开户', value: 'channel' },
-                      ]}
-                    />
-                  </div>
-                  <div ref={chartRef} className={styles.chartBox} />
-                </section>
-
-                {/* 5. 按平台拆分（广告投放） */}
-                <section className={styles.layerCard}>
-                  <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>按平台拆分 · 广告投放</span>
-                  </div>
-                  <table className={styles.dataTable}>
+                  <table className={styles.metricTable}>
                     <thead>
                       <tr>
-                        <th>平台</th>
-                        <th>展示量</th>
-                        <th>点击量</th>
-                        <th>花费</th>
-                        <th>线索</th>
-                        <th>开户</th>
+                        <th>指标</th>
+                        <th>本周</th>
+                        <th>全年累计</th>
+                        <th>环比</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {weeklyData.by_platform.map((p, i) => (
-                        <tr key={i}>
-                          <td className={styles.cellName}>{p.platform}</td>
-                          <td className={styles.cellNum}>{fmtLarge(p.impressions)}</td>
-                          <td className={styles.cellNum}>{fmtLarge(p.clicks)}</td>
-                          <td className={styles.cellNum}>{fmtMoney(p.cost)}</td>
-                          <td className={styles.cellNum}>{fmtNum(p.leads)}</td>
-                          <td className={styles.cellNum}>{fmtNum(p.new_accounts)}</td>
-                        </tr>
-                      ))}
+                      {METRICS.map((m) => {
+                        const cw = weeklyData.current_week[m.key];
+                        const ytd = weeklyData.year_to_date[m.key];
+                        const wow = weeklyData.week_over_week[m.key];
+                        const wowFmt = fmtWow(wow);
+                        return (
+                          <tr key={m.key}>
+                            <td className={styles.cellName}>{m.label}</td>
+                            <td className={styles.cellNum}>{m.fmt(cw)}</td>
+                            <td className={styles.cellNum}>{m.fmt(ytd)}</td>
+                            <td
+                              className={`${styles.cellNum} ${styles.wowCell}`}
+                              data-positive={wowFmt.positive === null ? 'na' : wowFmt.positive ? 'up' : 'down'}
+                            >
+                              {wowFmt.text}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </section>
 
-                {/* 6. 按渠道拆分（互联网开户） */}
+                {/* 2. 互联网渠道占公司开户占比 */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>按渠道拆分 · 互联网开户</span>
+                    <span className={styles.layerTitle}>互联网渠道占公司开户占比</span>
+                    <span className={styles.layerTag}>互联网引流 / 全渠道类别</span>
                   </div>
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>渠道</th>
-                        <th>开户数</th>
-                        <th>入金户数</th>
-                        <th>有效户数</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weeklyData.by_channel.map((c, i) => (
-                        <tr key={i}>
-                          <td className={styles.cellName}>{c.channel}</td>
-                          <td className={styles.cellNum}>{fmtNum(c.opens)}</td>
-                          <td className={styles.cellNum}>{fmtNum(c.deposits)}</td>
-                          <td className={styles.cellNum}>{fmtNum(c.valid)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className={styles.ratioGrid}>
+                    <div className={styles.ratioCell}>
+                      <div className={styles.ratioLabel}>开户占比</div>
+                      <div className={styles.ratioValue}>{weeklyData.internet_ratio.opens_ratio.toFixed(2)}%</div>
+                    </div>
+                    <div className={styles.ratioCell}>
+                      <div className={styles.ratioLabel}>有效户占比</div>
+                      <div className={styles.ratioValue}>{weeklyData.internet_ratio.valid_ratio.toFixed(2)}%</div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 3. 开户数按渠道堆叠日走势 */}
+                <section className={styles.layerCard}>
+                  <div className={styles.layerHeader}>
+                    <span className={styles.layerTitle}>开户数 · 按渠道堆叠日走势</span>
+                    <span className={styles.layerTag}>互联网引流</span>
+                  </div>
+                  <div ref={opensChartRef} className={styles.chartBox} />
+                </section>
+
+                {/* 4. 有效户数按渠道堆叠日走势 */}
+                <section className={styles.layerCard}>
+                  <div className={styles.layerHeader}>
+                    <span className={styles.layerTitle}>有效户数 · 按渠道堆叠日走势</span>
+                    <span className={styles.layerTag}>互联网引流</span>
+                  </div>
+                  <div ref={validChartRef} className={styles.chartBox} />
                 </section>
 
                 {/* 脚注 */}
                 <footer className={styles.reportFooter}>
                   <div className={styles.footerLabel}>Notes · 数据说明</div>
                   <ul>
-                    <li>广告投放数据来自 agg_vendor_daily（按日期聚合）</li>
-                    <li>互联网开户数据来自 agg_daily_channel_open（仅互联网引流）</li>
-                    <li>累计范围：年初至周末</li>
-                    <li>漏斗转化率 = 开户数 / 线索数，内容平台按线索日期筛选，应用市场限互联网引流</li>
+                    <li>消耗金额 / 品牌曝光 / 线索数：来自 agg_vendor_daily（广告投放日聚合）</li>
+                    <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
+                    <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
+                    <li>全年累计：年初至周末；环比：与上一周对比</li>
+                    <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）</li>
                   </ul>
                 </footer>
               </div>

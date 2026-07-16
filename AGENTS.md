@@ -476,6 +476,23 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.32 已落地（2026-07-16） 报告生成页数据周报按业务维度重梳
+
+- **后端 `weekly_reports.py` `/data` 端点完全重写**：新增 `_query_metrics(sd, ed)` helper 函数复用于本周 / 全年累计 / 上周三套时间区间。返回结构改为：
+  - `current_week` / `year_to_date` / `prev_week`：各含 6 指标（消耗金额 `cost` / 品牌曝光 `impressions` / 线索数 `leads` / 开户数 `opens` / 新增有效户数 `valid` / 新增客户资产 `assets`）
+  - `week_over_week`：6 指标环比百分比（prev=0 时返回 `null`）
+  - `daily_opens_stacked` / `daily_valid_stacked`：按日 × 渠道名称 pivot 后的堆叠图数据
+  - `channels`：按开户数总和降序的渠道列表
+  - `internet_ratio`：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）的开户数与有效户数占比
+  - **线索数统一从 `agg_vendor_daily.线索数` 取**（不再从明细表）；开户数 / 有效户从 `agg_daily_channel_open` 取（仅 `渠道类别=互联网引流`）；新增客户资产从 `fact_conv_content`（`是否开户=1 AND 非存量`，按线索日期筛选）+ `fact_conv_appmarket`（`是否新开户=1 AND 渠道类型=互联网引流`，按下载日期筛选）取
+- **前端 `ReportGeneration/index.tsx` 完全重写**：
+  - 去掉 tab 切换（Segmented），两个堆叠图直接平铺（开户数 + 有效户数，按渠道堆叠日走势）
+  - 6 指标改为表格形式（指标 / 本周 / 全年累计 / 环比 4 列），环比单元格按中国股市惯例上色（上升红 `#c0392b` / 下降绿 `#27ae60`，null 显示 `—`）
+  - 加互联网渠道占公司开户占比 section（开户占比 + 有效户占比 2 卡，蓝色 accent 色条 + JetBrains Mono 等宽数字）
+  - ECharts 多 series 用 `ECHARTS_COLORS` 调色板（`pickEChartsColor(idx)`）
+- **样式 `index.module.scss` 追加**：`.metricTable`（4 列表格 + JetBrains Mono 等宽数字）+ `.wowCell`（`data-positive` 属性选择器上色）+ `.ratioGrid` / `.ratioCell` / `.ratioLabel` / `.ratioValue`（占比卡片样式）
+- **验证**：`npm run build` 0 错（35.83s）；PowerShell smoke `POST /api/v1/reports/weekly/data` W28（2026-07-10~07-16）返回 `current_week` cost=¥341K / imp=9.5M / leads=300 / opens=136 / valid=28 / assets=¥1.62M；`year_to_date` cost=¥1326万 / imp=366M / leads=27139 / opens=8556 / valid=4111 / assets=¥6.57亿；`prev_week` cost=¥91万 / imp=25.7M / leads=999 / opens=389 / valid=179 / assets=¥2046万；`week_over_week` 全部负增长（-62%~-92%）；`daily_opens_stacked` / `daily_valid_stacked` 各 2 条（10 渠道：oppo/华为/小米/vivo/荣耀/小红书/腾讯/抖音/其他/财联社）；`internet_ratio` opens_ratio=2.36% / valid_ratio=13.53%
+
 ## v3.1.31 已落地（2026-07-16） 员工转化周报加存量线索新开户榜 + 报告生成页改造纯数据周报
 
 - **需求1：员工转化周报加「存量线索新开户」榜**：与原 `existing`（线索日期在区间内的存量客户）互补，新增第 4 榜统计「线索日期在区间前 + 开户时间落在区间内」的客户。

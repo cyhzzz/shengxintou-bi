@@ -398,6 +398,94 @@
   }
 }
 
+/* v3.1.31 核心指标表（6 指标 × 3 列：本周/全年/环比） */
+.metricTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th {
+    text-align: right;
+    padding: 10px 8px;
+    font-weight: 600;
+    color: #8c8c8c;
+    border-bottom: 1.5px solid #1a1a1a;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  td {
+    text-align: right;
+    padding: 12px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #1a1a1a;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 13px;
+
+    &:first-child {
+      text-align: left;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+    }
+  }
+
+  tbody tr:hover {
+    background: #f7f7f7;
+  }
+}
+
+/* 环比单元格颜色（中国股市惯例：上升红、下降绿） */
+.wowCell {
+  &[data-positive='up'] {
+    color: #c0392b;
+    font-weight: 600;
+  }
+
+  &[data-positive='down'] {
+    color: #27ae60;
+    font-weight: 600;
+  }
+
+  &[data-positive='na'] {
+    color: #a3a3a3;
+  }
+}
+
+/* 互联网占比网格 */
+.ratioGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.ratioCell {
+  padding: 16px 12px;
+  background: #f7f7f7;
+  border-left: 3px solid #0052d9;
+}
+
+.ratioLabel {
+  font-size: 10px;
+  color: #525252;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.ratioValue {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0052d9;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
 .cellName {
   font-weight: 500;
   color: #1a1a1a;
