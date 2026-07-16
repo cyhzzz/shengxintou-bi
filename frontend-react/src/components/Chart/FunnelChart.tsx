@@ -27,6 +27,13 @@ export interface FunnelChartProps {
   height?: number;
   palette?: string[];
   showOverall?: boolean;
+  /**
+   * 是否使用对数刻度（log10）映射各级宽度。
+   * 当各级数据偏差较大（如曝光 1,000,000 vs 有效户 100），
+   * 线性映射下底层阶段宽度趋近于 0、看不清。开启后视觉宽度更平衡。
+   * tooltip / label 仍显示原始人数。
+   */
+  useLogScale?: boolean;
 }
 
 const formatNumber = (v: number) => Number(v || 0).toLocaleString();
@@ -34,17 +41,19 @@ const formatNumber = (v: number) => Number(v || 0).toLocaleString();
 const DEFAULT_PALETTE = ['#1677ff', '#4096ff', '#69b1ff', '#91caff', '#bae0ff'];
 
 /** CSS 横条降级实现（仅 ErrorBoundary 使用） */
-const FallbackBars: React.FC<{ data: FunnelStage[]; palette?: string[]; height: number }> = ({
+const FallbackBars: React.FC<{ data: FunnelStage[]; palette?: string[]; height: number; useLogScale?: boolean }> = ({
   data,
   palette,
   height,
+  useLogScale = false,
 }) => {
   const colors = palette?.length ? palette : DEFAULT_PALETTE;
-  const max = data.reduce((m, d) => Math.max(m, d.count), 0);
+  const plotValues = data.map((d) => useLogScale ? Math.log10(d.count + 1) : d.count);
+  const max = plotValues.reduce((m, v) => Math.max(m, v), 0);
   return (
     <div className={styles.fallback} style={{ minHeight: height }}>
       {data.map((stage, idx) => {
-        const w = max > 0 ? (stage.count / max) * 100 : 0;
+        const w = max > 0 ? (plotValues[idx] / max) * 100 : 0;
         const color = colors[idx % colors.length];
         return (
           <div key={idx} className={styles.fbRow}>
@@ -70,6 +79,7 @@ interface BoundaryProps {
   data: FunnelStage[];
   palette?: string[];
   height: number;
+  useLogScale?: boolean;
 }
 
 class ChartErrorBoundary extends Component<BoundaryProps, { hasError: boolean }> {
@@ -88,7 +98,7 @@ class ChartErrorBoundary extends Component<BoundaryProps, { hasError: boolean }>
   render() {
     if (this.state.hasError) {
       return (
-        <FallbackBars data={this.props.data} palette={this.props.palette} height={this.props.height} />
+        <FallbackBars data={this.props.data} palette={this.props.palette} height={this.props.height} useLogScale={this.props.useLogScale} />
       );
     }
     return this.props.children;
@@ -100,6 +110,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
   height = 360,
   palette,
   showOverall = true,
+  useLogScale = false,
 }) => {
   if (!data || data.length === 0) {
     return (
@@ -126,13 +137,15 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
   const overallRate = firstCount > 0 ? (lastCount / firstCount) * 100 : 0;
   const colors = palette && palette.length ? palette : DEFAULT_PALETTE;
 
-  const chartData = clean.map((s) => ({ stage: s.name, value: s.count }));
+  // 对数尺度：将人数映射到 log10(count+1)，tooltip / label 仍用原始人数
+  const plotValues = clean.map((s) => useLogScale ? Math.log10(s.count + 1) : s.count);
+  const chartData = clean.map((s, idx) => ({ stage: s.name, value: plotValues[idx] }));
   const chartHeight = Math.max(220, height - 64); // 阶段标签占 64px
 
   return (
     <div className={styles.funnelChart} style={{ minHeight: height }}>
       <div className={styles.chartWrap}>
-        <ChartErrorBoundary data={clean} palette={colors} height={chartHeight}>
+        <ChartErrorBoundary data={clean} palette={colors} height={chartHeight} useLogScale={useLogScale}>
           <FunnelChartAntd
             data={chartData}
             xField="stage"
@@ -142,8 +155,10 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
             style={{ fillOpacity: 0.92, stroke: '#fff', lineWidth: 2 }}
             scale={{ color: { range: colors.slice(0, clean.length) } }}
             label={{
-              text: (d: { stage?: string; value?: number }) =>
-                `${d.stage ?? ''}\n${Number(d.value ?? 0).toLocaleString()} 人`,
+              text: (d: { stage?: string; value?: number }, index?: number) => {
+                const orig = clean[index ?? 0]?.count ?? 0;
+                return `${d.stage ?? ''}\n${orig.toLocaleString()} 人`;
+              },
               position: 'inside',
               transform: [{ type: 'overlapDodgeY' }],
               style: {
@@ -155,9 +170,9 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
             tooltip={{
               title: (d: { stage?: string }) => d.stage,
               items: [
-                (d: { stage?: string; value?: number }) => ({
-                  name: d.stage,
-                  value: Number(d.value ?? 0).toLocaleString(),
+                (d: { stage?: string; value?: number }, index?: number) => ({
+                  name: d.stage ?? '',
+                  value: (clean[index ?? 0]?.count ?? 0).toLocaleString(),
                 }),
               ],
             }}
