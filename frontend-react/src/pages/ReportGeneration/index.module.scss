@@ -193,3 +193,259 @@
   box-shadow: var(--shadow-elevated);
   border: none;
 }
+
+/* ==================== v3.1.30 纯数据周报样式 ==================== */
+.reportScroll {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: var(--spacer-24) var(--spacer-16);
+}
+
+.reportPage {
+  width: 480px;
+  background: #fafaf8;
+  padding: 24px 28px 32px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1a1a1a;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 刊头 */
+.masthead {
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #1a1a1a;
+  position: relative;
+}
+
+.kicker {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #0052d9;
+  margin-bottom: 6px;
+}
+
+.headline {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0052d9;
+  margin: 0;
+}
+
+.dateline {
+  font-size: 10px;
+  color: #8c8c8c;
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡片层 */
+.layerCard {
+  border-top: 2px solid #1a1a1a;
+  padding: 14px 0 16px;
+  margin-bottom: 16px;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 16px;
+    height: 2px;
+    background: #0052d9;
+  }
+}
+
+.layerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.layerTitle {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.layerTag {
+  font-size: 9px;
+  color: #8c8c8c;
+  letter-spacing: 0.05em;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* 指标网格 */
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 16px;
+}
+
+.metricCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metricLabel {
+  font-size: 10px;
+  color: #525252;
+  letter-spacing: 0.05em;
+}
+
+.metricValue {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.metricCum {
+  font-size: 9px;
+  color: #a3a3a3;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 漏斗行 */
+.funnelRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.funnelCell {
+  padding: 8px 0;
+  border-top: 1px solid #e5e5e5;
+}
+
+.funnelLabel {
+  font-size: 10px;
+  color: #525252;
+  margin-bottom: 4px;
+}
+
+.funnelValue {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0052d9;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.funnelMeta {
+  font-size: 10px;
+  color: #a3a3a3;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图表容器 */
+.chartBox {
+  width: 100%;
+  height: 220px;
+}
+
+/* 数据表格 */
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+
+  th {
+    text-align: right;
+    padding: 8px 6px;
+    font-weight: 600;
+    color: #8c8c8c;
+    border-bottom: 1px solid #d9d9d9;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  td {
+    text-align: right;
+    padding: 9px 6px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #404040;
+    font-variant-numeric: tabular-nums;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  tbody tr:hover {
+    background: #f7f7f7;
+  }
+}
+
+.cellName {
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.cellNum {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* 脚注 */
+.reportFooter {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #d9d9d9;
+}
+
+.footerLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8c8c8c;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.reportFooter ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  counter-reset: note;
+}
+
+.reportFooter li {
+  font-size: 10px;
+  color: #525252;
+  margin-bottom: 4px;
+  padding-left: 20px;
+  position: relative;
+  line-height: 1.6;
+  counter-increment: note;
+
+  &::before {
+    content: counter(note, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #a3a3a3;
+  }
+}
