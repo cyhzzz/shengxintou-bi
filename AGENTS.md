@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.18`（2026-07-16）。下一站 `v3.1.19`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.19`（2026-07-16）。下一站 `v3.1.20`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -253,6 +253,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Flask 后台线程不能用 `current_app`**：自更新 `self_update.py` 的后台 `_do_self_update(task_id, force)` 跑在子线程，**Flask app context 不会自动继承**。要拿 `version` / `current_app.config` 时必须 `with app.app_context():`，否则抛 `RuntimeError: Working outside of application context`。当前实现已用纯函数 `_read_version_json()` / `_run_git()` 绕开，避免引入 context 依赖。
 - **`git pull` 前检测 dirty 工作区**：未 commit 的本地改动会让 `git pull` 直接报 `Your local changes would be overwritten` 失败；前端调 `start(force=true)` 时后端先 `git stash push -u -m self-update-<ts>` 暂存再 pull，更新成功后用 `git stash pop` 恢复（冲突时报错并保留 stash 供用户手动处理）。
 - **Windows `subprocess.run` 弹 cmd 黑窗**：默认 `creationflags=0` 会从父进程继承 console，每次 git 调用（`rev-parse / status / fetch / pull`）都会闪一个黑窗口，用户体验极差。**修复**：`_run_git` 显式传 `creationflags=0x08000000`（CREATE_NO_WINDOW），子进程静默执行、stdout/stderr 仍走 `capture_output=True` 收集。其它 Windows 子进程调用（备份、git hook、第三方 SDK）也按同样方式处理。
+- **报表 `.page` padding 全站统一为 0**（v3.1.19 fix）：早期 OmniChannel `index.module.scss` 用了 `padding: var(--spacer-16)` 让整页内容向右下偏移 16px，与 Dashboard / ConversionFunnel / AnchorCluster / Live/Funnel / AgencyAnalysis / LeadsDetail 等 padding:0 的页面不齐。后续新建 / 修改报表 `.page` 时禁止再加 padding，外层由 MainLayout / ConfigProvider 提供统一间距。
 
 ## 9. 修改守则
 
