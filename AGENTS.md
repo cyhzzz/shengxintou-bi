@@ -122,6 +122,47 @@
 - 新数据类型必须走 v2 原样导入入口：`backend/processors/v2/raw_import.py`。
 - 旧 v1 上传类型已退役并返回 410 Gone，不要复活旧 processor 或旧表链路。
 
+### 业务洞察：新开户 vs 存量客户（核心业务区分，贯穿所有获客类报表）
+
+本项目所有获客类报表的核心业务诉求是「新增」——新开户客户及其引进资产是核心产出指标，存量客户的服务与存量资产仅作辅助参考。两者必须分开分析，不能混算。
+
+- **新开户**：首次在省心投完成开户的客户，带来新增开户量 + 引进资产。
+- **存量客户**：已开户的老客户（含他渠道开户后在本渠道再次出现），其开户量/资产属于存量服务，不代表新增获客。
+- **核心规则**：凡涉及「开户成功」指标的报表，都应进一步拆出「新开户」——开户成功 = 新开户 + 存量客户。漏斗 / 对比 / 创意 / 员工转化 / 直播获客均适用。
+
+#### 应用市场漏斗（fact_conv_appmarket）的存量剔除陷阱
+
+`fact_conv_appmarket` 每行是一个**设备**，其布尔阶段字段（是否激活APP / 是否开户注册 / … / 是否开户成功）是**渐进的**——一个走完全流程的设备，前置阶段字段全=1。
+
+**错误做法**：用 `WHERE 是否新开户 == 1` 过滤结果集。因为「是否新开户=1」的设备必然已开户成功（开户是新开户的前置），过滤后所有行的前置阶段字段全=1，SUM 后「激活APP → 开户注册 → … → 开户成功」全部相等，漏斗变平。
+
+**正确做法**：不过滤，将「新开户」作为「开户成功」之后的漏斗阶段呈现（开户成功 → 新开户 → 入金 → 有效户）。存量客户 = 开户成功 - 新开户，在漏斗中自然递减。
+
+#### 应用市场渠道类型过滤的必要性（互联网引流 vs 误点）
+
+`fact_conv_appmarket.渠道类型` 区分获客来源：**互联网引流** = 应用市场广告投放获取的真实线索；**其它渠道类型**（合作机构/员工开户/自然流入等）= 客户经其他渠道引流后下载 APP 时误点了应用市场广告，并非应用市场广告真正获客。
+
+- 非互联网引流的设备线索与存量客户一样需剔除——它们不是应用市场广告的真实产出。
+- 应用市场所有报表统一走 `_funnel_filters`（强制 `WHERE 渠道类型 == '互联网引流'`），不允许走 `_apply_filters`（后者会带 channel_types 筛选但不强制限互联网引流）。
+- 口径锁定后前端的「渠道类型」筛选项应移除（筛选无意义，口径已固定）。
+
+> 已修复（v3.1.25）：
+> - `backend/routes/data/cost_analysis.py` `conversion-funnel/split` + `backend/routes/reports/app_market.py` `_funnel_filters` 均移除 `是否新开户 == 1` 过滤。
+> - `backend/routes/reports/app_market.py` `app_market_creative` 从 `_apply_filters` 改走 `_funnel_filters`（限互联网引流），funnels 加「新开户」SUM，totals/排序以新开户为核心产出。
+> - `frontend-react/src/pages/Reports/AppMarket/Creative.tsx` 移除渠道类型筛选项，加「总新开户」指标卡 + 「新开户」列 + 「激活→新开户」率 + 默认按新开户降序。
+
+#### 内容平台漏斗（fact_conv_content）的存量剔除
+
+`fact_conv_content` 每行是一条**线索**，布尔字段（是否客户开口 / 是否有效线索 / 是否开户）在该行仍可能=0（新增量客户的线索也可能没开口/没开户），漏斗仍递减。
+
+v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生：有效线索（含存量）→ 有效线索(剔除存量) → 成功开户 → 有效户。`cq_all` 统计线索/开口/有效线索（全部记录），`cq_new` 加 `WHERE 是否为存量客户 != 1` 统计有效线索(非存量)/成功开户/有效户。这样漏斗呈现存量剔除效果，后续阶段只反映新客户。
+
+#### 各报表口径要求（含待修复项）
+
+- **应用市场 · 漏斗/总览/市场对比/明细/创意**：统一走 `_funnel_filters`，仅限 `渠道类型=互联网引流`，新开户作为阶段/指标呈现。✅ 市场对比表已展示「新开户」列 + 「激活→新开户」率 + 月度堆叠图改用新开户。
+- **应用市场 · 创意效果**（`/creative`）：✅ 已修复（v3.1.25）——走 `_funnel_filters` + 新开户 SUM + 前端新开户指标卡/列/默认排序。
+- **员工转化 / 直播获客 / 小红书**：涉及开户量、资产指标时，新开户（新增 + 引进资产）与存量客户（服务 + 存量资产）分开呈现，新开户为主指标、存量为辅助。
+
 ## 3. 共享组件
 
 | 组件                             | 路径                                                    | 职责                                                  |
@@ -371,4 +412,18 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **修复**：之前 `appmarket_stages` 用 `lambda prev=base:` 把 rate 写成"此阶段 / 激活APP"（语义错位 = 累计转化率），已改为 for 循环正确计算 `prev_count`（上一阶段人数）。Reports/AppMarket/Funnel.tsx 调用顺序未受影响。
 
 - **build**：`npx tsc --noEmit` 0 错；`npm run build` 0 错。
+
+### v3.1.26 已落地（2026-07-16）
+
+- **直播漏斗存量剔除 + 同名主播跨平台聚合 + 转化漏斗 4 卡概览（3 项）**：
+  - **直播漏斗 6 阶段 + 11 卡概览（Live/Funnel.tsx）**：原 5 阶段 → 6 阶段（客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户(新) → 有效户(新)），与 `cost_analysis/conversion-funnel/split` 存量剔除口径对齐（非存量 = `是否为存量客户==0 OR IS NULL`）。指标卡从 6 张扩到 11 张，新增「存量客户」「新客户」「有效线索(剔除存量)」「新开户」「新有效户」「新开户资产」「存量资产」7 张分项卡。
+  - **后端 leads.py `anchor-clusters` 端点扩字段**：`base_q` 新增 `existing_leads`（`是否为存量客户==1` 线索 SUM）/ `new_leads`（非存量线索 SUM）/ `new_valid_lead`（非存量且有效线索 SUM）/ `new_opened`（非存量且开户成功 SUM）/ `new_valid`（非存量且有效户 SUM）/ `new_assets`（非存量客户资产 SUM）/ `existing_assets`（存量客户资产 SUM）7 个 SQL 字段；`agg_map`/`items`/`totals` 同步扩到 14 字段；`meta.note` 说明存量客户线索与资产分项辅助呈现。
+  - **同名主播跨平台聚合**：前端 `anchorAggRows` 按 `anchor` 名跨平台聚合，主播详情表展示「覆盖平台」（多 Tag）+「平台数」列，响应上方「主播平台」多选筛选。后端 32 个 platform-anchor 组合，去重后 22 位主播（7 位跨平台：谭记恩/胡磊/余荩 各 3 平台，蒋亦凡/赵茜 各 2 平台）。
+  - **转化漏斗 4 卡概览对齐应用市场**：ConversionFunnel/index.tsx 两个 Tab 的 MetricSection 从 5/4 卡 → 4 卡，与 `Reports/AppMarket/Funnel.tsx` 概览对齐：
+    - 内容平台：客户线索 / 新开户 / 有效户 / 新开户引进资产
+    - 应用市场：激活APP / 新开户 / 有效户 / 新开户引进资产
+  - **后端 cost_analysis.py `conversion-funnel/split` 新增 `new_open_assets`**：内容平台 = `非存量 AND 是否开户==1, SUM(资产)`；应用市场 = `是否新开户==1, SUM(总资产)`（口径与 `app_market.py` 一致）。响应 `funnels.content.new_open_assets` 与 `funnels.appmarket.new_open_assets`。
+  - **Live/Funnel.module.scss 新增 `.stageTable + .colNum` 样式**：阶段明细表与 ConversionFunnel 风格对齐（`table-layout: fixed` + 行高 hover 反色 + 数字列右对齐 + tabular-nums）。
+  - **ReportFooter 补存量剔除口径说明**：直播漏斗页脚加「非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致」「新开户作为核心获客产出，存量客户线索数与存量资产作为辅助呈现」。
+- **校验**：Python smoke `POST /api/v1/leads-detail/anchor-clusters`（2026-01-01 ~ 2026-12-31, top_n=200）→ `total_existing_leads=1703`、`total_new_leads=13052`、`total_existing_assets=¥1,467,064,484.80`、`total_new_assets=¥25,310,560.28`、`total_anchors=32`；`POST /api/v1/conversion-funnel/split` → `content.new_open_assets=143,091,131.4`、`appmarket.new_open_assets=514,198,150.22`。`npx tsc --noEmit` 0 错；`npm run build` 0 错（5988 modules）。
 

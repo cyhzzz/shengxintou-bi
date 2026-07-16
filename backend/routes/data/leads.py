@@ -145,14 +145,43 @@ def get_anchor_clusters():
 
     # 主播聚类正则: (平台)引流-(主播名)
     # 复合来源如 "视频号引流-姚立琦,视频号引流-蒋亦凡" 需按分隔符拆成多个主播归因。
+    # v3.1.26: 存量剔除口径与 cost_analysis/conversion-funnel/split 对齐
+    # 非存量条件: 是否为存量客户 == 0 OR IS NULL
+    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+
     base_q = db.session.query(
         FactConvContent.客户来源,
         FactConvContent.平台来源,
         func.count(FactConvContent.id).label('leads'),
+        # 存量客户线索数（是否为存量客户==1）
+        func.coalesce(func.sum(case((FactConvContent.是否为存量客户 == 1, 1), else_=0)), 0).label('existing_leads'),
+        # 非存量客户线索数
+        func.coalesce(func.sum(case((non_existing, 1), else_=0)), 0).label('new_leads'),
         func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
         func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
         func.coalesce(func.sum(case((FactConvContent.是否开户 == 1, 1), else_=0)), 0).label('opened'),
+        # 非存量有效线索(剔除存量)
+        func.coalesce(func.sum(case(
+            (and_(FactConvContent.是否有效线索 == 1, non_existing), 1), else_=0
+        )), 0).label('new_valid_lead'),
+        # 非存量且开户成功
+        func.coalesce(func.sum(case(
+            (and_(FactConvContent.是否开户 == 1, non_existing), 1), else_=0
+        )), 0).label('new_opened'),
         func.coalesce(func.sum(case((FactConvContent.是否为有效户 == 1, 1), else_=0)), 0).label('valid'),
+        # 非存量且有效户
+        func.coalesce(func.sum(case(
+            (and_(FactConvContent.是否为有效户 == 1, non_existing), 1), else_=0
+        )), 0).label('new_valid'),
+        # v3.1.25: 资产拆分新开 vs 存量
+        func.coalesce(func.sum(case(
+            (non_existing, FactConvContent.资产),
+            else_=0
+        )), 0).label('new_assets'),
+        func.coalesce(func.sum(case(
+            (FactConvContent.是否为存量客户 == 1, FactConvContent.资产),
+            else_=0
+        )), 0).label('existing_assets'),
         func.coalesce(func.sum(FactConvContent.资产), 0).label('assets'),
     ).filter(
         and_(
@@ -199,47 +228,86 @@ def get_anchor_clusters():
                     'platform': anchor_platform,
                     'anchor': anchor_name,
                     'leads': 0,
+                    'existing_leads': 0,
+                    'new_leads': 0,
                     'mouth': 0,
                     'valid_lead': 0,
+                    'new_valid_lead': 0,
                     'opened': 0,
+                    'new_opened': 0,
                     'valid': 0,
+                    'new_valid': 0,
+                    'new_assets': 0.0,
+                    'existing_assets': 0.0,
                     'assets': 0.0,
                     'raw_sources': set(),
                 }
             a = agg_map[key]
             a['leads'] += int(r.leads or 0)
+            a['existing_leads'] += int(r.existing_leads or 0)
+            a['new_leads'] += int(r.new_leads or 0)
             a['mouth'] += int(r.mouth or 0)
             a['valid_lead'] += int(r.valid_lead or 0)
+            a['new_valid_lead'] += int(r.new_valid_lead or 0)
             a['opened'] += int(r.opened or 0)
+            a['new_opened'] += int(r.new_opened or 0)
             a['valid'] += int(r.valid or 0)
+            a['new_valid'] += int(r.new_valid or 0)
+            a['new_assets'] += float(r.new_assets or 0)
+            a['existing_assets'] += float(r.existing_assets or 0)
             a['assets'] += float(r.assets or 0)
             a['raw_sources'].add(segment)
 
     items = []
     for a in agg_map.values():
         leads = a['leads']
+        existing_leads = a['existing_leads']
+        new_leads = a['new_leads']
         opened = a['opened']
+        new_opened = a['new_opened']
         valid = a['valid']
+        new_valid = a['new_valid']
+        new_valid_lead = a['new_valid_lead']
         items.append({
             'platform': a['platform'],
             'anchor': a['anchor'],
             'leads': leads,
+            'existing_leads': existing_leads,
+            'new_leads': new_leads,
             'mouth': a['mouth'],
             'valid_lead': a['valid_lead'],
+            'new_valid_lead': new_valid_lead,
             'opened': opened,
+            'new_opened': new_opened,
+            'existing_opened': opened - new_opened,
             'valid': valid,
+            'new_valid': new_valid,
+            'existing_valid': valid - new_valid,
+            'new_assets': round(a['new_assets'], 2),
+            'existing_assets': round(a['existing_assets'], 2),
             'assets': round(a['assets'], 2),
-            'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
-            'valid_rate': round(valid / leads * 100, 2) if leads > 0 else 0,
+            # 漏斗转化率按新口径计算（线索 → 非存量有效线索 → 非存量开户 → 非存量有效户）
+            'opening_rate': round(new_opened / leads * 100, 2) if leads > 0 else 0,
+            'valid_rate': round(new_valid / leads * 100, 2) if leads > 0 else 0,
             'sources': sorted(a['raw_sources']),
         })
-    items.sort(key=lambda x: (x['leads'], x['opened']), reverse=True)
+    items.sort(key=lambda x: (x['leads'], x['new_opened']), reverse=True)
 
     totals = {
         'total_anchors': len(items),
         'total_leads': sum(i['leads'] for i in items),
+        'total_existing_leads': sum(i['existing_leads'] for i in items),
+        'total_new_leads': sum(i['new_leads'] for i in items),
+        'total_valid_lead': sum(i['valid_lead'] for i in items),
+        'total_new_valid_lead': sum(i['new_valid_lead'] for i in items),
         'total_opened': sum(i['opened'] for i in items),
+        'total_new_opened': sum(i['new_opened'] for i in items),
+        'total_existing_opened': sum(i['existing_opened'] for i in items),
         'total_valid': sum(i['valid'] for i in items),
+        'total_new_valid': sum(i['new_valid'] for i in items),
+        'total_existing_valid': sum(i['existing_valid'] for i in items),
+        'total_new_assets': round(sum(i['new_assets'] for i in items), 2),
+        'total_existing_assets': round(sum(i['existing_assets'] for i in items), 2),
         'total_assets': round(sum(i['assets'] for i in items), 2),
     }
 
@@ -253,9 +321,9 @@ def get_anchor_clusters():
             'platforms': sorted(set(i['platform'] for i in items)),
         },
         'meta': {
-            'version': 'v3.1-anchor-cluster',
+            'version': 'v3.1.26-anchor-cluster',
             'source': 'fact_conv_content.客户来源',
             'pattern': '^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$',
-            'note': '按 客户来源 中"平台引流-主播"模式聚合；复合来源会拆分并分别归因给每个主播',
+            'note': '按 客户来源 中"平台引流-主播"模式聚合；复合来源会拆分并分别归因给每个主播。v3.1.26 起新增 existing_leads/new_leads/new_valid_lead/new_valid 字段。存量客户(是否为存量客户==1)线索计入 existing_leads，但其开户/有效户通常=0(已在别处开户)，其资产计入 existing_assets；非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 对齐。',
         },
     })

@@ -134,3 +134,39 @@
     text-align: right;
   }
 }
+
+// ---------- 漏斗 + 阶段转化详情 左右等高布局（v3.1.25） ----------
+.funnelSplitRow {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+
+  > [class*="ant-col"] {
+    display: flex;
+    flex-direction: column;
+    max-width: none;
+    flex: none;
+
+    > .ant-card {
+      flex: 1 1 auto;
+    }
+  }
+}
+
+.funnelSplitCol {
+  height: 100%;
+}
+
+.h100Card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  :global(.ant-card-body) {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
