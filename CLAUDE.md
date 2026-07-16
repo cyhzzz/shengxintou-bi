@@ -427,3 +427,14 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
   - **ReportFooter 补存量剔除口径说明**：直播漏斗页脚加「非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致」「新开户作为核心获客产出，存量客户线索数与存量资产作为辅助呈现」。
 - **校验**：Python smoke `POST /api/v1/leads-detail/anchor-clusters`（2026-01-01 ~ 2026-12-31, top_n=200）→ `total_existing_leads=1703`、`total_new_leads=13052`、`total_existing_assets=¥1,467,064,484.80`、`total_new_assets=¥25,310,560.28`、`total_anchors=32`；`POST /api/v1/conversion-funnel/split` → `content.new_open_assets=143,091,131.4`、`appmarket.new_open_assets=514,198,150.22`。`npx tsc --noEmit` 0 错；`npm run build` 0 错（5988 modules）。
 
+### v3.1.27 已落地（2026-07-16）
+
+- **主播分析菜单对齐直播漏斗业务口径**：AnchorCluster/index.tsx 复用 `anchor-clusters` 端点（v3.1.26 已扩字段），前端再按 anchor 名跨平台聚合（同名主播合并为一行）。
+  - **概览卡片 5 张 → 11 张**：新增「存量客户」「新客户」「有效线索(剔除存量)」「新开户」「新有效户」「新开户资产」「存量资产」7 张分项卡，与 Live/Funnel 概览口径完全一致。`totals` 改为基于 `anchorAggRows` 去重后聚合（与明细表口径一致），避免 `total_anchors=32`（platform-anchor 组合数）误显示为主播数（实际去重后 22 位）。
+  - **明细表聚合逻辑补全**：原前端聚合只累加 `opened/valid/assets` 等旧字段，新字段 `existing_leads/new_leads/new_valid_lead/new_opened/existing_opened/new_valid/existing_valid/new_assets/existing_assets` 全部缺失。改为 `anchorAggRows` useMemo 按 anchor 名跨平台聚合，累加全部 14 字段；`opening_rate` 改用 `new_opened / leads`（新口径）。
+  - **明细表列扩充**：从 11 列扩到 20 列，新增「存量客户/新客户/有效(非存量)/开户量(全)/新开户/存量开户/有效户(全)/新有效户/新开户资产/存量资产/总资产」等列；「覆盖平台」列改为多 Tag 展开 + 「平台数」列。
+  - **筛选器**：保留「主播平台」多选筛选 + 「主播」多选筛选（支持搜索），`anchorAggRows` 响应两个筛选器。
+  - **CSV 导出**：headers 从 9 列扩到 21 列，含主播/覆盖平台/平台数/线索量/存量客户/新客户/开口/有效线索/有效(非存量)/开户量(全)/新开户/存量开户/有效户(全)/新有效户/存量有效户/新开户率/新有效率/新开户资产/存量资产/总资产/线索来源。CSV 字段转义（含 `,` `"` `\n` 的字段用双引号包裹，内部 `"` 翻倍）。
+  - **ReportFooter 补口径说明**：加「存量剔除口径」「主播聚合」两项，notes 说明新开户作为核心获客产出。
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（5988 modules，37s）；dist grep 命中「主播分析概览/有效线索(剔除存量)/新开户资产」。
+
