@@ -50,10 +50,11 @@ def _apply_filters(q, filters):
 
 
 def _funnel_filters(q, filters):
-    # v3.1.24 业务规则:漏斗端点专用,只看互联网引流 + 新开户(排除存量客户)
+    # v3.1.24 业务规则:漏斗端点只看互联网引流。
+    # 「新开户」作为漏斗阶段(开户成功→新开户)呈现存量剔除,不用 WHERE 过滤——
+    # 否则 是否新开户=1 的设备行其前置阶段字段全部=1,SUM 后漏斗变平。
     q = _apply_filters(q, filters)
     q = q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
-    q = q.filter(FactConvAppmarket.是否新开户 == 1)
     return q
 
 
@@ -90,6 +91,17 @@ def app_market_summary():
     q = _funnel_filters(db.session.query(*_funnel_selects()), filters)
     r = q.first()
     total_counts = _funnel_dict_from_row(r)
+
+    # v3.1.25: 新开户对应的引进资产总额（核心业务产出指标）
+    # 仅对 是否新开户=1 的设备行累加 总资产，存量为 0
+    asset_q = _funnel_filters(
+        db.session.query(
+            func.coalesce(func.sum(case((FactConvAppmarket.是否新开户 == 1, FactConvAppmarket.总资产), else_=0)), 0).label('new_open_assets')
+        ),
+        filters
+    )
+    asset_r = asset_q.first()
+    total_counts['新开户资产'] = round(float(asset_r.new_open_assets or 0), 2)
 
     month_q = _funnel_filters(
         db.session.query(
@@ -282,6 +294,7 @@ def app_market_creative():
     funnels = [
         ('是否激活APP', '激活APP'),
         ('是否开户成功', '开户成功'),
+        ('是否新开户', '新开户'),
         ('是否入金', '入金'),
         ('是否有效户', '有效户'),
     ]
@@ -301,7 +314,9 @@ def app_market_creative():
         FactConvAppmarket.渠道类型,
         *[func.coalesce(func.sum(getattr(FactConvAppmarket, col)), 0).label(alias) for col, alias in funnels]
     )
-    q = _apply_filters(q, filters)
+    # v3.1.25: creative 也走 _funnel_filters(限互联网引流)——非互联网引流的设备
+    # 是客户在其他渠道引流后误点应用市场广告产生的,非真正应用市场广告获客,需剔除(与存量客户同理)。
+    q = _funnel_filters(q, filters)
     q = q.group_by(plan_expr, FactConvAppmarket.投放账号, FactConvAppmarket.应用市场, FactConvAppmarket.渠道类型)
     rows = q.all()
 
@@ -309,6 +324,7 @@ def app_market_creative():
     for r in rows:
         activate = int(r.激活APP or 0)
         opened = int(r.开户成功 or 0)
+        new_open = int(r.新开户 or 0)
         deposit = int(r.入金 or 0)
         valid = int(r.有效户 or 0)
         items.append({
@@ -319,14 +335,17 @@ def app_market_creative():
             '渠道类型': r.渠道类型 or '未归因',
             '激活APP': activate,
             '开户成功': opened,
+            '新开户': new_open,
             '入金': deposit,
             '有效户': valid,
             '激活_开户率': round(opened / activate * 100, 2) if activate > 0 else 0,
+            '激活_新开户率': round(new_open / activate * 100, 2) if activate > 0 else 0,
             '激活_有效率': round(valid / activate * 100, 2) if activate > 0 else 0,
             '开户_有效率': round(valid / opened * 100, 2) if opened > 0 else 0,
+            '开户_新开户率': round(new_open / opened * 100, 2) if opened > 0 else 0,
         })
 
-    items.sort(key=lambda x: (x['开户成功'], x['激活APP']), reverse=True)
+    items.sort(key=lambda x: (x['新开户'], x['开户成功'], x['激活APP']), reverse=True)
     top_items = items[:top_n]
 
     totals = {
@@ -334,6 +353,7 @@ def app_market_creative():
         'top_plans': len(top_items),
         'total_activate': sum(i['激活APP'] for i in items),
         'total_open': sum(i['开户成功'] for i in items),
+        'total_new_open': sum(i['新开户'] for i in items),
         'total_deposit': sum(i['入金'] for i in items),
         'total_valid': sum(i['有效户'] for i in items),
     }

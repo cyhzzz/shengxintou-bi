@@ -223,22 +223,64 @@ def get_conversion_funnel_split():
     ed = filters.get('end_date')
     platforms = filters.get('platforms') or []
 
-    cq = db.session.query(
+    # v3.1.25 业务规则：存量剔除在「有效线索」之后发生。
+    # 客户线索/客户开口/有效线索统计全部记录（含存量），
+    # 然后增加「有效线索(剔除存量)」阶段,后续成功开户/有效户只统计非存量记录。
+    cq_all = db.session.query(
         func.count(FactConvContent.id).label('leads'),
         func.coalesce(func.sum(FactConvContent.是否客户开口), 0).label('mouth'),
         func.coalesce(func.sum(FactConvContent.是否有效线索), 0).label('valid_lead'),
+    )
+    if sd and ed:
+        cq_all = cq_all.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms:
+        cq_all = cq_all.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
+    cr_all = cq_all.first()
+    leads = int(cr_all.leads or 0); mouth = int(cr_all.mouth or 0)
+    valid_lead = int(cr_all.valid_lead or 0)
+
+    # 剔除存量后：有效线索(非存量)/成功开户/有效户仅统计新客户
+    cq_new = db.session.query(
+        func.coalesce(func.sum(FactConvContent.是否有效线索), 0).label('new_valid_lead'),
         func.coalesce(func.sum(FactConvContent.是否开户), 0).label('opened'),
         func.coalesce(func.sum(FactConvContent.是否为有效户), 0).label('valid'),
     )
     if sd and ed:
-        cq = cq.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+        cq_new = cq_new.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms:
-        cq = cq.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
-    # v3.1.24 业务规则：内容平台漏斗只看新开户,排除存量客户
-    cq = cq.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
-    cr = cq.first()
-    leads = int(cr.leads or 0); mouth = int(cr.mouth or 0); valid_lead = int(cr.valid_lead or 0)
-    opened = int(cr.opened or 0); valid = int(cr.valid or 0)
+        cq_new = cq_new.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
+    cq_new = cq_new.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    cr_new = cq_new.first()
+    new_valid_lead = int(cr_new.new_valid_lead or 0)
+    opened = int(cr_new.opened or 0)
+    valid = int(cr_new.valid or 0)
+
+    # 业务说明:成功开户可能大于有效线索(剔除存量),因为存在「非有效线索但新开户」的客户
+    # (未标记为有效线索但实际开户成功)。统计该数量供前端页脚说明。
+    extra_open_q = db.session.query(
+        func.coalesce(func.sum(FactConvContent.是否开户), 0).label('extra_opened'),
+    )
+    if sd and ed:
+        extra_open_q = extra_open_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms:
+        extra_open_q = extra_open_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
+    extra_open_q = extra_open_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    extra_open_q = extra_open_q.filter(FactConvContent.是否有效线索 != 1)
+    extra_open_r = extra_open_q.first()
+    extra_new_opened = int(extra_open_r.extra_opened or 0)
+
+    # v3.1.26 问题3: 内容平台新开户引进资产 = 非存量且开户成功的客户资产 SUM
+    content_asset_q = db.session.query(
+        func.coalesce(func.sum(FactConvContent.资产), 0).label('new_open_assets'),
+    )
+    if sd and ed:
+        content_asset_q = content_asset_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms:
+        content_asset_q = content_asset_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
+    content_asset_q = content_asset_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    content_asset_q = content_asset_q.filter(FactConvContent.是否开户 == 1)
+    content_asset_r = content_asset_q.first()
+    content_new_open_assets = round(float(content_asset_r.new_open_assets or 0), 2)
 
     # 头 2 阶段（广告曝光 / 客户点击）从 agg_vendor_daily 取（内容平台 = 小红书/腾讯/抖音/快手）
     vq = db.session.query(
@@ -255,7 +297,7 @@ def get_conversion_funnel_split():
     clicks = int(vr.clicks or 0)
     cost_total = float(vr.cost or 0)
 
-    # 7 阶段漏斗（v3.1 §三.1）
+    # 8 阶段漏斗（v3.1.25: 有效线索后剔除存量,呈现非存量有效线索→成功开户→有效户）
     content_top = impressions if impressions > 0 else 1
     content_stages = [
         {'step': '广告曝光', 'value': impressions, 'rate': 100.0, 'step_rate': 100.0},
@@ -271,8 +313,11 @@ def get_conversion_funnel_split():
         {'step': '有效线索', 'value': valid_lead,
          'rate': round(valid_lead / mouth * 100, 2) if mouth > 0 else 0,
          'step_rate': round(valid_lead / content_top * 100, 2)},
+        {'step': '有效线索(剔除存量)', 'value': new_valid_lead,
+         'rate': round(new_valid_lead / valid_lead * 100, 2) if valid_lead > 0 else 0,
+         'step_rate': round(new_valid_lead / content_top * 100, 2)},
         {'step': '成功开户', 'value': opened,
-         'rate': round(opened / valid_lead * 100, 2) if valid_lead > 0 else 0,
+         'rate': round(opened / new_valid_lead * 100, 2) if new_valid_lead > 0 else 0,
          'step_rate': round(opened / content_top * 100, 2)},
         {'step': '有效户', 'value': valid,
          'rate': round(valid / opened * 100, 2) if opened > 0 else 0,
@@ -293,9 +338,11 @@ def get_conversion_funnel_split():
     aq = db.session.query(*[func.coalesce(func.sum(col), 0).label(name) for name, col in stage_cols])
     if sd and ed:
         aq = aq.filter(and_(FactConvAppmarket.下载日期 >= sd, FactConvAppmarket.下载日期 <= ed))
-    # v3.1.24 业务规则:应用市场漏斗只看互联网引流 + 新开户(排除存量客户)
+    # v3.1.24 业务规则:应用市场漏斗只看互联网引流。
+    # 「新开户」作为漏斗阶段(开户成功→新开户)呈现存量剔除,而非 WHERE 过滤——
+    # 否则 是否新开户=1 的设备行其前置阶段字段(激活APP/开户注册/.../开户成功)全部=1,
+    # SUM 后激活APP~开户成功全部相等,漏斗变平。存量客户=开户成功-新开户,在漏斗中自然递减。
     aq = aq.filter(FactConvAppmarket.渠道类型 == '互联网引流')
-    aq = aq.filter(FactConvAppmarket.是否新开户 == 1)
     ar = aq.first()
     counts = {name: int(getattr(ar, name) or 0) for name, _ in stage_cols}
     base = counts['激活APP']
@@ -310,6 +357,17 @@ def get_conversion_funnel_split():
         appmarket_stages.append({'step': k, 'value': v, 'rate': rate, 'step_rate': step_rate})
         prev_count = v
 
+    # v3.1.26 问题3: 应用市场新开户引进资产 = 是否新开户==1 的设备行总资产 SUM（口径与 app_market.py 一致）
+    app_asset_q = db.session.query(
+        func.coalesce(func.sum(FactConvAppmarket.总资产), 0).label('new_open_assets'),
+    )
+    if sd and ed:
+        app_asset_q = app_asset_q.filter(and_(FactConvAppmarket.下载日期 >= sd, FactConvAppmarket.下载日期 <= ed))
+    app_asset_q = app_asset_q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    app_asset_q = app_asset_q.filter(FactConvAppmarket.是否新开户 == 1)
+    app_asset_r = app_asset_q.first()
+    appmarket_new_open_assets = round(float(app_asset_r.new_open_assets or 0), 2)
+
     return jsonify({
         'success': True,
         'data': {
@@ -318,11 +376,14 @@ def get_conversion_funnel_split():
                     'stages': content_stages,
                     'data_source': 'fact_conv_content + agg_vendor_daily(前 2 段)',
                     'channel_category': 'content',
+                    'extra_new_opened': extra_new_opened,
+                    'new_open_assets': content_new_open_assets,
                 },
                 'appmarket': {
                     'stages': appmarket_stages,
                     'data_source': 'fact_conv_appmarket',
                     'channel_category': 'appmarket',
+                    'new_open_assets': appmarket_new_open_assets,
                 },
             },
             'core_metrics': {
@@ -333,5 +394,5 @@ def get_conversion_funnel_split():
             },
             'is_employee_mode': is_employee_mode,
         },
-        'meta': {**_META, 'version': 'v3.1-split', 'raw_sums_keys': ['value'], 'derived_keys': ['rate']},
+        'meta': {**_META, 'version': 'v3.1.26-split', 'raw_sums_keys': ['value'], 'derived_keys': ['rate', 'new_open_assets']},
     })
