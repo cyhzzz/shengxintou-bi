@@ -48,6 +48,7 @@ def _run_git(args, cwd, timeout=60):
             timeout=timeout,
             encoding="utf-8",
             errors="replace",
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
         )
         return proc.returncode, proc.stdout, proc.stderr
     except subprocess.TimeoutExpired:
