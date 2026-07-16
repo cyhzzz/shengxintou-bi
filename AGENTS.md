@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.22`（2026-07-16）。下一站 `v3.1.23`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.23`（2026-07-16）。下一站 `v3.1.24`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -67,6 +67,15 @@
 - **菜单清理：删除「简称管理」**：账号管理已包含 platform / agency / agency_short / business_model 全部字段，简称管理菜单冗余，移除 /system/abbreviation-management 菜单项 + pages/System/AbbreviationManagement.tsx + .module.scss + router 路由。后端 abbreviation_mapping 路由保留（DimVendor 由 ETL/导入侧维护）。
 - **线索明细菜单扁平化**：MainLayout 将线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail。
 - **npx tsc --noEmit + npm run build** 双通过。
+
+### v3.1.23 已落地（2026-07-16）
+
+- **转化漏斗报表优化**：
+  - **左右等高布局**：内容平台 / 应用市场 两个 Tab 下的漏斗图 + 阶段转化详情 Card 改为 `<Row align="stretch">` + `<Col span={12}>`，通过 `.funnelSplitRow / .funnelSplitCol / .h100Card` 三个 scss 类拉伸高度。
+  - **8×4 阶段明细表**：原 .stageList / .stageItem 简易渲染改为真 HTML `<table>`（table-layout: fixed）：表头 # / 阶段 / 累计人数 / 累计转化率 4 列；行高 hover 反色；数字列右对齐 + tabular-nums。
+  - **FunnelChart 新增 `useLogScale` 对数尺度**：传入后调用 `Math.log10(count + 1)` 映射缓解各级数据偏差过大（内容平台 5.86亿曝光 → 3099 有效户约 19万倍，线性下层几乎看不见）；CSS FallbackBars 也同步以 log 计算宽度；label / tooltip 始终以原始人数呈现。
+  - **ReportFooter 补选中平台受限说明**：原来塑在筛选卡里的说明“当前仅针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制”移至 ReportFooter.notes，筛选卡唯留提示 + 查询 / 重置按钮。
+- **校验**：Python smoke `POST /api/v1/conversion-funnel/split` 返回两套独立漏斗、content 7 阶段、appmarket 8 阶段；`npm run build` 0 error；`npx tsc --noEmit` 0 error。
 
 ### v3.1.22 已落地（2026-07-16）
 
