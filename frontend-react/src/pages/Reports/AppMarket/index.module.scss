@@ -89,3 +89,48 @@
   display: flex;
   gap: var(--spacer-4);
 }
+// ---------- v3.1.24 阶段明细表(与转化漏斗页同款) ----------
+.stageTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+
+  thead {
+    background: var(--bg-secondary);
+  }
+
+  th, td {
+    padding: var(--spacer-12) var(--spacer-12);
+    text-align: left;
+    border-bottom: 1px solid var(--border-default);
+    font-size: var(--text-base);
+  }
+
+  th {
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    background: var(--bg-secondary);
+  }
+
+  td {
+    color: var(--color-text-secondary);
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover td {
+    background: var(--bg-secondary);
+  }
+
+  .colNum {
+    width: 18%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th.colNum {
+    text-align: right;
+  }
+}

@@ -49,6 +49,14 @@ def _apply_filters(q, filters):
     return q
 
 
+def _funnel_filters(q, filters):
+    # v3.1.24 业务规则:漏斗端点专用,只看互联网引流 + 新开户(排除存量客户)
+    q = _apply_filters(q, filters)
+    q = q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    q = q.filter(FactConvAppmarket.是否新开户 == 1)
+    return q
+
+
 def _funnel_selects():
     sel = []
     for col, alias in FUNNEL_STAGES:
@@ -79,11 +87,11 @@ def app_market_summary():
     """总览：SUM 各阶段 + 按月 × 应用市场透视"""
     data = request.get_json() or {}
     filters = data.get('filters') or {}
-    q = _apply_filters(db.session.query(*_funnel_selects()), filters)
+    q = _funnel_filters(db.session.query(*_funnel_selects()), filters)
     r = q.first()
     total_counts = _funnel_dict_from_row(r)
 
-    month_q = _apply_filters(
+    month_q = _funnel_filters(
         db.session.query(
             func.substr(FactConvAppmarket.下载日期, 1, 7).label('month'),
             FactConvAppmarket.应用市场.label('app_market'),
@@ -102,7 +110,7 @@ def app_market_summary():
             'final_valid_rate': round(cnt['有效户'] / cnt['激活APP'] * 100, 4) if cnt['激活APP'] > 0 else 0,
         })
 
-    market_q = _apply_filters(
+    market_q = _funnel_filters(
         db.session.query(
             FactConvAppmarket.应用市场.label('app_market'),
             *_funnel_selects(),
@@ -151,10 +159,10 @@ def app_market_summary():
 @bp.route('/funnel', methods=['POST'])
 @handle_exceptions
 def app_market_funnel():
-    """单应用市场的漏斗细节"""
+    # 单应用市场的漏斗细节
     data = request.get_json() or {}
     filters = data.get('filters') or {}
-    q = _apply_filters(db.session.query(*_funnel_selects()), filters)
+    q = _funnel_filters(db.session.query(*_funnel_selects()), filters)
     r = q.first()
     counts = _funnel_dict_from_row(r)
     return jsonify({

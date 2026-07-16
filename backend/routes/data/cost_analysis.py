@@ -7,7 +7,7 @@
 - summary：totals + 派生 avg_cost_per_*
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from backend.models_v2 import AggVendorDaily, FactConvContent, FactConvAppmarket
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -234,6 +234,8 @@ def get_conversion_funnel_split():
         cq = cq.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms:
         cq = cq.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
+    # v3.1.24 业务规则：内容平台漏斗只看新开户,排除存量客户
+    cq = cq.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
     cr = cq.first()
     leads = int(cr.leads or 0); mouth = int(cr.mouth or 0); valid_lead = int(cr.valid_lead or 0)
     opened = int(cr.opened or 0); valid = int(cr.valid or 0)
@@ -254,14 +256,27 @@ def get_conversion_funnel_split():
     cost_total = float(vr.cost or 0)
 
     # 7 阶段漏斗（v3.1 §三.1）
+    content_top = impressions if impressions > 0 else 1
     content_stages = [
-        {'step': '广告曝光', 'value': impressions, 'rate': 100.0},
-        {'step': '客户点击', 'value': clicks, 'rate': round(clicks / impressions * 100, 2) if impressions > 0 else 0},
-        {'step': '客户线索', 'value': leads, 'rate': round(leads / clicks * 100, 2) if clicks > 0 else 0},
-        {'step': '客户开口', 'value': mouth, 'rate': round(mouth / leads * 100, 2) if leads > 0 else 0},
-        {'step': '有效线索', 'value': valid_lead, 'rate': round(valid_lead / mouth * 100, 2) if mouth > 0 else 0},
-        {'step': '成功开户', 'value': opened, 'rate': round(opened / valid_lead * 100, 2) if valid_lead > 0 else 0},
-        {'step': '有效户', 'value': valid, 'rate': round(valid / opened * 100, 2) if opened > 0 else 0},
+        {'step': '广告曝光', 'value': impressions, 'rate': 100.0, 'step_rate': 100.0},
+        {'step': '客户点击', 'value': clicks,
+         'rate': round(clicks / impressions * 100, 2) if impressions > 0 else 0,
+         'step_rate': round(clicks / content_top * 100, 2)},
+        {'step': '客户线索', 'value': leads,
+         'rate': round(leads / clicks * 100, 2) if clicks > 0 else 0,
+         'step_rate': round(leads / content_top * 100, 2)},
+        {'step': '客户开口', 'value': mouth,
+         'rate': round(mouth / leads * 100, 2) if leads > 0 else 0,
+         'step_rate': round(mouth / content_top * 100, 2)},
+        {'step': '有效线索', 'value': valid_lead,
+         'rate': round(valid_lead / mouth * 100, 2) if mouth > 0 else 0,
+         'step_rate': round(valid_lead / content_top * 100, 2)},
+        {'step': '成功开户', 'value': opened,
+         'rate': round(opened / valid_lead * 100, 2) if valid_lead > 0 else 0,
+         'step_rate': round(opened / content_top * 100, 2)},
+        {'step': '有效户', 'value': valid,
+         'rate': round(valid / opened * 100, 2) if opened > 0 else 0,
+         'step_rate': round(valid / content_top * 100, 2)},
     ]
 
     stage_cols = [
@@ -274,16 +289,26 @@ def get_conversion_funnel_split():
         ('入金', FactConvAppmarket.是否入金),
         ('有效户', FactConvAppmarket.是否有效户),
     ]
+    stage_cols.insert(6, ('新开户', FactConvAppmarket.是否新开户))
     aq = db.session.query(*[func.coalesce(func.sum(col), 0).label(name) for name, col in stage_cols])
     if sd and ed:
         aq = aq.filter(and_(FactConvAppmarket.下载日期 >= sd, FactConvAppmarket.下载日期 <= ed))
+    # v3.1.24 业务规则:应用市场漏斗只看互联网引流 + 新开户(排除存量客户)
+    aq = aq.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    aq = aq.filter(FactConvAppmarket.是否新开户 == 1)
     ar = aq.first()
     counts = {name: int(getattr(ar, name) or 0) for name, _ in stage_cols}
     base = counts['激活APP']
-    appmarket_stages = [
-        {'step': s, 'value': counts[s], 'rate': round(counts[s] / base * 100, 2) if base > 0 else 0}
-        for s, _ in stage_cols
-    ]
+    # v3.1.24: rate = 此阶段/上一阶段(阶段转化率);step_rate = 此阶段/激活APP(累计转化率)
+    appmarket_stages = []
+    prev_count = base
+    keys = [s for s, _ in stage_cols]
+    for k in keys:
+        v = counts[k]
+        rate = round(v / prev_count * 100, 2) if prev_count > 0 else 0
+        step_rate = round(v / (base or 1) * 100, 2)
+        appmarket_stages.append({'step': k, 'value': v, 'rate': rate, 'step_rate': step_rate})
+        prev_count = v
 
     return jsonify({
         'success': True,
