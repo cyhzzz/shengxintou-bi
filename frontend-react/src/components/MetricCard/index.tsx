@@ -90,13 +90,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     }
   };
 
-  const getTrendColor = (color?: WowChangeColor) => {
-    const isPositive = color === 'green';
-    if (inverseTrend) {
-      return isPositive ? 'var(--color-error)' : 'var(--color-success)';
-    }
-    return isPositive ? 'var(--color-success)' : 'var(--color-error)';
-  };
+  // 中国股市惯例上升=红下降=绿：color 只是方向标记，不区分业务趋势。inverseTrend 已废弃但保留接口避免外部 break。
+  const getTrendColor = (color?: WowChangeColor) =>
+    color === 'green' ? 'var(--color-success)' : 'var(--color-error)';
 
   const renderFooter = () => {
     if (description) {
