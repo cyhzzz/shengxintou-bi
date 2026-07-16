@@ -476,6 +476,23 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.33 已落地（2026-07-16） 报告生成页数据周报线索数拆分 + 堆叠图改造
+
+- **后端 `_query_metrics` 线索数拆分**：原 `leads`（`agg_vendor_daily.线索数` 单值）拆为 2 项：
+  - **企微数 `leads_wx`**：`fact_conv_content COUNT(*)`，内容平台线索明细（1 行=1 企微），按 `线索日期 BETWEEN [sd, ed]` 过滤。
+  - **APP激活数 `leads_app`**：`agg_vendor_daily.APP激活人数 SUM`，应用市场线索。
+- **METRICS 从 6 项扩到 7 项**：消耗金额 / 品牌曝光 / **企微数** / **APP激活数** / 开户数 / 新增有效户数 / 新增客户资产。`week_over_week` keys 同步扩。
+- **堆叠图改造**：
+  - 移除 `daily_valid_stacked`（原有效户数按日堆叠）。
+  - 新增 `weekly_opens_stacked`：**全年按周次 × 渠道堆叠**，参考厂商分析报表样式。周次列表由 `get_all_fridays_in_year` + `get_week_info` 生成 W01..W28（仅保留 `wsd <= ed` 的周次，跨周末时 `wed = min(wed, ed)`），每个周次的日数据合并到周次（`_pivot_weekly`）。
+  - `channels` 改为按全年开户数总和降序（保持图例顺序稳定）。
+- **前端 `ReportGeneration/index.tsx`**：
+  - `METRICS` 拆为 7 项；`MetricSet` 接口 `leads` → `leads_wx` + `leads_app`。
+  - 两个图都画开户数堆叠：图 1 本周按日（`stack: 'opens'`）、图 2 全年按周次（`stack: '总量'`，参考 `AgencyAnalysis trendOption` 配置：`barMaxWidth=36` / `emphasis.focus='series'` / `legend.bottom type='scroll'` / `yAxis.axisLabel.formatter` w 单位）。
+  - `validChartRef` → `yearlyChartRef`，`validChartInstanceRef` → `yearlyChartInstanceRef`。
+- **脚注更新**：新增「企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）」与「两图均为开户数堆叠（按渠道分色）：左图本周按日，右图全年按周次」。
+- **校验**：`npm run build` 0 错（44.52s）；`POST /api/v1/reports/weekly/data` W28 返回 `current_week.leads_wx=296 / leads_app=5237`（vs v3.1.32 `leads=300`）；`year_to_date.leads_wx=28669 / leads_app=137180`；`weekly_opens_stacked` 28 周数据，W01 `{yj:44, 云极:66, 其他:9, 小红书:25, 抖音:38, 腾讯:27, 高德:3}`；`channels` 14 个渠道。
+
 ## v3.1.32 已落地（2026-07-16） 报告生成页数据周报按业务维度重梳
 
 - **后端 `weekly_reports.py` `/data` 端点完全重写**：新增 `_query_metrics(sd, ed)` helper 函数复用于本周 / 全年累计 / 上周三套时间区间。返回结构改为：

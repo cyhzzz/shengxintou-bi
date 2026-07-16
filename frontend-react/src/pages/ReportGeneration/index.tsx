@@ -34,7 +34,8 @@ interface PeriodOption {
 interface MetricSet {
   cost: number;          // 消耗金额
   impressions: number;   // 品牌曝光
-  leads: number;         // 线索数
+  leads_wx: number;      // 企微数（内容平台）
+  leads_app: number;     // APP激活数（应用市场）
   opens: number;         // 开户数
   valid: number;         // 新增有效户数
   assets: number;        // 新增客户资产
@@ -56,16 +57,17 @@ interface WeeklyData {
   prev_week: MetricSet;
   week_over_week: { [K in keyof MetricSet]: number | null };
   daily_opens_stacked: Array<Record<string, number | string>>;
-  daily_valid_stacked: Array<Record<string, number | string>>;
+  weekly_opens_stacked: Array<Record<string, number | string>>;
   channels: string[];
   internet_ratio: { opens_ratio: number; valid_ratio: number };
 }
 
-// 6 个核心指标定义
+// 7 个核心指标定义（v3.1.32：线索数拆分为企微数 + APP激活数）
 const METRICS: Array<{ key: keyof MetricSet; label: string; fmt: (n: number) => string }> = [
   { key: 'cost', label: '消耗金额', fmt: fmtMoney },
   { key: 'impressions', label: '品牌曝光', fmt: fmtLarge },
-  { key: 'leads', label: '线索数', fmt: fmtNum },
+  { key: 'leads_wx', label: '企微数', fmt: fmtNum },
+  { key: 'leads_app', label: 'APP激活数', fmt: fmtNum },
   { key: 'opens', label: '开户数', fmt: fmtNum },
   { key: 'valid', label: '新增有效户数', fmt: fmtNum },
   { key: 'assets', label: '新增客户资产', fmt: fmtMoney },
@@ -117,9 +119,9 @@ const ReportGeneration: React.FC = () => {
 
   const posterRef = useRef<HTMLDivElement>(null);
   const opensChartRef = useRef<HTMLDivElement>(null);
-  const validChartRef = useRef<HTMLDivElement>(null);
+  const yearlyChartRef = useRef<HTMLDivElement>(null);
   const opensChartInstanceRef = useRef<echarts.ECharts | null>(null);
-  const validChartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const yearlyChartInstanceRef = useRef<echarts.ECharts | null>(null);
 
   // 加载报告期选项
   const loadWeekOptions = useCallback(async () => {
@@ -176,7 +178,7 @@ const ReportGeneration: React.FC = () => {
     loadWeekOptions();
   }, [loadWeekOptions]);
 
-  // 渲染开户数堆叠柱状图
+  // 渲染开户数 · 本周内按日堆叠柱状图
   useEffect(() => {
     if (!weeklyData || !opensChartRef.current) return;
     if (opensChartInstanceRef.current) {
@@ -191,14 +193,16 @@ const ReportGeneration: React.FC = () => {
 
     const option: echarts.EChartsOption = {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { data: channels, top: 0, textStyle: { fontSize: 9 } },
-      grid: { top: 36, left: 36, right: 16, bottom: 24 },
-      xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
+      legend: { data: channels, top: 0, textStyle: { fontSize: 9 }, type: 'scroll' },
+      grid: { top: 36, left: 36, right: 16, bottom: 24, containLabel: true },
+      xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: dates.length > 7 ? 30 : 0 } },
       yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
       series: channels.map((ch, idx) => ({
         name: ch,
         type: 'bar',
         stack: 'opens',
+        barMaxWidth: 36,
+        emphasis: { focus: 'series' },
         data: weeklyData.daily_opens_stacked.map((d) => Number(d[ch] || 0)),
         itemStyle: { color: pickEChartsColor(idx) },
       })),
@@ -214,30 +218,49 @@ const ReportGeneration: React.FC = () => {
     };
   }, [weeklyData]);
 
-  // 渲染有效户数堆叠柱状图
+  // 渲染开户数 · 年内按周次堆叠柱状图（参考厂商分析报表样式）
   useEffect(() => {
-    if (!weeklyData || !validChartRef.current) return;
-    if (validChartInstanceRef.current) {
-      validChartInstanceRef.current.dispose();
-      validChartInstanceRef.current = null;
+    if (!weeklyData || !yearlyChartRef.current) return;
+    if (yearlyChartInstanceRef.current) {
+      yearlyChartInstanceRef.current.dispose();
+      yearlyChartInstanceRef.current = null;
     }
-    const chart = echarts.init(validChartRef.current);
-    validChartInstanceRef.current = chart;
+    const chart = echarts.init(yearlyChartRef.current);
+    yearlyChartInstanceRef.current = chart;
 
-    const dates = weeklyData.daily_valid_stacked.map((d) => fmtDate(String(d.date)));
+    const weeks = weeklyData.weekly_opens_stacked.map((d) => String(d.week));
     const channels = weeklyData.channels;
 
     const option: echarts.EChartsOption = {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { data: channels, top: 0, textStyle: { fontSize: 9 } },
-      grid: { top: 36, left: 36, right: 16, bottom: 24 },
-      xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9 } },
-      yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
+        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+      },
+      legend: { data: channels, bottom: 0, textStyle: { fontSize: 9 }, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        boundaryGap: true,
+        data: weeks,
+        axisLabel: { fontSize: 9, rotate: weeks.length > 12 ? 30 : 0 },
+      },
+      yAxis: {
+        type: 'value',
+        name: '开户数',
+        nameTextStyle: { fontSize: 11, color: '#8a8d99' },
+        axisLabel: {
+          fontSize: 9,
+          formatter: (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(1)}w` : v.toFixed(0)),
+        },
+      },
       series: channels.map((ch, idx) => ({
         name: ch,
         type: 'bar',
-        stack: 'valid',
-        data: weeklyData.daily_valid_stacked.map((d) => Number(d[ch] || 0)),
+        stack: '总量',
+        barMaxWidth: 36,
+        emphasis: { focus: 'series' },
+        data: weeklyData.weekly_opens_stacked.map((d) => Number(d[ch] || 0)),
         itemStyle: { color: pickEChartsColor(idx) },
       })),
     };
@@ -248,7 +271,7 @@ const ReportGeneration: React.FC = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.dispose();
-      validChartInstanceRef.current = null;
+      yearlyChartInstanceRef.current = null;
     };
   }, [weeklyData]);
 
@@ -493,33 +516,35 @@ const ReportGeneration: React.FC = () => {
                   </div>
                 </section>
 
-                {/* 3. 开户数按渠道堆叠日走势 */}
+                {/* 3. 开户数 · 本周按日堆叠 */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>开户数 · 按渠道堆叠日走势</span>
+                    <span className={styles.layerTitle}>开户数 · 本周按日堆叠</span>
                     <span className={styles.layerTag}>互联网引流</span>
                   </div>
                   <div ref={opensChartRef} className={styles.chartBox} />
                 </section>
 
-                {/* 4. 有效户数按渠道堆叠日走势 */}
+                {/* 4. 开户数 · 全年按周次堆叠 */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
-                    <span className={styles.layerTitle}>有效户数 · 按渠道堆叠日走势</span>
-                    <span className={styles.layerTag}>互联网引流</span>
+                    <span className={styles.layerTitle}>开户数 · 全年按周次堆叠</span>
+                    <span className={styles.layerTag}>互联网引流 · 年初至今</span>
                   </div>
-                  <div ref={validChartRef} className={styles.chartBox} />
+                  <div ref={yearlyChartRef} className={styles.chartBox} />
                 </section>
 
                 {/* 脚注 */}
                 <footer className={styles.reportFooter}>
                   <div className={styles.footerLabel}>Notes · 数据说明</div>
                   <ul>
-                    <li>消耗金额 / 品牌曝光 / 线索数：来自 agg_vendor_daily（广告投放日聚合）</li>
+                    <li>消耗金额 / 品牌曝光 / APP激活数：来自 agg_vendor_daily（广告投放日聚合）</li>
+                    <li>企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）</li>
                     <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
                     <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
                     <li>全年累计：年初至周末；环比：与上一周对比</li>
                     <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入）</li>
+                    <li>两图均为开户数堆叠（按渠道分色）：左图本周按日，右图全年按周次</li>
                   </ul>
                 </footer>
               </div>
