@@ -84,10 +84,13 @@ const XhsNotesOperationPage: React.FC = () => {
 
       const element = pageRef.current;
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         logging: false,
-        backgroundColor: 'var(--bg-page)',
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        allowTaint: false,
+        backgroundColor: document.documentElement.classList.contains('dark') ? '#0f1419' : '#ffffff',
       });
 
       if (type === 'image') {
@@ -119,8 +122,9 @@ const XhsNotesOperationPage: React.FC = () => {
         message.success({ content: '导出PDF成功', key: 'export' });
       }
     } catch (error) {
-      console.error('导出失败:', error);
-      message.error({ content: '导出失败，请重试', key: 'export' });
+      console.error('[XhsNotes/Operation] 导出失败:', error);
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      message.error({ content: `导出失败 · ${detail}。如重试仍失败请刷新本页重试。`, key: 'export', duration: 6 });
     }
   };
 
