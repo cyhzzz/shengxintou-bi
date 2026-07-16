@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.1.19`（2026-07-16）。下一站 `v3.1.20`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
+- 当前版本基线：`version.json` 为 `3.1.20`（2026-07-16）。下一站 `v3.1.21`（待规划：webdav 5xx 长尾专项排查 + 账号管理迭代）。
 
 ### v3.1.11 已落地（2026-07-15）
 
@@ -67,6 +67,15 @@
 - **菜单清理：删除「简称管理」**：账号管理已包含 platform / agency / agency_short / business_model 全部字段，简称管理菜单冗余，移除 /system/abbreviation-management 菜单项 + pages/System/AbbreviationManagement.tsx + .module.scss + router 路由。后端 abbreviation_mapping 路由保留（DimVendor 由 ETL/导入侧维护）。
 - **线索明细菜单扁平化**：MainLayout 将线索明细由 leads-detail-group 子菜单（单条 /leads-detail 子项）扁平化为顶级菜单项 key=/leads-detail。
 - **npx tsc --noEmit + npm run build** 双通过。
+
+### v3.1.20 已落地（2026-07-16）
+
+- **应用市场设备明细（AppMarket/Detail）与线索明细同步**：两个表都是原样呈现底表源表（fact_conv_appmarket / fact_conv_content）。
+  - **后端 `app_market_detail` 从 16 字段扩充为 43 字段**：与 `models_v2.FactConvAppmarket` 1:1，表格列（下载日期 / 应用市场 / 应用市场名称 / 渠道类型 / 设备号 / 资金账号 / 激活APP / 开户成功 / 新开户 / 入金 / 有效户）保留短名 bool；详情浮7e7a5c5f33字段以源表中文列名完整返回（含数据更新日期 / 投放账号 / 广告计划ID / 注册手机号 / 是否注册身份证 / 注册身份证时间 / 是否注册银行卡 / 注册银行卡时间 / 是否激活APP / APP激活时间 / 是否开户注册 / 注册开户流程时间 / 是否提交开户 / 提交开户时间 / 是否开户成功 / 开户成功时间 / 开户时间 / 是否新开户 / 是否创建完资金账号 / 资金账号创建完成时间 / 是否入金 / 是否有效户 / 有效户时间 / 是否存量客户 / 总资产 / 累计创收 / 人均日创收）。
+  - **5 个 bool 列加 `dataIndex` + `key`**：原代码 `render: (v: any) => v ? ...` 没设 dataIndex，antd 把整行 record 当 v 传入（对象永远 truthy → 全"是"）。现在表格 5 个 bool 列均设 `dataIndex: '激活APP'` 等 + 统一 `renderBool`。
+  - **详情浮7e7a5c5f33 Descriptions（column=2）**：与 LeadsDetail 同款、`width=800` + `.detailModal` label 加宽 110px。
+  - **过滤/表格/模态三段样式对齐 LeadsDetail**：`filterRow / filterGroup / filterLabel / filterActions` + `tableCard / tableHeader / tableTitle / statText`；`.page` padding 16 -> 0（v3.1.19 同款修复）。
+- **校验**：`npm run build` 0 error（5988 modules）→ dist 刷新→ 5000 端口可访问；Python smoke `POST /api/v1/reports/app-market/detail` 返回 43 字段、bool 为 true/false、总行数 137,516。
 
 ### v3.1.17 已落地（2026-07-15）
 
@@ -228,7 +237,10 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 8. 注意事项 / 踩坑记录
 
-- **不要动 `data.py.backup_20260211_174355`**：v0.9.1 拆分前的 4000 行单文件备份，仅留作对照。
+- **不要动 `data.py.backup_20260211_174355`**
+- **后端详情接口与前端浮7e7a5c5f33字段对齐**：修改详情浮7e7a5c5f33前一定检查后端返回的字段集是否覆盖所有 Descriptions.Item 的 label；不覆盖则部分字段显示"-"。AppMarket/Detail 原只返 16 字段，前端浮7e7a5c5f33 33 字段，v3.1.20 后端扩为 43 字段与源表 1:1。
+
+：v0.9.1 拆分前的 4000 行单文件备份，仅留作对照。
 - **`models_v2.py` 列名含中文**（如 `AggVendorDaily.花费`、`FactConvContent.微信昵称`），SQLAlchemy 用 `Text`/`BigInteger`/`Float`，**禁止改列名以匹配业务字段**。
 - **报表头部数据卡片一律 `MetricCard + MetricSection`**；禁止在 page 内重新实现 `Card + Row/Col` 卡片组（小红书运营报表 XhsNotes/Operation 与 EmployeeConversion Weekly 周报海报子系统除外）。
 - **数据源 / 端点 / 口径说明一律放进 `ReportFooter`**，不要在 MetricCard description 或筛选卡里重复。
@@ -250,6 +262,8 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **数据源**：v2 上传识别 6 个新类型（account_mapping / conversion_content / conversion_appmarket / vendor_daily / xhs_note / channel_open）→ 旧 7 个类型 → 410 Gone。
 - **Swagger**：`/apidocs` 可选（需装 flasgger，未列在 requirements.txt），app.py 已做 ImportError 容错。
 - **一次性脚本**：`scripts/_write_docs.py` / `_patch_creative.py` 等保留在 `scripts/` 下，不进 git 索引，使用时按需。
+
+- **antd `Table` columns 缺 `dataIndex`**：列未设 dataIndex 时 `render(v)` 拿到的 `v` 是整行 record，对象恒 truthy → 全部返回"是"（AppMarket/Detail 5 个 bool 列出现过此 bug，v3.1.20 修复）。
 - **Flask 后台线程不能用 `current_app`**：自更新 `self_update.py` 的后台 `_do_self_update(task_id, force)` 跑在子线程，**Flask app context 不会自动继承**。要拿 `version` / `current_app.config` 时必须 `with app.app_context():`，否则抛 `RuntimeError: Working outside of application context`。当前实现已用纯函数 `_read_version_json()` / `_run_git()` 绕开，避免引入 context 依赖。
 - **`git pull` 前检测 dirty 工作区**：未 commit 的本地改动会让 `git pull` 直接报 `Your local changes would be overwritten` 失败；前端调 `start(force=true)` 时后端先 `git stash push -u -m self-update-<ts>` 暂存再 pull，更新成功后用 `git stash pop` 恢复（冲突时报错并保留 stash 供用户手动处理）。
 - **Windows `subprocess.run` 弹 cmd 黑窗**：默认 `creationflags=0` 会从父进程继承 console，每次 git 调用（`rev-parse / status / fetch / pull`）都会闪一个黑窗口，用户体验极差。**修复**：`_run_git` 显式传 `creationflags=0x08000000`（CREATE_NO_WINDOW），子进程静默执行、stdout/stderr 仍走 `capture_output=True` 收集。其它 Windows 子进程调用（备份、git hook、第三方 SDK）也按同样方式处理。
