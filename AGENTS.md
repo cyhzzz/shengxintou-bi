@@ -476,6 +476,16 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.35 已落地（2026-07-17） 报告生成页 KPI 环形图 + 占比拆本周/年度
+
+- **后端 internet_ratio 拆本周/年度**：`weekly_reports.py` 从 2 字段（opens_ratio/valid_ratio）扩到 4 字段，新增 `year_opens_ratio`/`year_valid_ratio`（全年累计全渠道占比）。
+- **后端新增 kpi 对象**：`KPI_TARGETS = { opens: 20000, valid: 10000, assets: 5亿 }`；`time_progress = (ed_dt.date() - 当年1月1日).days + 1) / 全年天数`；`rate = 实际值 / (目标 × 时间进度) × 100%`。响应带 `kpi.time_progress` + 3 项 KPI（target/actual/rate）。
+- **前端 KpiRing 微型 SVG 环形图组件**：28x28 viewBox，r=10，`strokeDasharray + strokeDashoffset` 画进度环；颜色按 rate 分档（≥100绿 / ≥75蓝 / ≥50橙 / <50红）；核心指标卡片右上角 `layerTag`（原灰字"本周/全年累计/环比"）替换为 3 个 `KpiRing`（开户数/有效户/资产）+ 标签 + 完成率数字。
+- **占比卡片改为表格**：从 2 卡（开户占比/有效户占比）改为 `ratioTable` 3 列（指标/本周/全年累计），与核心指标表同款样式（table-layout:fixed + colgroup）。
+- **ReportFooter 补 KPI 口径说明**：时间进度、目标值、计算公式。
+- **修复**：`ed` 是 string，与 `_date` 相减报 `TypeError`；改用 `ed_dt.date()`。
+- **校验**：`npm run build` 0 错（42.45s）；`POST /api/v1/reports/weekly/data` W28 `internet_ratio` 4 字段（本周 opens_ratio=2.36%/valid_ratio=13.53%，年度 year_opens_ratio=1.82%/year_valid_ratio=6.62%）；`kpi.time_progress=53.97%`，`opens rate=79.26%`，`valid rate=76.17%`，`assets rate=243.56%`（超额完成）。
+
 ## v3.1.34 已落地（2026-07-17） 报告生成页 UI 修复 + 堆叠图按 3 大类聚合
 
 - **Notes 数据说明移到底部**：`reportScroll` 从 `display:flex; justify-content:center`（水平排列）改为 `flex-direction:column; align-items:center`（垂直排列），footer 从 reportPage 右侧移到下方；`reportFooter` 加 `width:480px` 与 reportPage 同宽对齐。

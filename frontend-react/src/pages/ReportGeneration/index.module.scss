@@ -286,6 +286,87 @@
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
+/* v3.1.35 KPI 环形图行（核心指标卡片右上角） */
+.kpiRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.kpiRing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpiRingText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.kpiRingLabel {
+  font-size: 8px;
+  color: #8c8c8c;
+  letter-spacing: 0.05em;
+}
+
+.kpiRingRate {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* v3.1.35 占比表（本周 + 全年累计） */
+.ratioTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  colgroup col:nth-child(1) { width: 130px; }
+  colgroup col:nth-child(2),
+  colgroup col:nth-child(3) { width: calc((100% - 130px) / 2); }
+
+  th {
+    text-align: right;
+    padding: 10px 6px;
+    font-weight: 600;
+    color: #8c8c8c;
+    border-bottom: 1.5px solid #1a1a1a;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  td {
+    text-align: right;
+    padding: 12px 6px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #1a1a1a;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: 13px;
+    white-space: nowrap;
+
+    &:first-child {
+      text-align: left;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+    }
+  }
+
+  tbody tr:hover {
+    background: #f7f7f7;
+  }
+}
+
 /* 指标网格 */
 .metricGrid {
   display: grid;

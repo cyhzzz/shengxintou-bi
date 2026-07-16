@@ -804,22 +804,76 @@ def get_weekly_data():
     weekly_opens_stacked = _pivot_weekly(opens_yearly_rows)
 
     # ===== 互联网渠道占公司开户占比（互联网引流 / 全渠道类别）=====
-    all_opens = db.session.query(
+    # 本周占比
+    week_all_opens = db.session.query(
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0)
     ).filter(and_(
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
     )).scalar() or 0
-    all_valid = db.session.query(
+    week_all_valid = db.session.query(
         func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0)
     ).filter(and_(
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
     )).scalar() or 0
+    # 年度占比（全年累计全渠道）
+    year_all_opens = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0)
+    ).filter(and_(
+        AggDailyChannelOpen.时间区间 >= year_start,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).scalar() or 0
+    year_all_valid = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0)
+    ).filter(and_(
+        AggDailyChannelOpen.时间区间 >= year_start,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).scalar() or 0
 
     internet_ratio = {
-        'opens_ratio': _safe_div(current_week['opens'], all_opens, pct=True) if all_opens else 0.0,
-        'valid_ratio': _safe_div(current_week['valid'], all_valid, pct=True) if all_valid else 0.0,
+        'opens_ratio': _safe_div(current_week['opens'], week_all_opens, pct=True) if week_all_opens else 0.0,
+        'valid_ratio': _safe_div(current_week['valid'], week_all_valid, pct=True) if week_all_valid else 0.0,
+        'year_opens_ratio': _safe_div(year_to_date['opens'], year_all_opens, pct=True) if year_all_opens else 0.0,
+        'year_valid_ratio': _safe_div(year_to_date['valid'], year_all_valid, pct=True) if year_all_valid else 0.0,
+    }
+
+    # ===== 年度 KPI 完成率（按时间进度测算）=====
+    # 时间进度 = 当前周末日 / 全年天数
+    from datetime import date as _date
+    year_total_days = (_date(report_year, 12, 31) - _date(report_year, 1, 1)).days + 1
+    passed_days = (ed_dt.date() - _date(report_year, 1, 1)).days + 1
+    time_progress = passed_days / year_total_days
+
+    KPI_TARGETS = {
+        'opens': 20000,    # 开户数年度KPI 2万户
+        'valid': 10000,    # 有效户年度KPI 1万户
+        'assets': 5_0000_0000,  # 资产年度KPI 5亿
+    }
+
+    def _kpi_rate(key):
+        target = KPI_TARGETS[key]
+        actual = year_to_date[key]
+        expected = target * time_progress
+        return _safe_div(actual, expected, pct=True) if expected else 0.0
+
+    kpi = {
+        'time_progress': round(time_progress * 100, 2),  # 时间进度 %
+        'opens': {
+            'target': KPI_TARGETS['opens'],
+            'actual': year_to_date['opens'],
+            'rate': _kpi_rate('opens'),  # 完成率 %
+        },
+        'valid': {
+            'target': KPI_TARGETS['valid'],
+            'actual': year_to_date['valid'],
+            'rate': _kpi_rate('valid'),
+        },
+        'assets': {
+            'target': KPI_TARGETS['assets'],
+            'actual': year_to_date['assets'],
+            'rate': _kpi_rate('assets'),
+        },
     }
 
     return jsonify({
@@ -843,5 +897,6 @@ def get_weekly_data():
             'weekly_opens_stacked': weekly_opens_stacked,
             'channels': channels,
             'internet_ratio': internet_ratio,
+            'kpi': kpi,
         }
     })
