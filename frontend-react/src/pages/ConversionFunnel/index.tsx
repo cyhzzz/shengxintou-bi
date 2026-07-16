@@ -166,9 +166,6 @@ const ConversionFunnelPage: React.FC = () => {
             />
             <Button type="primary" icon={<SearchOutlined />} onClick={loadData}>查询</Button>
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 12 }}>
-              当前只针对 内容平台 / 应用市场 两套独立漏斗加载；选中平台仅受后端 现有 platforms 参数限制。
-            </span>
           </Space>
         </Card>
 
@@ -212,31 +209,47 @@ const ConversionFunnelPage: React.FC = () => {
                       </MetricSection>
                     </Col>
                   )}
-                  {/* 漏斗图 */}
+                  {/* 漏斗图 + 阶段明细 左右等高布局（v3.1.23） */}
                   <Col span={24}>
-                    <Card title="7 阶段转化漏斗" size="small">
-                      {contentStages.length ? (
-                        <FunnelChart data={contentFunnelData} height={520} />
-                      ) : (
-                        <Empty description="无数据" />
-                      )}
-                    </Card>
-                  </Col>
-                  {/* 阶段明细 */}
-                  <Col span={24}>
-                    <Card title="阶段转化详情" size="small">
-                      <div className={styles.stageList}>
-                        {contentStages.map((s, idx) => (
-                          <div key={s.step} className={styles.stageItem}>
-                            <Tag color="blue">{idx + 1}. {s.step}</Tag>
-                            <span className={styles.stageValue}>{s.value.toLocaleString()}</span>
-                            <Tag color={s.rate > 50 ? 'green' : s.rate > 10 ? 'gold' : 'default'}>
-                              累计 {s.rate.toFixed(2)}%
-                            </Tag>
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
+                    <Row gutter={[16, 16]} align="stretch" className={styles.funnelSplitRow}>
+                      <Col span={12} className={styles.funnelSplitCol}>
+                        <Card title="7 阶段转化漏斗" size="small" className={styles.h100Card}>
+                          {contentStages.length ? (
+                            <FunnelChart data={contentFunnelData} height={520} useLogScale />
+                          ) : (
+                            <Empty description="无数据" />
+                          )}
+                        </Card>
+                      </Col>
+                      <Col span={12} className={styles.funnelSplitCol}>
+                        <Card title="阶段转化详情" size="small" className={styles.h100Card}>
+                          <table className={styles.stageTable}>
+                            <thead>
+                              <tr>
+                                <th className={styles.colNum}>#</th>
+                                <th>阶段</th>
+                                <th className={styles.colNum}>累计人数</th>
+                                <th className={styles.colNum}>累计转化率</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {contentStages.map((s, idx) => (
+                                <tr key={s.step}>
+                                  <td className={styles.colNum}>{idx + 1}</td>
+                                  <td>{sanitizeText(s.step)}</td>
+                                  <td className={styles.colNum}>{s.value.toLocaleString()}</td>
+                                  <td className={styles.colNum}>
+                                    <Tag color={s.rate > 50 ? 'green' : s.rate > 10 ? 'gold' : 'default'}>
+                                      {s.rate.toFixed(2)}%
+                                    </Tag>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </Card>
+                      </Col>
+                    </Row>
                   </Col>
                 </Row>
               ),
@@ -285,28 +298,45 @@ const ConversionFunnelPage: React.FC = () => {
                     </Col>
                   )}
                   <Col span={24}>
-                    <Card title="8 阶段转化漏斗（应用市场口径）" size="small">
-                      {appmarketStages.length ? (
-                        <FunnelChart data={appmarketFunnelData} height={520} />
-                      ) : (
-                        <Empty description="无数据" />
-                      )}
-                    </Card>
-                  </Col>
-                  <Col span={24}>
-                    <Card title="阶段转化详情" size="small">
-                      <div className={styles.stageList}>
-                        {appmarketStages.map((s, idx) => (
-                          <div key={s.step} className={styles.stageItem}>
-                            <Tag color="purple">{idx + 1}. {s.step}</Tag>
-                            <span className={styles.stageValue}>{s.value.toLocaleString()}</span>
-                            <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
-                              累计 {s.rate.toFixed(2)}%
-                            </Tag>
-                          </div>
-                        ))}
-                      </div>
-                    </Card>
+                    <Row gutter={[16, 16]} align="stretch" className={styles.funnelSplitRow}>
+                      <Col span={12} className={styles.funnelSplitCol}>
+                        <Card title="8 阶段转化漏斗（应用市场口径）" size="small" className={styles.h100Card}>
+                          {appmarketStages.length ? (
+                            <FunnelChart data={appmarketFunnelData} height={520} useLogScale />
+                          ) : (
+                            <Empty description="无数据" />
+                          )}
+                        </Card>
+                      </Col>
+                      <Col span={12} className={styles.funnelSplitCol}>
+                        <Card title="阶段转化详情" size="small" className={styles.h100Card}>
+                          <table className={styles.stageTable}>
+                            <thead>
+                              <tr>
+                                <th className={styles.colNum}>#</th>
+                                <th>阶段</th>
+                                <th className={styles.colNum}>累计人数</th>
+                                <th className={styles.colNum}>累计转化率</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {appmarketStages.map((s, idx) => (
+                                <tr key={s.step}>
+                                  <td className={styles.colNum}>{idx + 1}</td>
+                                  <td>{sanitizeText(s.step)}</td>
+                                  <td className={styles.colNum}>{s.value.toLocaleString()}</td>
+                                  <td className={styles.colNum}>
+                                    <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
+                                      {s.rate.toFixed(2)}%
+                                    </Tag>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </Card>
+                      </Col>
+                    </Row>
                   </Col>
                 </Row>
               ),
@@ -320,7 +350,7 @@ const ConversionFunnelPage: React.FC = () => {
             { label: '应用市场漏斗', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
             { label: '端点', value: 'POST /api/v1/conversion-funnel/split' },
           ]}
-          notes={'双漏斗互为独立数据源，按渠道类别拆分。占比由前端按响应数据实时算 (value/previous)。v3.1 默认走 split，旧 is_employee_mode 单端点已弃用 (v3.2 删除)。'}
+          notes={`选中平台仅受后端现有 platforms 参数限制，当前仅针对 内容平台 / 应用市场 两套独立漏斗加载。漏斗采用对数尺度 (log10) 映射缓解各级数据偏差过大问题；表格与 tooltip 仍显示原始人数。`}
         />
       </Spin>
     </div>
