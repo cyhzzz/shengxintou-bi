@@ -1,7 +1,9 @@
 {
-  "version": "3.1.18",
+  "version": "3.1.19",
   "release_date": "2026-07-16",
   "changelog": [
+    "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16->0，对齐其它报表",
+    "v3.1.19 fix: 全渠道获客 OmniChannel .page padding 16→0，对齐其它报表",
     "v3.1.18 fix: 自更新 _run_git 加 CREATE_NO_WINDOW，不再弹 cmd 黑窗",
     "v3.1.17 HelpModal 资源修复（logo-横版 + 陈元昊肖像 + 姓名/typo）+ 一键 GitHub 自更新功能",
     "v3.1.16 GitHub 版本对比 + 问号角标红点 + 静默失败",
