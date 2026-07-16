@@ -709,7 +709,7 @@ def get_weekly_data():
         ['cost', 'impressions', 'leads_wx', 'leads_app', 'opens', 'valid', 'assets']
     }
 
-    # ===== 堆叠图 1：本周内按日 × 渠道（互联网引流开户数） =====
+    # ===== 堆叠图 1：本周内按日 × 渠道大类（互联网引流开户数） =====
     opens_daily_rows = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
         AggDailyChannelOpen.渠道名称.label('channel'),
@@ -720,8 +720,7 @@ def get_weekly_data():
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
 
-    # ===== 堆叠图 2：全年内按周次 × 渠道（互联网引流开户数） =====
-    # 用 get_all_fridays_in_year 计算每周起止，再按周聚合
+    # ===== 堆叠图 2：全年内按周次 × 渠道大类（互联网引流开户数） =====
     opens_yearly_rows = db.session.query(
         AggDailyChannelOpen.时间区间.label('date'),
         AggDailyChannelOpen.渠道名称.label('channel'),
@@ -732,6 +731,23 @@ def get_weekly_data():
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
 
+    # 渠道 → 大类映射（v3.1.33：堆叠图按 3 大类聚合）
+    CHANNEL_CATEGORY_MAP = {
+        # 内容平台
+        '小红书': '内容平台', '腾讯': '内容平台', '抖音': '内容平台',
+        '快手': '内容平台', '财联社': '内容平台', 'yj': '内容平台',
+        '云极': '内容平台', '其他': '内容平台',
+        # 应用市场
+        '华为': '应用市场', '荣耀': '应用市场', '小米': '应用市场',
+        'oppo': '应用市场', 'vivo': '应用市场', '苹果': '应用市场', '鸿蒙': '应用市场',
+        # 本地生活
+        '高德': '本地生活',
+    }
+    CHANNEL_CATEGORIES = ['内容平台', '应用市场', '本地生活']
+
+    def _map_channel(ch):
+        return CHANNEL_CATEGORY_MAP.get(ch, '内容平台')
+
     # 构造年内周次列表 [{week: 'W01', sd, ed}, ...]，仅保留有数据的周
     fridays = get_all_fridays_in_year(report_year)
     week_list = []
@@ -739,10 +755,8 @@ def get_weekly_data():
         wi = get_week_info(f)
         wsd = wi['start_date']
         wed = wi['end_date']
-        # 跳过完全在数据范围之后的周（ed < wsd）或之前的周（wed < year_start 不可能）
         if wsd > ed:
             continue
-        # 截止到当前周末
         if wed > ed:
             wed = ed
         week_list.append({'week': f'W{i:02d}', 'sd': wsd, 'ed': wed})
@@ -753,39 +767,38 @@ def get_weekly_data():
                 return w['week']
         return None
 
-    # 收集所有渠道名（按全年开户数总和降序，保持图例顺序稳定）
-    channel_set = {}
+    # channels 固定为 3 大类（按全年开户数降序）
+    cat_total = {c: 0 for c in CHANNEL_CATEGORIES}
     for r in opens_yearly_rows:
-        ch = r.channel or '未分类'
-        channel_set[ch] = channel_set.get(ch, 0) + int(r.val or 0)
-    channels = sorted(channel_set.keys(), key=lambda c: channel_set[c], reverse=True)
+        cat = _map_channel(r.channel)
+        cat_total[cat] = cat_total.get(cat, 0) + int(r.val or 0)
+    channels = sorted(CHANNEL_CATEGORIES, key=lambda c: cat_total.get(c, 0), reverse=True)
 
-    # 图 1：按日 pivot
+    # 图 1：按日 pivot（按大类聚合）
     def _pivot_daily(rows):
         all_dates = sorted(set([r.date for r in rows]))
         m = {}
         for r in rows:
             d = r.date
-            ch = r.channel or '未分类'
+            cat = _map_channel(r.channel)
             if d not in m:
                 m[d] = {'date': d}
-            m[d][ch] = int(r.val or 0)
+            m[d][cat] = m[d].get(cat, 0) + int(r.val or 0)
         return [m.get(d, {'date': d}) for d in all_dates]
 
     daily_opens_stacked = _pivot_daily(opens_daily_rows)
 
-    # 图 2：按周 pivot —— 把同周同渠道的多日数据合并到周次
+    # 图 2：按周 pivot（按大类聚合）
     def _pivot_weekly(rows):
         m = {}
         for r in rows:
             wk = _find_week(r.date)
             if not wk:
                 continue
-            ch = r.channel or '未分类'
+            cat = _map_channel(r.channel)
             if wk not in m:
                 m[wk] = {'week': wk}
-            m[wk][ch] = m[wk].get(ch, 0) + int(r.val or 0)
-        # 确保所有周都有（缺失补空对象）
+            m[wk][cat] = m[wk].get(cat, 0) + int(r.val or 0)
         return [m.get(w['week'], {'week': w['week']}) for w in week_list]
 
     weekly_opens_stacked = _pivot_weekly(opens_yearly_rows)

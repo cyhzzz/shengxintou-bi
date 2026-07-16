@@ -476,6 +476,19 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.34 已落地（2026-07-17） 报告生成页 UI 修复 + 堆叠图按 3 大类聚合
+
+- **Notes 数据说明移到底部**：`reportScroll` 从 `display:flex; justify-content:center`（水平排列）改为 `flex-direction:column; align-items:center`（垂直排列），footer 从 reportPage 右侧移到下方；`reportFooter` 加 `width:480px` 与 reportPage 同宽对齐。
+- **核心指标表第一列换行修复**：`metricTable` 加 `table-layout:fixed` + `<colgroup>`（第一列固定 130px，其余 3 列均分 `calc((100%-130px)/3)`）；`td/th` 加 `white-space:nowrap` + `word-break:keep-all`，第一列 `overflow:hidden + text-overflow:ellipsis` 兜底。根因：480px 宽的 reportPage 内 4 列无固定宽度，数字列把第一列挤窄导致"新增有效户数"等长标签换行变 3 倍行高。
+- **堆叠图渠道按 3 大类聚合**：后端 `weekly_reports.py` 新增 `CHANNEL_CATEGORY_MAP` 映射：
+  - **内容平台**：小红书 / 腾讯 / 抖音 / 快手 / 财联社 / yj / 云极 / 其他
+  - **应用市场**：华为 / 荣耀 / 小米 / oppo / vivo / 苹果 / 鸿蒙
+  - **本地生活**：高德
+  
+  `_pivot_daily` / `_pivot_weekly` 改用 `_map_channel()` 按大类聚合；`channels` 固定为 3 大类按全年开户数降序（应用市场 4557 > 内容平台 3929 > 本地生活 70）。
+- **顶部横线去重**：`masthead` 去掉 `border-bottom` + `margin-bottom:20px→0`，保留第一个 `layerCard` 的 `border-top:2px` 作为刊头与内容的单条分隔线（原先 masthead border-bottom + layerCard border-top 两条线紧挨）。
+- **校验**：`npm run build` 0 错（45.51s）；`POST /api/v1/reports/weekly/data` W28 `channels=['应用市场','内容平台','本地生活']`，`weekly_opens_stacked` 28 周，W01 `{内容平台:209, 本地生活:3}`，W28 `{内容平台:30, 应用市场:106}`，全年合计 8556 与 `current_week.opens` 一致。
+
 ## v3.1.33 已落地（2026-07-16） 报告生成页数据周报线索数拆分 + 堆叠图改造
 
 - **后端 `_query_metrics` 线索数拆分**：原 `leads`（`agg_vendor_daily.线索数` 单值）拆为 2 项：
