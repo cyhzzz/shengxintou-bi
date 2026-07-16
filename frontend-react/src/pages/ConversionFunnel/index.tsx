@@ -181,7 +181,7 @@ const ConversionFunnelPage: React.FC = () => {
                   {/* 核心指标 */}
                   {contentMetrics && (
                     <Col span={24}>
-                      <MetricSection title="内容平台核心指标" description="线索、开口到有效户的核心转化表现（v3.1.4 起从客户线索起步；曝光 / 点击仍见下方漏斗 7 阶段）">
+                      <MetricSection title="内容平台核心指标" description="线索、开口、成功开户到有效户的核心转化表现（v3.1.4 起从客户线索起步；曝光 / 点击仍见下方漏斗 7 阶段）">
                         <MetricCard
                           title="客户线索"
                           value={contentMetrics.leads}
@@ -196,6 +196,14 @@ const ConversionFunnelPage: React.FC = () => {
                           valueColor="var(--chart-color-7)"
                           icon={<MessageOutlined style={{ color: 'var(--chart-color-7)' }} />}
                           description={`线索中已沟通开口的客户数`}
+                          showWowChange={false}
+                        />
+                        <MetricCard
+                          title="成功开户"
+                          value={contentMetrics.opened}
+                          valueColor="var(--chart-color-3)"
+                          icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
+                          description={`客户开口后成功开户人数`}
                           showWowChange={false}
                         />
                         <MetricCard
@@ -229,6 +237,7 @@ const ConversionFunnelPage: React.FC = () => {
                                 <th className={styles.colNum}>#</th>
                                 <th>阶段</th>
                                 <th className={styles.colNum}>累计人数</th>
+                                <th className={styles.colNum}>阶段转化率</th>
                                 <th className={styles.colNum}>累计转化率</th>
                               </tr>
                             </thead>
@@ -241,6 +250,11 @@ const ConversionFunnelPage: React.FC = () => {
                                   <td className={styles.colNum}>
                                     <Tag color={s.rate > 50 ? 'green' : s.rate > 10 ? 'gold' : 'default'}>
                                       {s.rate.toFixed(2)}%
+                                    </Tag>
+                                  </td>
+                                  <td className={styles.colNum}>
+                                    <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
+                                      {s.step_rate.toFixed(2)}%
                                     </Tag>
                                   </td>
                                 </tr>
@@ -316,6 +330,7 @@ const ConversionFunnelPage: React.FC = () => {
                                 <th className={styles.colNum}>#</th>
                                 <th>阶段</th>
                                 <th className={styles.colNum}>累计人数</th>
+                                <th className={styles.colNum}>阶段转化率</th>
                                 <th className={styles.colNum}>累计转化率</th>
                               </tr>
                             </thead>
@@ -328,6 +343,11 @@ const ConversionFunnelPage: React.FC = () => {
                                   <td className={styles.colNum}>
                                     <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
                                       {s.rate.toFixed(2)}%
+                                    </Tag>
+                                  </td>
+                                  <td className={styles.colNum}>
+                                    <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
+                                      {s.step_rate.toFixed(2)}%
                                     </Tag>
                                   </td>
                                 </tr>
@@ -350,7 +370,7 @@ const ConversionFunnelPage: React.FC = () => {
             { label: '应用市场漏斗', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
             { label: '端点', value: 'POST /api/v1/conversion-funnel/split' },
           ]}
-          notes={`选中平台仅受后端现有 platforms 参数限制，当前仅针对 内容平台 / 应用市场 两套独立漏斗加载。漏斗采用对数尺度 (log10) 映射缓解各级数据偏差过大问题；表格与 tooltip 仍显示原始人数。`}
+          notes={`选中平台仅受后端现有 platforms 参数限制。内容平台漏斗仅看新开户（排除存量客户，FactConvContent.是否为存量客户=0）；应用市场漏斗限渠道类型=互联网引流 + 是否新开户=1。漏斗采用对数尺度 (log10) 映射缓解各级数据偏差过大问题；表格与 tooltip 仍显示原始人数。 stage.rate =此阶段/上一阶段、stage.step_rate =此阶段/顶端。`}
         />
       </Spin>
     </div>

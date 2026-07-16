@@ -358,3 +358,17 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - `docs/*_legacy.md`：历史归档，仅作参考。
 
 
+
+### v3.1.24 已落地（2026-07-16）
+
+- **转化漏斗业务规则统一（5 项）**：
+  - **内容平台核心指标加"成功开户"卡**：ConversionFunnel/index.tsx 在"客户开口"MetricCard 后插入"成功开户"MetricCard（`AimOutlined` + `var(--chart-color-3)`），显示 `contentMetrics.opened`（即 `fact_conv_content.是否开户` SUM）。
+  - **阶段转化详情新增"阶段转化率"列**：两张 stageTable thead/tbody 在"累计人数"和"累计转化率"之间插入"阶段转化率"列。`stage.rate = 此阶段 / 上一阶段`、`stage.step_rate = 此阶段 / 顶端`，分别用不同色阶 Tag 渲染。后端 cost_analysis.py 把 contentStages + appmarketStages 全部补齐 `rate` + `step_rate` 两个语义字段，并把 list comprehension 改为显式 for 循环保证 prev_count 正确传递。
+  - **应用市场漏斗限定"渠道类型=互联网引流 + 是否新开户=1"**：app_market.py 新增 `_funnel_filters(q, filters)`（在 `_apply_filters` 后追加 `FactConvAppmarket.渠道类型 == '互联网引流'` + `FactConvAppmarket.是否新开户 == 1`），`/summary` (total + month_market + by_market 三个子查询) 和 `/funnel` 两个端点改为走 `_funnel_filters`；detail / comparison / by_channel_type 继续走 `_apply_filters` 不受影响。
+  - **内容平台漏斗排除存量客户仅看新开户**：cost_analysis.py 的 `cq` 查询在 `平台来源.in_(platforms)` 后追加 `or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))`，让聚合口径只看新开户。
+  - **应用市场 9 阶段文案同步 + Reports/AppMarket/Funnel.tsx 口径/样式与转化漏斗页对齐**：appmarketStages 显式插入"新开户"阶段（`stage_cols.insert(6, ('新开户', FactConvAppmarket.是否新开户))`）；Funnel.tsx 加 `useLogScale`，详情卡从 `div.funnelList` 改为 `table.stageTable + colNum`（同 ConversionFunnel 风格），文案升级到 9 阶段并标注 `_funnel_filters` 业务限制；AppMarket/index.module.scss 追加 `.stageTable + .colNum` 样式块。
+
+- **修复**：之前 `appmarket_stages` 用 `lambda prev=base:` 把 rate 写成"此阶段 / 激活APP"（语义错位 = 累计转化率），已改为 for 循环正确计算 `prev_count`（上一阶段人数）。Reports/AppMarket/Funnel.tsx 调用顺序未受影响。
+
+- **build**：`npx tsc --noEmit` 0 错；`npm run build` 0 错。
+

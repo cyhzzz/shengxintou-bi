@@ -123,42 +123,52 @@ const AppMarketFunnelPage: React.FC = () => {
         <Row gutter={[16, 16]}>
           <Col span={24}>
             <Card title='9 阶段漏斗图' size='small'>
-              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={500} />
+              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={520} useLogScale />
             </Card>
           </Col>
           <Col span={24}>
             <Card title='各阶段转化详情' size='small'>
-              <div className={styles.funnelList}>
-                {funnel.map((s: any, idx: number) => (
-                  <div key={s.step} className={styles.funnelItem}>
-                    <div className={styles.funnelStep}>
-                      <Tag color={idx === 0 ? 'blue' : 'default'}>{idx + 1}. {s.step}</Tag>
-                    </div>
-                    <div className={styles.funnelCount}>{s.count?.toLocaleString() || 0}</div>
-                    <div className={styles.funnelRates}>
-                      <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
-                        累计 {s.step_rate?.toFixed(2) || 0}%
-                      </Tag>
-                      {idx > 0 && (
-                        <Tag color={s.rate > 50 ? 'green' : 'default'}>
-                          阶段 {s.rate?.toFixed(2) || 0}%
+              <table className={styles.stageTable}>
+                <thead>
+                  <tr>
+                    <th className={styles.colNum}>#</th>
+                    <th>阶段</th>
+                    <th className={styles.colNum}>累计人数</th>
+                    <th className={styles.colNum}>阶段转化率</th>
+                    <th className={styles.colNum}>累计转化率</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnel.map((s: any, idx: number) => (
+                    <tr key={s.step}>
+                      <td className={styles.colNum}>{idx + 1}</td>
+                      <td>{s.step}</td>
+                      <td className={styles.colNum}>{s.count?.toLocaleString() || 0}</td>
+                      <td className={styles.colNum}>
+                        <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
+                          {s.rate?.toFixed(2) || 0}%
                         </Tag>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </td>
+                      <td className={styles.colNum}>
+                        <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
+                          {s.step_rate?.toFixed(2) || 0}%
+                        </Tag>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </Card>
           </Col>
         </Row>
 
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'fact_conv_appmarket（8 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 入金 → 有效户）' },
-            { label: '端点', value: 'POST /api/v1/reports/app-market/summary' },
+            { label: '数据源', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },
+            { label: '端点', value: 'POST /api/v1/reports/app-market/summary（v3.1.24 起走 _funnel_filters，业务限渠道类型=互联网引流 + 是否新开户=1）' },
             { label: '漏斗顶端', value: '激活APP人数（衡量获客容量）' },
           ]}
-          notes={'总体转化率 = 有效户 / 激活APP；阶段转化率 = 当前阶段 / 上一阶段，由后端返回的 step_rate / rate 字段提供。'}
+          notes={'v3.1.24 业务口径：仅统计 渠道类型=互联网引流 且 是否新开户=1 的设备，与转化漏斗页口径完全一致。rate = 此阶段/上一阶段，step_rate = 此阶段/顶端，漏斗采用 log10 映射缓解各级数据偏差过大问题。'}
         />
       </Spin>
     </div>
