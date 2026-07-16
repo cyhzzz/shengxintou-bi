@@ -476,6 +476,14 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **Weekly/index.tsx 调用点接 line**：两个 <WeeklyReportPreview /> 依顺接 mode prop；同时 poster 路径将 loading={false} 改为 loading={loading} ，反映自动生成期间的 Spin。
 - **验证**：npx tsc --noEmit 0 错、npm run build 0 错（built in ~21s）、vite 3000 与 Flask 5000 两端 /employee-conversion/weekly 路由返 SPA shell 200、POST /api/v1/employee-conversion/weekly 以默认周口径返平台 rank 、star 正确。
 
+## v3.1.36 已落地（2026-07-17） 报告生成页堆叠图色系改造（内容平台红 / 应用市场蓝 / 本地生活绿）
+
+- **后端堆叠图改回按具体渠道聚合**：`weekly_reports.py` 的 `_pivot_daily` / `_pivot_weekly` 不再按 3 大类压缩，恢复按 14 个具体渠道返回；保留 `CHANNEL_CATEGORY_MAP` 供前端色系分配使用；`channels` 按全年开户数降序。
+- **前端色系映射**：新增 `CHANNEL_CATEGORY_MAP`（与后端一致）+ `CONTENT_REDS` 8 档红色系（深红→浅红）+ `APPMARKET_BLUES` 8 档蓝色系（深蓝→浅蓝）+ `LOCAL_GREEN` 绿色；`buildChannelColorMap(channels)` 按渠道所属大类分配同色系内深浅（开户数越大颜色越深）。
+- **自定义 3 大类图例**：ECharts `legend.show = false`（不再显示 14 个渠道名），改用 `layerHeader` 右侧 `.catLegend` 自定义图例（3 个色块 + 文字：内容平台/应用市场/本地生活），与原 `layerTag` 占用空间相近。
+- **图表空间优化**：去掉 legend 后 grid top 从 36/10% 降到 8/5%，绘图区域更大。
+- **校验**：`npm run build` 0 错（43.76s）；`POST /api/v1/reports/weekly/data` W28 `channels=14`，全年合计 8556 与 YTD 一致。
+
 ## v3.1.35 已落地（2026-07-17） 报告生成页 KPI 环形图 + 占比拆本周/年度
 
 - **后端 internet_ratio 拆本周/年度**：`weekly_reports.py` 从 2 字段（opens_ratio/valid_ratio）扩到 4 字段，新增 `year_opens_ratio`/`year_valid_ratio`（全年累计全渠道占比）。

@@ -286,6 +286,29 @@
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
+/* v3.1.36 3 大类自定义图例（堆叠图 layerHeader 右侧） */
+.catLegend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.catLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #595959;
+  letter-spacing: 0.02em;
+}
+
+.catLegendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
 /* v3.1.35 KPI 环形图行（核心指标卡片右上角） */
 .kpiRow {
   display: flex;

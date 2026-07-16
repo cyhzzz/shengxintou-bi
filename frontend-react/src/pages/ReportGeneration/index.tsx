@@ -120,6 +120,53 @@ function fmtWow(n: number | null | undefined): { text: string; positive: boolean
   return { text: `${sign}${n.toFixed(2)}%`, positive: n >= 0 };
 }
 
+// 渠道 → 大类映射（与后端 CHANNEL_CATEGORY_MAP 一致）
+const CHANNEL_CATEGORY_MAP: Record<string, string> = {
+  小红书: '内容平台', 腾讯: '内容平台', 抖音: '内容平台',
+  快手: '内容平台', 财联社: '内容平台', yj: '内容平台',
+  云极: '内容平台', 其他: '内容平台',
+  华为: '应用市场', 荣耀: '应用市场', 小米: '应用市场',
+  oppo: '应用市场', vivo: '应用市场', 苹果: '应用市场', 鸿蒙: '应用市场',
+  高德: '本地生活',
+};
+
+// 各大类的色系（同色系内按索引取深浅，越深 = 越靠前（开户数越大））
+const CONTENT_REDS = [
+  '#8b0000', '#a52a2a', '#c0392b', '#d63031',
+  '#e74c3c', '#e57373', '#ef9a9a', '#ffcdd2',
+];
+const APPMARKET_BLUES = [
+  '#0d47a1', '#1565c0', '#1976d2', '#1e88e5',
+  '#2196f3', '#42a5f5', '#64b5f6', '#90caf9',
+];
+const LOCAL_GREEN = '#27ae60';
+
+// 渠道索引缓存（按同色系内的排序分配深浅）
+function buildChannelColorMap(channels: string[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  const contentChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '内容平台');
+  const appChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '应用市场');
+  const localChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '本地生活');
+
+  contentChs.forEach((ch, i) => {
+    map[ch] = CONTENT_REDS[Math.min(i, CONTENT_REDS.length - 1)];
+  });
+  appChs.forEach((ch, i) => {
+    map[ch] = APPMARKET_BLUES[Math.min(i, APPMARKET_BLUES.length - 1)];
+  });
+  localChs.forEach((ch) => {
+    map[ch] = LOCAL_GREEN;
+  });
+  return map;
+}
+
+// 3 大类的代表色（用于自定义图例）
+const CATEGORY_REP_COLORS: Record<string, string> = {
+  内容平台: '#c0392b',
+  应用市场: '#1976d2',
+  本地生活: '#27ae60',
+};
+
 // v3.1.35 微型 KPI 环形图（SVG，尺寸 ~44x32，与原 layerTag 灰字占用空间相近）
 function KpiRing({ label, rate }: { label: string; rate: number }) {
   // rate 为百分比，>100 时截断到 100 用于画环
@@ -236,21 +283,22 @@ const ReportGeneration: React.FC = () => {
 
     const dates = weeklyData.daily_opens_stacked.map((d) => fmtDate(String(d.date)));
     const channels = weeklyData.channels;
+    const colorMap = buildChannelColorMap(channels);
 
     const option: echarts.EChartsOption = {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      legend: { data: channels, top: 0, textStyle: { fontSize: 9 }, type: 'scroll' },
-      grid: { top: 36, left: 36, right: 16, bottom: 24, containLabel: true },
+      legend: { show: false },
+      grid: { top: 8, left: 36, right: 16, bottom: 24, containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: dates.length > 7 ? 30 : 0 } },
       yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
-      series: channels.map((ch, idx) => ({
+      series: channels.map((ch) => ({
         name: ch,
         type: 'bar',
         stack: 'opens',
         barMaxWidth: 36,
         emphasis: { focus: 'series' },
         data: weeklyData.daily_opens_stacked.map((d) => Number(d[ch] || 0)),
-        itemStyle: { color: pickEChartsColor(idx) },
+        itemStyle: { color: colorMap[ch] || '#999' },
       })),
     };
     chart.setOption(option);
@@ -276,6 +324,7 @@ const ReportGeneration: React.FC = () => {
 
     const weeks = weeklyData.weekly_opens_stacked.map((d) => String(d.week));
     const channels = weeklyData.channels;
+    const colorMap = buildChannelColorMap(channels);
 
     const option: echarts.EChartsOption = {
       tooltip: {
@@ -283,8 +332,8 @@ const ReportGeneration: React.FC = () => {
         axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
         valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
       },
-      legend: { data: channels, bottom: 0, textStyle: { fontSize: 9 }, type: 'scroll' },
-      grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+      legend: { show: false },
+      grid: { left: '3%', right: '4%', bottom: '8%', top: '5%', containLabel: true },
       xAxis: {
         type: 'category',
         boundaryGap: true,
@@ -300,14 +349,14 @@ const ReportGeneration: React.FC = () => {
           formatter: (v: number) => (v >= 10000 ? `${(v / 10000).toFixed(1)}w` : v.toFixed(0)),
         },
       },
-      series: channels.map((ch, idx) => ({
+      series: channels.map((ch) => ({
         name: ch,
         type: 'bar',
         stack: '总量',
         barMaxWidth: 36,
         emphasis: { focus: 'series' },
         data: weeklyData.weekly_opens_stacked.map((d) => Number(d[ch] || 0)),
-        itemStyle: { color: pickEChartsColor(idx) },
+        itemStyle: { color: colorMap[ch] || '#999' },
       })),
     };
     chart.setOption(option);
@@ -592,7 +641,17 @@ const ReportGeneration: React.FC = () => {
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
                     <span className={styles.layerTitle}>开户数 · 本周按日堆叠</span>
-                    <span className={styles.layerTag}>互联网引流</span>
+                    <div className={styles.catLegend}>
+                      {['内容平台', '应用市场', '本地生活'].map((cat) => (
+                        <span key={cat} className={styles.catLegendItem}>
+                          <span
+                            className={styles.catLegendDot}
+                            style={{ background: CATEGORY_REP_COLORS[cat] }}
+                          />
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div ref={opensChartRef} className={styles.chartBox} />
                 </section>
@@ -601,7 +660,17 @@ const ReportGeneration: React.FC = () => {
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
                     <span className={styles.layerTitle}>开户数 · 全年按周次堆叠</span>
-                    <span className={styles.layerTag}>互联网引流 · 年初至今</span>
+                    <div className={styles.catLegend}>
+                      {['内容平台', '应用市场', '本地生活'].map((cat) => (
+                        <span key={cat} className={styles.catLegendItem}>
+                          <span
+                            className={styles.catLegendDot}
+                            style={{ background: CATEGORY_REP_COLORS[cat] }}
+                          />
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div ref={yearlyChartRef} className={styles.chartBox} />
                 </section>
@@ -618,7 +687,7 @@ const ReportGeneration: React.FC = () => {
                   <li>全年累计：年初至周末；环比：与上一周对比</li>
                   <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入），分本周与全年累计两个口径</li>
                   <li>年度 KPI 完成率：年初至今实际值 / (年度目标 × 时间进度)，时间进度 = 当前周末日 / 全年天数（{weeklyData?.kpi?.time_progress.toFixed(0)}%）；目标：开户数 2 万、有效户 1 万、资产 5 亿</li>
-                  <li>两图均为开户数堆叠（按渠道分色）：上图本周按日，下图全年按周次</li>
+                  <li>两图均为开户数堆叠（按渠道分色，内容平台红色系/应用市场蓝色系/本地生活绿色系）：上图本周按日，下图全年按周次</li>
                 </ul>
               </footer>
             </div>
