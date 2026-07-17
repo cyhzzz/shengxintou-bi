@@ -97,51 +97,35 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     const currentTheme = getCurrentTheme();
     const mergedOption = mergeChartTheme(option, currentTheme);
 
-    // v3.2.8：统一注入入场 + 更新动画（1.2 秒级），让加载和切换都有缓慢变化
-    // - animationDuration：首次入场动画
-    // - animationDurationUpdate：数据切换/更新动画（默认仅 300ms，太急促）
-    // - animationDelay / animationDelayUpdate：多 series 按索引 stagger
+    // v3.2.8：让线/柱缓慢绘制出现（非整图淡入）
+    // - 折线图默认入场动画是 clip：clipRect 从左到右展开，线被逐渐"绘制"出来
+    // - 柱状图默认入场动画是 scaleY：柱子从底部往上生长
+    // - 只设置 option 级别的 animationDuration，不在 series 级别覆盖，让 ECharts 用默认入场动画类型
+    // - 多 series 用短 stagger（idx * 60ms），避免最后一个等太久
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!disableAnimation && !prefersReduced) {
       (mergedOption as any).animation = true;
-      (mergedOption as any).animationDuration = (mergedOption as any).animationDuration ?? 1200;
-      (mergedOption as any).animationDurationUpdate =
-        (mergedOption as any).animationDurationUpdate ?? 1200;
-      (mergedOption as any).animationEasing = (mergedOption as any).animationEasing ?? 'cubicOut';
-      (mergedOption as any).animationEasingUpdate =
-        (mergedOption as any).animationEasingUpdate ?? 'cubicOut';
-      (mergedOption as any).animationDelay = (mergedOption as any).animationDelay ?? 0;
-      (mergedOption as any).animationDelayUpdate =
-        (mergedOption as any).animationDelayUpdate ?? 0;
+      (mergedOption as any).animationDuration = 1500;
+      (mergedOption as any).animationDurationUpdate = 800;
+      (mergedOption as any).animationEasing = 'cubicOut';
+      (mergedOption as any).animationEasingUpdate = 'cubicOut';
 
+      // series 级别只设置 stagger delay，不覆盖 animationDuration
+      // 这样 ECharts 会用默认的入场动画类型（line: clip, bar: scaleY）
       const series = (mergedOption as any).series;
       if (Array.isArray(series)) {
         (mergedOption as any).series = series.map((s, idx) => ({
-          animation: true,
-          animationDuration: 1200,
-          animationDurationUpdate: 1200,
-          animationEasing: 'cubicOut',
-          animationEasingUpdate: 'cubicOut',
-          animationDelay: idx * 120,
-          animationDelayUpdate: idx * 120,
           ...s,
-        }));
-      } else if (series && typeof series === 'object') {
-        (mergedOption as any).series = {
           animation: true,
-          animationDuration: 1200,
-          animationDurationUpdate: 1200,
-          animationEasing: 'cubicOut',
-          animationEasingUpdate: 'cubicOut',
-          ...series,
-        };
+          animationDelay: idx * 60,
+          animationDelayUpdate: idx * 60,
+        }));
       }
     } else {
       (mergedOption as any).animation = false;
     }
 
-    // v3.2.8：切换 Tab / 筛选器时 series 引用通常变化，用 notMerge: true 触发完整入场动画
-    // 首次渲染也走 notMerge: true，确保入场动画生效（merge 模式下入场动画可能不触发）
+    // notMerge: true 确保每次 setOption 都触发完整入场动画（线/柱重新绘制）
     chartRef.current.setOption(mergedOption, {
       notMerge: true,
       lazyUpdate: true,

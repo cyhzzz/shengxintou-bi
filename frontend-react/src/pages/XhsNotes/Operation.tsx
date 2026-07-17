@@ -1500,7 +1500,7 @@ const XhsNotesOperationPage: React.FC = () => {
   return (
     <div className={`${styles.operationPage} ${viewMode === 'h5' ? styles.h5Mode : ''} xhsReportRoot`} ref={pageRef}>
       {/* 筛选器 */}
-      <FadeInSection delay={0} duration={1}>
+      <FadeInSection delay={0} duration={0.8}>
         <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
           {/* 主日期范围 */}
@@ -1691,7 +1691,7 @@ const XhsNotesOperationPage: React.FC = () => {
         </Spin>
       ) : (
         <>
-          <FadeInSection delay={0.30} duration={1}>
+          <FadeInSection delay={0.30} duration={0.8}>
           {/* 创作者综合分析 - 合并原 4 表（内容/转化/创作/互动） */}
           <Card
             className={styles.tableCard}
@@ -1736,7 +1736,7 @@ const XhsNotesOperationPage: React.FC = () => {
           </Card>
           </FadeInSection>
 
-          <FadeInSection delay={0.45} duration={1}>
+          <FadeInSection delay={0.36} duration={0.8}>
           {/* 内容运营趋势 - 2 图（删除笔记创作量横向图，与综合表重复） */}
           <Card className={styles.chartCard}>
             <CardTitle icon="📈">内容运营趋势</CardTitle>
@@ -1765,7 +1765,7 @@ const XhsNotesOperationPage: React.FC = () => {
           </Card>
           </FadeInSection>
 
-          <FadeInSection delay={0.60} duration={1}>
+          <FadeInSection delay={0.60} duration={0.8}>
           {/* 笔记排行榜 - 独立筛选器 */}
           <Card
             className={styles.tableCard}
@@ -1840,7 +1840,7 @@ const XhsNotesOperationPage: React.FC = () => {
           </Card>
           </FadeInSection>
 
-          <FadeInSection delay={0.75} duration={1}>
+          <FadeInSection delay={0.75} duration={0.8}>
             {/* 整体转化走势 - v3.2.3：周维度（上周五到本周四），数据源 fact_conv_content 小红书 */}
             <Card className={styles.chartCard}>
               <CardTitle icon="📊">整体转化走势（按周 · 上周五到本周四）</CardTitle>
@@ -1854,7 +1854,7 @@ const XhsNotesOperationPage: React.FC = () => {
             </Card>
           </FadeInSection>
 
-          <FadeInSection delay={0.90} duration={1}>
+          <FadeInSection delay={0.90} duration={0.8}>
           {/* 代理商数据 - 上 */}
           <Card
             className={styles.tableCard}
@@ -1899,7 +1899,7 @@ const XhsNotesOperationPage: React.FC = () => {
           </Card>
           </FadeInSection>
 
-          <FadeInSection delay={1.05} duration={1}>
+          <FadeInSection delay={1.05} duration={0.8}>
           {/* 员工转化排行 - 下 */}
           <Card
             className={styles.tableCard}

@@ -156,7 +156,7 @@ const ConversionFunnelPage: React.FC = () => {
     <div className={styles.page}>
       <Spin spinning={loading}>
         {/* v3.1.4: 筛选器 — 日期范围 + 平台多选 */}
-        <FadeInSection delay={0} duration={1}>
+        <FadeInSection delay={0} duration={0.8}>
           <Card size='small' style={{ marginBottom: 16 }}>
             <Space size={16} wrap>
               <span>日期范围：</span>
@@ -183,7 +183,7 @@ const ConversionFunnelPage: React.FC = () => {
         </FadeInSection>
 
         {/* v3.1: Tab 切换两套独立漏斗 */}
-        <FadeInSection delay={0.2} duration={1}>
+        <FadeInSection delay={0.2} duration={0.8}>
           <Tabs
             defaultActiveKey="content"
             items={[
@@ -195,7 +195,7 @@ const ConversionFunnelPage: React.FC = () => {
                     {/* v3.1.26 问题3: 核心指标参考应用市场概览 4 卡（线索/新开户/有效户/新开户引进资产） */}
                     {contentMetrics && (
                       <Col span={24}>
-                        <FadeInSection delay={0.1} duration={1}>
+                        <FadeInSection delay={0.1} duration={0.8}>
                           <MetricSection title="内容平台获客概览" description="线索 / 新开户 / 有效户 / 新开户引进资产（核心业务产出，与应用市场获客概览口径对齐）">
                             <MetricCard
                               title="客户线索"
@@ -236,7 +236,7 @@ const ConversionFunnelPage: React.FC = () => {
                     )}
                     {/* 漏斗图 + 阶段明细 左右等高布局（v3.1.23） */}
                     <Col span={24}>
-                      <FadeInSection delay={0.25} duration={1}>
+                      <FadeInSection delay={0.25} duration={0.8}>
                         <Row className={styles.funnelSplitRow}>
                           <Col span={12} className={styles.funnelSplitCol}>
                             <Card title="8 阶段转化漏斗" size="small" className={styles.h100Card}>
@@ -295,7 +295,7 @@ const ConversionFunnelPage: React.FC = () => {
                     {/* v3.1.26 问题3: 应用市场核心指标参考应用市场-获客漏斗概览 4 卡 */}
                     {appmarketMetrics && (
                       <Col span={24}>
-                        <FadeInSection delay={0.1} duration={1}>
+                        <FadeInSection delay={0.1} duration={0.8}>
                           <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出，与应用市场-获客漏斗页口径一致）">
                             <MetricCard
                               title="激活APP"
@@ -335,7 +335,7 @@ const ConversionFunnelPage: React.FC = () => {
                       </Col>
                     )}
                     <Col span={24}>
-                      <FadeInSection delay={0.25} duration={1}>
+                      <FadeInSection delay={0.25} duration={0.8}>
                         <Row className={styles.funnelSplitRow}>
                           <Col span={12} className={styles.funnelSplitCol}>
                             <Card title="9 阶段转化漏斗（应用市场口径）" size="small" className={styles.h100Card}>
@@ -390,7 +390,7 @@ const ConversionFunnelPage: React.FC = () => {
           />
         </FadeInSection>
 
-        <FadeInSection delay={0.4} duration={1}>
+        <FadeInSection delay={0.4} duration={0.8}>
           <ReportFooter
             sources={[
               { label: '内容平台漏斗', value: 'agg_vendor_daily(平台∈内容平台) + fact_conv_content（8 阶段：广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户 → 有效户）' },

@@ -489,7 +489,7 @@ const ReportGeneration: React.FC = () => {
   return (
     <div className={styles.container}>
       {/* 左侧控制面板 */}
-      <FadeInSection delay={0} duration={1}>
+      <FadeInSection delay={0} duration={0.8}>
       <div className={styles.controlPanel}>
         <div className={styles.panelHeader}>
           <div className={styles.cardHeader}>
@@ -551,7 +551,7 @@ const ReportGeneration: React.FC = () => {
       </FadeInSection>
 
       {/* 右侧预览画布 */}
-      <FadeInSection delay={0.15} duration={1}>
+      <FadeInSection delay={0.12} duration={0.8}>
       <div className={styles.previewPanel}>
         <div className={styles.previewHeader}>
           <div className={styles.cardHeader}>

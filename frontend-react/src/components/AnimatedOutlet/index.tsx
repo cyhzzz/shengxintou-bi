@@ -12,16 +12,16 @@ export default function AnimatedOutlet() {
   const outlet = useOutlet();
 
   return (
-    // v3.2.6：mode="popLayout" 让进入/离开同时发生，避免 wait 模式的「等退出再进入」空档，减少 perceived delay
+    // v3.2.8：动效层次梳理——AnimatedOutlet 只做纯淡入（去掉 y 位移），避免与 FadeInSection 的 translateY 叠加
+    // 页面级（0.5s 纯淡入） → 容器级（FadeInSection 0.8s 淡入+上浮） → 组件级（ECharts 1.5s 线/柱绘制） → 细节级（hover/focus）
     <AnimatePresence mode="popLayout">
       <m.div
         key={location.pathname}
         className={styles.pageMotion}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -14 }}
-        transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
-        style={{ willChange: 'transform, opacity' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
       >
         {outlet}
       </m.div>
