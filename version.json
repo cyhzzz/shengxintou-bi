@@ -1,8 +1,9 @@
 {
-  "version": "3.2.0",
+  "version": "3.2.1",
   "release_date": "2026-07-17",
   "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
   "changelog": [
-    "v3.2.0 报告生成页数据周报·色系与排版优化（原 v3.1.31~v3.1.36 合并收敛）：(1) 堆叠图色系改造：内容平台红色系（8 档深浅）/ 应用市场蓝色系（8 档深浅）/ 本地生活绿色，同色系内按全年开户数降序分配深浅；渠道按「内容平台→应用市场→本地生活」分组排序堆叠，同色系挨在一起不交错。(2) 自定义 3 大类图例：ECharts legend 关闭，layerHeader 右侧 .catLegend 展示 3 色块+文字；grid top 从 36→8 释放绘图空间。(3) 标题精简：「本周按日堆叠/全年按周次堆叠」→「本周/全年」。(4) KPI 环形图 + 占比拆本周/年度：核心指标卡右上角 3 个微型 SVG 环形图（开户/有效户/资产，完成率分档上色）；占比卡片改 3 列表格。(5) 数据周报纯数据化：6 指标表格化（指标/本周/全年累计/环比），环比中国股市色；两堆叠图（开户数本周按日 + 全年按周次）；互联网渠道占比 section。(6) 验证：npm run build 0 错（~42s）；POST W28 14 渠道、全年合计 8556 一致。"
+    "v3.2.1 清理旧周报系统 + 冗余 DIM 表（简称管理下线收尾）：(1) 删除 weekly_reports 表及 WeeklyReport ORM 模型——旧周报系统存文案/重点工作/HTML，v3.1.31 起纯数据周报从 agg_vendor_daily/agg_daily_channel_open/fact_conv_* 实时聚合，不再依赖该表。(2) 简化 /periods 端点：去掉数据库查询，纯生成周次选项。(3) 删除旧端点 /generate、/<report_id> GET/PUT、/<report_id>/export、/test-code-loading。(4) 删除旧脚本 aggregate_weekly_data.py、weekly_report_template.py。(5) 删除冗余 DIM 表 dim_vendor/dim_channel/dim_channel_category 及 abbreviation_mapping 端点——简称管理页面已下线，代理商映射改从 dim_account 去重构建。(6) 数据库底表精简至 8 张（2 系统表 + 6 业务表）。(7) 验证：API 冒烟测试 33 个接口全部通过。",
+    "v3.2.0 报告生成页数据周报·色系与排版优化（原 v3.1.31~v3.1.36 合并收敛）：堆叠图色系改造（内容红/应用蓝/本地绿）、自定义 3 大类图例、KPI 环形图、纯数据周报 6 指标表格化。"
   ]
 }

@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.0`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.1`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,16 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.1 已落地（2026-07-17） 清理旧周报系统 + 冗余 DIM 表
+
+- **删除 `weekly_reports` 表及 `WeeklyReport` ORM 模型**：旧周报系统存文案/重点工作/HTML，v3.1.31 起纯数据周报从 `agg_vendor_daily` / `agg_daily_channel_open` / `fact_conv_*` 实时聚合，不再依赖该表。
+- **简化 `/periods` 端点**：去掉数据库查询，纯生成周次选项（旧逻辑会合并 `weekly_reports` 表中"已存在"的周报，纯数据模式下无意义）。
+- **删除旧端点**：`/generate`、`/<report_id>` GET/PUT、`/<report_id>/export`、`/test-code-loading`（前端已不调用）。
+- **删除旧脚本**：`aggregate_weekly_data.py`、`weekly_report_template.py`。
+- **删除冗余 DIM 表**：`dim_vendor` / `dim_channel` / `dim_channel_category` 及 `abbreviation_mapping` 端点——简称管理页面已下线，代理商映射改从 `dim_account` 去重构建。
+- **数据库底表精简至 8 张**：2 系统表（`data_import_log` / `system_configuration`）+ 6 业务表（`dim_account` / `fact_conv_content` / `fact_conv_appmarket` / `agg_vendor_daily` / `agg_xhs_note` / `agg_daily_channel_open`）。
+- **校验**：API 冒烟测试 33 个接口全部通过。
 
 ### v3.2.0 已落地（2026-07-17） 报告生成页数据周报·色系与排版优化
 
