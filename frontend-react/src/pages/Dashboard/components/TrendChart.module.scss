@@ -1,7 +1,8 @@
-@use '../../../styles/mixins' as *;
+﻿@use '../../../styles/mixins' as *;
 
 /**
  * TrendChart 组件样式
+ * 标题独占一行 / 控件横向滚动
  */
 
 .trendCard {
@@ -12,8 +13,10 @@
 
 .chartHeader {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacer-12);
+  min-width: 0;
   margin-bottom: var(--spacer-16);
   padding-bottom: var(--spacer-8);
   border-bottom: 1px solid var(--border-default);
@@ -23,6 +26,8 @@
   display: flex;
   align-items: baseline;
   gap: var(--spacer-12);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .chartTitle {
@@ -36,15 +41,20 @@
 
 .chartControls {
   display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--spacer-16);
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--spacer-8) var(--spacer-12);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .metricGroup {
   display: flex;
   align-items: center;
-  gap: var(--spacer-8);
+  gap: var(--spacer-6);
+  flex-shrink: 0;
 }
 
 .metricGroupLabel {
@@ -58,6 +68,7 @@
   display: flex;
   align-items: center;
   gap: var(--spacer-8);
+  flex-shrink: 0;
 }
 
 .controlLabel {
@@ -74,32 +85,19 @@
   font-size: var(--text-base);
 }
 
-// 响应式
-@media (max-width: 1200px) {
+@media (max-width: 992px) {
   .chartControls {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .metricGroup {
-    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 
 @media (max-width: 768px) {
-  .chartHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacer-12);
+  .chartControls {
+    flex-wrap: wrap;
   }
 
   .metricGroup {
-    width: 100%;
-
-    .radioGroup {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--spacer-4);
-    }
+    flex-wrap: wrap;
+    flex: 1 1 100%;
   }
 }

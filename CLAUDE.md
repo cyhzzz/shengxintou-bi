@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.4`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.5`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,39 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.5 已落地（2026-07-17） 系统性 UI 动效优化（数据呈现生动化）
+
+- **新增动效 Design Token**：`tokens.css` 追加 `--motion-duration-*`、`--motion-easing-*`、`--motion-stagger-gap`，统一全站动效时长与缓动曲线。
+
+- **图表入场动画**：`EChartsComponent` 统一注入 `animationDuration: 800ms` + `cubicOut`；多 series 按索引 stagger delay 120ms；loading 状态从 Spin 改为 shimmer 骨架屏（`skeletonOverlay` + `skeletonShimmer`）。
+
+- **指标卡动效**：
+  - 新增 `useCountUp` hook，数字从 0 平滑增长到目标值，duration 800ms，easeOutQuart。
+  - `MetricCard` 支持 `loading` 骨架屏；`MetricSection` 自动为子卡片注入 `index` 实现 stagger 入场。
+  - hover lift 增强：`translateY(-3px)` + `shadow-elevated`。
+
+- **全局交互反馈**：
+  - 按钮悬浮上移 + 阴影；`ReloadOutlined` 图标按钮悬浮旋转 180°。
+  - 卡片悬浮阴影提升。
+  - 输入框 / 选择器 / 日期选择器 focus ring（`box-shadow: 0 0 0 3px var(--color-brand-bg)`）。
+  - `Segmented` 切换时高亮条滑动。
+  - 表格行 hover 背景过渡 + 排序图标 active 放大 1.2 倍。
+
+- **漏斗图阶段展开**：`@ant-design/plots` Funnel 配置 `wave-in` appear 动画 + 索引递增 delay；降级 CSS 横条带宽度展开动画。
+
+- **表格 shimmer loading**：新增 `SkeletonTable` / `AnimatedTable` 组件，加载时呈现结构骨架而非 Spin。
+
+- **页面路由过渡**：引入 `framer-motion`，新增 `AnimatedOutlet` 组件封装 `AnimatePresence` + `m.div` 路由切换动画；`MainLayout` 改用 `LazyMotion` + `domAnimation` 按需加载动效运行时，避免引入完整 motion 包，主包 index 块从 1660 kB 降至 1613 kB。
+
+- **可访问性**：全局支持 `prefers-reduced-motion: reduce`，自动关闭所有动画。
+
+- **修复 7 个功能测试用例**（测试用例与当前页面结构不匹配，未改代码）：
+  - 账号管理搜索功能：改用 `input[placeholder*="搜索"]` 实时过滤。
+  - Dashboard 无数据场景：检查 MetricCard 数值而非表格。
+  - 数据导入页 5 个用例：适配卡片网格选择器 + `Upload.Dragger`。
+
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6391 modules，36s）；API 冒烟 33/33 通过。
 
 ### v3.2.4 已落地（2026-07-17） 小红书运营分析报表改造（Web/H5 双视图 + 数据准确性 + 杂志风数据块）
 

@@ -101,6 +101,17 @@
   /* 过渡 */
   --transition-fast: 0.12s;
   --transition-normal: 0.2s;
+
+  /* 动效系统 */
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --motion-duration-slow: 500ms;
+  --motion-duration-slower: 800ms;
+  --motion-easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-enter: cubic-bezier(0, 0, 0.2, 1);
+  --motion-easing-leave: cubic-bezier(0.4, 0, 1, 1);
+  --motion-easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --motion-stagger-gap: 60ms;
 }
 
 /* ===== 夜间模式 ===== */

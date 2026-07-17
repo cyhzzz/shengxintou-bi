@@ -52,7 +52,7 @@ const METRIC_COLORS = {
 
 const DashboardPage: React.FC = () => {
   // 趋势图指标类型状态
-  const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_split');
+  const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_per_customer');
   // 趋势图粒度状态
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   // 使用自定义 Hooks

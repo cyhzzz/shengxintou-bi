@@ -156,11 +156,14 @@ test.describe('数据概览页面功能测试', () => {
 
   test('错误处理 - 无数据场景显示', async ({ page }) => {
     await waitForDataLoad(page);
-    
+
+    // Dashboard 页无表格，仅由 MetricCard 组成，应检查指标卡中是否存在数值内容
     const emptyState = page.locator('.ant-empty, text=/暂无数据/i').first();
     const hasEmptyState = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
-    
-    const hasData = await hasDataInTable(page);
-    expect(hasData || hasEmptyState).toBeTruthy();
+
+    const metricValue = page.locator('[class*="metricValue"], .ant-statistic-content-value, [class*="value"]').first();
+    const hasMetricValue = await metricValue.isVisible({ timeout: 3000 }).catch(() => false);
+
+    expect(hasMetricValue || hasEmptyState).toBeTruthy();
   });
 });
