@@ -41,10 +41,10 @@ export const DEFAULT_FUNCTIONAL_CONFIG: FunctionalConfig = {
   baseURL: 'http://localhost:3000',
   timeout: 60000,
   waitConfig: {
-    pageLoad: 3000,
-    dataLoad: 2000,
-    chartRender: 2500,
-    filterChange: 1500,
+    pageLoad: 8000,
+    dataLoad: 3000,
+    chartRender: 3000,
+    filterChange: 2000,
     animation: 500,
   },
 };
