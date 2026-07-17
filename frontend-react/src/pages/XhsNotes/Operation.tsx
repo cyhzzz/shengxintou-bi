@@ -1500,7 +1500,8 @@ const XhsNotesOperationPage: React.FC = () => {
   return (
     <div className={`${styles.operationPage} ${viewMode === 'h5' ? styles.h5Mode : ''} xhsReportRoot`} ref={pageRef}>
       {/* 筛选器 */}
-      <Card className={styles.filterCard} size="small">
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
           {/* 主日期范围 */}
           <div className={styles.filterGroup}>
@@ -1682,6 +1683,7 @@ const XhsNotesOperationPage: React.FC = () => {
           </Row>
         </div>
       </Card>
+      </FadeInSection>
 
       {loading ? (
         <Spin spinning={loading} description="加载中...">
@@ -1689,6 +1691,7 @@ const XhsNotesOperationPage: React.FC = () => {
         </Spin>
       ) : (
         <>
+          <FadeInSection delay={0.30} duration={1.2}>
           {/* 创作者综合分析 - 合并原 4 表（内容/转化/创作/互动） */}
           <Card
             className={styles.tableCard}
@@ -1731,7 +1734,9 @@ const XhsNotesOperationPage: React.FC = () => {
               />
             )}
           </Card>
+          </FadeInSection>
 
+          <FadeInSection delay={0.45} duration={1.2}>
           {/* 内容运营趋势 - 2 图（删除笔记创作量横向图，与综合表重复） */}
           <Card className={styles.chartCard}>
             <CardTitle icon="📈">内容运营趋势</CardTitle>
@@ -1758,7 +1763,9 @@ const XhsNotesOperationPage: React.FC = () => {
               </div>
             </div>
           </Card>
+          </FadeInSection>
 
+          <FadeInSection delay={0.60} duration={1.2}>
           {/* 笔记排行榜 - 独立筛选器 */}
           <Card
             className={styles.tableCard}
@@ -1831,19 +1838,23 @@ const XhsNotesOperationPage: React.FC = () => {
               )}
             </Spin>
           </Card>
+          </FadeInSection>
 
-          {/* 整体转化走势 - v3.2.3：周维度（上周五到本周四），数据源 fact_conv_content 小红书 */}
-          <Card className={styles.chartCard}>
-            <CardTitle icon="📊">整体转化走势（按周 · 上周五到本周四）</CardTitle>
-            <div className={styles.chartContainer}>
-              {data?.conversion_trend?.weeks?.length ? (
-                <EChartsComponent option={conversionTrendOption} height={300} />
-              ) : (
-                <div className={styles.chartEmpty}>暂无数据</div>
-              )}
-            </div>
-          </Card>
+          <FadeInSection delay={0.75} duration={1.2}>
+            {/* 整体转化走势 - v3.2.3：周维度（上周五到本周四），数据源 fact_conv_content 小红书 */}
+            <Card className={styles.chartCard}>
+              <CardTitle icon="📊">整体转化走势（按周 · 上周五到本周四）</CardTitle>
+              <div className={styles.chartContainer}>
+                {data?.conversion_trend?.weeks?.length ? (
+                  <EChartsComponent option={conversionTrendOption} height={300} />
+                ) : (
+                  <div className={styles.chartEmpty}>暂无数据</div>
+                )}
+              </div>
+            </Card>
+          </FadeInSection>
 
+          <FadeInSection delay={0.90} duration={1.2}>
           {/* 代理商数据 - 上 */}
           <Card
             className={styles.tableCard}
@@ -1886,7 +1897,9 @@ const XhsNotesOperationPage: React.FC = () => {
               />
             )}
           </Card>
+          </FadeInSection>
 
+          <FadeInSection delay={1.05} duration={1.2}>
           {/* 员工转化排行 - 下 */}
           <Card
             className={styles.tableCard}
@@ -1929,6 +1942,7 @@ const XhsNotesOperationPage: React.FC = () => {
               />
             )}
           </Card>
+          </FadeInSection>
 
         </>
       )}

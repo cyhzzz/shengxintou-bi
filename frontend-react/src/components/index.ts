@@ -12,6 +12,9 @@ export { HelpModal } from './HelpModal';
 // 页面路由过渡
 export { default as AnimatedOutlet } from './AnimatedOutlet';
 
+// 大容器顺序浮现
+export { FadeInSection } from './FadeInSection';
+
 // 数据新鲜度指示器
 export { DataFreshnessIndicator } from './DataFreshness';
 export type { DataFreshnessIndicatorRef } from './DataFreshness';

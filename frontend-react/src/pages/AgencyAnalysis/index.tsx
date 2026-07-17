@@ -14,7 +14,7 @@ import { Card, Segmented, Space, Button, Tooltip, Spin, Table, Tag, Typography }
 import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { EChartsOption } from 'echarts';
-import { FilterBar } from '@/components';
+import { FilterBar, FadeInSection } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -265,107 +265,117 @@ const AgencyAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.agencyAnalysisPage}>
-      <FilterBar showPlatform showAgency showBusinessModel onSearch={() => fetchData()} onReset={() => fetchData()} />
+      <FadeInSection delay={0} duration={1.2}>
+        <FilterBar showPlatform showAgency showBusinessModel onSearch={() => fetchData()} onReset={() => fetchData()} />
+      </FadeInSection>
 
-      <MetricSection title="厂商投放概览" description="投放消耗、曝光点击与后端转化核心指标">
-        <MetricCard
-          title="投放花费"
-          value={totals.cost}
-          prefix="¥"
-          formatter="currency"
-          valueColor="var(--color-brand)"
-          icon={<DollarOutlined style={{ color: 'var(--color-brand)' }} />}
-          description={`广告投放总花费额`}
-          showWowChange={false}
-        />
-        <MetricCard
-          title="曝光量"
-          value={totals.impressions}
-          valueColor="var(--chart-color-2)"
-          icon={<EyeOutlined style={{ color: 'var(--chart-color-2)' }} />}
-          description={`广告曝光总次数`}
-          showWowChange={false}
-        />
-        <MetricCard
-          title="点击量"
-          value={totals.clicks}
-          valueColor="var(--chart-color-3)"
-          icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
-          description={`广告点击总次数`}
-          showWowChange={false}
-        />
-        <MetricCard
-          title="线索量"
-          value={totals.lead_users}
-          valueColor="var(--chart-color-4)"
-          icon={<UserOutlined style={{ color: 'var(--chart-color-4)' }} />}
-          description={`投放产生的客户线索总数`}
-          showWowChange={false}
-        />
-        <MetricCard
-          title="开户量"
-          value={totals.opened}
-          valueColor="var(--chart-color-5)"
-          icon={<TeamOutlined style={{ color: 'var(--chart-color-5)' }} />}
-          description={`线索中成功开户人数`}
-          showWowChange={false}
-        />
-        <MetricCard
-          title="有效户"
-          value={totals.valid}
-          valueColor="var(--color-success)"
-          icon={<TeamOutlined style={{ color: 'var(--color-success)' }} />}
-          description={`入金且资产达标有效户`}
-          showWowChange={false}
-        />
-      </MetricSection>
-
-      <Card className={styles.chartCard}>
-        <div className={styles.cardHeader}>
-          <Text type="secondary" className={styles.cardTitle}>📊 日级趋势图（按平台聚合）</Text>
-          <Text type="secondary" className={styles.cardDesc}>每日 {METRIC_LABELS[metric]} 趋势</Text>
-          <Space size="middle" style={{ marginLeft: 'auto' }}>
-            <span className={styles.controlLabel}>指标:</span>
-            <Segmented
-              value={metric}
-              onChange={(v) => setMetric(v as MetricType)}
-              options={Object.entries(METRIC_LABELS).map(([k, l]) => ({ label: l, value: k }))}
-            />
-          </Space>
-        </div>
-        <Spin spinning={loading}>
-          <EChartsComponent option={trendOption} height={360} />
-        </Spin>
-      </Card>
-
-      <Card className={styles.tableCard}>
-        <div className={styles.cardHeader}>
-          <Text type="secondary" className={styles.cardTitle}>📈 平台×代理商聚合数据</Text>
-          <Text type="secondary" className={styles.cardDesc}>
-            按平台 × 代理商聚合
-          </Text>
-          <Tooltip title="导出为 CSV" style={{ marginLeft: 'auto' }}>
-            <Button type="primary" icon={<DownloadOutlined />} onClick={exportCsv} disabled={!visibleSummary.length}>
-              导出 CSV
-            </Button>
-          </Tooltip>
-        </div>
-        <Spin spinning={loading}>
-          <Table
-            columns={columns}
-            dataSource={visibleSummary}
-            rowKey={(r) => `${r.platform}-${r.business_model}-${r.agency_short||r.agency}-${r.is_total ? 'T' : r.is_subtotal ? 'S' : 'D'}`}
-            scroll={{ x: 1200 }}
-            pagination={false}
-            size="small"
-            rowClassName={(r) => {
-              if (r.is_total) return 'total-row';
-              if (r.is_subtotal) return 'subtotal-row';
-              return '';
-            }}
+      <FadeInSection delay={0.15} duration={1.2}>
+        <MetricSection title="厂商投放概览" description="投放消耗、曝光点击与后端转化核心指标">
+          <MetricCard
+            title="投放花费"
+            value={totals.cost}
+            prefix="¥"
+            formatter="currency"
+            valueColor="var(--color-brand)"
+            icon={<DollarOutlined style={{ color: 'var(--color-brand)' }} />}
+            description={`广告投放总花费额`}
+            showWowChange={false}
           />
-        </Spin>
-      </Card>
+          <MetricCard
+            title="曝光量"
+            value={totals.impressions}
+            valueColor="var(--chart-color-2)"
+            icon={<EyeOutlined style={{ color: 'var(--chart-color-2)' }} />}
+            description={`广告曝光总次数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="点击量"
+            value={totals.clicks}
+            valueColor="var(--chart-color-3)"
+            icon={<AimOutlined style={{ color: 'var(--chart-color-3)' }} />}
+            description={`广告点击总次数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="线索量"
+            value={totals.lead_users}
+            valueColor="var(--chart-color-4)"
+            icon={<UserOutlined style={{ color: 'var(--chart-color-4)' }} />}
+            description={`投放产生的客户线索总数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="开户量"
+            value={totals.opened}
+            valueColor="var(--chart-color-5)"
+            icon={<TeamOutlined style={{ color: 'var(--chart-color-5)' }} />}
+            description={`线索中成功开户人数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="有效户"
+            value={totals.valid}
+            valueColor="var(--color-success)"
+            icon={<TeamOutlined style={{ color: 'var(--color-success)' }} />}
+            description={`入金且资产达标有效户`}
+            showWowChange={false}
+          />
+        </MetricSection>
+      </FadeInSection>
+
+      <FadeInSection delay={0.3} duration={1.2}>
+        <Card className={styles.chartCard}>
+          <div className={styles.cardHeader}>
+            <Text type="secondary" className={styles.cardTitle}>📊 日级趋势图（按平台聚合）</Text>
+            <Text type="secondary" className={styles.cardDesc}>每日 {METRIC_LABELS[metric]} 趋势</Text>
+            <Space size="middle" style={{ marginLeft: 'auto' }}>
+              <span className={styles.controlLabel}>指标:</span>
+              <Segmented
+                value={metric}
+                onChange={(v) => setMetric(v as MetricType)}
+                options={Object.entries(METRIC_LABELS).map(([k, l]) => ({ label: l, value: k }))}
+              />
+            </Space>
+          </div>
+          <Spin spinning={loading}>
+            <EChartsComponent option={trendOption} height={360} />
+          </Spin>
+        </Card>
+      </FadeInSection>
+
+      <FadeInSection delay={0.45} duration={1.2}>
+        <Card className={styles.tableCard}>
+          <div className={styles.cardHeader}>
+            <Text type="secondary" className={styles.cardTitle}>📈 平台×代理商聚合数据</Text>
+            <Text type="secondary" className={styles.cardDesc}>
+              按平台 × 代理商聚合
+            </Text>
+            <Tooltip title="导出为 CSV" style={{ marginLeft: 'auto' }}>
+              <Button type="primary" icon={<DownloadOutlined />} onClick={exportCsv} disabled={!visibleSummary.length}>
+                导出 CSV
+              </Button>
+            </Tooltip>
+          </div>
+          <Spin spinning={loading}>
+            <Table
+              columns={columns}
+              dataSource={visibleSummary}
+              rowKey={(r) => `${r.platform}-${r.business_model}-${r.agency_short||r.agency}-${r.is_total ? 'T' : r.is_subtotal ? 'S' : 'D'}`}
+              scroll={{ x: 1200 }}
+              pagination={false}
+              size="small"
+              rowClassName={(r) => {
+                if (r.is_total) return 'total-row';
+                if (r.is_subtotal) return 'subtotal-row';
+                return '';
+              }}
+            />
+          </Spin>
+        </Card>
+      </FadeInSection>
+
+      <FadeInSection delay={0.6} duration={1.2}>
         <ReportFooter
           sources={[
             { label: '数据源', value: 'agg_vendor_daily' },
@@ -374,6 +384,7 @@ const AgencyAnalysisPage: React.FC = () => {
           ]}
           notes={'顶部核心指标为平台 × 代理商 × 业务模式的 SUM，表格按代理商聚合展示，is_subtotal/is_total 行为层级小计/合计；导出 CSV 含全部行。'}
         />
+      </FadeInSection>
     </div>
   );
 };

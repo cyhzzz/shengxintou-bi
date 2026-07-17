@@ -23,6 +23,7 @@ import type { EChartsOption } from 'echarts';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { FadeInSection } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { http } from '@/services/http';
 import styles from './Funnel.module.scss';
@@ -384,42 +385,47 @@ const LiveFunnelPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size="small">
-        <Space size="middle" wrap>
-          <span className={styles.label}>日期区间</span>
-          <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-          <span className={styles.label}>主播平台</span>
-          <Select
-            mode="multiple"
-            allowClear
-            placeholder={'全部'}
-            value={platformFilter}
-            onChange={setPlatformFilter}
-            options={platforms.map((p) => ({ label: p, value: p }))}
-            style={{ minWidth: 200 }}
-            maxTagCount="responsive"
-          />
-          <span className={styles.label}>排名限制</span>
-          <Select
-            value={'200'}
-            options={[{ label: 'Top 200', value: '200' }]}
-            disabled
-            style={{ minWidth: 100 }}
-          />
-          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-        </Space>
-      </Card>
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size="small">
+          <Space size="middle" wrap>
+            <span className={styles.label}>日期区间</span>
+            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+            <span className={styles.label}>主播平台</span>
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder={'全部'}
+              value={platformFilter}
+              onChange={setPlatformFilter}
+              options={platforms.map((p) => ({ label: p, value: p }))}
+              style={{ minWidth: 200 }}
+              maxTagCount="responsive"
+            />
+            <span className={styles.label}>排名限制</span>
+            <Select
+              value={'200'}
+              options={[{ label: 'Top 200', value: '200' }]}
+              disabled
+              style={{ minWidth: 100 }}
+            />
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+          </Space>
+        </Card>
+      </FadeInSection>
 
       <Spin spinning={loading}>
-        <MetricSection title="直播获客核心产出" description="同名主播跨平台去重后的新客户获客主指标（仅统计非存量客户，v3.1.25 起坚持这一口径）">
+        <FadeInSection delay={0.15} duration={1.2}>
+          <MetricSection title="直播获客核心产出" description="同名主播跨平台去重后的新客户获客主指标（仅统计非存量客户，v3.1.25 起坚持这一口径）">
           <MetricCard title="主播数" value={totals.anchors} valueColor="var(--color-brand)" icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />} description={`同名主播跨平台去重后的活跃主播数量`} showWowChange={false} />
           <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
           <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
           <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />
           <MetricCard title="新开户资产" value={totals.new_assets} prefix="¥" formatter="currency" valueColor="var(--color-warning)" icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />} description={`非存量且开户成功客户总资产·主指标`} showWowChange={false} />
         </MetricSection>
+        </FadeInSection>
 
+        <FadeInSection delay={0.3} duration={1.2}>
         <MetricSection title="全量主播引流明细" description="含存量客户与资产分项呈现，仅作为辅助参考不取代上方产出指标">
           <MetricCard title="线索量" value={totals.leads} valueColor="var(--color-success)" icon={<UserOutlined style={{ color: 'var(--color-success)' }} />} description={`主播引流客户线索总数（含存量）`} showWowChange={false} />
           <MetricCard title="存量客户" value={totals.existing_leads} valueColor="var(--color-text-tertiary)" icon={<UserOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`线索中已在他处开户的存量客户数·辅助指标`} showWowChange={false} />
@@ -428,7 +434,9 @@ const LiveFunnelPage: React.FC = () => {
           <MetricCard title="有效线索(剔除存量)" value={totals.new_valid_lead} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`剔除存量客户后的有效线索·核心获客产出`} showWowChange={false} />
           <MetricCard title="存量资产" value={totals.existing_assets} prefix="¥" formatter="currency" valueColor="var(--color-text-tertiary)" icon={<DollarOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`存量客户资产·辅助指标（存量客户虽不再开户，但资产仍呈现）`} showWowChange={false} />
         </MetricSection>
+        </FadeInSection>
 
+        <FadeInSection delay={0.45} duration={1.2}>
         {/* v3.1.27: 主播引流走势图 (daily/weekly/monthly) */}
         <Card size="small" style={{ marginBottom: 16 }}>
           <Row align="middle" gutter={12} style={{ marginBottom: 12 }}>
@@ -460,7 +468,9 @@ const LiveFunnelPage: React.FC = () => {
             <Empty description={trendLoading ? '加载中...' : '暂无走势数据'} />
           )}
         </Card>
+        </FadeInSection>
 
+        <FadeInSection delay={0.6} duration={1.2}>
                 <Row className={styles.funnelSplitRow}>
           <Col span={12} className={styles.funnelSplitCol}>
             <Card title="6 阶段主播引流业务漏斗" size="small" className={styles.h100Card} extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
@@ -506,31 +516,38 @@ const LiveFunnelPage: React.FC = () => {
             </Card>
           </Col>
         </Row>
+        </FadeInSection>
 
-        <Card title="主播平台对比" size="small" style={{ marginBottom: 16 }}>
-          <Table<PlatformRow> size="small" rowKey="platform" dataSource={platformRows} pagination={false} columns={platformColumns as any} scroll={{ x: 'max-content' }} />
-        </Card>
+        <FadeInSection delay={0.75} duration={1.2}>
+          <Card title="主播平台对比" size="small" style={{ marginBottom: 16 }}>
+            <Table<PlatformRow> size="small" rowKey="platform" dataSource={platformRows} pagination={false} columns={platformColumns as any} scroll={{ x: 'max-content' }} />
+          </Card>
+        </FadeInSection>
 
-        <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{platformFilter.length ? '·已按选中平台筛选' : ''}</span>}>
-          {anchorAggRows.length > 0 ? (
-            <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
-          ) : (
-            <Empty description={'暂无主播聚类数据（请检查日期区间是否覆盖主播引流时段）'} />
-          )}
-        </Card>
+        <FadeInSection delay={0.90} duration={1.2}>
+          <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{platformFilter.length ? '·已按选中平台筛选' : ''}</span>}>
+            {anchorAggRows.length > 0 ? (
+              <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
+            ) : (
+              <Empty description={'暂无主播聚类数据（请检查日期区间是否覆盖主播引流时段）'} />
+            )}
+          </Card>
+        </FadeInSection>
 
-        <ReportFooter
-          sources={[
-            { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）' },
-            { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
-            { label: '粒度', value: 'Top 200 主播引流聚合' },
-            { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
-            { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台多选筛选' },
-          { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly）' },
-          { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
-          ]}
-          notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
-        />
+        <FadeInSection delay={1.05} duration={1.2}>
+          <ReportFooter
+            sources={[
+              { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）' },
+              { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
+              { label: '粒度', value: 'Top 200 主播引流聚合' },
+              { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
+              { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台多选筛选' },
+            { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly）' },
+            { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
+            ]}
+            notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
+          />
+        </FadeInSection>
       </Spin>
     </div>
   );

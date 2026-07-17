@@ -2,14 +2,14 @@
   position: relative;
   width: 100%;
   opacity: 0;
-  // v3.2.6：图表容器更从容的淡入上浮
-  animation: chartFadeIn var(--motion-duration-slow) var(--motion-easing-smooth) both;
+  // v3.2.7：图表容器 1.2s 级淡入上浮
+  animation: chartFadeIn var(--motion-duration-reveal, 1200ms) var(--motion-easing-smooth) both;
 }
 
 @keyframes chartFadeIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;

@@ -1,0 +1,30 @@
+.fadeInSection {
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: sectionReveal var(--reveal-duration, 1s) var(--motion-easing-smooth, cubic-bezier(0.25, 0.1, 0.25, 1)) both;
+  animation-delay: var(--reveal-delay, 0s);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+@keyframes sectionReveal {
+  from {
+    opacity: 0;
+    transform: var(--reveal-translate, translateY(20px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateX(0);
+  }
+}
+
+// 减少动画偏好：直接呈现
+@media (prefers-reduced-motion: reduce) {
+  .fadeInSection {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

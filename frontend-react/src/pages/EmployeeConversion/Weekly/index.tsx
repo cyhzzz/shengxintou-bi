@@ -9,6 +9,7 @@ import WeeklyReportPreview from './components/WeeklyReportPreview';
 import PosterModal from './components/PosterModal';
 import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
 import { ReportFooter } from '@/components/ReportFooter';
+import { FadeInSection } from '@/components';
 import { withFixedAssistants, type WeeklyReportData } from './weeklyRanking';
 import styles from './index.module.scss';
 
@@ -182,6 +183,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
   return (
     <div className={styles.weeklyPage}>
       {/* 配置卡片 */}
+      <FadeInSection delay={0} duration={1.2}>
       <Card className={styles.configCard}>
         <div className={styles.configContent}>
           <Space wrap size={16}>
@@ -214,9 +216,11 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
           </Button>
         </div>
       </Card>
+      </FadeInSection>
 
       {/* 周报内容卡片 */}
-      <Card className={styles.reportCard}>
+      <FadeInSection delay={0.15} duration={1.2}>
+        <Card className={styles.reportCard}>
         <div className={styles.cardHeader}>
           <Text type="secondary" className={styles.cardTitle}>
             📋 周报内容
@@ -286,7 +290,9 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
           <WeeklyReportPreview content={reportContent} loading={loading} mode="text" />
         )}
       </Card>
+      </FadeInSection>
 
+      <FadeInSection delay={0.30} duration={1.2}>
       <ReportFooter
         sources={[
           { label: '口径', value: '内容平台（小红书 / 腾讯 / 抖音 / 快手 / 财联社）—— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },
@@ -295,6 +301,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
         ]}
         notes={'周报的概览、趋势和榜单仅统计固定 12 位小助手；不再取 TOP N，名单内人员按各榜单原有指标降序。内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
       />
+      </FadeInSection>
     </div>
   );
 };

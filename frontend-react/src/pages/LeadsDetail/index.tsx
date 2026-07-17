@@ -27,6 +27,7 @@ import { getLeadsDetail } from '@/types/api';
 import type { LeadsDetailItem, LeadsDetailResponse } from '@/types/api.schemas';
 import { http } from '@/services/http';
 import styles from './index.module.scss';
+import { FadeInSection } from '@/components';
 
 // 筛选选项类型
 interface FilterOption {
@@ -503,6 +504,7 @@ const LeadsDetailPage: React.FC = () => {
   return (
     <div className={styles.leadsDetailPage}>
       {/* 筛选器 */}
+      <FadeInSection delay={0} duration={1.2}>
       <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
           {/* 日期范围 */}
@@ -569,8 +571,10 @@ const LeadsDetailPage: React.FC = () => {
           </div>
         </div>
       </Card>
+      </FadeInSection>
 
       {/* 数据表格 */}
+      <FadeInSection delay={0.15} duration={1.2}>
       <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <span className={styles.tableTitle}>线索明细</span>
@@ -601,6 +605,7 @@ const LeadsDetailPage: React.FC = () => {
           onChange={handleTableChange}
         />
       </Card>
+      </FadeInSection>
 
       {/* 详情弹窗 */}
       <Modal

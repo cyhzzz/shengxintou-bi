@@ -23,7 +23,7 @@ export function useCountUp(
   target: number | undefined | null,
   options: UseCountUpOptions = {}
 ): number {
-  const { duration = 1000, disabled = false, decimals = 0 } = options;
+  const { duration = 1500, disabled = false, decimals = 0 } = options;
   const [displayValue, setDisplayValue] = useState(0);
   const startTimeRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);

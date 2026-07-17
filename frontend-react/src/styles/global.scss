@@ -167,12 +167,34 @@ a {
   }
 }
 
-// 卡片悬浮：仅阴影提升，避免 transform 导致的 layout/paint（MetricCard 自身入场动画已用 transform）
+// 卡片悬浮：阴影 + 边框微亮，避免 transform 导致的 layout/paint（MetricCard 自身入场动画已用 transform）
 .ant-card {
-  transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
+  transition:
+    box-shadow var(--motion-duration-normal) var(--motion-easing-default),
+    border-color var(--motion-duration-normal) var(--motion-easing-default);
 
   &:hover {
     box-shadow: var(--shadow-elevated);
+    border-color: var(--border-strong);
+  }
+}
+
+// v3.2.7：带左侧色条的章节标题（用于卡片内子模块）
+.sectionTitleBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacer-12);
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--color-brand);
   }
 }
 
@@ -247,6 +269,7 @@ a {
 
   .metricCard,
   .container,
+  .fadeInSection,
   .ant-btn,
   .ant-card,
   .ant-input,
