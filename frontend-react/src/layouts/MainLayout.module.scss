@@ -164,6 +164,8 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  // v3.2.8：预留滚动条空间，避免动画过程中滚动条出现/消失导致内容区宽度跳变
+  scrollbar-gutter: stable;
   // v3.2.7：极淡的顶部光照渐变，让页面更有层次
   background-image:
     radial-gradient(ellipse at 50% 0%, var(--color-brand-bg) 0%, transparent 60%);

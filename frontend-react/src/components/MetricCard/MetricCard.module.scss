@@ -4,20 +4,8 @@
   margin-bottom: var(--spacer-16);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  // v3.2.7：整组卡片区域先淡入，为内部 stagger 做层次铺垫；默认跟随父级 FadeInSection 的节奏
-  opacity: 0;
-  animation: sectionEnter var(--motion-duration-slow, 800ms) var(--motion-easing-smooth) both;
-}
-
-@keyframes sectionEnter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  // v3.2.8：移除 sectionEnter 动画，由外层 FadeInSection 控制大容器浮现
+  // 小卡片不再单独 stagger，避免与 FadeInSection 叠加导致"一起加载"的视觉混乱
 }
 
 .sectionHeader {
@@ -56,13 +44,10 @@
   overflow: hidden;  // v3.1.25: 截断超长数字 / 描述
   height: 100%;
   border-radius: var(--radius-lg);
-  // v3.2.6：hover 仅改阴影，避免 transform 触发 layout/paint；入场动画使用 transform + opacity
+  // v3.2.6：hover 仅改阴影，避免 transform 触发 layout/paint
   transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
-  // v3.2.7：更慢的 stagger 入场（大容器内卡片依次浮现，1~2 秒级）
-  opacity: 0;
-  will-change: transform, opacity;
-  animation: metricCardEnter var(--motion-duration-slower, 1200ms) var(--motion-easing-smooth) both;
-  animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-gap));
+  // v3.2.8：移除 metricCardEnter stagger 入场动画，由外层 FadeInSection 控制大容器浮现
+  // 小卡片即时显示，避免与 FadeInSection 叠加
 
   &:hover {
     box-shadow: var(--shadow-elevated);
@@ -74,16 +59,7 @@
   }
 }
 
-@keyframes metricCardEnter {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+// v3.2.8：metricCardEnter keyframes 保留但不再被 .metricCard 引用（向后兼容）
 
 .metricContent {
   display: flex;

@@ -385,7 +385,7 @@ const LiveFunnelPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <FadeInSection delay={0} duration={1.2}>
+      <FadeInSection delay={0} duration={1}>
         <Card className={styles.filterCard} size="small">
           <Space size="middle" wrap>
             <span className={styles.label}>日期区间</span>
@@ -415,7 +415,7 @@ const LiveFunnelPage: React.FC = () => {
       </FadeInSection>
 
       <Spin spinning={loading}>
-        <FadeInSection delay={0.15} duration={1.2}>
+        <FadeInSection delay={0.15} duration={1}>
           <MetricSection title="直播获客核心产出" description="同名主播跨平台去重后的新客户获客主指标（仅统计非存量客户，v3.1.25 起坚持这一口径）">
           <MetricCard title="主播数" value={totals.anchors} valueColor="var(--color-brand)" icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />} description={`同名主播跨平台去重后的活跃主播数量`} showWowChange={false} />
           <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
@@ -425,7 +425,7 @@ const LiveFunnelPage: React.FC = () => {
         </MetricSection>
         </FadeInSection>
 
-        <FadeInSection delay={0.3} duration={1.2}>
+        <FadeInSection delay={0.3} duration={1}>
         <MetricSection title="全量主播引流明细" description="含存量客户与资产分项呈现，仅作为辅助参考不取代上方产出指标">
           <MetricCard title="线索量" value={totals.leads} valueColor="var(--color-success)" icon={<UserOutlined style={{ color: 'var(--color-success)' }} />} description={`主播引流客户线索总数（含存量）`} showWowChange={false} />
           <MetricCard title="存量客户" value={totals.existing_leads} valueColor="var(--color-text-tertiary)" icon={<UserOutlined style={{ color: 'var(--color-text-tertiary)' }} />} description={`线索中已在他处开户的存量客户数·辅助指标`} showWowChange={false} />
@@ -436,7 +436,7 @@ const LiveFunnelPage: React.FC = () => {
         </MetricSection>
         </FadeInSection>
 
-        <FadeInSection delay={0.45} duration={1.2}>
+        <FadeInSection delay={0.45} duration={1}>
         {/* v3.1.27: 主播引流走势图 (daily/weekly/monthly) */}
         <Card size="small" style={{ marginBottom: 16 }}>
           <Row align="middle" gutter={12} style={{ marginBottom: 12 }}>
@@ -470,7 +470,7 @@ const LiveFunnelPage: React.FC = () => {
         </Card>
         </FadeInSection>
 
-        <FadeInSection delay={0.6} duration={1.2}>
+        <FadeInSection delay={0.6} duration={1}>
                 <Row className={styles.funnelSplitRow}>
           <Col span={12} className={styles.funnelSplitCol}>
             <Card title="6 阶段主播引流业务漏斗" size="small" className={styles.h100Card} extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
@@ -518,13 +518,13 @@ const LiveFunnelPage: React.FC = () => {
         </Row>
         </FadeInSection>
 
-        <FadeInSection delay={0.75} duration={1.2}>
+        <FadeInSection delay={0.75} duration={1}>
           <Card title="主播平台对比" size="small" style={{ marginBottom: 16 }}>
             <Table<PlatformRow> size="small" rowKey="platform" dataSource={platformRows} pagination={false} columns={platformColumns as any} scroll={{ x: 'max-content' }} />
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={0.90} duration={1.2}>
+        <FadeInSection delay={0.90} duration={1}>
           <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{platformFilter.length ? '·已按选中平台筛选' : ''}</span>}>
             {anchorAggRows.length > 0 ? (
               <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
@@ -534,7 +534,7 @@ const LiveFunnelPage: React.FC = () => {
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={1.05} duration={1.2}>
+        <FadeInSection delay={1.05} duration={1}>
           <ReportFooter
             sources={[
               { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）' },

@@ -504,7 +504,7 @@ const LeadsDetailPage: React.FC = () => {
   return (
     <div className={styles.leadsDetailPage}>
       {/* 筛选器 */}
-      <FadeInSection delay={0} duration={1.2}>
+      <FadeInSection delay={0} duration={1}>
       <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
           {/* 日期范围 */}
@@ -574,7 +574,7 @@ const LeadsDetailPage: React.FC = () => {
       </FadeInSection>
 
       {/* 数据表格 */}
-      <FadeInSection delay={0.15} duration={1.2}>
+      <FadeInSection delay={0.15} duration={1}>
       <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <span className={styles.tableTitle}>线索明细</span>
