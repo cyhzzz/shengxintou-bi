@@ -391,6 +391,12 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 13. 版本历史
 
+### v3.2.3 已落地（2026-07-17） 修复报告生成页与互联网渠道数据概览「新增客户资产」数值不一致
+
+- **根因**：报告生成页 `/api/v1/reports/weekly/data` 的 `_query_metrics` 用 DWD 明细层实时 SUM（`fact_conv_content.资产` 过滤 `是否开户=1 + 非存量` + `fact_conv_appmarket.总资产` 过滤 `是否新开户=1 + 互联网引流`），而互联网渠道数据概览页 `/api/v1/dashboard/core-metrics` 走 DWS 预聚合字段 `agg_vendor_daily.客户资产`。两端口径在 2026-01-01~2026-07-16 区间相差 16.75 万（DWD 多算，ETL 在 agg 表已做清洗剔除）。
+- **修复**：`backend/routes/weekly_reports.py` 的 `_query_metrics` 改为直接 SUM `AggVendorDaily.客户资产`（并入现有 `ad_r` 查询，减少一次 SQL），与 `/dashboard/core-metrics` 完全对齐。同时清理未使用的 `FactConvAppmarket` / `or_` import。
+- **验证**：新口径下两端口径数值完全一致（677,383,336.85）；API 冒烟 33/33 通过。
+
 ### v3.2.1 已落地（2026-07-17） 清理旧周报系统 + 冗余 DIM 表
 
 - **删除 `weekly_reports` 表及 `WeeklyReport` ORM 模型**：旧周报系统存文案/重点工作/HTML，v3.1.31 起纯数据周报从 `agg_vendor_daily` / `agg_daily_channel_open` / `fact_conv_*` 实时聚合，不再依赖该表。
