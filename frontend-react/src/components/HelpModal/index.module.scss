@@ -37,7 +37,12 @@
 }
 
 .infoCard {
-  // Ant Design card overrides removed — use component props or theme config
+  // 列内卡片之间的垂直间距（与 Live/Funnel 等子页 MetricSection 卡片间距对齐）
+  margin-bottom: var(--spacer-12);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .description {
