@@ -21,14 +21,17 @@
   /* 小红书 — 砖红（低饱和） */
   --rose-accent: #8a3a3c;
   --rose-tint: #f4e8e8;
+  --rose-glow: rgba(138, 58, 60, 0.06);
 
   /* 腾讯 — 深青（低饱和） */
   --azure-accent: #1f4e79;
   --azure-tint: #e8eef4;
+  --azure-glow: rgba(31, 78, 121, 0.06);
 
   /* 抖音 — 深紫（低饱和） */
   --violet-accent: #3d2e6b;
   --violet-tint: #eeeaf5;
+  --violet-glow: rgba(61, 46, 107, 0.06);
 }
 
 /* 模态框容器 */
@@ -115,7 +118,7 @@
 /* 基础容器 */
 .posterContainer {
   width: 800px;
-  min-width: 800px; /* v3.1.28: 防止窄视口下 flex 容器塌陷 */
+  min-width: 800px;
   flex-shrink: 0;
   min-height: 600px;
   background: var(--paper);
@@ -123,7 +126,7 @@
   color: var(--ink-900);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 1px 0 var(--ink-100);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* ==================== 三平台共用骨架 ==================== */
@@ -132,10 +135,28 @@
 .douyin {
   /* 顶部 masthead — 报刊头风格 */
   .header {
-    padding: 36px 40px 28px;
+    padding: 40px 40px 28px;
     background: var(--paper);
-    border-bottom: 1px solid var(--ink-900);
+    border-bottom: 2px solid var(--ink-900);
     position: relative;
+
+    /* 装饰性底纹 */
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 6px;
+      opacity: 0.08;
+      background-image: repeating-linear-gradient(
+        45deg,
+        currentColor 0,
+        currentColor 1px,
+        transparent 1px,
+        transparent 8px
+      );
+    }
 
     .platformLabel {
       font-size: 10px;
@@ -213,43 +234,50 @@
     background: transparent;
     border: none;
     box-shadow: none;
+    position: relative;
 
     &:last-child {
       margin-bottom: 0;
     }
 
     .rankingHeader {
-      padding: 0 0 10px 0;
+      padding: 0 0 12px 0;
       margin-bottom: 0;
       background: transparent;
       display: flex;
-      align-items: baseline;
-      gap: 10px;
-      border-bottom: 1px solid var(--ink-900);
+      align-items: center;
+      gap: 12px;
+      border-bottom: 2px solid var(--ink-900);
+    }
 
-      .rankingIndex {
-        font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--ink-300);
-        letter-spacing: 1px;
-      }
+    /* 序号徽章 — 替代旧的纯文字序号 */
+    .rankingBadge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 24px;
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--paper);
+      letter-spacing: 0;
+      border-radius: 2px;
+    }
 
-      .rankingTitle {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--ink-900);
-        letter-spacing: 0;
-      }
+    .rankingTitle {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink-900);
+      letter-spacing: 0;
+    }
 
-      .rankingMeta {
-        margin-left: auto;
-        font-size: 10px;
-        color: var(--ink-400);
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        font-weight: 500;
-      }
+    .rankingMeta {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--ink-400);
+      letter-spacing: 1px;
+      font-weight: 500;
     }
   }
 
@@ -261,7 +289,7 @@
     margin-top: 0;
 
     thead {
-      background: transparent;
+      background: var(--ink-025);
     }
 
     th {
@@ -273,7 +301,6 @@
       text-align: right;
       font-size: 10px;
       letter-spacing: 1px;
-      text-transform: uppercase;
 
       &:first-child,
       &:nth-child(2) {
@@ -282,7 +309,7 @@
     }
 
     td {
-      padding: 12px 6px;
+      padding: 11px 6px;
       border-bottom: 1px solid var(--ink-050);
       text-align: right;
       color: var(--ink-700);
@@ -295,12 +322,45 @@
       }
     }
 
-    /* 斑马纹去掉，hover 用 accent 色淡背景 */
-    tbody tr {
-      transition: background 0.1s ease;
+    /* 普通数据行 */
+    .dataRow {
+      transition: background 0.15s ease;
 
       &:hover {
         background: var(--ink-025);
+      }
+    }
+
+    /* TOP1-3 高亮行 */
+    .top1 {
+      background: var(--accent-tint) !important;
+      border-left: 3px solid var(--accent-color);
+      box-shadow: inset 0 0 0 0 transparent;
+
+      .employeeName {
+        color: var(--accent-color);
+        font-weight: 700;
+      }
+      .highlight {
+        color: var(--accent-color);
+      }
+    }
+
+    .top2 {
+      background: var(--accent-tint-2) !important;
+      border-left: 3px solid var(--accent-color-2);
+
+      .employeeName {
+        font-weight: 600;
+      }
+    }
+
+    .top3 {
+      background: var(--accent-tint-3) !important;
+      border-left: 3px solid var(--accent-color-3);
+
+      .employeeName {
+        font-weight: 500;
       }
     }
 
@@ -315,6 +375,21 @@
         color: var(--paper);
         padding-top: 14px;
         padding-bottom: 14px;
+      }
+    }
+
+    /* 年度拆分行 */
+    .yearRow {
+      background: var(--ink-050);
+      font-weight: 500;
+
+      td {
+        border-top: 1px solid var(--ink-200);
+        border-bottom: 1px solid var(--ink-100);
+        color: var(--ink-500);
+        padding-top: 10px;
+        padding-bottom: 10px;
+        font-size: 12px;
       }
     }
 
@@ -388,7 +463,6 @@
       color: var(--ink-400);
       margin-bottom: 10px;
       letter-spacing: 2px;
-      text-transform: uppercase;
     }
 
     ul {
@@ -426,8 +500,8 @@
 }
 
 /* ==================== 平台差异化 ==================== */
-/* 仅 masthead 顶部 accent 条与 platform label 用 accent 色 */
 
+/* 小红书 — 砖红系 */
 .xiaohongshu {
   .header {
     border-top: 4px solid var(--rose-accent);
@@ -441,20 +515,24 @@
     }
   }
 
-  .rankingSection .rankingHeader {
-    /* 小红书：accent 色细线 */
+  /* TOP 行高亮色 */
+  --accent-color: var(--rose-accent);
+  --accent-color-2: #b05050;
+  --accent-color-3: #c07070;
+  --accent-tint: var(--rose-tint);
+  --accent-tint-2: rgba(138, 58, 60, 0.04);
+  --accent-tint-3: rgba(138, 58, 60, 0.02);
+
+  .rankingBadge {
+    background: var(--rose-accent);
   }
 
-  .rankingTable .totalRow td {
-    /* 合计行 accent 色 */
-  }
-
-  /* TOP1 highlight 用 accent 色 */
   .rank1 {
     color: var(--rose-accent);
   }
 }
 
+/* 腾讯 — 深青系 */
 .tencent {
   .header {
     border-top: 4px solid var(--azure-accent);
@@ -468,11 +546,23 @@
     }
   }
 
+  --accent-color: var(--azure-accent);
+  --accent-color-2: #4a7ba8;
+  --accent-color-3: #6a9bc0;
+  --accent-tint: var(--azure-tint);
+  --accent-tint-2: rgba(31, 78, 121, 0.04);
+  --accent-tint-3: rgba(31, 78, 121, 0.02);
+
+  .rankingBadge {
+    background: var(--azure-accent);
+  }
+
   .rank1 {
     color: var(--azure-accent);
   }
 }
 
+/* 抖音 — 深紫系 */
 .douyin {
   .header {
     border-top: 4px solid var(--violet-accent);
@@ -484,6 +574,17 @@
         background: var(--violet-accent);
       }
     }
+  }
+
+  --accent-color: var(--violet-accent);
+  --accent-color-2: #5d4e8b;
+  --accent-color-3: #7d6eab;
+  --accent-tint: var(--violet-tint);
+  --accent-tint-2: rgba(61, 46, 107, 0.04);
+  --accent-tint-3: rgba(61, 46, 107, 0.02);
+
+  .rankingBadge {
+    background: var(--violet-accent);
   }
 
   .rank1 {

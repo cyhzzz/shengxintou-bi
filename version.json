@@ -1,8 +1,9 @@
 {
-  "version": "3.2.1",
+  "version": "3.2.2",
   "release_date": "2026-07-17",
   "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
   "changelog": [
+    "v3.2.2 员工转化周报对齐腾讯渠道开户榜模板 + 海报样式美化：(1) 列名对齐业务术语（微信线索数/开户数/有效户数/引入资产/有效户率）。(2) 总榜改为历史累计数据（不按 start_date 过滤），对齐模板「截至时间」口径。(3) 总榜总计行下方新增 26年/25年年度拆分行（后端 get_yearly_breakdown 按年份聚合，/weekly 端点返回 year_breakdown 字段）。(4) 修复有效户率=0（后端 ranking 补 valid_customer_rate 字段）。(5) 修复存量线索新开户榜微信线索数=开户数（拆分为两个查询：存量线索总数 + 本周新开户）。(6) 小红书固定员工名单改为 8 人（史菡漾/何泳萍/杨华/贾芳/陈鸿/袁孝春/赵梅/张杰明），与腾讯/抖音 12 人区分。(7) 海报样式全面重写为 Editorial 风格：平台 accent 色系（小红书砖红/腾讯深青/抖音深紫）、TOP1-3 分级高亮、装饰性斜纹底纹、序号徽章、脚注编号。(8) 口径说明文字动态填充日期。验证：tsc 0 错、build 30.95s、API 冒烟 33/33。",
     "v3.2.1 清理旧周报系统 + 冗余 DIM 表（简称管理下线收尾）：(1) 删除 weekly_reports 表及 WeeklyReport ORM 模型——旧周报系统存文案/重点工作/HTML，v3.1.31 起纯数据周报从 agg_vendor_daily/agg_daily_channel_open/fact_conv_* 实时聚合，不再依赖该表。(2) 简化 /periods 端点：去掉数据库查询，纯生成周次选项。(3) 删除旧端点 /generate、/<report_id> GET/PUT、/<report_id>/export、/test-code-loading。(4) 删除旧脚本 aggregate_weekly_data.py、weekly_report_template.py。(5) 删除冗余 DIM 表 dim_vendor/dim_channel/dim_channel_category 及 abbreviation_mapping 端点——简称管理页面已下线，代理商映射改从 dim_account 去重构建。(6) 数据库底表精简至 8 张（2 系统表 + 6 业务表）。(7) 验证：API 冒烟测试 33 个接口全部通过。",
     "v3.2.0 报告生成页数据周报·色系与排版优化（原 v3.1.31~v3.1.36 合并收敛）：堆叠图色系改造（内容红/应用蓝/本地绿）、自定义 3 大类图例、KPI 环形图、纯数据周报 6 指标表格化。"
   ]

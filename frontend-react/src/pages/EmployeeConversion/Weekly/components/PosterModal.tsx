@@ -6,10 +6,11 @@
 import React, { useRef, useState } from 'react';
 import { Modal, message, Spin } from 'antd';
 import {
-  FIXED_ASSISTANTS,
+  getPlatformAssistants,
   withFixedAssistants,
   type WeeklyPlatformRankings,
   type WeeklyRankingItem,
+  type YearBreakdownItem,
 } from '../weeklyRanking';
 import styles from './PosterModal.module.scss';
 
@@ -19,6 +20,7 @@ interface PosterModalProps {
   startDate: string;
   endDate: string;
   rankings: WeeklyPlatformRankings;
+  yearBreakdown?: { y2025: YearBreakdownItem; y2026: YearBreakdownItem };
   onCancel?: () => void;
   // v3.1.25: 'modal' = 原貌 Modal 包装（PosterExportButtons 调用）；'inline' = 直接渲染与主页面作为海报视图（Weekly 主页面调用）
   mode?: 'modal' | 'inline';
@@ -74,10 +76,13 @@ const renderTableRow = (
     );
   }
 
+  const rank = index + 1;
+  const rowClass = rank <= 3 ? `${styles.dataRow} ${styles[`top${rank}`]}` : styles.dataRow;
+
   return (
-    <tr key={index}>
+    <tr key={index} className={rowClass}>
       <td>
-        <span className={getRankClass(index + 1)}>{index + 1}</span>
+        <span className={getRankClass(rank)}>{rank}</span>
       </td>
       <td className={styles.employeeName}>{item.employee_name}</td>
       <td className={styles.number}>{formatNumber(item.total_leads)}</td>
@@ -95,7 +100,8 @@ const renderRankingTable = (
   data: WeeklyRankingItem[],
   title: string,
   indexLabel: string,
-  platform: string
+  platform: string,
+  yearBreakdown?: { y2025: YearBreakdownItem; y2026: YearBreakdownItem }
 ) => {
   // 固定名单内保留榜单原始降序，缺少数据的员工补 0 后置。
   data = withFixedAssistants(data, platform);
@@ -120,21 +126,21 @@ const renderRankingTable = (
   return (
     <div className={styles.rankingSection}>
       <div className={styles.rankingHeader}>
-        <span className={styles.rankingIndex}>{indexLabel}</span>
+        <span className={styles.rankingBadge}>{indexLabel}</span>
         <span className={styles.rankingTitle}>{title}</span>
-        <span className={styles.rankingMeta}>固定 {FIXED_ASSISTANTS.length} 名员工</span>
+        <span className={styles.rankingMeta}>固定 {getPlatformAssistants(platform).length} 名员工</span>
       </div>
       <table className={styles.rankingTable}>
         <thead>
           <tr>
             <th style={{ width: '48px' }}>#</th>
             <th style={{ width: '110px' }}>员工</th>
-            <th>线索</th>
-            <th>开户</th>
-            <th>有效户</th>
-            <th>资产(万)</th>
+            <th>微信线索数</th>
+            <th>开户数</th>
+            <th>有效户数</th>
+            <th>引入资产</th>
             <th>开户率</th>
-            <th>有效率</th>
+            <th>有效户率</th>
           </tr>
         </thead>
         <tbody>
@@ -148,6 +154,28 @@ const renderRankingTable = (
             <>
               {data.map((item, index) => renderTableRow(item, index))}
               {renderTableRow(total as WeeklyRankingItem, 0, true)}
+              {yearBreakdown && (
+                <>
+                  <tr className={styles.yearRow} key="y2026">
+                    <td colSpan={2} style={{ whiteSpace: 'pre-line' }}>26年线索<br/>26年开户</td>
+                    <td className={styles.number}>{formatNumber(yearBreakdown.y2026.total_leads)}</td>
+                    <td className={styles.highlight}>{formatNumber(yearBreakdown.y2026.opened_count)}</td>
+                    <td className={styles.number}>{formatNumber(yearBreakdown.y2026.valid_customer_count)}</td>
+                    <td className={styles.number}>{formatAssets(yearBreakdown.y2026.total_assets)}</td>
+                    <td className={styles.rate}>{(yearBreakdown.y2026.opening_rate || 0).toFixed(2)}%</td>
+                    <td className={styles.rate}>{(yearBreakdown.y2026.valid_customer_rate || 0).toFixed(2)}%</td>
+                  </tr>
+                  <tr className={styles.yearRow} key="y2025">
+                    <td colSpan={2} style={{ whiteSpace: 'pre-line' }}>25年线索<br/>25年开户</td>
+                    <td className={styles.number}>{formatNumber(yearBreakdown.y2025.total_leads)}</td>
+                    <td className={styles.highlight}>{formatNumber(yearBreakdown.y2025.opened_count)}</td>
+                    <td className={styles.number}>{formatNumber(yearBreakdown.y2025.valid_customer_count)}</td>
+                    <td className={styles.number}>{formatAssets(yearBreakdown.y2025.total_assets)}</td>
+                    <td className={styles.rate}>{(yearBreakdown.y2025.opening_rate || 0).toFixed(2)}%</td>
+                    <td className={styles.rate}>{(yearBreakdown.y2025.valid_customer_rate || 0).toFixed(2)}%</td>
+                  </tr>
+                </>
+              )}
             </>
           )}
         </tbody>
@@ -157,13 +185,27 @@ const renderRankingTable = (
 };
 
 // 渲染底部说明
-const renderFooterNote = (platform: string) => {
+const renderFooterNote = (platform: string, startDate: string, endDate: string) => {
+  // 格式化日期为 YYYY.M.D 格式
+  const fmtDate = (d: string) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()}`;
+  };
+  // start_date 前一天
+  const prevDay = (d: string) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    dt.setDate(dt.getDate() - 1);
+    return `${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()}`;
+  };
+
   const notes = [
-    '微信线索数指添加企业微信后留存线索量',
-    '开户数据指开户营业部归属为 10 / 30（即成都天府四街 / 二营业部）',
-    '开户率 = 开户数 / 微信线索数；有效率 = 有效户数 / 开户数',
-    '资产单位：万元',
-    '存量线索新开户榜：线索日期在统计周期前 + 开户时间落在周期内的户数（与新增线索开户周榜分别覆盖"老企微线索新开户"与"本周新增线索开户"两组增量业绩）',
+    `①微信线索数：添加企业微信数（截至时间：${fmtDate(endDate)}）`,
+    `②开户数：开户营业部隶属7030（成都天府四街2营业部）+助力分支营业部开户数（开户时间≤加微信时间）`,
+    `③开户率=开户数/微信线索数；有效户率=有效户数/开户数`,
+    `④资产单位：万元`,
+    `⑤存量线索新开户榜：线索日期在${prevDay(startDate)}前+开户时间落在${fmtDate(startDate)}--${fmtDate(endDate)}内的户数`,
   ];
 
   if (platform === '小红书') {
@@ -188,6 +230,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
   startDate,
   endDate,
   rankings,
+  yearBreakdown,
   onCancel,
   mode = 'modal',
 }) => {
@@ -376,7 +419,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
 
           {/* 内容区域 */}
           <div className={styles.content}>
-            {renderRankingTable(rankings.total, `${getRankingPrefix()}开户总榜`, '01', platform)}
+            {renderRankingTable(rankings.total, `${getRankingPrefix()}开户总榜`, '01', platform, yearBreakdown)}
             {renderRankingTable(
               rankings.new,
               `${getRankingPrefix()}新增线索开户周榜`,
@@ -389,7 +432,7 @@ const PosterModal: React.FC<PosterModalProps> = ({
               '03',
               platform
             )}
-            {renderFooterNote(platform)}
+            {renderFooterNote(platform, startDate, endDate)}
           </div>
         </div>
       </div>
