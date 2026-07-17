@@ -62,7 +62,7 @@ const AppMarketFunnelPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <FadeInSection delay={0} duration={1.2}>
+      <FadeInSection delay={0} duration={1}>
         <Card className={styles.filterCard} size='small'>
           <Space size='middle' wrap>
             <span className={styles.label}>日期区间</span>
@@ -78,7 +78,7 @@ const AppMarketFunnelPage: React.FC = () => {
       </FadeInSection>
       <Spin spinning={loading}>
         {/* v3.1.25: 4 卡片概览，核心业务产出导向 */}
-        <FadeInSection delay={0.15} duration={1.2}>
+        <FadeInSection delay={0.15} duration={1}>
           <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出）">
             <MetricCard
               title="激活APP"
@@ -116,7 +116,7 @@ const AppMarketFunnelPage: React.FC = () => {
           </MetricSection>
         </FadeInSection>
 
-        <FadeInSection delay={0.3} duration={1.2}>
+        <FadeInSection delay={0.3} duration={1}>
           <Row className={styles.funnelSplitRow}>
             <Col span={12} className={styles.funnelSplitCol}>
               <Card title='9 阶段转化漏斗' size='small' className={styles.h100Card}>
@@ -160,7 +160,7 @@ const AppMarketFunnelPage: React.FC = () => {
           </Row>
         </FadeInSection>
 
-        <FadeInSection delay={0.45} duration={1.2}>
+        <FadeInSection delay={0.45} duration={1}>
           <ReportFooter
             sources={[
               { label: '数据源', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },

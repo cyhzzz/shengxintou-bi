@@ -156,7 +156,7 @@ const ConversionFunnelPage: React.FC = () => {
     <div className={styles.page}>
       <Spin spinning={loading}>
         {/* v3.1.4: 筛选器 — 日期范围 + 平台多选 */}
-        <FadeInSection delay={0} duration={1.2}>
+        <FadeInSection delay={0} duration={1}>
           <Card size='small' style={{ marginBottom: 16 }}>
             <Space size={16} wrap>
               <span>日期范围：</span>
@@ -183,7 +183,7 @@ const ConversionFunnelPage: React.FC = () => {
         </FadeInSection>
 
         {/* v3.1: Tab 切换两套独立漏斗 */}
-        <FadeInSection delay={0.2} duration={1.2}>
+        <FadeInSection delay={0.2} duration={1}>
           <Tabs
             defaultActiveKey="content"
             items={[
@@ -390,7 +390,7 @@ const ConversionFunnelPage: React.FC = () => {
           />
         </FadeInSection>
 
-        <FadeInSection delay={0.4} duration={1.2}>
+        <FadeInSection delay={0.4} duration={1}>
           <ReportFooter
             sources={[
               { label: '内容平台漏斗', value: 'agg_vendor_daily(平台∈内容平台) + fact_conv_content（8 阶段：广告曝光 → 客户点击 → 客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户 → 有效户）' },

@@ -85,7 +85,7 @@ const AppMarketCreativePage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <FadeInSection delay={0} duration={1.2}>
+      <FadeInSection delay={0} duration={1}>
         <Card className={styles.filterCard} size='small'>
           <Space size='middle' wrap>
             <span className={styles.label}>日期区间</span>
@@ -107,7 +107,7 @@ const AppMarketCreativePage: React.FC = () => {
         </Card>
       </FadeInSection>
       <Spin spinning={loading}>
-        <FadeInSection delay={0.15} duration={1.2}>
+        <FadeInSection delay={0.15} duration={1}>
           <MetricSection title="创意效果概览" description="广告计划规模、激活、开户、有效户与整体转化率">
             <MetricCard
               title="创意计划数"
@@ -161,7 +161,7 @@ const AppMarketCreativePage: React.FC = () => {
           </MetricSection>
         </FadeInSection>
 
-        <FadeInSection delay={0.3} duration={1.2}>
+        <FadeInSection delay={0.3} duration={1}>
           <Card title='广告创意效果（按广告计划ID + 投放账号聚合）' size='small'
             extra={<Tooltip title='导出为 CSV'><Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!data.length}>导出 CSV</Button></Tooltip>}>
             <Table size='small' rowKey={(r: any) => r.row_id}
@@ -197,7 +197,7 @@ const AppMarketCreativePage: React.FC = () => {
           </Card>
         </FadeInSection>
       </Spin>
-      <FadeInSection delay={0.45} duration={1.2}>
+      <FadeInSection delay={0.45} duration={1}>
         <ReportFooter
           sources={[
             { label: '数据源', value: 'fact_conv_appmarket（明细聚合）' },

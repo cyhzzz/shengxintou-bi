@@ -97,26 +97,42 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     const currentTheme = getCurrentTheme();
     const mergedOption = mergeChartTheme(option, currentTheme);
 
-    // v3.2.7：统一注入更慢、更从容的入场动画（1~2 秒级）
+    // v3.2.8：统一注入入场 + 更新动画（1.2 秒级），让加载和切换都有缓慢变化
+    // - animationDuration：首次入场动画
+    // - animationDurationUpdate：数据切换/更新动画（默认仅 300ms，太急促）
+    // - animationDelay / animationDelayUpdate：多 series 按索引 stagger
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!disableAnimation && !prefersReduced) {
       (mergedOption as any).animation = true;
       (mergedOption as any).animationDuration = (mergedOption as any).animationDuration ?? 1200;
+      (mergedOption as any).animationDurationUpdate =
+        (mergedOption as any).animationDurationUpdate ?? 1200;
       (mergedOption as any).animationEasing = (mergedOption as any).animationEasing ?? 'cubicOut';
+      (mergedOption as any).animationEasingUpdate =
+        (mergedOption as any).animationEasingUpdate ?? 'cubicOut';
+      (mergedOption as any).animationDelay = (mergedOption as any).animationDelay ?? 0;
+      (mergedOption as any).animationDelayUpdate =
+        (mergedOption as any).animationDelayUpdate ?? 0;
+
       const series = (mergedOption as any).series;
       if (Array.isArray(series)) {
         (mergedOption as any).series = series.map((s, idx) => ({
           animation: true,
           animationDuration: 1200,
+          animationDurationUpdate: 1200,
           animationEasing: 'cubicOut',
-          animationDelay: idx * 200,
+          animationEasingUpdate: 'cubicOut',
+          animationDelay: idx * 120,
+          animationDelayUpdate: idx * 120,
           ...s,
         }));
       } else if (series && typeof series === 'object') {
         (mergedOption as any).series = {
           animation: true,
           animationDuration: 1200,
+          animationDurationUpdate: 1200,
           animationEasing: 'cubicOut',
+          animationEasingUpdate: 'cubicOut',
           ...series,
         };
       }
@@ -124,9 +140,10 @@ const EChartsComponent: React.FC<EChartsProps> = ({
       (mergedOption as any).animation = false;
     }
 
-    // v3.2.6：正常数据更新用 merge（避免全量重绘），lazyUpdate 减少阻塞
+    // v3.2.8：切换 Tab / 筛选器时 series 引用通常变化，用 notMerge: true 触发完整入场动画
+    // 首次渲染也走 notMerge: true，确保入场动画生效（merge 模式下入场动画可能不触发）
     chartRef.current.setOption(mergedOption, {
-      notMerge: false,
+      notMerge: true,
       lazyUpdate: true,
     });
   }, [option, getCurrentTheme]);
