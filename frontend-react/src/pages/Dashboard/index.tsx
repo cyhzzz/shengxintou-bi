@@ -4,9 +4,9 @@
  * 使用自动生成的 API 类型和自定义 Hooks
  *
  * 业务分组结构：
- * - 前端投放: 阶段投入金额、总展示数、总点击数、总线索数
+ * - 前端投放: 阶段投入金额、总展示数、企微数、APP下载激活数
  * - 后端转化: 新开客户数、新增有效户数、客户资产、客户贡献
- * - 运营效率: 单线索成本、单开户成本、单有效户成本
+ * - 运营效率: 单企微成本、单APP下载激活成本、单开户成本、单有效户成本
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import { Row, Col, Spin, Tooltip, Typography, message } from 'antd';
@@ -40,17 +40,19 @@ const { Text } = Typography;
 const METRIC_COLORS = {
   cost: 'var(--chart-color-1)',
   impressions: 'var(--chart-color-2)',
-  clicks: 'var(--chart-color-3)',
-  leads: 'var(--chart-color-4)',
+  leadsWechat: 'var(--chart-color-3)',
+  leadsApp: 'var(--chart-color-4)',
   openedAccounts: 'var(--chart-color-5)',
   validCustomers: 'var(--chart-color-6)',
   customerAssets: 'var(--chart-color-7)',
   contribution: 'var(--chart-color-5)',
+  costWechat: 'var(--chart-color-1)',
+  costApp: 'var(--chart-color-8)',
 };
 
 const DashboardPage: React.FC = () => {
   // 趋势图指标类型状态
-  const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_per_lead');
+  const [trendMetricType, setTrendMetricType] = useState<MetricType>('cost_split');
   // 趋势图粒度状态
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   // 使用自定义 Hooks
@@ -267,26 +269,26 @@ const DashboardPage: React.FC = () => {
                 icon={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
               />
                           <MetricCard
-                title="总点击数"
-                value={coreMetrics?.total_clicks}
-                wowChange={wowChanges?.total_clicks ? {
-                  value: wowChanges.total_clicks.value,
-                  trend: wowChanges.total_clicks.trend,
-                  color: wowChanges.total_clicks.color,
+                title="企微数"
+                value={coreMetrics?.leads_wechat}
+                wowChange={wowChanges?.leads_wechat ? {
+                  value: wowChanges.leads_wechat.value,
+                  trend: wowChanges.leads_wechat.trend,
+                  color: wowChanges.leads_wechat.color,
                 } : undefined}
                 formatter="number"
-                icon={<AimOutlined style={{ color: METRIC_COLORS.clicks }} />}
+                icon={<UserOutlined style={{ color: METRIC_COLORS.leadsWechat }} />}
               />
-                          <MetricCard
-                title="总线索数"
-                value={coreMetrics?.total_leads}
-                wowChange={wowChanges?.total_leads ? {
-                  value: wowChanges.total_leads.value,
-                  trend: wowChanges.total_leads.trend,
-                  color: wowChanges.total_leads.color,
+              <MetricCard
+                title="APP下载激活数"
+                value={coreMetrics?.leads_app}
+                wowChange={wowChanges?.leads_app ? {
+                  value: wowChanges.leads_app.value,
+                  trend: wowChanges.leads_app.trend,
+                  color: wowChanges.leads_app.color,
                 } : undefined}
                 formatter="number"
-                icon={<UserOutlined style={{ color: METRIC_COLORS.leads }} />}
+                icon={<AimOutlined style={{ color: METRIC_COLORS.leadsApp }} />}
               />
         </MetricSection>
 
@@ -366,16 +368,28 @@ const DashboardPage: React.FC = () => {
         >
 
                           <MetricCard
-                title="单线索成本"
-                value={coreMetrics?.cost_per_lead}
-                wowChange={wowChanges?.cost_per_lead ? {
-                  value: wowChanges.cost_per_lead.value,
-                  trend: wowChanges.cost_per_lead.trend,
-                  color: wowChanges.cost_per_lead.color,
+                title="单企微成本"
+                value={coreMetrics?.cost_per_wechat_lead}
+                wowChange={wowChanges?.cost_per_wechat_lead ? {
+                  value: wowChanges.cost_per_wechat_lead.value,
+                  trend: wowChanges.cost_per_wechat_lead.trend,
+                  color: wowChanges.cost_per_wechat_lead.color,
                 } : undefined}
                 prefix="¥"
                 formatter="currency"
-                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.cost }} />}
+                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costWechat }} />}
+              />
+              <MetricCard
+                title="单APP下载激活成本"
+                value={coreMetrics?.cost_per_app_activation}
+                wowChange={wowChanges?.cost_per_app_activation ? {
+                  value: wowChanges.cost_per_app_activation.value,
+                  trend: wowChanges.cost_per_app_activation.trend,
+                  color: wowChanges.cost_per_app_activation.color,
+                } : undefined}
+                prefix="¥"
+                formatter="currency"
+                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costApp }} />}
               />
                           <MetricCard
                 title="单开户成本"
