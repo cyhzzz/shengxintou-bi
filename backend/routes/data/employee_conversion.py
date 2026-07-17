@@ -6,7 +6,7 @@ from backend.routes.data.employee_conversion_helpers import (
     get_employee_conversion_ranking, get_weekly_trend_data,
     get_employee_rate_trend, get_weekly_report_data,
     get_employee_list, get_platform_overview, get_latest_data_week_range,
-    get_qualified_employees
+    get_qualified_employees, get_yearly_breakdown
 )
 from backend.utils.decorators import handle_exceptions
 
@@ -80,7 +80,8 @@ def get_weekly_data():
         'data': {
             'roster_count': len(WEEKLY_ASSISTANTS),
             'rankings': {p: {
-                'total': get_employee_conversion_ranking([p], start_date, end_date, 'all', WEEKLY_ASSISTANTS),
+                # 总榜：截至 end_date 的全量历史累计（不按 start_date 过滤），对齐腾讯渠道开户榜模板
+                'total': get_employee_conversion_ranking([p], None, end_date, 'all', WEEKLY_ASSISTANTS),
                 'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing', WEEKLY_ASSISTANTS),
                 'new': get_employee_conversion_ranking([p], start_date, end_date, 'new', WEEKLY_ASSISTANTS),
                 # v3.1.30: 存量线索新开户榜 — 线索日期在区间前 + 开户时间落在区间内
@@ -88,6 +89,8 @@ def get_weekly_data():
                     [p], start_date, end_date, 'existing_new_open', WEEKLY_ASSISTANTS
                 ),
             } for p in platforms},
+            # v3.2.2: 总榜年度拆分（累计，截至 end_date，按 2025/2026 年份分组）
+            'year_breakdown': {p: get_yearly_breakdown([p], end_date, WEEKLY_ASSISTANTS) for p in platforms},
             'overview': get_platform_overview(platforms, start_date, end_date, WEEKLY_ASSISTANTS),
             'trend': get_weekly_trend_data(platforms, start_date, end_date, WEEKLY_ASSISTANTS),
         }

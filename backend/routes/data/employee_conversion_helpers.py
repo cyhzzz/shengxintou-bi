@@ -39,13 +39,36 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
     if lead_type == 'existing_new_open':
         if not start_date or not end_date:
             return []
-        q = db.session.query(
+        qualified = get_qualified_employees(min_leads=5)
+        pfs = [get_platform_filter(p) for p in platforms]
+        emp_filter = [str(e) for e in employees] if employees else (qualified if qualified else [])
+
+        # 查询1：存量线索总数（线索日期 < start_date 的全部存量线索，不论是否开户）
+        leads_q = db.session.query(
             FactConvContent.添加员工姓名,
             FactConvContent.平台来源,
             func.count(FactConvContent.id).label('total_leads'),
+        ).filter(
+            and_(
+                FactConvContent.添加员工姓名.isnot(None),
+                FactConvContent.添加员工姓名 != '',
+                FactConvContent.线索日期 < start_date,
+            )
+        )
+        if emp_filter:
+            leads_q = leads_q.filter(FactConvContent.添加员工姓名.in_(emp_filter))
+        if pfs:
+            leads_q = leads_q.filter(or_(*pfs))
+        leads_rows = leads_q.group_by(FactConvContent.添加员工姓名, FactConvContent.平台来源).all()
+        leads_map = {(r.添加员工姓名, r.平台来源): _i(r.total_leads) for r in leads_rows}
+
+        # 查询2：本周新开户的存量线索（开户时间落在 [start_date, end_date] 内 + 是否开户==1）
+        q = db.session.query(
+            FactConvContent.添加员工姓名,
+            FactConvContent.平台来源,
             func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
             func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
-            func.coalesce(func.sum(case((FactConvContent.是否开户 == 1, 1), else_=0)), 0).label('opened'),
+            func.count(FactConvContent.id).label('opened'),
             func.coalesce(func.sum(case((FactConvContent.是否为有效户 == 1, 1), else_=0)), 0).label('valid_customer'),
             func.coalesce(func.sum(FactConvContent.资产), 0).label('assets'),
         ).filter(
@@ -60,18 +83,16 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
                 FactConvContent.是否开户 == 1,
             )
         )
-        qualified = get_qualified_employees(min_leads=5)
-        if qualified:
-            q = q.filter(FactConvContent.添加员工姓名.in_(qualified))
-        if employees:
-            q = q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
-        pfs = [get_platform_filter(p) for p in platforms]
+        if emp_filter:
+            q = q.filter(FactConvContent.添加员工姓名.in_(emp_filter))
         if pfs:
             q = q.filter(or_(*pfs))
         rows = q.group_by(FactConvContent.添加员工姓名, FactConvContent.平台来源).all()
         ranking = []
         for r in rows:
-            leads, opened, valid = _i(r.total_leads), _i(r.opened), _i(r.valid_customer)
+            opened = _i(r.opened)
+            valid = _i(r.valid_customer)
+            leads = leads_map.get((r.添加员工姓名, r.平台来源), 0)
             ranking.append({
                 'employee_name': r.添加员工姓名,
                 'platform': r.平台来源,
@@ -82,6 +103,7 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
                 'valid_customer_count': valid,
                 'total_assets': round(_f(r.assets), 2),
                 'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
+                'valid_customer_rate': round(valid / opened * 100, 2) if opened > 0 else 0,
             })
         ranking.sort(key=lambda x: x['opened_count'], reverse=True)
         return ranking
@@ -126,6 +148,7 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
             'valid_customer_count': valid,
             'total_assets': round(_f(r.assets), 2),
             'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
+            'valid_customer_rate': round(valid / opened * 100, 2) if opened > 0 else 0,
         })
     ranking.sort(key=lambda x: x['opening_rate'], reverse=True)
     return ranking
@@ -176,6 +199,53 @@ def get_latest_data_week_range():
         'default_week_start': start.isoformat(),
         'default_week_end': end.isoformat(),
     }
+
+
+def get_yearly_breakdown(platforms, end_date=None, employees=None):
+    """累计年度拆分：截至 end_date，按年份（2025/2026）分别聚合总榜 6 项指标。
+
+    对齐腾讯渠道开户榜模板的"26年线索/26年开户"和"25年线索/25年开户"行。
+    口径与 total 榜一致（全部线索，不分存量/新增），但时间范围为全年累计。
+    """
+    result = {}
+    for year in [2025, 2026]:
+        year_start = f'{year}-01-01'
+        year_end = f'{year}-12-31'
+        q = db.session.query(
+            func.count(FactConvContent.id).label('total_leads'),
+            func.coalesce(func.sum(case((FactConvContent.是否开户 == 1, 1), else_=0)), 0).label('opened'),
+            func.coalesce(func.sum(case((FactConvContent.是否为有效户 == 1, 1), else_=0)), 0).label('valid_customer'),
+            func.coalesce(func.sum(FactConvContent.资产), 0).label('assets'),
+        ).filter(
+            and_(
+                FactConvContent.添加员工姓名.isnot(None),
+                FactConvContent.添加员工姓名 != '',
+                FactConvContent.线索日期 >= year_start,
+                FactConvContent.线索日期 <= year_end,
+            )
+        )
+        if end_date:
+            q = q.filter(FactConvContent.线索日期 <= end_date)
+        qualified = get_qualified_employees(min_leads=5)
+        if qualified:
+            q = q.filter(FactConvContent.添加员工姓名.in_(qualified))
+        if employees:
+            q = q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
+        pfs = [get_platform_filter(p) for p in platforms]
+        if pfs:
+            q = q.filter(or_(*pfs))
+        r = q.first()
+        leads, opened, valid = _i(r.total_leads), _i(r.opened), _i(r.valid_customer)
+        result[f'y{year}'] = {
+            'label': f'{year % 100}年线索\n{year % 100}年开户',
+            'total_leads': leads,
+            'opened_count': opened,
+            'valid_customer_count': valid,
+            'total_assets': round(_f(r.assets), 2),
+            'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
+            'valid_customer_rate': round(valid / opened * 100, 2) if opened > 0 else 0,
+        }
+    return result
 
 
 def get_platform_overview(platforms, start_date=None, end_date=None, employees=None):
