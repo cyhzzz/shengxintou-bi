@@ -77,6 +77,14 @@ desktop.ini
 .coverage
 htmlcov/
 
+# Playwright 产物
+frontend-react/playwright-report/
+frontend-react/test-results/
+frontend-react/.playwright/
+
+# superpowers（技能相关，不入主仓）
+docs/superpowers/
+
 # ===== 根目录的其他目录（不包含在开发代码中）=====
 ../../版本输出/
 ../../temp/
