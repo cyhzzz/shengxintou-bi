@@ -322,16 +322,6 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                       </Button>
                     </div>
 
-                    {versionInfo.changelog && versionInfo.changelog.length > 0 && (
-                      <div className={styles.changelog}>
-                        <Text type="secondary">当前版本更新内容：</Text>
-                        <ul>
-                          {versionInfo.changelog.slice(0, 6).map((item, index) => (
-                            <li key={index}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <Text type="secondary">版本信息加载失败</Text>

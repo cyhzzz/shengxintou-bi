@@ -32,9 +32,10 @@ _update_lock = threading.Lock()
 
 
 def _project_root() -> str:
-    """获取项目根目录（backend/routes/system/self_update.py -> backend -> project_root）。"""
+    """获取项目根目录（backend/routes/system/self_update.py -> project_root）。"""
     here = os.path.dirname(os.path.abspath(__file__))
-    return os.path.dirname(os.path.dirname(here))
+    # 三层 dirname：self_update.py -> system/ -> routes/ -> backend/ -> project_root
+    return os.path.dirname(os.path.dirname(os.path.dirname(here)))
 
 
 def _run_git(args, cwd, timeout=60):
@@ -117,19 +118,30 @@ def _do_self_update(task_id, force):
     project_root = _project_root()
     log_lines = []
 
-    def log(msg):
+    # 进度阶段（running 中单调递增，仅 success 才会被覆盖为 100）：
+    #   5  -> 已提交任务（start_self_update 写入）
+    #  15  -> 读取本地状态完成
+    #  25  -> git stash（仅 dirty + force 走）
+    #  40  -> git fetch origin 完成
+    #  60  -> 准备 git pull
+    #  85  -> git pull 完成，正在校验
+    #  95  -> 恢复 stash（仅 dirty + force 走）
+    # 100  -> success（在成功分支写入）
+    def log(msg, progress=None):
         ts = datetime.now().strftime("%H:%M:%S")
         line = "[" + ts + "] " + msg
         log_lines.append(line)
         with _update_lock:
             _update_tasks[task_id]["log"] = list(log_lines)
             _update_tasks[task_id]["message"] = msg
+            if progress is not None:
+                _update_tasks[task_id]["progress"] = progress
         logger.info("[self-update %s] %s", task_id, msg)
 
     try:
         before_version = (_read_version_json() or {}).get("version", "")
         before_snap = _git_status_snapshot(project_root)
-        log("开始更新：本地 v" + before_version + " @ " + (before_snap.get("local_sha") or "?")[:8])
+        log("开始更新：本地 v" + before_version + " @ " + (before_snap.get("local_sha") or "?")[:8], progress=15)
 
         if before_snap.get("dirty") and not force:
             log("工作区有未提交改动（force=False 拒绝覆盖）")
@@ -142,7 +154,7 @@ def _do_self_update(task_id, force):
             return
 
         if before_snap.get("dirty") and force:
-            log("工作区有改动，force=True 执行 git stash ...")
+            log("工作区有改动，force=True 执行 git stash ...", progress=25)
             rc, out, err = _run_git(["stash", "push", "-u", "-m", "self-update-" + task_id], project_root)
             if rc != 0:
                 log("git stash 失败: " + err)
@@ -156,7 +168,7 @@ def _do_self_update(task_id, force):
             first_line = (out or "").strip().splitlines()
             log("已 stash: " + (first_line[0] if first_line else "OK"))
 
-        log("执行 git fetch origin ...")
+        log("执行 git fetch origin ...", progress=40)
         rc, out, err = _run_git(["fetch", "origin"], project_root, timeout=60)
         if rc != 0:
             log("git fetch 失败: " + err)
@@ -168,7 +180,7 @@ def _do_self_update(task_id, force):
                 })
             return
 
-        log("执行 git pull --ff-only origin <branch> ...")
+        log("执行 git pull --ff-only origin <branch> ...", progress=60)
         rc, out, err = _run_git(["pull", "--ff-only", "origin", before_snap.get("branch", "main")], project_root, timeout=120)
         if rc != 0:
             log("git pull 失败: " + (err or out))
@@ -180,14 +192,14 @@ def _do_self_update(task_id, force):
                     "log": log_lines,
                 })
             return
-        log("git pull 完成：" + (out or "").strip()[:200])
+        log("git pull 完成：" + (out or "").strip()[:200], progress=85)
 
         after_snap = _git_status_snapshot(project_root)
         after_version = (_read_version_json() or {}).get("version", "")
         log("更新完成：v" + before_version + " -> v" + after_version + " @ " + (after_snap.get("local_sha") or "?")[:8])
 
         if before_snap.get("dirty") and force:
-            log("尝试恢复 stash ...")
+            log("尝试恢复 stash ...", progress=95)
             rc, out, err = _run_git(["stash", "pop"], project_root)
             if rc != 0:
                 log("stash pop 冲突，需手动处理：" + err)
