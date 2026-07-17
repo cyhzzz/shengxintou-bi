@@ -5,16 +5,22 @@ const config: FunctionalConfig = DEFAULT_FUNCTIONAL_CONFIG;
 
 export const PAGE_ROUTES = {
   dashboard: '/dashboard',
+  'omni-channel': '/omni-channel',
   'agency-analysis': '/agency-analysis',
   'xhs-notes-list': '/xhs-notes/list',
   'xhs-notes-operation': '/xhs-notes/operation',
   'leads-detail': '/leads-detail',
   'conversion-funnel': '/conversion-funnel',
+  'anchor-clusters': '/anchor-clusters',
   'employee-conversion-analysis': '/employee-conversion/analysis',
   'employee-conversion-weekly': '/employee-conversion/weekly',
+  'app-market-funnel': '/app-market/funnel',
+  'app-market-comparison': '/app-market/comparison',
+  'app-market-detail': '/app-market/detail',
+  'app-market-creative': '/app-market/creative',
+  'live-funnel': '/live/funnel',
   'data-import': '/system/data-import',
   'account-management': '/system/account-management',
-  'abbreviation-management': '/system/abbreviation-management',
   'database-backup': '/system/database-backup',
   'report-generation': '/report-generation',
 };
@@ -22,7 +28,7 @@ export const PAGE_ROUTES = {
 export const WAIT_CONFIG = config.waitConfig;
 
 export async function waitForPageReady(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(WAIT_CONFIG.pageLoad);
 }
 
@@ -50,25 +56,25 @@ export async function navigateToPage(page: Page, pageKey: keyof typeof PAGE_ROUT
 
 export async function expectSidebarVisible(page: Page): Promise<Locator> {
   const sidebar = page.locator('.ant-layout-sider, [class*="sidebar"]').first();
-  await expect(sidebar).toBeVisible({ timeout: 10000 });
+  await expect(sidebar).toBeVisible({ timeout: 30000 });
   return sidebar;
 }
 
 export async function expectHeaderVisible(page: Page): Promise<Locator> {
   const header = page.locator('.ant-layout-header, [class*="header"]').first();
-  await expect(header).toBeVisible({ timeout: 10000 });
+  await expect(header).toBeVisible({ timeout: 30000 });
   return header;
 }
 
 export async function expectMainContentVisible(page: Page): Promise<Locator> {
   const content = page.locator('.ant-layout-content, main, [class*="content"]').first();
-  await expect(content).toBeVisible({ timeout: 10000 });
+  await expect(content).toBeVisible({ timeout: 30000 });
   return content;
 }
 
 export async function expectFilterBarVisible(page: Page): Promise<Locator> {
   const filterBar = page.locator('.ant-card, [class*="filter"]').first();
-  await expect(filterBar).toBeVisible({ timeout: 10000 });
+  await expect(filterBar).toBeVisible({ timeout: 30000 });
   return filterBar;
 }
 

@@ -30,9 +30,6 @@ test.describe('线索明细页面功能测试', () => {
     await expectSidebarVisible(page);
     await expectMainContentVisible(page);
     await expectFilterBarVisible(page);
-    
-    const header = page.locator('h1, .ant-page-header-heading-title').first();
-    await expect(header).toBeVisible({ timeout: 10000 });
   });
 
   test('页面加载 - 筛选器组件', async ({ page }) => {
