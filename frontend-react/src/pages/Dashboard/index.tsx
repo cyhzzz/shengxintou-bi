@@ -227,7 +227,7 @@ const DashboardPage: React.FC = () => {
     <div className={styles.dashboardPage}>
       <Spin spinning={loading}>
         {/* 筛选器 */}
-        <FadeInSection delay={0} duration={1.2}>
+        <FadeInSection delay={0} duration={1}>
           <FilterBar
             showPlatform
             showAgency
@@ -238,7 +238,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 前端投放指标卡片 */}
-        <FadeInSection delay={0.15} duration={1.2}>
+        <FadeInSection delay={0.15} duration={1}>
           <MetricSection
             title={
               <>
@@ -296,7 +296,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 后端转化指标卡片 */}
-        <FadeInSection delay={0.3} duration={1.2}>
+        <FadeInSection delay={0.3} duration={1}>
           <MetricSection
             title={
               <>
@@ -363,7 +363,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 运营效率指标卡片 */}
-        <FadeInSection delay={0.45} duration={1.2}>
+        <FadeInSection delay={0.45} duration={1}>
           <MetricSection
             title={
               <>
@@ -424,7 +424,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 趋势图 */}
-        <FadeInSection delay={0.6} duration={1.2}>
+        <FadeInSection delay={0.6} duration={1}>
           <Row gutter={[16, 16]} className={styles.chartsRow}>
             <Col xs={24} lg={24}>
               <TrendChart
@@ -440,7 +440,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 互联网渠道开户日历热力图（7 行 × N 列布局，表头与 Dashboard 其他卡组一致） */}
-        <FadeInSection delay={0.75} duration={1.2}>
+        <FadeInSection delay={0.75} duration={1}>
           <MetricSection
             title={
               <>

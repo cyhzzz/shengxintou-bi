@@ -151,7 +151,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     <Card
       className={cardClassName}
       hoverable
-      style={{ '--stagger-index': index } as React.CSSProperties}
     >
       <div className={styles.metricContent}>
         {loading ? (

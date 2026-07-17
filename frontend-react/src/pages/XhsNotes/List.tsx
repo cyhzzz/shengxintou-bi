@@ -678,7 +678,7 @@ const XhsNotesListPage: React.FC = () => {
   return (
     <div className={styles.notesListPage}>
       {/* 筛选器卡片 */}
-      <FadeInSection delay={0} duration={1.2}>
+      <FadeInSection delay={0} duration={1}>
       <Card className={styles.filterCard} size="small">
         <Space wrap size="middle">
           {/* 数据时间 */}
@@ -809,7 +809,7 @@ const XhsNotesListPage: React.FC = () => {
       </FadeInSection>
 
       {/* 数据表格卡片 */}
-      <FadeInSection delay={0.15} duration={1.2}>
+      <FadeInSection delay={0.15} duration={1}>
         <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <span className={styles.tableTitle}>笔记列表</span>

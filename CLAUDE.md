@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.7`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.8`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,15 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.8 已落地（2026-07-18） 修复动效三问题（宽度跳变 / 图表无缓慢变化 / 大卡片一起加载）
+
+- **FadeInSection 重构为 IntersectionObserver 滚动触发**：视口外的容器不开始动画，真正实现从上到下依次浮现；动画从 CSS `animation` 改为 `transition`，避免 `will-change` 创建层叠上下文导致的副作用。
+- **修复宽度跳变**：`MainLayout .content` 加 `scrollbar-gutter: stable`，预留滚动条空间，修复动画过程中滚动条出现/消失导致的内容区宽度跳变。
+- **ECharts 加载/切换缓慢入场**：`EChartsComponent` 增加 `animationDurationUpdate` / `animationDelayUpdate` / `animationEasingUpdate`，并改 `setOption` 为 `notMerge: true`，让加载和切换 Tab/筛选器都有 1.2 秒级缓慢入场动画（之前 merge 模式下仅 300ms 数据更新动画）。
+- **移除小卡片 stagger 动画**：移除 `MetricCard` 的 `metricCardEnter` stagger 入场动画和 `MetricSection` 的 `sectionEnter` 动画，避免与大容器 `FadeInSection` 叠加导致视觉混乱；小卡片即时显示，由外层 `FadeInSection` 控制大容器浮现。
+- **duration 调整**：从 1.2s 调为 1s，让卡片更快完成，层次感更清晰。
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，40.40s）；API 冒烟 33/33 通过。
 
 ### v3.2.7 已落地（2026-07-18） 容器级顺序浮现 + 慢节奏动效 + 全局美学优化
 
