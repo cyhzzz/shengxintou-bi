@@ -16,6 +16,9 @@
 html,
 body {
   height: 100%;
+  // v3.2.8：彻底阻止 body 级滚动条出现/消失导致的宽度跳变
+  // 滚动由 .content 内部 overflow-y: auto 处理
+  overflow: hidden;
   font-family: var(--font-family);
   font-size: var(--text-base);
   line-height: var(--leading-base);
@@ -27,6 +30,7 @@ body {
 
 #root {
   height: 100%;
+  overflow: hidden;
 }
 
 // ===== 滚动条样式 =====

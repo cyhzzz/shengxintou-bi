@@ -265,11 +265,11 @@ const AgencyAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.agencyAnalysisPage}>
-      <FadeInSection delay={0} duration={1}>
+      <FadeInSection delay={0} duration={0.8}>
         <FilterBar showPlatform showAgency showBusinessModel onSearch={() => fetchData()} onReset={() => fetchData()} />
       </FadeInSection>
 
-      <FadeInSection delay={0.15} duration={1}>
+      <FadeInSection delay={0.12} duration={0.8}>
         <MetricSection title="厂商投放概览" description="投放消耗、曝光点击与后端转化核心指标">
           <MetricCard
             title="投放花费"
@@ -324,7 +324,7 @@ const AgencyAnalysisPage: React.FC = () => {
         </MetricSection>
       </FadeInSection>
 
-      <FadeInSection delay={0.3} duration={1}>
+      <FadeInSection delay={0.24} duration={0.8}>
         <Card className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <Text type="secondary" className={styles.cardTitle}>📊 日级趋势图（按平台聚合）</Text>
@@ -344,7 +344,7 @@ const AgencyAnalysisPage: React.FC = () => {
         </Card>
       </FadeInSection>
 
-      <FadeInSection delay={0.45} duration={1}>
+      <FadeInSection delay={0.36} duration={0.8}>
         <Card className={styles.tableCard}>
           <div className={styles.cardHeader}>
             <Text type="secondary" className={styles.cardTitle}>📈 平台×代理商聚合数据</Text>
@@ -375,7 +375,7 @@ const AgencyAnalysisPage: React.FC = () => {
         </Card>
       </FadeInSection>
 
-      <FadeInSection delay={0.6} duration={1}>
+      <FadeInSection delay={0.48} duration={0.8}>
         <ReportFooter
           sources={[
             { label: '数据源', value: 'agg_vendor_daily' },
