@@ -12,10 +12,10 @@ from datetime import datetime, timedelta, date as _date
 import logging
 
 from backend.database import db
-from backend.models_v2 import AggVendorDaily, AggDailyChannelOpen, FactConvContent, FactConvAppmarket
+from backend.models_v2 import AggVendorDaily, AggDailyChannelOpen, FactConvContent
 from backend.utils.weekly_utils import get_week_info, generate_week_options, validate_week_period, get_all_fridays_in_year
 from backend.utils.decorators import handle_exceptions
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +55,15 @@ def _query_metrics(sd, ed):
     4. APP激活数 (agg_vendor_daily.APP激活人数, 应用市场线索)
     5. 开户数   (agg_daily_channel_open.开户成功人数, 仅互联网引流)
     6. 新增有效户数 (agg_daily_channel_open.有效户数, 仅互联网引流)
-    7. 新增客户资产 (fact_conv_content 新开户 SUM(资产) + fact_conv_appmarket 新开户 SUM(总资产))
+    7. 新增客户资产 (agg_vendor_daily.客户资产 SUM)
+       v3.2.3 起改走 DWS 预聚合字段，与 Dashboard /core-metrics 口径对齐
+       （原 DWD 明细实时 SUM 与 ETL 预聚合有 ~16.75 万差异，DWS 更权威）
     """
     ad_r = db.session.query(
         func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
         func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
         func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
+        func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
     ).filter(and_(AggVendorDaily.日期 >= sd, AggVendorDaily.日期 <= ed)).first()
 
     leads_wx = db.session.query(
@@ -79,24 +82,6 @@ def _query_metrics(sd, ed):
         AggDailyChannelOpen.时间区间 <= ed,
     )).first()
 
-    content_assets = db.session.query(
-        func.coalesce(func.sum(FactConvContent.资产), 0)
-    ).filter(and_(
-        FactConvContent.是否开户 == 1,
-        or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)),
-        FactConvContent.线索日期 >= sd,
-        FactConvContent.线索日期 <= ed,
-    )).scalar() or 0
-
-    appmarket_assets = db.session.query(
-        func.coalesce(func.sum(FactConvAppmarket.总资产), 0)
-    ).filter(and_(
-        FactConvAppmarket.是否新开户 == 1,
-        FactConvAppmarket.渠道类型 == '互联网引流',
-        FactConvAppmarket.下载日期 >= sd,
-        FactConvAppmarket.下载日期 <= ed,
-    )).scalar() or 0
-
     return {
         'cost': float(ad_r.cost or 0),
         'impressions': int(ad_r.impressions or 0),
@@ -104,7 +89,7 @@ def _query_metrics(sd, ed):
         'leads_app': int(ad_r.leads_app or 0),
         'opens': int(ch_r.opens or 0),
         'valid': int(ch_r.valid or 0),
-        'assets': float(content_assets) + float(appmarket_assets),
+        'assets': float(ad_r.assets or 0),
     }
 
 
