@@ -5,7 +5,7 @@
  *
  * 业务分组结构：
  * - 前端投放: 阶段投入金额、总展示数、总点击数、总线索数
- * - 后端转化: 新开客户数、新增有效户数、客户资产、客户贡献、存量客户资产
+ * - 后端转化: 新开客户数、新增有效户数、客户资产、客户贡献
  * - 运营效率: 单线索成本、单开户成本、单有效户成本
  */
 import React, { useEffect, useCallback, useState } from 'react';
@@ -18,7 +18,6 @@ import {
   TeamOutlined,
   TrophyOutlined,
   AccountBookOutlined,
-  GoldOutlined,
   RiseOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
@@ -46,7 +45,6 @@ const METRIC_COLORS = {
   openedAccounts: 'var(--chart-color-5)',
   validCustomers: 'var(--chart-color-6)',
   customerAssets: 'var(--chart-color-7)',
-  existingAssets: 'var(--chart-color-8)',
   contribution: 'var(--chart-color-5)',
 };
 
@@ -354,22 +352,6 @@ const DashboardPage: React.FC = () => {
                 prefix="¥"
                 formatter="currency"
                 icon={<RiseOutlined style={{ color: METRIC_COLORS.contribution }} />}
-              />
-              <MetricCard
-                title={
-                  <Tooltip title="服务存量客户的资产总额">
-                    <span>存量客户资产</span>
-                  </Tooltip>
-                }
-                value={coreMetrics?.existing_customers_assets}
-                wowChange={wowChanges?.existing_customers_assets ? {
-                  value: wowChanges.existing_customers_assets.value,
-                  trend: wowChanges.existing_customers_assets.trend,
-                  color: wowChanges.existing_customers_assets.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<GoldOutlined style={{ color: METRIC_COLORS.existingAssets }} />}
               />
         </MetricSection>
 
