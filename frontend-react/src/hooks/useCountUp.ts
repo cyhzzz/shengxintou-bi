@@ -15,15 +15,15 @@ export interface UseCountUpOptions {
   useGrouping?: boolean;
 }
 
-function easeOutQuart(t: number): number {
-  return 1 - Math.pow(1 - t, 4);
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 export function useCountUp(
   target: number | undefined | null,
   options: UseCountUpOptions = {}
 ): number {
-  const { duration = 800, disabled = false, decimals = 0 } = options;
+  const { duration = 1000, disabled = false, decimals = 0 } = options;
   const [displayValue, setDisplayValue] = useState(0);
   const startTimeRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -47,7 +47,7 @@ export function useCountUp(
       }
       const elapsed = timestamp - startTimeRef.current;
       const progress = Math.min(elapsed / duration, 1);
-      const eased = easeOutQuart(progress);
+      const eased = easeOutCubic(progress);
       const current = fromRef.current + (targetRef.current - fromRef.current) * eased;
 
       setDisplayValue(current);
