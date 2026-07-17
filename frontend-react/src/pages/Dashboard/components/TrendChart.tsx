@@ -12,14 +12,19 @@ import styles from './TrendChart.module.scss';
 
 // 扩展指标类型，支持更多指标
 export type MetricType =
-  | 'cost_per_lead'
+  | 'cost_split'
+  | 'cost_per_wechat_lead'
+  | 'cost_per_app_activation'
   | 'cost_per_customer'
   | 'cost_per_valid_account'
   | 'investment'
   | 'impressions'
   | 'clicks'
   | 'leads'
-  | 'new_customers';
+  | 'leads_wechat'
+  | 'leads_app'
+  | 'new_customers'
+  | 'valid_customers';
 
 export type Granularity = 'daily' | 'weekly' | 'monthly';
 
@@ -37,35 +42,42 @@ interface TrendChartProps {
 
 // 指标标签映射
 const METRIC_LABELS: Record<MetricType, string> = {
-  cost_per_lead: '线索成本',
+  cost_split: '线索成本对比',
+  cost_per_wechat_lead: '企微成本',
+  cost_per_app_activation: 'APP下载激活成本',
   cost_per_customer: '开户成本',
   cost_per_valid_account: '有效户成本',
   investment: '阶段投入',
   impressions: '展示数',
   clicks: '点击数',
   leads: '线索数',
+  leads_wechat: '企微数',
+  leads_app: 'APP下载激活数',
   new_customers: '新开客户',
+  valid_customers: '有效户',
 };
 
 // 指标分组配置
 const METRIC_GROUPS = [
   {
     label: '📊 前端投放',
-    metrics: ['investment', 'impressions', 'clicks', 'leads'] as MetricType[],
+    metrics: ['investment', 'impressions', 'leads_wechat', 'leads_app'] as MetricType[],
   },
   {
     label: '💼 后端转化',
-    metrics: ['new_customers'] as MetricType[],
+    metrics: ['new_customers', 'valid_customers'] as MetricType[],
   },
   {
     label: '⚡ 运营效率',
-    metrics: ['cost_per_lead', 'cost_per_customer', 'cost_per_valid_account'] as MetricType[],
+    metrics: ['cost_split', 'cost_per_wechat_lead', 'cost_per_app_activation', 'cost_per_customer', 'cost_per_valid_account'] as MetricType[],
   },
 ];
 
 // 是否为货币类型的指标
 const CURRENCY_METRICS: MetricType[] = [
-  'cost_per_lead',
+  'cost_split',
+  'cost_per_wechat_lead',
+  'cost_per_app_activation',
   'cost_per_customer',
   'cost_per_valid_account',
   'investment'
@@ -130,6 +142,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
     });
 
     // 为每个类别创建一个系列
+    const isCostSplit = localMetricType === 'cost_split';
     const series = categories.length > 0
       ? categories.map(cat => ({
           name: cat,
@@ -163,7 +176,39 @@ const TrendChart: React.FC<TrendChartProps> = ({
             },
           },
         }))
-      : [{
+      : isCostSplit
+        ? [
+            // 线索成本对比：2 条线，从 _derived.cost_wechat / _derived.cost_app 取值
+            {
+              name: '单企微成本',
+              type: 'line' as const,
+              smooth: true,
+              data: allDates.map(date => {
+                const item = data.find(d => d.date === date);
+                return item?._derived?.cost_wechat ?? null;
+              }),
+              symbol: 'circle',
+              symbolSize: 6,
+              itemStyle: { color: pickEChartsColor(0) },
+              connectNulls: true,
+              lineStyle: { color: pickEChartsColor(0), width: 2 },
+            },
+            {
+              name: '单APP下载激活成本',
+              type: 'line' as const,
+              smooth: true,
+              data: allDates.map(date => {
+                const item = data.find(d => d.date === date);
+                return item?._derived?.cost_app ?? null;
+              }),
+              symbol: 'circle',
+              symbolSize: 6,
+              itemStyle: { color: pickEChartsColor(1) },
+              connectNulls: true,
+              lineStyle: { color: pickEChartsColor(1), width: 2 },
+            },
+          ]
+        : [{
           name: METRIC_LABELS[localMetricType],
           type: 'line' as const,
           smooth: true, // 平滑曲线
@@ -207,7 +252,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
           let html = `<div style="font-weight:bold;margin-bottom:4px;">日期：${dateStr}</div>`;
           params.forEach((param: any) => {
             if (param.value !== null && param.value !== undefined) {
-              const label = categories.length > 0 ? param.seriesName : METRIC_LABELS[localMetricType];
+              const label = (categories.length > 0 || isCostSplit) ? param.seriesName : METRIC_LABELS[localMetricType];
               html += `<div>${label}: ${formatValue(param.value)}</div>`;
             }
           });
@@ -215,7 +260,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
         },
       },
       legend: {
-        show: false, // 隐藏图例
+        show: isCostSplit, // 线索成本对比时显示图例区分两条线
       },
       xAxis: {
         type: 'category',

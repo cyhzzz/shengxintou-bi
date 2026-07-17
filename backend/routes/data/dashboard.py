@@ -63,8 +63,11 @@ def get_dashboard_core_metrics():
         db.session.query(
             func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
             func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-            func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-            func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+            func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads_wechat'),
+            func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
+            # 加权单成本：SUM(线索成本*线索数) 等价于 SUM(花费 where 线索数>0)，避开整列 SUM(花费) 的口径污染
+            func.coalesce(func.sum(AggVendorDaily.线索成本 * AggVendorDaily.线索数), 0).label('cost_wechat_w'),
+            func.coalesce(func.sum(AggVendorDaily.APP激活成本 * AggVendorDaily.APP激活人数), 0).label('cost_app_w'),
             func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
             func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
             func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
@@ -73,21 +76,28 @@ def get_dashboard_core_metrics():
         ),
         filters, AggVendorDaily
     ).first()
-    cost, impr, clk = _f(main_q.cost), _i(main_q.impressions), _i(main_q.clicks)
-    leads, opened, valid = _i(main_q.leads), _i(main_q.opened), _i(main_q.valid)
+    cost = _f(main_q.cost)
+    impr = _i(main_q.impressions)
+    leads_wechat = _i(main_q.leads_wechat)
+    leads_app = _i(main_q.leads_app)
+    cost_wechat_w = _f(main_q.cost_wechat_w)
+    cost_app_w = _f(main_q.cost_app_w)
+    opened = _i(main_q.opened)
+    valid = _i(main_q.valid)
     assets, contrib, exist_assets = _f(main_q.assets), _f(main_q.contribution), _f(main_q.existing_assets)
     core = {
         'new_customers': opened,
         'investment': round(cost, 2),
         'new_valid_accounts': valid,
-        'total_leads': leads,
+        'leads_wechat': leads_wechat,
+        'leads_app': leads_app,
         'total_impressions': impr,
-        'total_clicks': clk,
         'customer_assets': round(assets, 2),
         'customer_contribution': round(contrib, 2),
         'existing_customers_assets': round(exist_assets, 2),
         'cost_per_valid_account': round(cost / valid, 2) if valid > 0 else 0,
-        'cost_per_lead': round(cost / leads, 2) if leads > 0 else 0,
+        'cost_per_wechat_lead': round(cost_wechat_w / leads_wechat, 2) if leads_wechat > 0 else 0,
+        'cost_per_app_activation': round(cost_app_w / leads_app, 2) if leads_app > 0 else 0,
         'cost_per_account': round(cost / opened, 2) if opened > 0 else 0,
     }
     wow = {}
@@ -105,8 +115,10 @@ def get_dashboard_core_metrics():
                 db.session.query(
                     func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
                     func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-                    func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
-                    func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+                    func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads_wechat'),
+                    func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
+                    func.coalesce(func.sum(AggVendorDaily.线索成本 * AggVendorDaily.线索数), 0).label('cost_wechat_w'),
+                    func.coalesce(func.sum(AggVendorDaily.APP激活成本 * AggVendorDaily.APP激活人数), 0).label('cost_app_w'),
                     func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
                     func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
                     func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
@@ -124,23 +136,28 @@ def get_dashboard_core_metrics():
                 color = 'red' if is_up else 'green'
                 return {'value': _pct(curr, prev), 'trend': 'up' if is_up else 'down', 'color': color}
             # 前后 cost_per_* 派生值（分母是 leads/opened/valid）
-            curr_cpl = round(cost / leads, 2) if leads > 0 else 0
+            curr_cpwl = round(cost_wechat_w / leads_wechat, 2) if leads_wechat > 0 else 0
+            curr_cpaa = round(cost_app_w / leads_app, 2) if leads_app > 0 else 0
             curr_cpa = round(cost / opened, 2) if opened > 0 else 0
             curr_cpva = round(cost / valid, 2) if valid > 0 else 0
-            prev_cpl = round(_f(prev_q.cost) / _i(prev_q.leads), 2) if _i(prev_q.leads) > 0 else 0
+            prev_leads_wechat = _i(prev_q.leads_wechat)
+            prev_leads_app = _i(prev_q.leads_app)
+            prev_cpwl = round(_f(prev_q.cost_wechat_w) / prev_leads_wechat, 2) if prev_leads_wechat > 0 else 0
+            prev_cpaa = round(_f(prev_q.cost_app_w) / prev_leads_app, 2) if prev_leads_app > 0 else 0
             prev_cpa = round(_f(prev_q.cost) / _i(prev_q.opened), 2) if _i(prev_q.opened) > 0 else 0
             prev_cpva = round(_f(prev_q.cost) / _i(prev_q.valid), 2) if _i(prev_q.valid) > 0 else 0
             wow = {
                 'investment': _w(main_q.cost, prev_q.cost),
                 'total_impressions': _w(main_q.impressions, prev_q.impressions),
-                'total_clicks': _w(main_q.clicks, prev_q.clicks),
-                'total_leads': _w(main_q.leads, prev_q.leads),
+                'leads_wechat': _w(leads_wechat, prev_leads_wechat),
+                'leads_app': _w(leads_app, prev_leads_app),
                 'new_customers': _w(main_q.opened, prev_q.opened),
                 'new_valid_accounts': _w(main_q.valid, prev_q.valid),
                 'customer_assets': _w(main_q.assets, prev_q.assets),
                 'customer_contribution': _w(main_q.contribution, prev_q.contribution),
                 'existing_customers_assets': _w(main_q.existing_assets, prev_q.existing_assets),
-                'cost_per_lead': _w(curr_cpl, prev_cpl),
+                'cost_per_wechat_lead': _w(curr_cpwl, prev_cpwl),
+                'cost_per_app_activation': _w(curr_cpaa, prev_cpaa),
                 'cost_per_account': _w(curr_cpa, prev_cpa),
                 'cost_per_valid_account': _w(curr_cpva, prev_cpva),
             }
@@ -151,8 +168,8 @@ def get_dashboard_core_metrics():
         'data': {'core_metrics': core, 'wow_changes': wow},
         'meta': {
             **_META_DASHBOARD,
-            'raw_sums_keys': ['investment', 'total_leads', 'total_impressions', 'total_clicks', 'new_customers', 'new_valid_accounts', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
-            'derived_keys': ['cost_per_lead', 'cost_per_account', 'cost_per_valid_account'],
+            'raw_sums_keys': ['investment', 'leads_wechat', 'leads_app', 'total_impressions', 'new_customers', 'new_valid_accounts', 'customer_assets', 'customer_contribution', 'existing_customers_assets'],
+            'derived_keys': ['cost_per_wechat_lead', 'cost_per_app_activation', 'cost_per_account', 'cost_per_valid_account'],
         }
     })
 
@@ -189,6 +206,9 @@ def get_dashboard_trend_data():
             func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
             func.coalesce(func.sum(AggVendorDaily.点击量), 0).label('clicks'),
             func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
+            func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
+            func.coalesce(func.sum(AggVendorDaily.线索成本 * AggVendorDaily.线索数), 0).label('cost_wechat_w'),
+            func.coalesce(func.sum(AggVendorDaily.APP激活成本 * AggVendorDaily.APP激活人数), 0).label('cost_app_w'),
             func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
             func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
         ),
@@ -201,18 +221,28 @@ def get_dashboard_trend_data():
     rows = q.all()
 
     def _per_metric(mt):
-        if mt == 'cost_per_lead': return lambda c, ld, op, vl, clk, i: (round(c / ld, 2) if ld > 0 else 0)
-        if mt == 'cost_per_customer' or mt == 'cost_per_account':
-            return lambda c, ld, op, vl, clk, i: (round(c / op, 2) if op > 0 else 0)
-        if mt == 'cost_per_valid_account':
-            return lambda c, ld, op, vl, clk, i: (round(c / vl, 2) if vl > 0 else 0)
-        if mt == 'investment': return lambda c, ld, op, vl, clk, i: round(c, 2)
-        if mt == 'impressions': return lambda c, ld, op, vl, clk, i: i
-        if mt == 'clicks': return lambda c, ld, op, vl, clk, i: clk
-        if mt == 'leads': return lambda c, ld, op, vl, clk, i: ld
-        if mt == 'new_customers': return lambda c, ld, op, vl, clk, i: op
-        if mt == 'valid_customers': return lambda c, ld, op, vl, clk, i: vl
-        return lambda c, ld, op, vl, clk, i: 0
+        def sel(p):
+            if mt == 'cost_per_lead':
+                return round(p['cost'] / p['leads'], 2) if p['leads'] > 0 else 0
+            if mt == 'cost_per_wechat_lead':
+                return round(p['cost_wechat_w'] / p['leads'], 2) if p['leads'] > 0 else 0
+            if mt == 'cost_per_app_activation':
+                return round(p['cost_app_w'] / p['leads_app'], 2) if p['leads_app'] > 0 else 0
+            if mt == 'cost_per_customer' or mt == 'cost_per_account':
+                return round(p['cost'] / p['opened'], 2) if p['opened'] > 0 else 0
+            if mt == 'cost_per_valid_account':
+                return round(p['cost'] / p['valid'], 2) if p['valid'] > 0 else 0
+            if mt == 'investment': return round(p['cost'], 2)
+            if mt == 'impressions': return p['impressions']
+            if mt == 'clicks': return p['clicks']
+            if mt == 'leads': return p['leads']
+            if mt == 'leads_wechat': return p['leads']
+            if mt == 'leads_app': return p['leads_app']
+            if mt == 'new_customers': return p['opened']
+            if mt == 'valid_customers': return p['valid']
+            # 双系列：value 无意义，前端从 _derived.cost_wechat / _derived.cost_app 取两条线
+            return 0
+        return sel
 
     selector = _per_metric(metric_type)
 
@@ -220,18 +250,31 @@ def get_dashboard_trend_data():
     for r in rows:
         d = str(r.period)
         cost = _f(r.cost); impr = _i(r.impressions); clk = _i(r.clicks)
-        leads = _i(r.leads); opened = _i(r.opened); valid = _i(r.valid)
-        value = selector(cost, leads, opened, valid, clk, impr)
+        leads = _i(r.leads); leads_app = _i(r.leads_app)
+        cost_wechat_w = _f(r.cost_wechat_w); cost_app_w = _f(r.cost_app_w)
+        opened = _i(r.opened); valid = _i(r.valid)
+        p = {
+            'cost': cost, 'impressions': impr, 'clicks': clk,
+            'leads': leads, 'leads_app': leads_app,
+            'cost_wechat_w': cost_wechat_w, 'cost_app_w': cost_app_w,
+            'opened': opened, 'valid': valid,
+        }
+        value = selector(p)
         point = {
             'date': d,
             'cost': round(cost, 2),
             'impressions': impr,
             'clicks': clk,
             'leads': leads,
+            'leads_app': leads_app,
             'opened': opened,
             'valid': valid,
             '_derived': {
                 'cost_per_lead': round(cost / leads, 2) if leads > 0 else 0,
+                'cost_per_wechat_lead': round(cost_wechat_w / leads, 2) if leads > 0 else 0,
+                'cost_per_app_activation': round(cost_app_w / leads_app, 2) if leads_app > 0 else 0,
+                'cost_wechat': round(cost_wechat_w / leads, 2) if leads > 0 else 0,
+                'cost_app': round(cost_app_w / leads_app, 2) if leads_app > 0 else 0,
                 'cost_per_account': round(cost / opened, 2) if opened > 0 else 0,
                 'cost_per_valid_account': round(cost / valid, 2) if valid > 0 else 0,
                 'ctr': round(clk / impr * 100, 4) if impr > 0 else 0,
@@ -248,11 +291,13 @@ def get_dashboard_trend_data():
         'data': {'dates': dates, 'trend_data': trend_data, 'metric_type': metric_type},
         'meta': {
             **_META_DASHBOARD,
-            'raw_sums_keys': ['cost', 'impressions', 'clicks', 'leads', 'opened', 'valid'],
-            'derived_keys': ['cost_per_lead', 'cost_per_account', 'cost_per_valid_account', 'ctr', 'click_to_lead_rate', 'lead_to_account_rate', 'account_to_valid_rate'],
+            'raw_sums_keys': ['cost', 'impressions', 'clicks', 'leads', 'leads_app', 'opened', 'valid', 'cost_wechat_w', 'cost_app_w'],
+            'derived_keys': ['cost_per_lead', 'cost_per_wechat_lead', 'cost_per_app_activation', 'cost_wechat', 'cost_app', 'cost_per_account', 'cost_per_valid_account', 'ctr', 'click_to_lead_rate', 'lead_to_account_rate', 'account_to_valid_rate'],
             'supported_metric_types': [
-                'cost_per_lead', 'cost_per_customer', 'cost_per_valid_account', 'cost_per_account',
-                'investment', 'impressions', 'clicks', 'leads', 'new_customers', 'valid_customers',
+                'cost_per_lead', 'cost_per_wechat_lead', 'cost_per_app_activation',
+                'cost_per_customer', 'cost_per_valid_account', 'cost_per_account',
+                'investment', 'impressions', 'clicks', 'leads', 'leads_wechat', 'leads_app',
+                'new_customers', 'valid_customers',
             ],
             'note': '前端可用 sums 字段自计算任意 derived 指标，零 round-trip 切换 metric_type',
         }

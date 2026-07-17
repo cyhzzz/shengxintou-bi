@@ -18,6 +18,8 @@ export interface TrendDataItem {
   value: number;
   /** 分类（可选，用于多系列图表） */
   category?: string;
+  /** 派生指标字典（cost_per_*、ctr、cost_wechat、cost_app 等） */
+  _derived?: Record<string, number>;
 }
 
 /**
