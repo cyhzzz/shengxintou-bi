@@ -1,7 +1,7 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """元数据API接口（v2 - 查新表）"""
 from flask import Blueprint, jsonify
-from backend.models_v2 import AggVendorDaily, FactConvContent, DimAccount, DimVendor, AggXhsNote
+from backend.models_v2 import AggVendorDaily, FactConvContent, DimAccount, AggXhsNote
 from sqlalchemy import distinct, func
 from datetime import datetime, date
 import logging

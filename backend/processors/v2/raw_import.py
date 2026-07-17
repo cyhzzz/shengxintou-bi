@@ -2,9 +2,9 @@
 """
 v2 原样导入处理器（无中间计算）
 
-6 个新数据类型，对应 6 张新表（4 张 DWS + 2 张 DWD + dim_account/vendor 维度合并写）：
+6 个新数据类型，对应 6 张新表（4 张 DWS + 2 张 DWD + dim_account 维度）：
 
-  account_mapping       -> dim_account + dim_vendor
+  account_mapping       -> dim_account (含代理商信息：名称/简称/字母简称)
   conversion_content    -> fact_conv_content (1 行=1 企微，内容平台加微链路)
   conversion_appmarket  -> fact_conv_appmarket (1 行=1 APP 下载，应用市场下载链路)
   vendor_daily          -> agg_vendor_daily (日×平台×厂商×业务模式统一漏斗超集)
@@ -15,6 +15,7 @@ v2 原样导入处理器（无中间计算）
 1. 原样导入（pandas to_sql replace on new tables），无业务计算
 2. 加载期规范化只做：'nan'->NULL、时间解析、丢脏列、超长 ID 转字符串
 3. 不做维度合并、不算漏斗率、不补映射（数据源自带的全量保留）
+4. 不派生冗余表（如 dim_vendor，直接从 dim_account 去重使用）
 """
 import os
 import re
@@ -93,7 +94,7 @@ def _to_datetime_str(series: pd.Series) -> pd.Series:
 # ============================================================================
 
 def handle_account_mapping(path: str):
-    """申万宏源-投放账号映射表.xlsx -> dim_account + dim_vendor（合并写两张表）。"""
+    """申万宏源-投放账号映射表.xlsx -> dim_account（含代理商信息）。"""
     df = _read_excel(path)
     df = _clean_nan(df)
     # 期望列：平台 / 主账号ID / 主账号名称 / 子账号ID / 子账号名称 / 代理商名称 / 代理商简称 / 代理商字母简称 / 业务模式
@@ -118,18 +119,9 @@ def handle_account_mapping(path: str):
     df["main_account_id"] = _safe_overlong_id(df["main_account_id"])
     df["sub_account_id"] = _safe_overlong_id(df["sub_account_id"])
     # 主键：原表无 id，落库时让 SQLite 自增
-    # 保留 id 列（SQLAlchemy ORM 需要 id 主键）
     if "id" not in df.columns:
         df = df.copy()
         df.insert(0, "id", range(1, len(df) + 1))
-    df["_row_no"] = range(1, len(df) + 1)  # 占位列
-
-    # vendor 取代理商去重（保留 id 列以满足 ORM）
-    vendor_df = df[["id", "agency_name", "agency_short", "agency_letter"]].drop_duplicates(
-        subset=["agency_name"]
-    ).reset_index(drop=True)
-    vendor_df = vendor_df.rename(columns={"id": "id"})
-
     # account 表中文列名（保留 id 列以满足 ORM）
     account_df = df[["id", "platform", "main_account_id", "main_account_name", "sub_account_id",
                      "sub_account_name", "agency_name", "agency_short", "agency_letter",
@@ -138,9 +130,9 @@ def handle_account_mapping(path: str):
     account_df.columns = ["id", "序号", "platform", "main_account_id", "main_account_name",
                           "sub_account_id", "sub_account_name", "agency_name",
                           "agency_short", "agency_letter", "business_model"]
-    return {"dim_account": account_df, "dim_vendor": vendor_df}, {
+    return {"dim_account": account_df}, {
         "primary_keys": {},
-        "row_counts": {"dim_account": len(account_df), "dim_vendor": len(vendor_df)},
+        "row_counts": {"dim_account": len(account_df)},
     }
 
 
