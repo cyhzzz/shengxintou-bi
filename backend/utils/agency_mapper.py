@@ -1,27 +1,29 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """代理商简称→全称映射工具
 
-DimVendor 表存有 agency_name（全称）和 agency_short（简称/显示名）。
+dim_account 表存有 agency_name（全称）、agency_short（简称/显示名）、agency_letter（字母简称）。
 agg_vendor_daily.厂商 和 fact_conv_content.广告代理商 存的是全称。
 同一代理商在不同平台的全称可能有差异（如"量子" vs "量子科技"），
 但简称是共同的。
 
-本模块提供：
+本模块直接从 dim_account 表去重构建映射，不依赖 dim_vendor 派生表。
+
+提供：
   - load_agency_map() -> {简称: [全称1, 全称2, ...]}
   - short_to_full(short) -> [全称列表]  # 筛选时用简称查全称
   - full_to_short(full) -> 简称          # 显示时用全称找简称
   - enrich_agency_short(items, key)      # 在数据列表里补 agency_short 字段
 """
 
-from backend.models_v2 import DimVendor
+from backend.models_v2 import DimAccount
 from backend.database import db
 
 _cache = None
 
 
 def _build_map():
-    """从 DimVendor 表构建简称→全称映射"""
-    rows = db.session.query(DimVendor).all()
+    """从 DimAccount 表去重构建简称→全称映射"""
+    rows = db.session.query(DimAccount).all()
     short_to_fulls = {}  # {简称: set(全称)}
     full_to_short = {}   # {全称: 简称}
 

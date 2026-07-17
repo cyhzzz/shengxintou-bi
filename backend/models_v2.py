@@ -1,8 +1,8 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 省心投 BI - v2 库表 ORM 模型（基于 docs/库表重构设计_v2.md）
 
-9 张表：DIM × 4（dim_account / dim_vendor / dim_channel_category / dim_channel）
+7 张表：DIM × 1（dim_account）
        + DWD × 2（fact_conv_content / fact_conv_appmarket）
        + DWS × 3（agg_vendor_daily / agg_xhs_note / agg_daily_channel_open）
 
@@ -18,7 +18,7 @@ from backend.database import db
 # ============================================================================
 
 class DimAccount(db.Model):
-    """投放账号维度（替代旧 account_agency_mapping）"""
+    """投放账号维度（含代理商信息：名称/简称/字母简称）"""
     __tablename__ = 'dim_account'
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -32,34 +32,6 @@ class DimAccount(db.Model):
     agency_short = Column(Text)              # 代理商简称
     agency_letter = Column(Text)             # 代理商字母简称
     business_model = Column(Text)            # 业务模式
-
-
-class DimVendor(db.Model):
-    """厂商/代理商字典（替代旧 agency_abbreviation_mapping）"""
-    __tablename__ = 'dim_vendor'
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    agency_name = Column(Text)               # 代理商名称
-    agency_short = Column(Text)              # 简称
-    agency_letter = Column(Text)             # 字母简称
-
-
-class DimChannelCategory(db.Model):
-    """渠道类别字典（5 行预置）"""
-    __tablename__ = 'dim_channel_category'
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    name = Column(Text)
-
-
-class DimChannel(db.Model):
-    """渠道叶子字典"""
-    __tablename__ = 'dim_channel'
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    name = Column(Text)
-    channel_category_id = Column(BigInteger)
-    is_enabled = Column(BigInteger)          # 1=启用 / 0=待上线
 
 
 # ============================================================================

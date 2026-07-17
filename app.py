@@ -300,7 +300,6 @@ from backend.routes.data import (
     external_analysis,
     leads,
     account_mapping,
-    abbreviation_mapping,
     xhs_operation,
     employee_conversion,
     weekly_report_poster
@@ -321,7 +320,6 @@ app.register_blueprint(cost_analysis.bp, url_prefix=API_PREFIX)
 app.register_blueprint(external_analysis.bp, url_prefix=API_PREFIX)
 app.register_blueprint(leads.bp, url_prefix=API_PREFIX)
 app.register_blueprint(account_mapping.bp, url_prefix=API_PREFIX)
-app.register_blueprint(abbreviation_mapping.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
 app.register_blueprint(employee_conversion.bp, url_prefix=API_PREFIX)
 app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
