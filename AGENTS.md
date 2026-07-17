@@ -250,13 +250,66 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **函数/变量名交叉验证**：`onClick`、`onChange` 等回调中引用的函数名必须在同作用域内有 `const xxx =` 或 `function xxx()` 定义。ConversionFunnel 曾因此类问题出现 `load is not defined`——函数实际名为 `loadData`。
 - 文档只描述当前真实状态；如果代码、`version.json`、README 冲突，**以代码和 `version.json` 为准**，并在文档中标注滞后点。
 
-## 10. 验证建议
+## 10. 自动化测试体系
 
-- 后端改动：优先跑相关端点的最小 smoke（如 `curl -X POST ...`），再视情况启动 `python app.py`；如果修改了 `backend/routes/*` 而 Flask 进程仍在跑，需手动重启。
-- 前端逻辑 / 类型改动：优先跑 `npm run typecheck`，再跑 `npm run lint` 与必要页面 smoke。
-- 前端样式改动：结合浏览器检查日/夜主题、报表头部卡片、表格和筛选栏；不要只看构建结果。
-- 全量验证成本较高时，在最终说明里明确已跑和未跑的命令。
-- **生产前端没看到最新代码**：先 `cd frontend-react && npm run build`，5000 端口不需要重启 Flask；确认 vite build 无 error 后再 curl 资源大小对比 dist 时间戳。
+### 测试金字塔（从上到下：量少 → 量多，慢 → 快）
+
+```
+    /  全量功能测试（Playwright，手动触发）  \   约 10~30 分钟
+   /    回归测试（历史 bug 复现）               \   按需
+  /      冒烟测试（路由 + API）                  \   < 1 分钟
+ /        类型检查 / 构建验证                     \   < 1 分钟
+```
+
+### 各层级说明
+
+| 层级 | 命令 | 时机 | 耗时 | 覆盖 |
+|---|---|---|---|---|
+| **类型检查** | `cd frontend-react && npm run typecheck` | 每次改前端 | < 30s | TS 类型 |
+| **构建验证** | `cd frontend-react && npm run build` | 提交前必跑 | ~45s | 前端编译 |
+| **API 冒烟** | `python -m unittest discover -s tests/api` 或 `scripts/test-api-smoke.bat` | 改后端必跑 | ~1s | 34 个核心接口 |
+| **路由冒烟** | `cd frontend-react && npm test` | 改路由/页面必跑 | ~1min | 19 个公开路由 |
+| **功能测试** | `cd frontend-react && npm run test:functional` | 发版前手动 | 较长 | 16 个页面 |
+| **全量测试** | `scripts/run-full-tests.bat` | 发版前手动 | 10~30min | API + 构建 + 功能 |
+
+### 目录结构
+
+**后端测试（tests/api/）**：
+- `tests/api/test_smoke.py` — API 冒烟测试（unittest，零新增依赖）
+- 覆盖：health、version、metadata、data-freshness、dashboard×3、trend、conversion-funnel×2、agency-analysis、cost-analysis、weekly×3、omni-channel×3、app-market×3、employee-conversion×2、leads、xhs-notes×2，共 34 个接口
+- 设计原则：只读、不写库、Flask test_client 内存执行
+
+**前端测试（frontend-react/tests/）**：
+- `smoke/` — 路由冒烟（route-health.spec.ts，19 个路由）
+- `functional/` — 页面级功能测试（16 个页面 spec）
+- `regression/` — 历史 bug 回归用例（新增 bug 时补）
+- `comparison/` — 新旧版对比测试（历史遗留，保留备查）
+- `_helpers/` — Python 辅助脚本、截图对比工具
+- `_legacy/` — 旧版零散 spec，功能已被 functional 覆盖
+
+### 提交前快测（pre-commit check）
+
+双击运行 `scripts/pre-commit-check.bat`，自动执行：
+1. 后端 API 冒烟（34 个接口，~1s）
+2. 前端构建（vite build，~45s）
+
+全部绿灯才允许提交。
+
+### 全量功能测试（手动触发）
+
+双击运行 `scripts/run-full-tests.bat`，自动执行：
+1. 后端 API 冒烟
+2. 前端构建
+3. Playwright 全量功能测试（16 个页面）
+
+**仅在发版前运行**，平时不需要跑。
+
+### 新增测试的原则
+
+- **每修复一个 bug**：在 `tests/regression/` 加一个对应的回归用例
+- **每新增一个核心接口**：在 `tests/api/test_smoke.py` 加一条 smoke
+- **每新增一个 lazy 路由**：在 `tests/smoke/route-health.spec.ts` 加一条路由
+- **冒烟测试要快**：单条 < 1 秒，不做复杂业务断言，只验证 200 + 结构合法
 
 ## 11. 文档索引
 
