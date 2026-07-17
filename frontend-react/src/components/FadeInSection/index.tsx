@@ -46,9 +46,9 @@ export interface FadeInSectionProps {
 export const FadeInSection: React.FC<FadeInSectionProps> = ({
   children,
   delay = 0,
-  duration = 1,
+  duration = 0.8,
   direction = 'up',
-  distance = 16,
+  distance = 12,
   fullWidth = true,
   once = true,
   className = '',

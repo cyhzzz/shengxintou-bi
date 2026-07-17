@@ -261,7 +261,7 @@ const AnchorClusterPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <FadeInSection delay={0} duration={1}>
+      <FadeInSection delay={0} duration={0.8}>
         <Card className={styles.filterCard} size='small'>
           <Space size='middle' wrap>
             <span className={styles.label}>日期区间</span>
@@ -281,7 +281,7 @@ const AnchorClusterPage: React.FC = () => {
       </FadeInSection>
 
       <Spin spinning={loading}>
-        <FadeInSection delay={0.15} duration={1}>
+        <FadeInSection delay={0.12} duration={0.8}>
           <MetricSection title="主播分析概览" description="主播引流链路的线索、开口、有效线索与成功开户核心表现（v3.1.26 起新开户作为核心获客产出，存量客户线索与资产分项辅助呈现）">
           <MetricCard
             title="主播数"
@@ -379,7 +379,7 @@ const AnchorClusterPage: React.FC = () => {
         </MetricSection>
         </FadeInSection>
 
-        <FadeInSection delay={0.3} duration={1}>
+        <FadeInSection delay={0.24} duration={0.8}>
           <Card title={`主播分析明细（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size='small'
             extra={
               <Space>
@@ -401,7 +401,7 @@ const AnchorClusterPage: React.FC = () => {
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={0.45} duration={1}>
+        <FadeInSection delay={0.36} duration={0.8}>
           <ReportFooter
             sources={[
               { label: '数据源', value: 'fact_conv_content.客户来源 字段中符合 [平台]引流-[主播名字] 模式的记录（例如 视频号引流-姚立琦、抖音引流-赵茜、财联社引流-谭记恩 等）' },

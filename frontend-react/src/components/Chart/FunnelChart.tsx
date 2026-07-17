@@ -157,13 +157,13 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
             animation={{
               appear: {
                 animation: 'wave-in',
-                duration: 1200,
-                delay: (d: any, index: number) => index * 220,
+                duration: 1500,
+                delay: (d: any, index: number) => index * 80,
                 easing: 'ease-out',
               },
               enter: {
                 animation: 'fade-in',
-                duration: 700,
+                duration: 800,
               },
             }}
             label={{

@@ -240,7 +240,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.employeeConversionPage}>
-      <FadeInSection delay={0} duration={1}>
+      <FadeInSection delay={0} duration={0.8}>
         <Card className={styles.filterCard} size='small'>
           <div className={styles.filterRow}>
             <div className={styles.filterGroup}>
@@ -270,7 +270,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       </FadeInSection>
 
       {/* 顶部核心指标：仅内容平台中已填写员工姓名的线索 */}
-      <FadeInSection delay={0.15} duration={1}>
+      <FadeInSection delay={0.12} duration={0.8}>
         <MetricSection title='内容平台员工转化核心指标' description='仅统计内容平台的员工承接线索，不含应用市场及非员工渠道。'>
           <MetricCard title='员工线索' description='内容平台' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
           <MetricCard title='员工开口' description='内容平台' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
@@ -280,7 +280,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       </FadeInSection>
 
       {/* 独立渠道参考，不并入员工核心指标 */}
-      <FadeInSection delay={0.30} duration={1}>
+      <FadeInSection delay={0.30} duration={0.8}>
       {channelOverview && (
         <MetricSection
           title='互联网引流渠道参考'
@@ -294,7 +294,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
       <Spin spinning={loading}>
         {/* 整体走势 */}
-        <FadeInSection delay={0.45} duration={1}>
+        <FadeInSection delay={0.36} duration={0.8}>
         <Card className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>📊 整体转化走势（月度）</Text>
@@ -309,7 +309,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </FadeInSection>
 
         {/* 员工开户转化率走势 */}
-        <FadeInSection delay={0.60} duration={1}>
+        <FadeInSection delay={0.60} duration={0.8}>
         <Card className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>📈 员工开户转化率走势</Text>
@@ -332,7 +332,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </FadeInSection>
 
         {/* 排行榜 */}
-        <FadeInSection delay={0.75} duration={1}>
+        <FadeInSection delay={0.75} duration={0.8}>
         <Card className={styles.tableCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>🏆 员工转化排行榜</Text>
@@ -352,7 +352,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </FadeInSection>
       </Spin>
 
-      <FadeInSection delay={0.90} duration={1}>
+      <FadeInSection delay={0.90} duration={0.8}>
       <ReportFooter
         sources={[
           { label: '口径', value: '内容平台' + (defaultPlatforms.length ? '（' + defaultPlatforms.join(' / ') + '）' : '') + ' —— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },

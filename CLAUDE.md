@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.8`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.7`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -391,23 +391,17 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 13. 版本历史
 
-### v3.2.8 已落地（2026-07-18） 修复动效三问题（宽度跳变 / 图表无缓慢变化 / 大卡片一起加载）
+### v3.2.7 已落地（2026-07-18） 容器级顺序浮现 + 慢节奏动效 + 全局美学优化（含多轮迭代修复）
 
-- **FadeInSection 重构为 IntersectionObserver 滚动触发**：视口外的容器不开始动画，真正实现从上到下依次浮现；动画从 CSS `animation` 改为 `transition`，避免 `will-change` 创建层叠上下文导致的副作用。
-- **修复宽度跳变**：`MainLayout .content` 加 `scrollbar-gutter: stable`，预留滚动条空间，修复动画过程中滚动条出现/消失导致的内容区宽度跳变。
-- **ECharts 加载/切换缓慢入场**：`EChartsComponent` 增加 `animationDurationUpdate` / `animationDelayUpdate` / `animationEasingUpdate`，并改 `setOption` 为 `notMerge: true`，让加载和切换 Tab/筛选器都有 1.2 秒级缓慢入场动画（之前 merge 模式下仅 300ms 数据更新动画）。
+- **动效四层体系**：页面级（AnimatedOutlet 0.5s 纯淡入，去掉 y 位移避免与 FadeInSection 叠加）→ 容器级（FadeInSection 0.8s 淡入+上浮 12px，delay 间隔 0.12s）→ 组件级（ECharts 1.5s 线 clip 从左到右绘制/柱 scaleY 从底到顶生长、useCountUp 1.5s 数字增长、FunnelChart 1.5s wave-in）→ 细节级（hover/focus 0.2-0.35s 交互反馈）。
+- **FadeInSection 基于 IntersectionObserver 滚动触发**：报表各大容器（筛选卡/指标区/图表区/表格区/页脚）按顺序淡入上浮浮现，视口外不开始动画，真正实现从上到下依次浮现；动画用 transition 而非 animation，避免 will-change 创建层叠上下文。
+- **修复宽度跳变**：`html/body/#root` 加 `overflow: hidden`，彻底阻止 body 级滚动条出现/消失；`MainLayout .content` 加 `scrollbar-gutter: stable` 预留滚动条空间。
+- **ECharts 线/柱缓慢绘制**：只设置 option 级别 `animationDuration=1500ms`，不在 series 级别覆盖 `animationDuration`，让 ECharts 用默认入场动画类型（line: clip, bar: scaleY）；series 级别仅设置短 stagger delay（`idx*60ms`）；`notMerge: true` 确保每次 setOption 触发完整入场动画。
 - **移除小卡片 stagger 动画**：移除 `MetricCard` 的 `metricCardEnter` stagger 入场动画和 `MetricSection` 的 `sectionEnter` 动画，避免与大容器 `FadeInSection` 叠加导致视觉混乱；小卡片即时显示，由外层 `FadeInSection` 控制大容器浮现。
-- **duration 调整**：从 1.2s 调为 1s，让卡片更快完成，层次感更清晰。
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，40.40s）；API 冒烟 33/33 通过。
-
-### v3.2.7 已落地（2026-07-18） 容器级顺序浮现 + 慢节奏动效 + 全局美学优化
-
-- **容器级顺序浮现**：新增 `FadeInSection` 组件（`frontend-react/src/components/FadeInSection/`），报表各大容器（筛选卡 / 指标区 / 图表区 / 表格区 / 页脚）按顺序淡入上浮浮现，替代容器内小卡片的细碎 stagger；支持 `delay` / `duration` / `direction` 配置与 `prefers-reduced-motion`。
-- **核心动效调慢到 1~2 秒级**：`useCountUp` 默认 1500ms；`EChartsComponent` / `FunnelChart` 入场 1200ms、series stagger 200ms；`MetricCard` 入场 1200ms；`tokens.css` 新增 `--motion-duration-reveal` 与 `--motion-easing-smooth`。
-- **全局美学优化**：`MainLayout` 内容区加顶部光照渐变增强层次；`global.scss` 新增 `sectionTitleBar` 带左侧色条的章节标题；卡片悬浮改为阴影 + 边框微亮，避免 transform 叠加入场动画；按钮上移收为 `-2px`；输入框 focus ring、Segmented 滑动、表格行 hover、排序图标放大等交互反馈保持克制。
+- **全局美学优化**：`MainLayout` 内容区加顶部光照渐变增强层次；`global.scss` 新增 `sectionTitleBar` 带左侧色条的章节标题；卡片悬浮改为阴影 + 边框微亮；按钮上移收为 `-2px`。
 - **覆盖全部报表页**：Dashboard、OmniChannel、ConversionFunnel、LeadsDetail、AgencyAnalysis、XhsNotes List/Operation、EmployeeConversion Analysis/Weekly、Live Funnel/AnchorCluster、Reports/AppMarket Funnel/Comparison/Detail/Creative、Reports/OmniChannel、ReportGeneration。
 - **修复 7 个功能测试用例**：账号管理搜索 selector、Dashboard 无数据检查、数据导入页 5 个用例适配新组件。
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，37.46s）；API 冒烟 33/33 通过。
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，36s）；API 冒烟 33/33 通过。
 
 ### v3.2.6 已落地（2026-07-18） UI 动效节奏与性能调优（更优雅、更流畅）
 
