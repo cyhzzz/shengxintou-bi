@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.5`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.6`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,27 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.6 已落地（2026-07-18） UI 动效节奏与性能调优（更优雅、更流畅）
+
+- **调慢全局动效节奏**，避免急促感：
+  - `tokens.css`：`--motion-duration-fast/normal/slow/slower` 整体上调 20%~50%；`--motion-stagger-gap` 从 60ms 提到 90ms；新增 `--motion-duration-page` 与 `--motion-easing-smooth`。
+  - `useCountUp` 默认 duration 从 800ms 改为 1000ms，缓动从 `easeOutQuart` 改为更柔和的 `easeOutCubic`。
+  - `EChartsComponent` 与 `FunnelChart` 入场动画从 700~800ms 提到 900~1000ms，series stagger delay 从 120ms 提到 150~160ms。
+
+- **页面路由过渡更自然**：`AnimatedOutlet` duration 0.4s + smooth easing；`AnimatePresence` 的 `mode` 从 `wait` 改为 `popLayout`，避免旧页完全退出后新页才进入的空档，显著降低 perceived delay。
+
+- **报表卡片层次入场（从上到下依次落下）**：
+  - `MetricSection` 整组先淡入上浮（`sectionEnter`），为内部卡片做层次铺垫。
+  - `MetricCard` stagger 入场改为 `translateY(16px) scale(0.98) -> translateY(0) scale(1)`，配合 90ms 递增 delay，形成「卡片从上到下依次落下并归位」的微动效。
+  - hover 去掉 transform，仅保留阴影提升，避免入场与 hover 动画叠加造成的凌乱感。
+
+- **性能优化**：
+  - `EChartsComponent` 移除所有 `console.log`；`setOption` 默认走 `notMerge: false` + `lazyUpdate: true`，避免每次数据更新都全量重绘；`ResizeObserver` 增加 100ms debounce。
+  - 全局 `.ant-card` hover 不再 `translateY`，仅改 `box-shadow`；按钮上移从 `-3px` 收为 `-2px`。
+  - `prefers-reduced-motion` 不再使用 `*` 全局选择器，改为精确命中动效元素，避免大面积重绘；同时强制 `opacity: 1`，防止默认 `opacity: 0` 在关闭动画时导致元素不可见。
+
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6391 modules，35s）；API 冒烟 33/33 通过。
 
 ### v3.2.5 已落地（2026-07-17） 系统性 UI 动效优化（数据呈现生动化）
 

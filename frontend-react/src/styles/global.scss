@@ -136,18 +136,18 @@ a {
 // v3.2.5 全局动效增强
 // ========================================
 
-// 按钮悬浮：轻微上移 + 阴影
+// 按钮悬浮：更克制的上移 + 阴影（v3.2.6：只改 transform/opacity，避免触发 layout）
 .ant-btn {
   transition:
-    transform var(--motion-duration-fast) var(--motion-easing-default),
-    box-shadow var(--motion-duration-fast) var(--motion-easing-default),
-    background-color var(--motion-duration-fast) var(--motion-easing-default),
-    border-color var(--motion-duration-fast) var(--motion-easing-default),
-    color var(--motion-duration-fast) var(--motion-easing-default);
+    transform var(--motion-duration-normal) var(--motion-easing-default),
+    box-shadow var(--motion-duration-normal) var(--motion-easing-default),
+    background-color var(--motion-duration-normal) var(--motion-easing-default),
+    border-color var(--motion-duration-normal) var(--motion-easing-default),
+    color var(--motion-duration-normal) var(--motion-easing-default);
 
   &:not(:disabled):not(.ant-btn-disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
   }
 
   &:not(:disabled):not(.ant-btn-disabled):active {
@@ -159,7 +159,7 @@ a {
 // 图标按钮悬浮旋转
 .ant-btn-icon-only {
   .anticon-reload {
-    transition: transform var(--motion-duration-normal) var(--motion-easing-default);
+    transition: transform var(--motion-duration-slow) var(--motion-easing-default);
   }
 
   &:hover .anticon-reload {
@@ -167,11 +167,9 @@ a {
   }
 }
 
-// 卡片悬浮 lift
+// 卡片悬浮：仅阴影提升，避免 transform 导致的 layout/paint（MetricCard 自身入场动画已用 transform）
 .ant-card {
-  transition:
-    transform var(--motion-duration-normal) var(--motion-easing-default),
-    box-shadow var(--motion-duration-normal) var(--motion-easing-default);
+  transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
 
   &:hover {
     box-shadow: var(--shadow-elevated);
@@ -241,14 +239,29 @@ a {
   }
 }
 
-// 减少动画偏好支持
+// 减少动画偏好支持（v3.2.6：避免 * 选择器造成大面积重绘，仅命中常用动效元素）
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .metricCard,
+  .container,
+  .ant-btn,
+  .ant-card,
+  .ant-input,
+  .ant-select .ant-select-selector,
+  .ant-picker,
+  .ant-input-number,
+  .ant-input-affix-wrapper,
+  .ant-table-tbody > tr,
+  .ant-table-column-sorter .anticon,
+  .ant-segmented .ant-segmented-thumb,
+  .ant-segmented .ant-segmented-item-selected,
+  .ant-segmented .ant-segmented-item-label {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
   }
 }
