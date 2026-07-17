@@ -15,6 +15,7 @@ import {
   Spin,
   Typography,
   Dropdown,
+  Segmented,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -24,6 +25,8 @@ import {
   DownOutlined,
   FileImageOutlined,
   FilePdfOutlined,
+  DesktopOutlined,
+  MobileOutlined,
 } from '@ant-design/icons';
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -35,15 +38,11 @@ import type {
   XhsCreatorContentItem,
   XhsCreatorConversionItem,
   XhsTopNoteItem,
-  XhsCreatorAnnualRankingItem,
   XhsAgencyDataItem,
-  XhsCreatorCreationItem,
-  XhsCreatorInteractionItem,
   XhsEmployeeConversionItem,
 } from '@/types/api.schemas';
 import styles from './Operation.module.scss';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 const { Link, Text } = Typography;
 
@@ -72,59 +71,93 @@ const XhsNotesOperationPage: React.FC = () => {
   // 页面内容ref - 用于导出
   const pageRef = useRef<HTMLDivElement>(null);
 
-  // 导出功能 - 导出整个报表为图片或PDF
+  // 导出功能 - 手机友好长图 / PDF
+  // v3.2.3：切到 H5 模式（480px poster 布局）截图，截图后恢复原模式
   const handleExportReport = async (type: 'image' | 'pdf') => {
     if (!pageRef.current) {
       message.error('无法获取页面内容');
       return;
     }
 
+    // 记录原模式，截图后恢复
+    const originalMode = viewMode;
     try {
       message.loading({ content: '正在生成报表...', key: 'export' });
 
+      // 1. 切到 H5 模式（如果还没在）
+      if (originalMode !== 'h5') {
+        setViewMode('h5');
+        // 等两帧让 React 重渲染 + ECharts 重绘
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
       const element = pageRef.current;
       const canvas = await html2canvas(element, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         logging: false,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
         allowTaint: false,
         backgroundColor: document.documentElement.classList.contains('dark') ? '#0f1419' : '#ffffff',
       });
 
+      const dateStr = new Date().toISOString().split('T')[0];
+      const baseName = `小红书运营分析报表_${dateStr}`;
+
       if (type === 'image') {
-        // 导出为图片
         const link = document.createElement('a');
-        link.download = `小红书运营分析报表_${new Date().toISOString().split('T')[0]}.png`;
+        link.download = `${baseName}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        message.success({ content: '导出图片成功', key: 'export' });
+        message.success({ content: '导出图片成功（H5 手机友好长图）', key: 'export' });
       } else {
-        // 导出为PDF
-        const imgData = canvas.toDataURL('image/png');
+        const jsPDF = (await import('jspdf')).jsPDF;
         const pdf = new jsPDF({
-          orientation: 'landscape',
+          orientation: 'portrait',
           unit: 'mm',
           format: 'a4',
         });
 
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
-        const imgX = (pageWidth - imgWidth * ratio) / 2;
-        const imgY = 10;
+        const margin = 5;
+        const usableWidth = pageWidth - margin * 2;
+        const usableHeight = pageHeight - margin * 2;
 
-        pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-        pdf.save(`小红书运营分析报表_${new Date().toISOString().split('T')[0]}.pdf`);
-        message.success({ content: '导出PDF成功', key: 'export' });
+        const imgHeightInPdf = (canvas.height / canvas.width) * usableWidth;
+        const sliceHeightInCanvas = Math.round((usableHeight / imgHeightInPdf) * canvas.width);
+        const totalSlices = Math.ceil(canvas.height / sliceHeightInCanvas);
+
+        for (let i = 0; i < totalSlices; i++) {
+          const startY = i * sliceHeightInCanvas;
+          const actualSliceHeight = Math.min(sliceHeightInCanvas, canvas.height - startY);
+          const sliceCanvas = document.createElement('canvas');
+          sliceCanvas.width = canvas.width;
+          sliceCanvas.height = actualSliceHeight;
+          const ctx = sliceCanvas.getContext('2d');
+          if (!ctx) continue;
+          ctx.drawImage(canvas, 0, startY, canvas.width, actualSliceHeight, 0, 0, canvas.width, actualSliceHeight);
+
+          const imgData = sliceCanvas.toDataURL('image/png');
+          const sliceHeightInPdf = (actualSliceHeight / canvas.width) * usableWidth;
+
+          if (i > 0) pdf.addPage();
+          pdf.addImage(imgData, 'PNG', margin, margin, usableWidth, sliceHeightInPdf);
+        }
+
+        pdf.save(`${baseName}.pdf`);
+        message.success({ content: `导出PDF成功（H5 手机友好 · 共 ${totalSlices} 页）`, key: 'export' });
       }
     } catch (error) {
       console.error('[XhsNotes/Operation] 导出失败:', error);
       const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       message.error({ content: `导出失败 · ${detail}。如重试仍失败请刷新本页重试。`, key: 'export', duration: 6 });
+    } finally {
+      // 2. 恢复原模式
+      if (originalMode !== viewMode) {
+        setViewMode(originalMode);
+      }
     }
   };
 
@@ -133,13 +166,13 @@ const XhsNotesOperationPage: React.FC = () => {
     {
       key: 'image',
       icon: <FileImageOutlined />,
-      label: '导出为图片 (PNG)',
+      label: '导出图片 · 手机友好长图',
       onClick: () => handleExportReport('image'),
     },
     {
       key: 'pdf',
       icon: <FilePdfOutlined />,
-      label: '导出为 PDF',
+      label: '导出 PDF · 手机友好分页',
       onClick: () => handleExportReport('pdf'),
     },
   ];
@@ -154,8 +187,6 @@ const XhsNotesOperationPage: React.FC = () => {
   const getDefaultDateRange = (_days?: number): [string, string] =>
     ['2026-01-01', '2026-12-31'];
 
-  const getDefaultYTDDateRange = (): [string, string] => ['2026-01-01', '2026-12-31'];
-
   // 数据可用日期范围（从元数据获取）
   const [xhsDataDateRange, setXhsDataDateRange] = useState<{ start: string | null; end: string | null } | null>(null);
 
@@ -163,20 +194,21 @@ const XhsNotesOperationPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string] | null>(null);
   // 笔记排行榜日期范围
   const [topNotesDateRange, setTopNotesDateRange] = useState<[string, string] | null>(null);
-  // 创作者年度排行日期范围
-  const [creatorAnnualDateRange, setCreatorAnnualDateRange] = useState<[string, string] | null>(null);
 
   // 数据状态
   const [data, setData] = useState<XhsOperationAnalysisData | null>(null);
   const [loading, setLoading] = useState(false);
   const [metadataLoaded, setMetadataLoaded] = useState(false);
 
-  // 独立模块加载状态 - 用于优秀笔记排行榜和创作者年度排行
+  // 独立模块加载状态 - 用于优秀笔记排行榜
   const [topNotesLoading, setTopNotesLoading] = useState(false);
-  const [creatorAnnualLoading, setCreatorAnnualLoading] = useState(false);
 
   // 当前选中的图表Tab
   const [creationChartType, setCreationChartType] = useState<string>('impressions');
+
+  // v3.2.3：视图模式 - Web 桌面布局 / H5 手机布局（480px poster）
+  // H5 模式参考报告生成页 poster 容器，所有双列改单列，导出截图即手机友好长图
+  const [viewMode, setViewMode] = useState<'web' | 'h5'>('web');
 
   // 加载元数据获取日期范围
   useEffect(() => {
@@ -191,23 +223,11 @@ const XhsNotesOperationPage: React.FC = () => {
           const defaultRange = getDefaultDateRangeFromData(xhsRange.start, xhsRange.end, 30);
           setDateRange(defaultRange);
           setTopNotesDateRange(defaultRange);
-
-          // 创作者年度排行使用数据范围或年度
-          if (xhsRange.end) {
-            const yearStart = new Date(new Date(xhsRange.end).getFullYear(), 0, 1);
-            setCreatorAnnualDateRange([
-              yearStart.toISOString().split('T')[0],
-              xhsRange.end
-            ]);
-          } else {
-            setCreatorAnnualDateRange(getDefaultYTDDateRange());
-          }
         } else {
           // 回退到默认30天
           const defaultRange = getDefaultDateRange(30);
           setDateRange(defaultRange);
           setTopNotesDateRange(defaultRange);
-          setCreatorAnnualDateRange(getDefaultYTDDateRange());
         }
         setMetadataLoaded(true);
       } catch (error) {
@@ -216,7 +236,6 @@ const XhsNotesOperationPage: React.FC = () => {
         const defaultRange = getDefaultDateRange(30);
         setDateRange(defaultRange);
         setTopNotesDateRange(defaultRange);
-        setCreatorAnnualDateRange(getDefaultYTDDateRange());
         setMetadataLoaded(true);
       }
     };
@@ -240,9 +259,6 @@ const XhsNotesOperationPage: React.FC = () => {
       // 添加可选日期范围
       if (topNotesDateRange?.[0] && topNotesDateRange?.[1]) {
         filters.top_notes_date_range = topNotesDateRange as [string, string];
-      }
-      if (creatorAnnualDateRange?.[0] && creatorAnnualDateRange?.[1]) {
-        filters.creator_annual_date_range = creatorAnnualDateRange as [string, string];
       }
 
       const response = await postXhsOperationAnalysis({ filters });
@@ -282,24 +298,6 @@ const XhsNotesOperationPage: React.FC = () => {
       console.error('获取笔记排行榜数据失败:', error);
     } finally {
       setTopNotesLoading(false);
-    }
-  }, []);
-
-  // 独立获取创作者年度排行数据
-  const fetchCreatorAnnualData = useCallback(async (annualDateRange: [string, string]) => {
-    setCreatorAnnualLoading(true);
-    try {
-      const filters: Record<string, unknown> = {
-        creator_annual_date_range: annualDateRange,
-      };
-      const response = await postXhsOperationAnalysis({ filters });
-      if (response.success && response.data) {
-        setData(prev => prev ? { ...prev, creator_annual_ranking: response.data.creator_annual_ranking } : response.data);
-      }
-    } catch (error) {
-      console.error('获取创作者年度排行数据失败:', error);
-    } finally {
-      setCreatorAnnualLoading(false);
     }
   }, []);
 
@@ -344,8 +342,8 @@ const XhsNotesOperationPage: React.FC = () => {
     return false;
   };
 
-  // 快速选择日期 - 独立筛选器
-  const handleQuickDateSelect = async (type: 'topNotes' | 'creatorAnnual', option: 'days30' | 'ytd') => {
+  // 快速选择日期 - 笔记排行榜独立筛选器
+  const handleQuickDateSelect = async (type: 'topNotes', option: 'days30' | 'ytd') => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
@@ -356,13 +354,7 @@ const XhsNotesOperationPage: React.FC = () => {
       if (type === 'topNotes') {
         const newRange: [string, string] = [startStr, todayStr];
         setTopNotesDateRange(newRange);
-        // 独立获取笔记排行榜数据
         await fetchTopNotesData(newRange);
-      } else {
-        const newRange: [string, string] = [startStr, todayStr];
-        setCreatorAnnualDateRange(newRange);
-        // 独立获取创作者年度排行数据
-        await fetchCreatorAnnualData(newRange);
       }
     } else if (option === 'ytd') {
       const yearStart = new Date(today.getFullYear(), 0, 1);
@@ -370,13 +362,7 @@ const XhsNotesOperationPage: React.FC = () => {
       if (type === 'topNotes') {
         const newRange: [string, string] = [startStr, todayStr];
         setTopNotesDateRange(newRange);
-        // 独立获取笔记排行榜数据
         await fetchTopNotesData(newRange);
-      } else {
-        const newRange: [string, string] = [startStr, todayStr];
-        setCreatorAnnualDateRange(newRange);
-        // 独立获取创作者年度排行数据
-        await fetchCreatorAnnualData(newRange);
       }
     }
   };
@@ -417,17 +403,6 @@ const XhsNotesOperationPage: React.FC = () => {
     );
     setDateRange(defaultRange);
     setTopNotesDateRange(defaultRange);
-
-    // 创作者年度排行使用数据范围或年度
-    if (xhsDataDateRange?.end) {
-      const yearStart = new Date(new Date(xhsDataDateRange.end).getFullYear(), 0, 1);
-      setCreatorAnnualDateRange([
-        yearStart.toISOString().split('T')[0],
-        xhsDataDateRange.end
-      ]);
-    } else {
-      setCreatorAnnualDateRange(getDefaultYTDDateRange());
-    }
     setData(null);
   };
 
@@ -519,21 +494,9 @@ const XhsNotesOperationPage: React.FC = () => {
     const safeTopNotesRange = topNotesDateRange ?? ['', ''];
 
     switch (exportType) {
-      case 'creator_content':
-        csvContent = exportCreatorContentData(data.creator_content_data ?? []);
-        filename = `创作者内容数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
-        break;
-      case 'creator_conversion':
-        csvContent = exportCreatorConversionData(data.creator_conversion_data ?? []);
-        filename = `创作者转化数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
-        break;
-      case 'creator_creation':
-        csvContent = exportCreatorCreationData(data.creator_creation_data ?? []);
-        filename = `创作者创作数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
-        break;
-      case 'creator_interaction':
-        csvContent = exportCreatorInteractionData(data.creator_interaction_data ?? []);
-        filename = `创作者互动数据_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
+      case 'creator_summary':
+        csvContent = exportCreatorSummaryData(creatorSummaryData);
+        filename = `创作者综合分析_${safeDateRange[0]}_${safeDateRange[1]}.csv`;
         break;
       case 'top_notes':
         csvContent = exportTopNotesData(data.top_notes ?? []);
@@ -563,18 +526,22 @@ const XhsNotesOperationPage: React.FC = () => {
     message.success('导出成功');
   };
 
-  // 导出创作者内容数据
-  const exportCreatorContentData = (items: XhsCreatorContentItem[]) => {
-    const headers = ['生产者', '笔记数', '曝光量', '点击量', '互动量', '消耗', '平均点击率', '平均互动率'];
+  // 导出创作者综合分析数据（合并原 4 表：内容 / 转化 / 创作 / 互动）
+  const exportCreatorSummaryData = (items: typeof creatorSummaryData) => {
+    const headers = ['生产者', '笔记数', '曝光量', '点击量', '互动量', '点击率', '互动率', '私信', '加微数', '企微添加', '开户数', '消耗'];
     const rows = items.map(item => [
       item.producer,
       item.note_count,
       item.total_impressions,
       item.total_clicks,
       item.total_interactions,
-      item.total_cost,
       `${item.avg_click_rate != null ? item.avg_click_rate.toFixed(2) : '0.00'}%`,
       `${item.avg_interaction_rate != null ? item.avg_interaction_rate.toFixed(2) : '0.00'}%`,
+      item.private_messages,
+      item.lead_users,
+      item.customer_mouth_users,
+      item.opened_account_users,
+      item.total_cost,
     ]);
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
@@ -598,46 +565,6 @@ const XhsNotesOperationPage: React.FC = () => {
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
 
-  // 导出创作者转化数据
-  const exportCreatorConversionData = (items: XhsCreatorConversionItem[]) => {
-    const headers = ['生产者', '私信量', '加微数', '开口数', '有效线索', '开户数', '有效户'];
-    const rows = items.map(item => [
-      item.producer,
-      item.private_messages,
-      item.lead_users,
-      item.customer_mouth_users,
-      item.valid_lead_users,
-      item.opened_account_users,
-      item.valid_customer_users,
-    ]);
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-  };
-
-  // 导出创作者创作数据
-  const exportCreatorCreationData = (items: XhsCreatorCreationItem[]) => {
-    const headers = ['生产者', '笔记数', '曝光量'];
-    const rows = items.map(item => [
-      item.producer,
-      item.note_count,
-      item.impressions,
-    ]);
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-  };
-
-  // 导出创作者互动数据
-  const exportCreatorInteractionData = (items: XhsCreatorInteractionItem[]) => {
-    const headers = ['生产者', '点赞', '收藏', '评论', '分享', '总互动'];
-    const rows = items.map(item => [
-      item.producer,
-      item.likes,
-      item.favorites,
-      item.comments,
-      item.shares,
-      item.total_interactions,
-    ]);
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-  };
-
   // 导出员工转化数据
   const exportEmployeeConversionData = (items: XhsEmployeeConversionItem[]) => {
     const headers = ['员工姓名', '加微数', '有效线索数', '开户数', '有效户数', '开户率', '有效户率', '总资产'];
@@ -656,14 +583,13 @@ const XhsNotesOperationPage: React.FC = () => {
 
   // 导出代理商数据
   const exportAgencyData = (items: XhsAgencyDataItem[]) => {
-    const headers = ['代理商', '消耗', '曝光量', '点击量', '加微数', '潜客数', '开口数', '有效线索', '开户数', '有效户'];
+    const headers = ['代理商', '投放金额', '曝光量', '点击量', '加微数', '开口数', '有效线索', '开户数', '有效户'];
     const rows = items.map(item => [
       item.agency,
       item.total_cost,
       item.total_impressions,
       item.total_clicks,
       item.lead_users,
-      item.potential_customers,
       item.customer_mouth_users,
       item.valid_lead_users,
       item.opened_account_users,
@@ -738,6 +664,20 @@ const XhsNotesOperationPage: React.FC = () => {
       ['#ec4899', '#f472b6'],
     ];
 
+    // v3.2.3: 周维度（上周五到本周四），把 YYYY-MM-DD 转为 MM-DD~MM-DD 友好显示
+    const formatWeekLabel = (weekStart: string): string => {
+      try {
+        const start = new Date(weekStart);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        const fmt = (d: Date) => `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+        return `${fmt(start)}~${fmt(end)}`;
+      } catch {
+        return weekStart;
+      }
+    };
+    const weekLabels = data.conversion_trend.weeks.map(formatWeekLabel);
+
     return {
       tooltip: {
         trigger: 'axis',
@@ -784,7 +724,7 @@ const XhsNotesOperationPage: React.FC = () => {
       },
       xAxis: {
         type: 'category',
-        data: data.conversion_trend.weeks,
+        data: weekLabels,
         axisLabel: {
           rotate: 30,
           fontSize: 11,
@@ -869,9 +809,16 @@ const XhsNotesOperationPage: React.FC = () => {
     };
   }, [data?.conversion_trend]);
 
-  // 创作量趋势图表配置 - ECharts 柱状图（原样复制旧版 XhsNotesOperationReport.js）
+  // 创作量趋势图表配置 - v3.2.3：按创作者堆叠柱状图
   const creationVolumeOption = useMemo((): EChartsOption => {
-    if (!data?.creation_trend?.dates?.length) return {};
+    const matrix = data?.creation_trend?.producer_matrix;
+    if (!matrix?.months?.length || !matrix?.producers?.length) return {};
+
+    // ECharts 调色板（10 色）
+    const palette = [
+      '#5B8FF9', '#5AD8A6', '#5D7092', '#F6BD16', '#E86452',
+      '#6DC8EC', '#945FB9', '#FF9845', '#1E9493', '#FF99C3',
+    ];
 
     return {
       tooltip: {
@@ -879,32 +826,44 @@ const XhsNotesOperationPage: React.FC = () => {
         axisPointer: { type: 'shadow' },
       },
       legend: {
-        show: false,
+        data: matrix.producers,
+        bottom: '2%',
+        type: 'scroll',
+        textStyle: { fontSize: 11, color: '#5a5c66' },
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '3%',
-        top: '3%',
+        bottom: '15%',
+        top: '8%',
         containLabel: true,
       },
       xAxis: {
         type: 'category',
-        data: data.creation_trend.dates,
+        data: matrix.months,
         axisLabel: {
-          rotate: data.creation_trend.dates.length > 30 ? 45 : 0,
+          fontSize: 11,
+          color: '#8a8d99',
         },
       },
       yAxis: {
         type: 'value',
         name: '笔记数',
+        nameTextStyle: { fontSize: 12, color: '#8a8d99' },
+        axisLabel: { fontSize: 11, color: '#8a8d99' },
+        splitLine: { lineStyle: { color: '#f0f1f3', type: 'dashed' as const } },
       },
-      series: [{
-        name: '笔记数',
-        type: 'bar',
-        data: data.creation_trend.note_counts,
-        itemStyle: { color: '#1890ff' },
-      }],
+      series: matrix.producers.map((producer, idx) => ({
+        name: producer,
+        type: 'bar' as const,
+        stack: 'total',
+        data: matrix.matrix[producer] || [],
+        itemStyle: { color: palette[idx % palette.length] },
+        emphasis: { focus: 'series' as const },
+        barMaxWidth: 40,
+      })),
+      animationDuration: 800,
+      animationEasing: 'cubicOut' as const,
     };
   }, [data?.creation_trend]);
 
@@ -1000,367 +959,76 @@ const XhsNotesOperationPage: React.FC = () => {
     };
   }, [data?.creation_trend]);
 
-  // 创作者创作量图表配置 - ECharts 横向双X轴柱状图（原样复制旧版）
-  const creatorCreationOption = useMemo((): EChartsOption => {
-    if (!data?.creator_creation_data?.length) return {};
-
-    // 按生产者聚合数据
-    const aggregatedMap = new Map<string, { note_count: number; impressions: number }>();
-    data.creator_creation_data.forEach(item => {
-      const producer = item.producer || '未知';
-      const existing = aggregatedMap.get(producer);
-      if (existing) {
-        existing.note_count += item.note_count || 0;
-        existing.impressions += item.impressions || 0;
-      } else {
-        aggregatedMap.set(producer, {
-          note_count: item.note_count || 0,
-          impressions: item.impressions || 0,
+  // 创作者综合分析数据 - 合并 creator_content_data + creator_conversion_data
+  const creatorSummaryData = useMemo(() => {
+    const contentList = data?.creator_content_data ?? [];
+    const conversionList = data?.creator_conversion_data ?? [];
+    const contentMap = new Map<string, XhsCreatorContentItem>();
+    contentList.forEach(item => {
+      if (item.producer) contentMap.set(item.producer, item);
+    });
+    const merged: Array<{
+      producer: string;
+      note_count: number;
+      total_impressions: number;
+      total_clicks: number;
+      total_interactions: number;
+      avg_click_rate: number | null;
+      avg_interaction_rate: number | null;
+      private_messages: number;
+      lead_users: number;
+      customer_mouth_users: number;
+      opened_account_users: number;
+      total_cost: number;
+    }> = [];
+    const conversionMap = new Map<string, XhsCreatorConversionItem>();
+    conversionList.forEach(item => {
+      if (item.producer) conversionMap.set(item.producer, item);
+    });
+    // 以 content 为主，转化数据合并进来；转化有但 content 没有的也补上
+    const seenProducers = new Set<string>();
+    contentList.forEach(c => {
+      const cv = conversionMap.get(c.producer);
+      seenProducers.add(c.producer);
+      merged.push({
+        producer: c.producer,
+        note_count: c.note_count || 0,
+        total_impressions: c.total_impressions || 0,
+        total_clicks: c.total_clicks || 0,
+        total_interactions: c.total_interactions || 0,
+        avg_click_rate: c.avg_click_rate ?? null,
+        avg_interaction_rate: c.avg_interaction_rate ?? null,
+        private_messages: cv?.private_messages || 0,
+        lead_users: cv?.lead_users || 0,
+        customer_mouth_users: cv?.customer_mouth_users || 0,
+        opened_account_users: cv?.opened_account_users || 0,
+        total_cost: c.total_cost || 0,
+      });
+    });
+    conversionList.forEach(cv => {
+      if (!seenProducers.has(cv.producer)) {
+        merged.push({
+          producer: cv.producer,
+          note_count: 0,
+          total_impressions: 0,
+          total_clicks: 0,
+          total_interactions: 0,
+          avg_click_rate: null,
+          avg_interaction_rate: null,
+          private_messages: cv.private_messages || 0,
+          lead_users: cv.lead_users || 0,
+          customer_mouth_users: cv.customer_mouth_users || 0,
+          opened_account_users: cv.opened_account_users || 0,
+          total_cost: cv.total_cost || 0,
         });
       }
     });
+    // 默认按消耗降序（与原创作者内容表口径一致）
+    return merged.sort((a, b) => b.total_cost - a.total_cost);
+  }, [data?.creator_content_data, data?.creator_conversion_data]);
 
-    const sortedData = Array.from(aggregatedMap.entries())
-      .map(([producer, values]) => ({ producer, ...values }))
-      .sort((a, b) => (b.note_count || 0) - (a.note_count || 0))
-      .slice(0, 10)
-      .reverse();
-
-    const producers = sortedData.map(item => item.producer);
-    const noteCounts = sortedData.map(item => item.note_count);
-    const impressions = sortedData.map(item => item.impressions);
-
-    const formatNumber = (value: number): string => {
-      if (value >= 10000) {
-        return (value / 10000).toFixed(1) + '万';
-      }
-      return value.toString();
-    };
-
-    return {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params: any) => {
-          const idx = params[0]?.dataIndex ?? 0;
-          const creator = producers[idx] || '未知';
-          let result = `${creator}<br/>`;
-          params.forEach((p: any) => {
-            const value = p.value;
-            if (p.seriesName === '笔记发布量') {
-              result += `${p.marker} ${p.seriesName}: ${value} 篇<br/>`;
-            } else {
-              result += `${p.marker} ${p.seriesName}: ${formatNumber(value)}<br/>`;
-            }
-          });
-          return result;
-        },
-      },
-      legend: {
-        show: false,
-      },
-      grid: {
-        left: '3%',
-        right: '3%',
-        bottom: '3%',
-        top: '3%',
-        containLabel: true,
-      },
-      xAxis: [
-        {
-          type: 'value',
-          name: '笔记发布量',
-          position: 'top' as const,
-          axisLabel: {
-            formatter: '{value} 篇',
-          },
-        },
-        {
-          type: 'value',
-          name: '笔记曝光量',
-          position: 'bottom' as const,
-          axisLabel: {
-            formatter: formatNumber,
-          },
-        },
-      ],
-      yAxis: {
-        type: 'category',
-        data: producers,
-        axisLabel: {
-          width: 100,
-          overflow: 'truncate' as const,
-        },
-      },
-      series: [
-        {
-          name: '笔记发布量',
-          type: 'bar',
-          data: noteCounts,
-          xAxisIndex: 0,
-          yAxisIndex: 0,
-          itemStyle: {
-            color: '#1890ff',
-          },
-        },
-        {
-          name: '笔记曝光量',
-          type: 'bar',
-          data: impressions,
-          xAxisIndex: 1,
-          yAxisIndex: 0,
-          itemStyle: {
-            color: '#52c41a',
-          },
-        },
-      ],
-    };
-  }, [data?.creator_creation_data]);
-
-  // 创作者互动量图表配置 - ECharts 横向堆叠条形图（原样复制旧版）
-  const creatorInteractionOption = useMemo((): EChartsOption => {
-    if (!data?.creator_interaction_data?.length) return {};
-
-    // 按生产者聚合数据
-    const aggregatedMap = new Map<string, { likes: number; favorites: number; comments: number; shares: number; total_interactions: number }>();
-    data.creator_interaction_data.forEach(item => {
-      const producer = item.producer || '未知';
-      const existing = aggregatedMap.get(producer);
-      if (existing) {
-        existing.likes += item.likes || 0;
-        existing.favorites += item.favorites || 0;
-        existing.comments += item.comments || 0;
-        existing.shares += item.shares || 0;
-        existing.total_interactions += item.total_interactions || 0;
-      } else {
-        aggregatedMap.set(producer, {
-          likes: item.likes || 0,
-          favorites: item.favorites || 0,
-          comments: item.comments || 0,
-          shares: item.shares || 0,
-          total_interactions: item.total_interactions || 0,
-        });
-      }
-    });
-
-    const sortedData = Array.from(aggregatedMap.entries())
-      .map(([producer, values]) => ({ producer, ...values }))
-      .sort((a, b) => (b.total_interactions || 0) - (a.total_interactions || 0))
-      .slice(0, 10)
-      .reverse();
-
-    const producers = sortedData.map(item => item.producer);
-    const likes = sortedData.map(item => item.likes);
-    const favorites = sortedData.map(item => item.favorites);
-    const comments = sortedData.map(item => item.comments);
-    const shares = sortedData.map(item => item.shares);
-
-    const formatNumber = (value: number): string => {
-      if (value >= 10000) {
-        return (value / 10000).toFixed(1) + '万';
-      }
-      return value.toString();
-    };
-
-    return {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-        formatter: (params: any) => {
-          const idx = params[0]?.dataIndex ?? 0;
-          const creator = producers[idx] || '未知';
-          let result = `${creator}<br/>`;
-          params.forEach((p: any) => {
-            const value = p.value;
-            result += `${p.marker} ${p.seriesName}: ${formatNumber(value)}<br/>`;
-          });
-          const total = sortedData[idx]?.total_interactions || 0;
-          result += `总互动量: ${formatNumber(total)}`;
-          return result;
-        },
-      },
-      legend: {
-        data: ['点赞', '收藏', '评论', '分享'],
-        bottom: 0,
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '10%',
-        top: '3%',
-        containLabel: true,
-      },
-      xAxis: {
-        type: 'value',
-        name: '互动量',
-        axisLabel: {
-          formatter: formatNumber,
-        },
-      },
-      yAxis: {
-        type: 'category',
-        data: producers,
-        axisLabel: {
-          width: 100,
-          overflow: 'truncate' as const,
-        },
-      },
-      series: [
-        {
-          name: '点赞',
-          type: 'bar' as const,
-          stack: 'interaction',
-          data: likes,
-          itemStyle: { color: '#ff4d4f' },
-        },
-        {
-          name: '收藏',
-          type: 'bar' as const,
-          stack: 'interaction',
-          data: favorites,
-          itemStyle: { color: '#faad14' },
-        },
-        {
-          name: '评论',
-          type: 'bar' as const,
-          stack: 'interaction',
-          data: comments,
-          itemStyle: { color: '#1890ff' },
-        },
-        {
-          name: '分享',
-          type: 'bar' as const,
-          stack: 'interaction',
-          data: shares,
-          itemStyle: { color: '#52c41a' },
-        },
-      ],
-    };
-  }, [data?.creator_interaction_data]);
-
-  // 员工周转化率趋势图表配置 - ECharts 多折线图（原样复制旧版）
-  const employeeWeeklyRateOption = useMemo((): EChartsOption => {
-    if (!data?.employee_weekly_conversion?.weeks?.length) return {};
-
-    const employees = data.employee_weekly_conversion.employees;
-    const weeks = data.employee_weekly_conversion.weeks;
-    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
-
-    // 颜色映射函数
-    const getRateColor = (rate: number): string => {
-      if (rate >= 10) return '#52c41a';
-      if (rate >= 5) return '#1890ff';
-      if (rate >= 2) return '#faad14';
-      if (rate > 0) return '#f5222d';
-      return '#999';
-    };
-
-    return {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'cross' },
-        formatter: (params: any) => {
-          if (!params || params.length === 0) return '';
-          const title = params[0].axisValue;
-          let result = `<div style="font-weight: 600; margin-bottom: 10px; font-size: 13px; color: #1a1a1a;">${title}</div>`;
-          params.forEach((p: any) => {
-            result += `<div style="margin: 5px 0;">
-              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${p.color}; margin-right: 8px;"></span>
-              <span style="color: #5a5c66;">${p.seriesName}:</span>
-              <span style="float: right; font-weight: 600; color: ${getRateColor(p.value)};">${p.value.toFixed(2)}%</span>
-            </div>`;
-          });
-          return result;
-        },
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-        borderColor: '#e8e9eb',
-        borderWidth: 1,
-        padding: [12, 16],
-        extraCssText: 'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 6px;',
-      },
-      legend: {
-        data: employees,
-        bottom: '2%',
-        left: 'center',
-        itemWidth: 14,
-        itemHeight: 14,
-        itemGap: 16,
-        textStyle: {
-          fontSize: 12,
-          color: '#5a5c66',
-        },
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '12%',
-        top: '5%',
-        containLabel: true,
-      },
-      xAxis: {
-        type: 'category',
-        data: weeks,
-        axisLabel: {
-          fontSize: 11,
-          color: '#8a8d99',
-          interval: 0,
-          margin: 12,
-          rotate: 30,
-        },
-        axisLine: {
-          lineStyle: { color: '#e8e9eb' },
-        },
-        axisTick: {
-          show: false,
-        },
-      },
-      yAxis: {
-        type: 'value',
-        name: '转化率',
-        nameTextStyle: {
-          fontSize: 12,
-          color: '#8a8d99',
-          padding: [0, 0, 0, -8],
-        },
-        axisLabel: {
-          fontSize: 11,
-          color: '#8a8d99',
-          formatter: '{value}%',
-        },
-        axisLine: {
-          lineStyle: { color: '#e8e9eb' },
-        },
-        splitLine: {
-          lineStyle: {
-            color: '#f0f1f3',
-            type: 'dashed' as const,
-          },
-        },
-      },
-      series: employees.map((employee: string, empIndex: number) => ({
-        name: employee,
-        type: 'line' as const,
-        smooth: true,
-        data: data.employee_weekly_conversion!.series[empIndex] || [],
-        symbol: 'circle',
-        symbolSize: 6,
-        showSymbol: true,
-        itemStyle: { color: colors[empIndex % colors.length] },
-        lineStyle: { width: 2.5, color: colors[empIndex % colors.length] },
-        emphasis: {
-          focus: 'series' as const,
-          itemStyle: {
-            borderColor: colors[empIndex % colors.length],
-            borderWidth: 2,
-            symbolSize: 8,
-          },
-        },
-      })),
-    };
-  }, [data?.employee_weekly_conversion]);
-
-  // 创作者内容表格列配置
-  const creatorContentColumns = [
+  // 创作者综合分析表格列配置（合并原 4 表：内容 / 转化 / 创作 / 互动）
+  const creatorSummaryColumns = [
     {
       title: '排名',
       key: 'rank',
@@ -1379,7 +1047,8 @@ const XhsNotesOperationPage: React.FC = () => {
       title: '生产者',
       dataIndex: 'producer',
       key: 'producer',
-      width: 90,
+      width: 100,
+      fixed: 'left' as const,
       ellipsis: true,
     },
     {
@@ -1387,9 +1056,8 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'note_count',
       key: 'note_count',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
-      sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.note_count - b.note_count,
+      sorter: (a: { note_count: number }, b: { note_count: number }) => a.note_count - b.note_count,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -1397,9 +1065,8 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'total_impressions',
       key: 'total_impressions',
       width: 90,
-      ellipsis: true,
       align: 'right' as const,
-      sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.total_impressions - b.total_impressions,
+      sorter: (a: { total_impressions: number }, b: { total_impressions: number }) => a.total_impressions - b.total_impressions,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -1407,8 +1074,8 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'total_clicks',
       key: 'total_clicks',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
+      sorter: (a: { total_clicks: number }, b: { total_clicks: number }) => a.total_clicks - b.total_clicks,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -1416,117 +1083,70 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'total_interactions',
       key: 'total_interactions',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
+      sorter: (a: { total_interactions: number }, b: { total_interactions: number }) => a.total_interactions - b.total_interactions,
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
-      title: '消耗',
-      dataIndex: 'total_cost',
-      key: 'total_cost',
-      width: 90,
-      ellipsis: true,
-      align: 'right' as const,
-      sorter: (a: XhsCreatorContentItem, b: XhsCreatorContentItem) => a.total_cost - b.total_cost,
-      render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
-    },
-    {
-      title: '平均点击率',
+      title: '点击率',
       dataIndex: 'avg_click_rate',
       key: 'avg_click_rate',
-      width: 90,
-      ellipsis: true,
+      width: 80,
       align: 'right' as const,
-      render: (value: number) => value != null ? <span className={value >= 5 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
+      render: (value: number | null) => value != null ? <span className={value >= 5 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
     },
     {
-      title: '平均互动率',
+      title: '互动率',
       dataIndex: 'avg_interaction_rate',
       key: 'avg_interaction_rate',
-      width: 90,
-      ellipsis: true,
+      width: 80,
       align: 'right' as const,
-      render: (value: number) => value != null ? <span className={value >= 10 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
-    },
-  ];
-
-  // 创作者转化表格列配置
-  const creatorConversionColumns = [
-    {
-      title: '排名',
-      key: 'rank',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, __: unknown, index: number) => (
-        <span style={{
-          fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
-        }}>
-          {index + 1}
-        </span>
-      ),
+      render: (value: number | null) => value != null ? <span className={value >= 10 ? styles.positive : ''}>{value.toFixed(2)}%</span> : '-',
     },
     {
-      title: '生产者',
-      dataIndex: 'producer',
-      key: 'producer',
-      width: 90,
-      ellipsis: true,
-    },
-    {
-      title: '私信量',
+      title: '私信',
       dataIndex: 'private_messages',
       key: 'private_messages',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
+      sorter: (a: { private_messages: number }, b: { private_messages: number }) => (a.private_messages || 0) - (b.private_messages || 0),
+      render: (value: number) => value?.toLocaleString() || '0',
     },
     {
       title: '加微数',
       dataIndex: 'lead_users',
       key: 'lead_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
-      sorter: (a: XhsCreatorConversionItem, b: XhsCreatorConversionItem) => a.lead_users - b.lead_users,
-      render: (value: number) => value?.toLocaleString() || '-',
+      sorter: (a: { lead_users: number }, b: { lead_users: number }) => (a.lead_users || 0) - (b.lead_users || 0),
+      render: (value: number) => value?.toLocaleString() || '0',
     },
     {
-      title: '开口数',
+      title: '企微添加',
       dataIndex: 'customer_mouth_users',
       key: 'customer_mouth_users',
-      width: 80,
-      ellipsis: true,
+      width: 90,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '有效线索',
-      dataIndex: 'valid_lead_users',
-      key: 'valid_lead_users',
-      width: 80,
-      ellipsis: true,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
+      sorter: (a: { customer_mouth_users: number }, b: { customer_mouth_users: number }) => (a.customer_mouth_users || 0) - (b.customer_mouth_users || 0),
+      render: (value: number) => value?.toLocaleString() || '0',
     },
     {
       title: '开户数',
       dataIndex: 'opened_account_users',
       key: 'opened_account_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
+      sorter: (a: { opened_account_users: number }, b: { opened_account_users: number }) => (a.opened_account_users || 0) - (b.opened_account_users || 0),
+      render: (value: number) => value?.toLocaleString() || '0',
     },
     {
-      title: '有效户',
-      dataIndex: 'valid_customer_users',
-      key: 'valid_customer_users',
-      width: 80,
-      ellipsis: true,
+      title: '消耗',
+      dataIndex: 'total_cost',
+      key: 'total_cost',
+      width: 100,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
+      sorter: (a: { total_cost: number }, b: { total_cost: number }) => (a.total_cost || 0) - (b.total_cost || 0),
+      render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
     },
   ];
 
@@ -1633,89 +1253,6 @@ const XhsNotesOperationPage: React.FC = () => {
     },
   ];
 
-  // 创作者年度排行表格列配置
-  const creatorAnnualColumns = [
-    {
-      title: '排名',
-      key: 'rank',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, __: XhsCreatorAnnualRankingItem, index: number) => (
-        <span style={{
-          fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? 'var(--color-text-brand)' : 'inherit',
-        }}>
-          {index + 1}
-        </span>
-      ),
-    },
-    {
-      title: '生产者',
-      dataIndex: 'producer',
-      key: 'producer',
-      width: 90,
-      ellipsis: true,
-    },
-    {
-      title: '笔记数',
-      dataIndex: 'note_count',
-      key: 'note_count',
-      width: 80,
-      align: 'right' as const,
-      sorter: (a: XhsCreatorAnnualRankingItem, b: XhsCreatorAnnualRankingItem) => a.note_count - b.note_count,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '消耗',
-      dataIndex: 'total_cost',
-      key: 'total_cost',
-      width: 90,
-      align: 'right' as const,
-      sorter: (a: XhsCreatorAnnualRankingItem, b: XhsCreatorAnnualRankingItem) => a.total_cost - b.total_cost,
-      render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
-    },
-    {
-      title: '曝光量',
-      dataIndex: 'total_impressions',
-      key: 'total_impressions',
-      width: 90,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '点击量',
-      dataIndex: 'total_clicks',
-      key: 'total_clicks',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '私信量',
-      dataIndex: 'total_private_messages',
-      key: 'total_private_messages',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '加微数',
-      dataIndex: 'lead_users',
-      key: 'lead_users',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '开户数',
-      dataIndex: 'opened_account_users',
-      key: 'opened_account_users',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-  ];
-
   // 代理商数据表格列配置
   const agencyDataColumns = [
     {
@@ -1740,13 +1277,12 @@ const XhsNotesOperationPage: React.FC = () => {
       ellipsis: true,
     },
     {
-      title: '消耗',
+      title: '投放金额',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      width: 90,
-      ellipsis: true,
+      width: 110,
       align: 'right' as const,
-      sorter: (a: XhsAgencyDataItem, b: XhsAgencyDataItem) => a.total_cost - b.total_cost,
+      sorter: (a: XhsAgencyDataItem, b: XhsAgencyDataItem) => (a.total_cost || 0) - (b.total_cost || 0),
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
     },
     {
@@ -1754,7 +1290,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'total_impressions',
       key: 'total_impressions',
       width: 90,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1763,7 +1298,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'total_clicks',
       key: 'total_clicks',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1772,16 +1306,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'lead_users',
       key: 'lead_users',
       width: 80,
-      ellipsis: true,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '潜客数',
-      dataIndex: 'potential_customers',
-      key: 'potential_customers',
-      width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1790,7 +1314,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'customer_mouth_users',
       key: 'customer_mouth_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1799,7 +1322,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'valid_lead_users',
       key: 'valid_lead_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1808,7 +1330,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'opened_account_users',
       key: 'opened_account_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1817,7 +1338,6 @@ const XhsNotesOperationPage: React.FC = () => {
       dataIndex: 'valid_customer_users',
       key: 'valid_customer_users',
       width: 80,
-      ellipsis: true,
       align: 'right' as const,
       render: (value: number) => value?.toLocaleString() || '-',
     },
@@ -1886,7 +1406,7 @@ const XhsNotesOperationPage: React.FC = () => {
       width: 80,
       align: 'right' as const,
       render: (value: number) => (
-        <span className={value >= 10 ? styles.positive : ''}>
+        <span style={{ color: 'var(--color-error, #cf1322)', fontWeight: 500 }}>
           {value?.toFixed(2)}%
         </span>
       ),
@@ -1898,7 +1418,7 @@ const XhsNotesOperationPage: React.FC = () => {
       width: 80,
       align: 'right' as const,
       render: (value: number) => (
-        <span className={value >= 30 ? styles.positive : ''}>
+        <span style={{ color: 'var(--color-error, #cf1322)', fontWeight: 500 }}>
           {value?.toFixed(2)}%
         </span>
       ),
@@ -1914,116 +1434,71 @@ const XhsNotesOperationPage: React.FC = () => {
     },
   ];
 
-  // 创作者创作数据表格列配置
-  const creatorCreationColumns = [
-    {
-      title: '排名',
-      key: 'rank',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, __: unknown, index: number) => (
-        <span style={{
-          fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
-        }}>
-          {index + 1}
-        </span>
-      ),
-    },
-    {
-      title: '生产者',
-      dataIndex: 'producer',
-      key: 'producer',
-      width: 100,
-      ellipsis: true,
-    },
-    {
-      title: '笔记数',
-      dataIndex: 'note_count',
-      key: 'note_count',
-      width: 80,
-      align: 'right' as const,
-      sorter: (a: XhsCreatorCreationItem, b: XhsCreatorCreationItem) => a.note_count - b.note_count,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '曝光量',
-      dataIndex: 'impressions',
-      key: 'impressions',
-      width: 100,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-  ];
+  // v3.2.3：H5 数据块 - 表格在 H5 模式下改用数据块呈现，每块 3 个核心字段，避免滚动条
+  const renderH5Block = (
+    items: any[],
+    titleKey: string,
+    stats: { label: string; key: string; format?: (v: any) => string }[]
+  ) => {
+    if (!items || items.length === 0) {
+      return <div className={styles.h5Empty}>暂无数据</div>;
+    }
+    return (
+      <div className={styles.h5DataBlock}>
+        {items.map((item, idx) => (
+          <div key={`${item[titleKey] || ''}-${idx}`} className={styles.h5DataBlockItem}>
+            <div className={styles.h5DataBlockTitle}>{item[titleKey] || '-'}</div>
+            <div className={styles.h5DataBlockStats}>
+              {stats.map((s) => (
+                <div key={s.key} className={styles.h5DataBlockStat}>
+                  <div className={styles.h5DataBlockStatLabel}>{s.label}</div>
+                  <div className={styles.h5DataBlockStatValue}>
+                    {s.format ? s.format(item[s.key]) : (item[s.key] ?? '-')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
-  // 创作者互动数据表格列配置
-  const creatorInteractionColumns = [
-    {
-      title: '排名',
-      key: 'rank',
-      width: 50,
-      align: 'center' as const,
-      render: (_: unknown, __: unknown, index: number) => (
-        <span style={{
-          fontWeight: index < 3 ? 'bold' : 'normal',
-          color: index < 3 ? '#1890ff' : 'inherit',
-        }}>
-          {index + 1}
-        </span>
-      ),
-    },
-    {
-      title: '生产者',
-      dataIndex: 'producer',
-      key: 'producer',
-      width: 100,
-      ellipsis: true,
-    },
-    {
-      title: '点赞',
-      dataIndex: 'likes',
-      key: 'likes',
-      width: 70,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '收藏',
-      dataIndex: 'favorites',
-      key: 'favorites',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '评论',
-      dataIndex: 'comments',
-      key: 'comments',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '分享',
-      dataIndex: 'shares',
-      key: 'shares',
-      width: 80,
-      align: 'right' as const,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-    {
-      title: '总互动',
-      dataIndex: 'total_interactions',
-      key: 'total_interactions',
-      width: 80,
-      align: 'right' as const,
-      sorter: (a: XhsCreatorInteractionItem, b: XhsCreatorInteractionItem) => a.total_interactions - b.total_interactions,
-      render: (value: number) => value?.toLocaleString() || '-',
-    },
-  ];
+  // H5 数据块配置 - 4 个表格各自的核心 3 字段
+  // v3.2.3 修复：创作者综合分析数据源改为前端合并的 creatorSummaryData（useMemo），
+  // 后端无 creator_summary_data 字段，原写法导致 H5 模式无数据
+  const h5CreatorSummary = creatorSummaryData.slice(0, 20).map((item) => ({
+    创作者: item.producer,
+    笔记数: item.note_count,
+    开户数: item.opened_account_users,
+    消耗: item.total_cost,
+  }));
+  // v3.2.3 优化：优秀笔记 H5 模式只显示前 10 条，避免过长
+  const h5TopNotes = (data?.top_notes || []).slice(0, 10).map((item: any) => ({
+    笔记标题: item.note_title,
+    消费: item.total_cost,
+    开户数: item.opened_account_users,
+    私信: item.total_private_messages,
+  }));
+  const h5AgencyData = (data?.agency_data || []).map((item: any) => ({
+    代理商: item.agency,
+    投放金额: item.total_cost,
+    开户数: item.opened_account_users,
+    曝光量: item.total_impressions,
+  }));
+  const h5EmployeeConversion = (data?.employee_conversion_ranking || []).map((item: any) => ({
+    员工: item.employee_name,
+    开户数: item.opened_account_users,
+    开户率: item.opening_rate,
+    有效户: item.valid_customer_users,
+  }));
+
+  const fmtInt = (v: any) => v != null ? Number(v).toLocaleString('zh-CN') : '-';
+  const fmtMoney = (v: any) => v != null ? `¥${Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-';
+  const fmtPct = (v: any) => v != null ? `${Number(v).toFixed(2)}%` : '-';
 
   return (
-    <div className={styles.operationPage} ref={pageRef}>
+    <div className={`${styles.operationPage} ${viewMode === 'h5' ? styles.h5Mode : ''} xhsReportRoot`} ref={pageRef}>
       {/* 筛选器 */}
       <Card className={styles.filterCard} size="small">
         <div className={styles.filterRow}>
@@ -2064,6 +1539,16 @@ const XhsNotesOperationPage: React.FC = () => {
 
           {/* 操作按钮 */}
           <div className={styles.filterActions}>
+            {/* v3.2.3：视图模式切换 - Web 桌面布局 / H5 手机布局 */}
+            <Segmented
+              value={viewMode}
+              onChange={(v) => setViewMode(v as 'web' | 'h5')}
+              options={[
+                { label: 'Web', value: 'web', icon: <DesktopOutlined /> },
+                { label: 'H5', value: 'h5', icon: <MobileOutlined /> },
+              ]}
+              size="small"
+            />
             <Dropdown menu={{ items: exportMenuItems }} trigger={['click']}>
               <Button icon={<DownloadOutlined />}>
                 导出报表 <DownOutlined />
@@ -2086,9 +1571,9 @@ const XhsNotesOperationPage: React.FC = () => {
 
       {/* 核心运营数据 - 4行结构 */}
       <Card className={styles.sectionCard}>
-        {/* 第一行：基础指标 */}
+        {/* 第一行：基础指标（v3.2.3 删除"投放笔记数"卡片，2 列布局） */}
         <Row gutter={12} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border-default)' }}>
-          <Col span={8}>
+          <Col span={12}>
             <div style={{ background: 'rgba(99, 102, 241, 0.08)', borderLeft: '3px solid var(--chart-color-5)', padding: '14px 16px', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--chart-color-5)', fontWeight: 600, marginBottom: 6 }}>新增笔记数</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
@@ -2097,16 +1582,7 @@ const XhsNotesOperationPage: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>篇</div>
             </div>
           </Col>
-          <Col span={8}>
-            <div style={{ background: 'rgba(139, 92, 246, 0.08)', borderLeft: '3px solid var(--chart-color-8)', padding: '14px 16px', borderRadius: 6 }}>
-              <div style={{ fontSize: 11, color: 'var(--chart-color-8)', fontWeight: 600, marginBottom: 6 }}>投放笔记数</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {formatNumber(data?.core_metrics?.ad_notes_count || 0)}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>篇</div>
-            </div>
-          </Col>
-          <Col span={8}>
+          <Col span={12}>
             <div style={{ background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid var(--color-warning)', padding: '14px 16px', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600, marginBottom: 6 }}>投放金额</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
@@ -2213,32 +1689,39 @@ const XhsNotesOperationPage: React.FC = () => {
         </Spin>
       ) : (
         <>
-          {/* 创作者内容与转化数据 */}
-          <div className={styles.twoColGrid}>
-            <Card
-              className={styles.sectionCard}
-              title={<CardTitle icon="📝" plain>创作者内容数据</CardTitle>}
-              extra={
-                <Space>
-                  <span className={styles.statText}>
-                    共 {data?.creator_content_data?.length || 0} 条
-                  </span>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    size="small"
-                    onClick={() => handleExport('creator_content')}
-                    disabled={!data?.creator_content_data?.length}
-                  >
-                    导出CSV
-                  </Button>
-                </Space>
-              }
-            >
+          {/* 创作者综合分析 - 合并原 4 表（内容/转化/创作/互动） */}
+          <Card
+            className={styles.tableCard}
+            title={<CardTitle icon="📝" plain>创作者综合分析</CardTitle>}
+            extra={
+              <Space>
+                <span className={styles.statText}>
+                  共 {creatorSummaryData.length} 条
+                </span>
+                <Button
+                  icon={<DownloadOutlined />}
+                  size="small"
+                  onClick={() => handleExport('creator_summary')}
+                  disabled={!creatorSummaryData.length}
+                >
+                  导出CSV
+                </Button>
+              </Space>
+            }
+          >
+            {viewMode === 'h5' ? (
+              renderH5Block(h5CreatorSummary, '创作者', [
+                { label: '笔记数', key: '笔记数', format: fmtInt },
+                { label: '开户数', key: '开户数', format: fmtInt },
+                { label: '消耗', key: '消耗', format: fmtMoney },
+              ])
+            ) : (
               <Table
-                columns={creatorContentColumns}
-                dataSource={data?.creator_content_data || []}
+                columns={creatorSummaryColumns}
+                dataSource={creatorSummaryData}
                 rowKey="producer"
                 size="small"
+                scroll={{ x: 1200 }}
                 pagination={{
                   defaultPageSize: 10,
                   showSizeChanger: true,
@@ -2246,117 +1729,15 @@ const XhsNotesOperationPage: React.FC = () => {
                   pageSizeOptions: ['10', '20', '50', '100'],
                 }}
               />
-            </Card>
+            )}
+          </Card>
 
-            <Card
-              className={styles.sectionCard}
-              title={<CardTitle icon="📊" plain>创作者转化数据</CardTitle>}
-              extra={
-                <Space>
-                  <span className={styles.statText}>
-                    共 {data?.creator_conversion_data?.length || 0} 条
-                  </span>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    size="small"
-                    onClick={() => handleExport('creator_conversion')}
-                    disabled={!data?.creator_conversion_data?.length}
-                  >
-                    导出CSV
-                  </Button>
-                </Space>
-              }
-            >
-              <Table
-                columns={creatorConversionColumns}
-                dataSource={data?.creator_conversion_data || []}
-                rowKey="producer"
-                size="small"
-                pagination={{
-                  defaultPageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `共 ${total} 条`,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                }}
-              />
-            </Card>
-          </div>
-
-          {/* 创作者创作与互动数据 - 表格区域 */}
-          <div className={styles.twoColGrid}>
-            <Card
-              className={styles.sectionCard}
-              title={<CardTitle icon="✍️" plain>创作者创作数据</CardTitle>}
-              extra={
-                <Space>
-                  <span className={styles.statText}>
-                    共 {data?.creator_creation_data?.length || 0} 条
-                  </span>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    size="small"
-                    onClick={() => handleExport('creator_creation')}
-                    disabled={!data?.creator_creation_data?.length}
-                  >
-                    导出CSV
-                  </Button>
-                </Space>
-              }
-            >
-              <Table
-                columns={creatorCreationColumns}
-                dataSource={data?.creator_creation_data || []}
-                rowKey="producer"
-                size="small"
-                pagination={{
-                  defaultPageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `共 ${total} 条`,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                }}
-              />
-            </Card>
-
-            <Card
-              className={styles.sectionCard}
-              title={<CardTitle icon="💬" plain>创作者互动数据</CardTitle>}
-              extra={
-                <Space>
-                  <span className={styles.statText}>
-                    共 {data?.creator_interaction_data?.length || 0} 条
-                  </span>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    size="small"
-                    onClick={() => handleExport('creator_interaction')}
-                    disabled={!data?.creator_interaction_data?.length}
-                  >
-                    导出CSV
-                  </Button>
-                </Space>
-              }
-            >
-              <Table
-                columns={creatorInteractionColumns}
-                dataSource={data?.creator_interaction_data || []}
-                rowKey="producer"
-                size="small"
-                pagination={{
-                  defaultPageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `共 ${total} 条`,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                }}
-              />
-            </Card>
-          </div>
-
-          {/* 内容运营数据 - 2x2图表网格 */}
+          {/* 内容运营趋势 - 2 图（删除笔记创作量横向图，与综合表重复） */}
           <Card className={styles.chartCard}>
-            <CardTitle icon="📈">内容运营数据</CardTitle>
+            <CardTitle icon="📈">内容运营趋势</CardTitle>
             <div className={styles.contentChartGrid}>
               <div>
-                <h4 className={styles.sectionTitle}>创作量趋势</h4>
+                <h4 className={styles.sectionTitle}>创作量趋势（按创作者堆叠）</h4>
                 <div className={styles.chartContainer}>
                   {data?.creation_trend?.dates?.length ? (
                     <EChartsComponent option={creationVolumeOption} height={280} />
@@ -2370,28 +1751,6 @@ const XhsNotesOperationPage: React.FC = () => {
                 <div className={styles.chartContainer}>
                   {data?.creation_trend?.dates?.length ? (
                     <EChartsComponent option={interactionTrendOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className={styles.contentChartGrid} style={{ marginTop: 20 }}>
-              <div>
-                <h4 className={styles.sectionTitle}>笔记创作量</h4>
-                <div className={styles.chartContainer}>
-                  {data?.creator_creation_data?.length ? (
-                    <EChartsComponent option={creatorCreationOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <h4 className={styles.sectionTitle}>笔记互动量</h4>
-                <div className={styles.chartContainer}>
-                  {data?.creator_interaction_data?.length ? (
-                    <EChartsComponent option={creatorInteractionOption} height={280} />
                   ) : (
                     <div className={styles.chartEmpty}>暂无数据</div>
                   )}
@@ -2449,75 +1808,46 @@ const XhsNotesOperationPage: React.FC = () => {
             }
           >
             <Spin spinning={topNotesLoading}>
-              <Table
-                columns={topNotesColumns}
-                dataSource={data?.top_notes || []}
-                rowKey="note_id"
-                size="small"
-                pagination={{
-                  defaultPageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total) => `共 ${total} 条`,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                }}
-              />
-            </Spin>
-          </Card>
-
-          {/* 创作者年度排行 - 独立筛选器 */}
-          <Card
-            className={styles.tableCard}
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                <Text type="secondary" className={styles.cardTitle}>创作者年度排行</Text>
-                <DateRangePicker
-                  value={creatorAnnualDateRange}
-                  onChange={(dates) => {
-                    if (dates && dates[0] && dates[1]) {
-                      setCreatorAnnualDateRange(dates);
-                      fetchCreatorAnnualData(dates);
-                    }
+              {viewMode === 'h5' ? (
+                renderH5Block(h5TopNotes, '笔记标题', [
+                  { label: '消费', key: '消费', format: fmtMoney },
+                  { label: '开户数', key: '开户数', format: fmtInt },
+                  { label: '私信', key: '私信', format: fmtInt },
+                ])
+              ) : (
+                <Table
+                  columns={topNotesColumns}
+                  dataSource={data?.top_notes || []}
+                  rowKey="note_id"
+                  size="small"
+                  pagination={{
+                    defaultPageSize: 10,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total) => `共 ${total} 条`,
+                    pageSizeOptions: ['10', '20', '50', '100'],
                   }}
-                  style={{ width: 240, height: 32 }}
                 />
-                <Space size={4}>
-                  <Button
-                    type={isDateRangeActive(creatorAnnualDateRange, 'days30') ? 'primary' : 'default'}
-                    onClick={() => handleQuickDateSelect('creatorAnnual', 'days30')}
-                  >
-                    近30天
-                  </Button>
-                  <Button
-                    type={isDateRangeActive(creatorAnnualDateRange, 'ytd') ? 'primary' : 'default'}
-                    onClick={() => handleQuickDateSelect('creatorAnnual', 'ytd')}
-                  >
-                    今年以来
-                  </Button>
-                </Space>
-              </div>
-            }
-          >
-            <Spin spinning={creatorAnnualLoading}>
-              <Table
-                columns={creatorAnnualColumns}
-                dataSource={data?.creator_annual_ranking || []}
-                rowKey="producer"
-                size="small"
-                pagination={{
-                  defaultPageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `共 ${total} 条`,
-                  pageSizeOptions: ['10', '20', '50', '100'],
-                }}
-              />
+              )}
             </Spin>
           </Card>
 
-          {/* 代理商数据 */}
+          {/* 整体转化走势 - v3.2.3：周维度（上周五到本周四），数据源 fact_conv_content 小红书 */}
+          <Card className={styles.chartCard}>
+            <CardTitle icon="📊">整体转化走势（按周 · 上周五到本周四）</CardTitle>
+            <div className={styles.chartContainer}>
+              {data?.conversion_trend?.weeks?.length ? (
+                <EChartsComponent option={conversionTrendOption} height={300} />
+              ) : (
+                <div className={styles.chartEmpty}>暂无数据</div>
+              )}
+            </div>
+          </Card>
+
+          {/* 代理商数据 - 上 */}
           <Card
             className={styles.tableCard}
-            title={<CardTitle icon="🏢" plain>代理商数据</CardTitle>}
+            title={<CardTitle icon="🏢" plain>代理商投放数据</CardTitle>}
             extra={
               <Space>
                 <span className={styles.statText}>
@@ -2534,51 +1864,38 @@ const XhsNotesOperationPage: React.FC = () => {
               </Space>
             }
           >
-            <Table
-              columns={agencyDataColumns}
-              dataSource={data?.agency_data || []}
-              rowKey="agency"
-              size="small"
-              pagination={{
-                defaultPageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `共 ${total} 条`,
-                pageSizeOptions: ['10', '20', '50', '100'],
-              }}
-              scroll={{ y: 400 }}
-            />
+            {viewMode === 'h5' ? (
+              renderH5Block(h5AgencyData, '代理商', [
+                { label: '投放金额', key: '投放金额', format: fmtMoney },
+                { label: '开户数', key: '开户数', format: fmtInt },
+                { label: '曝光量', key: '曝光量', format: fmtInt },
+              ])
+            ) : (
+              <Table
+                columns={agencyDataColumns}
+                dataSource={data?.agency_data || []}
+                rowKey="agency"
+                size="small"
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `共 ${total} 条`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+                scroll={{ y: 400 }}
+              />
+            )}
           </Card>
 
-          {/* 转化运营数据 - 左右等分图表布局 + 员工转化排行表格 */}
-          <Card className={styles.chartCard}>
-            <CardTitle icon="📊">转化运营数据</CardTitle>
-            <div className={styles.chartGrid}>
-              <div className={styles.chartGridItem}>
-                <h4 className={styles.sectionTitle}>整体转化走势（周度）</h4>
-                <div className={styles.chartContainer}>
-                  {data?.conversion_trend?.weeks?.length ? (
-                    <EChartsComponent option={conversionTrendOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-              <div className={styles.chartGridItem}>
-                <h4 className={styles.sectionTitle}>小助手开户转化率走势（周度）</h4>
-                <div className={styles.chartContainer}>
-                  {data?.employee_weekly_conversion?.weeks?.length ? (
-                    <EChartsComponent option={employeeWeeklyRateOption} height={280} />
-                  ) : (
-                    <div className={styles.chartEmpty}>暂无数据</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 员工转化量排行榜 - 在图表下方 */}
-            <div className={styles.tableSection}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h4 className={styles.sectionTitle}>员工转化量排行榜</h4>
+          {/* 员工转化排行 - 下 */}
+          <Card
+            className={styles.tableCard}
+            title={<CardTitle icon="👥" plain>员工转化排行</CardTitle>}
+            extra={
+              <Space>
+                <span className={styles.statText}>
+                  共 {data?.employee_conversion_ranking?.length || 0} 条
+                </span>
                 <Button
                   icon={<DownloadOutlined />}
                   size="small"
@@ -2587,7 +1904,16 @@ const XhsNotesOperationPage: React.FC = () => {
                 >
                   导出CSV
                 </Button>
-              </div>
+              </Space>
+            }
+          >
+            {viewMode === 'h5' ? (
+              renderH5Block(h5EmployeeConversion, '员工', [
+                { label: '开户数', key: '开户数', format: fmtInt },
+                { label: '开户率', key: '开户率', format: fmtPct },
+                { label: '有效户', key: '有效户', format: fmtInt },
+              ])
+            ) : (
               <Table
                 columns={employeeConversionColumns}
                 dataSource={data?.employee_conversion_ranking || []}
@@ -2599,8 +1925,9 @@ const XhsNotesOperationPage: React.FC = () => {
                   showTotal: (total) => `共 ${total} 条`,
                   pageSizeOptions: ['10', '20', '50', '100'],
                 }}
+                scroll={{ y: 400 }}
               />
-            </div>
+            )}
           </Card>
 
         </>

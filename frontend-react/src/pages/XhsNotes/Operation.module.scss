@@ -16,10 +16,12 @@
   @include card-base;
 }
 
-// 筛选器行
+// 筛选器行 - v3.2.3：space-between + 上下居中，避免 Segmented 与按钮不齐
 .filterRow {
   @include filter-bar;
-  align-items: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacer-8);
 }
 
 // 筛选器组
@@ -34,9 +36,12 @@
   white-space: nowrap;
 }
 
-// 筛选器操作按钮
+// 筛选器操作按钮 - v3.2.3：不再用 filter-actions mixin（margin-left:auto），改 flex + center
 .filterActions {
-  @include filter-actions;
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+  flex-wrap: wrap;
 }
 
 // 主内容区域 - 带间距的卡片容器
@@ -227,4 +232,205 @@
     margin-top: var(--spacer-8);
     justify-content: flex-end;
   }
+}
+
+/* v3.2.3 H5 模式：参考报告生成页 480px poster 容器
+   切换到此模式后所有双列 grid 改单列、容器收窄到 480px，
+   导出时截图就是手机友好的长图布局 */
+.h5Mode {
+  width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  background: #fafaf8;
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  // 所有双列布局改单列
+  .twoColGrid,
+  .chartGrid,
+  .contentChartGrid {
+    display: block;
+    width: 100%;
+  }
+
+  .chartGridItem {
+    min-height: 240px;
+    margin-bottom: 12px;
+  }
+
+  // 筛选器纵向排布
+  .filterRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterGroup {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .filterActions {
+    margin-left: 0;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  // 卡片间距收紧
+  .contentSection {
+    margin-bottom: 12px;
+  }
+
+  .sectionCard,
+  .chartCard,
+  .tableCard {
+    margin-bottom: 12px;
+    padding: 12px;
+  }
+
+  // 卡片标题字号缩小
+  .cardTitle {
+    font-size: 13px;
+  }
+
+  // 表格字体缩小，去除滚动条
+  :global(.ant-table) {
+    font-size: 12px;
+  }
+
+  // 指标卡数字字号缩小
+  :global(.ant-statistic-content-value) {
+    font-size: 18px;
+  }
+
+  // === 核心运营数据 H5 适配 ===
+
+  // 业务转化漏斗 5 列（span=4.8 width:20%）改 5x1 单列堆叠，避免数字与序号徽章重叠
+  :global(.ant-col[style*='width: 20%']) {
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin-bottom: 6px;
+  }
+
+  // 转化率 / 成本效率 4 卡（span=6）改 2x2 布局，避免数字溢出容器
+  :global(.ant-col) {
+    &:not([style*='width: 20%']) {
+      flex: 0 0 50% !important;
+      max-width: 50% !important;
+    }
+  }
+
+  // 核心指标 + 转化率 + 成本效率 卡片等高 + 内边距收紧
+  :global(.ant-card-body) {
+    .ant-row > .ant-col > div {
+      min-height: 64px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 10px 12px !important;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+  }
+}
+
+// === v3.2.3 H5 数据块（杂志风格）===
+// 学习 ReportGeneration 的 .layerCard / .dataTable 风格：
+// - 顶部 2px 黑色分隔线（首项）+ 1px 灰色分隔线（后续），无左侧高亮条
+// - 序号用 decimal-leading-zero + 等宽字体 + 品牌色（参考 .reportFooter li）
+// - 标题用 'Noto Serif SC' 衬线，数字用 'JetBrains Mono' + tabular-nums
+// - 标签用 9px uppercase + letter-spacing（参考 .dataTable th）
+.h5DataBlock {
+  display: flex;
+  flex-direction: column;
+  counter-reset: h5item;
+  padding: 4px 0;
+}
+
+.h5DataBlockItem {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 14px 28px;
+  border-top: 1px solid #e5e5e5;
+  position: relative;
+  counter-increment: h5item;
+
+  &:first-child {
+    border-top: 2px solid #1a1a1a;
+    padding-top: 14px;
+  }
+
+  &:last-child {
+    padding-bottom: 4px;
+  }
+}
+
+// 序号徽章（左侧悬挂，参考 ReportGeneration .reportFooter li::before）
+.h5DataBlockItem::before {
+  content: counter(h5item, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 14px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: #0052d9;
+  letter-spacing: 0.05em;
+}
+
+.h5DataBlockTitle {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5DataBlockStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 10px;
+}
+
+.h5DataBlockStat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.h5DataBlockStatLabel {
+  font-size: 9px;
+  color: #8c8c8c;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.h5DataBlockStatValue {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.h5Empty {
+  padding: 24px 0;
+  text-align: center;
+  color: #8c8c8c;
+  font-size: 11px;
+  letter-spacing: 0.05em;
 }

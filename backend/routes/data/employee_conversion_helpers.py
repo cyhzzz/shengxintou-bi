@@ -105,7 +105,30 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
                 'opening_rate': round(opened / leads * 100, 2) if leads > 0 else 0,
                 'valid_customer_rate': round(valid / opened * 100, 2) if opened > 0 else 0,
             })
-        ranking.sort(key=lambda x: x['opened_count'], reverse=True)
+        # v3.2.3: 补全有存量(老)线索但本周未新开户的固定员工
+        # 否则前端 withFixedAssistants 会给这些员工全字段补 0，导致"存量线索数"列错误显示为 0
+        ranked_keys = {(r['employee_name'], r['platform']) for r in ranking}
+        for emp in emp_filter:
+            for p in platforms:
+                key = (emp, p)
+                if key in ranked_keys:
+                    continue
+                leads = leads_map.get(key, 0)
+                if leads > 0:
+                    ranking.append({
+                        'employee_name': emp,
+                        'platform': p,
+                        'total_leads': leads,
+                        'mouth_count': 0,
+                        'valid_lead_count': 0,
+                        'opened_count': 0,
+                        'valid_customer_count': 0,
+                        'total_assets': 0.0,
+                        'opening_rate': 0,
+                        'valid_customer_rate': 0,
+                    })
+        # 排序：本周新开户数降序为主，存量线索数降序为次（让未转化员工内部顺序稳定）
+        ranking.sort(key=lambda x: (x['opened_count'], x['total_leads']), reverse=True)
         return ranking
 
     q = db.session.query(

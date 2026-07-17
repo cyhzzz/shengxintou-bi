@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.1`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.4`（2026-07-17）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,43 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.4 已落地（2026-07-17） 小红书运营分析报表改造（Web/H5 双视图 + 数据准确性 + 杂志风数据块）
+
+- **后端数据准确性（`backend/routes/data/xhs_operation.py`）**：
+  - 三处查询（`agency_q` / `conv_q` / `emp_q`）补齐小红书平台筛选，原误取所有内容平台数据。
+  - 创作量趋势按创作者堆叠柱状图且限 2026+（新增 `producer_matrix` 字段，原按日期折线为空）。
+  - 整体转化走势改用 `fact_conv_content` 按周维度（上周五到本周四，`_week_label` 函数），原月维度每月只有一周数据。
+  - 代理商数据改用 `agg_vendor_daily` 表（带 `小红书` 平台过滤），原取 `fact_conv_content` 投放金额字段口径错位。
+  - 员工排行补齐小红书 8 人固定名单（史菡漾 / 何泳萍 / 杨华 / 贾芳 / 陈鸿 / 袁孝春 / 赵梅 / 张杰明），与 `员工转化-转化周报-小红书渠道` 榜单口径对齐。
+
+- **前端布局简化（`frontend-react/src/pages/XhsNotes/Operation.tsx`）**：8 表 → 4 表 + 3 图，删除冗余「创作量趋势条形图」（与综合表内容重复）。
+
+- **Web/H5 双视图模式**：
+  - `viewMode: 'web' | 'h5'` state + `Segmented` 切换器，H5 模式参考 `ReportGeneration` 的 480px poster 容器。
+  - 导出时自动切 H5 模式截图（`html2canvas` `scale: 2`，`jsPDF` 动态 `import` 分页），完成后恢复原模式。
+  - H5 下业务转化漏斗 5 列 → 5x1 单列（`:global(.ant-col[style*='width: 20%'])` 强制 100%）；转化率/成本效率 4 卡 → 2x2 等高布局。
+
+- **H5 表格 → 数据块（`renderH5Block` 通用函数 + 4 表各 3 核心字段）**：
+  - H5 模式下不用表格（避免横向滚动条），改用数据块呈现，每块只放 3 个核心字段。
+  - **修复**：创作者综合分析数据源从 `data?.creator_summary_data`（后端无此字段，导致 H5 无数据）改为前端 `useMemo` 合并的 `creatorSummaryData`（`creator_content_data` + `creator_conversion_data` 按 `producer` 合并，按 `total_cost` 降序）。
+  - 优秀笔记 H5 模式限前 10 条（`.slice(0, 10)`，原 20 条过长）。
+
+- **H5 数据块改杂志风（`Operation.module.scss`）**：删除左侧蓝色高亮条（`border-left: 3px solid`，AI 味重），参考 `ReportGeneration` 的 `.layerCard` / `.dataTable` / `.reportFooter li` 风格——
+  - 顶部 2px 黑分隔线（首项 `:first-child`）+ 1px 灰线（后续 `border-top: 1px solid #e5e5e5`）。
+  - 序号 `decimal-leading-zero`（01/02/…）+ `'JetBrains Mono'` + 品牌色 `#0052d9`，CSS counter 实现，DOM 无需 JSX 渲染序号。
+  - 标题 `'Noto Serif SC'` 衬线 14px；数字 `'JetBrains Mono'` + `tabular-nums` 14px；标签 9px `uppercase` + `letter-spacing: 0.05em`。
+  - 3 列固定 grid（`grid-template-columns: repeat(3, 1fr)`），每块正好 3 字段对齐。
+
+- **筛选器对齐修复**：`filterRow` `align-items: flex-end` → `center` + `flex-wrap`；`filterActions` 由 `@include filter-actions`（`margin-left:auto`）改 `flex + align-items:center`，避免 `Segmented` 切换按钮与其它按钮不在一条线上；H5 下 `filterRow` 改 `flex-direction: column`。
+
+- **其它一并修复**：
+  - `员工转化-转化分析`：业务口径说明（内容平台客户统计范围）从顶部 `Alert` 移入 `ReportFooter` notes；删除「线索类型」筛选器（修复布局换行问题），API 调用 `lead_type: 'all'` 硬编码。
+  - `互联网渠道数据概览`：删除「存量客户资产」卡片（前端 JSX + `GoldOutlined` import + `METRIC_COLORS.existingAssets` 三处清理，后端字段保留）。
+  - `小红书笔记列表`（`List.tsx`）：删除 5 个源表 `agg_xhs_note` 不存在的字段。
+  - `GuideModal`：所有「XX导入指南」改为弹窗内直接渲染内容（不依赖外部文档加载），修复点击问号提示「文档加载失败」。
+
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（5987 modules，~35s）。
 
 ### v3.2.3 已落地（2026-07-17） 修复报告生成页与互联网渠道数据概览「新增客户资产」数值不一致
 

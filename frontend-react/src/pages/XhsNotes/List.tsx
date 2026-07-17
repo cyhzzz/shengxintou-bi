@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 小红书笔记列表页面
  * 提供笔记搜索、筛选、分页和导出功能
  */
@@ -906,9 +906,6 @@ const XhsNotesListPage: React.FC = () => {
             <Descriptions.Item label="总展现量">
               {selectedRecord.impressions?.toLocaleString() ?? '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="总阅读量">
-              {selectedRecord.reads?.toLocaleString() ?? '-'}
-            </Descriptions.Item>
             <Descriptions.Item label="总点击量">
               {selectedRecord.clicks?.toLocaleString() ?? '-'}
             </Descriptions.Item>
@@ -925,9 +922,6 @@ const XhsNotesListPage: React.FC = () => {
             {/* 推广数据 */}
             <Descriptions.Item label="推广展现量">
               {selectedRecord.ad_impressions?.toLocaleString() ?? '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="推广阅读量">
-              {selectedRecord.ad_reads?.toLocaleString() ?? '-'}
             </Descriptions.Item>
             <Descriptions.Item label="推广点击量">
               {selectedRecord.ad_clicks?.toLocaleString() ?? '-'}
@@ -957,15 +951,6 @@ const XhsNotesListPage: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label="开户成本">
               {selectedRecord.open_account_cost != null ? `¥${selectedRecord.open_account_cost.toFixed(2)}` : '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="投放标签用户数">
-              {selectedRecord.ad_tag_users?.toLocaleString() ?? '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="资产用户数">
-              {selectedRecord.customer_assets_users?.toLocaleString() ?? '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="资产金额">
-              {selectedRecord.customer_assets_amount?.toLocaleString() ?? '-'}
             </Descriptions.Item>
           </Descriptions>
         )}

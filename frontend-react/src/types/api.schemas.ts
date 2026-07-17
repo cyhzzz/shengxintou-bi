@@ -945,12 +945,23 @@ export interface XhsEmployeeConversionItem {
 /**
  * 小红书创作趋势数据
  */
+export interface XhsProducerMatrix {
+  /** 创作者列表 */
+  producers?: string[];
+  /** 月份列表 */
+  months?: string[];
+  /** 每个创作者在每月的笔记数 */
+  matrix?: Record<string, number[]>;
+}
+
 export interface XhsCreationTrend {
   dates?: string[];
   note_counts?: number[];
   impression_series?: number[];
   interaction_series?: number[];
   cost_series?: number[];
+  /** v3.2.3: 按创作者堆叠矩阵（用于堆叠柱状图） */
+  producer_matrix?: XhsProducerMatrix;
 }
 
 /**
