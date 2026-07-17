@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """省心投 BI - 后端 API 冒烟测试
 
 目标：快速验证核心接口返回 200 + 响应结构合法。
@@ -103,16 +103,12 @@ class ApiSmokeTest(unittest.TestCase):
         data = self._ok(self.client.get('/api/v1/account-mapping'), '/account-mapping')
         self.assertIsInstance(data, list)
 
-    def test_07_abbreviation_mapping(self):
-        data = self._ok(self.client.get('/api/v1/abbreviation-mapping'), '/abbreviation-mapping')
-        self.assertIsInstance(data, list)
-
-    def test_08_upload_data_types(self):
+    def test_07_upload_data_types(self):
         data = self._ok(self.client.get('/api/v1/data-types'), '/data-types')
         # 可能是 list 或 dict，只要有数据就行
         self.assertIsInstance(data, (list, dict))
 
-    def test_09_upload_history(self):
+    def test_08_upload_history(self):
         data = self._ok(self.client.get('/api/v1/history'), '/history')
         self.assertIsInstance(data, (list, dict))
 
@@ -120,7 +116,7 @@ class ApiSmokeTest(unittest.TestCase):
     #  Dashboard 三大核心接口
     # ============================================================
 
-    def test_10_dashboard_core_metrics(self):
+    def test_00_dashboard_core_metrics(self):
         data = self._ok(
             self._post('/api/v1/dashboard/core-metrics', self._dash_payload()),
             '/dashboard/core-metrics')
@@ -128,7 +124,7 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIsInstance(data, dict)
         self.assertGreater(len(data), 0, 'core-metrics 返回空')
 
-    def test_11_dashboard_trend_data(self):
+    def test_01_dashboard_trend_data(self):
         payload = dict(self._dash_payload(), metrics=['opened', 'cost'], period='day')
         data = self._ok(
             self._post('/api/v1/dashboard/trend-data', payload),
@@ -136,7 +132,7 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIsInstance(data, dict)
         self.assertGreater(len(data), 0, 'trend-data 返回空')
 
-    def test_12_dashboard_accounts(self):
+    def test_02_dashboard_accounts(self):
         data = self._ok(
             self._post('/api/v1/dashboard/accounts', self._dash_payload()),
             '/dashboard/accounts')

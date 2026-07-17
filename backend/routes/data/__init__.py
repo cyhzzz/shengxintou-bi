@@ -16,7 +16,6 @@ from . import cost_analysis
 from . import external_analysis
 from . import leads
 from . import account_mapping
-from . import abbreviation_mapping
 from . import xhs_operation
 from . import employee_conversion
 from . import weekly_report_poster
@@ -33,7 +32,6 @@ __all__ = [
     'external_analysis',
     'leads',
     'account_mapping',
-    'abbreviation_mapping',
     'xhs_operation',
     'employee_conversion',
     'weekly_report_poster',
