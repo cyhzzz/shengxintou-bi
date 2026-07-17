@@ -1,11 +1,16 @@
-/**
+﻿/**
  * 海报模态框组件
  * 参照旧版前端的海报模板实现
  * 在弹窗中展示海报，支持导出图片和PDF
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Modal, message, Spin } from 'antd';
-import type { EmployeeConversionWeeklyRankings } from '@/types/api.schemas';
+import {
+  FIXED_ASSISTANTS,
+  withFixedAssistants,
+  type WeeklyPlatformRankings,
+  type WeeklyRankingItem,
+} from '../weeklyRanking';
 import styles from './PosterModal.module.scss';
 
 interface PosterModalProps {
@@ -13,13 +18,7 @@ interface PosterModalProps {
   platform: string;
   startDate: string;
   endDate: string;
-  rankings: {
-    total: EmployeeConversionWeeklyRankings[];
-    existing: EmployeeConversionWeeklyRankings[];
-    new: EmployeeConversionWeeklyRankings[];
-    // v3.1.30: 存量线索新开户榜 — 线索日期在区间前 + 开户时间落在区间内
-    existing_new_open?: EmployeeConversionWeeklyRankings[];
-  };
+  rankings: WeeklyPlatformRankings;
   onCancel?: () => void;
   // v3.1.25: 'modal' = 原貌 Modal 包装（PosterExportButtons 调用）；'inline' = 直接渲染与主页面作为海报视图（Weekly 主页面调用）
   mode?: 'modal' | 'inline';
@@ -46,7 +45,7 @@ const formatDateDisplay = (dateStr: string): string => {
 };
 
 // 获取排名样式类
-const getRankClass = (rank: number, platform: string): string => {
+const getRankClass = (rank: number): string => {
   const baseClass = styles.rank;
   if (rank === 1) return `${baseClass} ${styles.rank1}`;
   if (rank === 2) return `${baseClass} ${styles.rank2}`;
@@ -56,9 +55,8 @@ const getRankClass = (rank: number, platform: string): string => {
 
 // 渲染表格行
 const renderTableRow = (
-  item: EmployeeConversionWeeklyRankings,
+  item: WeeklyRankingItem,
   index: number,
-  platform: string,
   isTotal = false
 ) => {
   if (isTotal) {
@@ -79,7 +77,7 @@ const renderTableRow = (
   return (
     <tr key={index}>
       <td>
-        <span className={getRankClass(index + 1, platform)}>{index + 1}</span>
+        <span className={getRankClass(index + 1)}>{index + 1}</span>
       </td>
       <td className={styles.employeeName}>{item.employee_name}</td>
       <td className={styles.number}>{formatNumber(item.total_leads)}</td>
@@ -94,11 +92,13 @@ const renderTableRow = (
 
 // 渲染榜单表格
 const renderRankingTable = (
-  data: EmployeeConversionWeeklyRankings[],
+  data: WeeklyRankingItem[],
   title: string,
   indexLabel: string,
   platform: string
 ) => {
+  // 固定名单内保留榜单原始降序，缺少数据的员工补 0 后置。
+  data = withFixedAssistants(data, platform);
   // 计算合计
   const total = {
     total_leads: data.reduce((sum, item) => sum + (item.total_leads || 0), 0),
@@ -122,7 +122,7 @@ const renderRankingTable = (
       <div className={styles.rankingHeader}>
         <span className={styles.rankingIndex}>{indexLabel}</span>
         <span className={styles.rankingTitle}>{title}</span>
-        <span className={styles.rankingMeta}>{data.length} 名员工</span>
+        <span className={styles.rankingMeta}>固定 {FIXED_ASSISTANTS.length} 名员工</span>
       </div>
       <table className={styles.rankingTable}>
         <thead>
@@ -146,8 +146,8 @@ const renderRankingTable = (
             </tr>
           ) : (
             <>
-              {data.map((item, index) => renderTableRow(item, index, platform))}
-              {renderTableRow(total as EmployeeConversionWeeklyRankings, 0, platform, true)}
+              {data.map((item, index) => renderTableRow(item, index))}
+              {renderTableRow(total as WeeklyRankingItem, 0, true)}
             </>
           )}
         </tbody>
@@ -163,7 +163,7 @@ const renderFooterNote = (platform: string) => {
     '开户数据指开户营业部归属为 10 / 30（即成都天府四街 / 二营业部）',
     '开户率 = 开户数 / 微信线索数；有效率 = 有效户数 / 开户数',
     '资产单位：万元',
-    '存量线索新开户榜：线索日期在统计周期前 + 开户时间落在周期内的户数',
+    '存量线索新开户榜：线索日期在统计周期前 + 开户时间落在周期内的户数（与新增线索开户周榜分别覆盖"老企微线索新开户"与"本周新增线索开户"两组增量业绩）',
   ];
 
   if (platform === '小红书') {
@@ -378,24 +378,16 @@ const PosterModal: React.FC<PosterModalProps> = ({
           <div className={styles.content}>
             {renderRankingTable(rankings.total, `${getRankingPrefix()}开户总榜`, '01', platform)}
             {renderRankingTable(
-              rankings.existing,
-              `${getRankingPrefix()}存量线索开户周榜`,
+              rankings.new,
+              `${getRankingPrefix()}新增线索开户周榜`,
               '02',
               platform
             )}
             {renderRankingTable(
-              rankings.new,
-              `${getRankingPrefix()}新增线索开户周榜`,
+              rankings.existing_new_open || [],
+              `${getRankingPrefix()}存量线索新开户周榜`,
               '03',
               platform
-            )}
-            {rankings.existing_new_open && rankings.existing_new_open.length > 0 && (
-              renderRankingTable(
-                rankings.existing_new_open,
-                `${getRankingPrefix()}存量线索新开户周榜`,
-                '04',
-                platform
-              )
             )}
             {renderFooterNote(platform)}
           </div>

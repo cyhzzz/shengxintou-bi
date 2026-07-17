@@ -1,15 +1,15 @@
-/**
+﻿/**
  * 员工转化周报页面
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, DatePicker, Button, Select, Space, message, Typography, Segmented } from 'antd';
-import { CopyOutlined, FileWordOutlined, FileExcelOutlined, PictureOutlined } from '@ant-design/icons';
+import { CopyOutlined, FileWordOutlined, FileExcelOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
 import PosterModal from './components/PosterModal';
 import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
-import type { EmployeeConversionWeeklyData } from '@/types/api.schemas';
 import { ReportFooter } from '@/components/ReportFooter';
+import { withFixedAssistants, type WeeklyReportData } from './weeklyRanking';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
@@ -23,13 +23,6 @@ const PLATFORM_OPTIONS = [
   { label: '抖音', value: '抖音' },
 ];
 
-// TOP数量选项
-const TOP_COUNT_OPTIONS = [
-  { label: 'TOP 5', value: 5 },
-  { label: 'TOP 10', value: 10 },
-  { label: 'TOP 20', value: 20 },
-];
-
 interface WeeklyDefaultDateOptions {
   default_week_start?: string;
   default_week_end?: string;
@@ -38,9 +31,8 @@ interface WeeklyDefaultDateOptions {
 const EmployeeConversionWeeklyPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
   const [platforms, setPlatforms] = useState<string[]>(['小红书', '腾讯', '抖音']);
-  const [topCount, setTopCount] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<EmployeeConversionWeeklyData | null>(null);
+  const [reportData, setReportData] = useState<WeeklyReportData | null>(null);
   const [reportContent, setReportContent] = useState<string>('');
   // v3.1.25: 默认以海报为主视图，文本为备选
   const [viewMode, setViewMode] = useState<'poster' | 'text'>('poster');
@@ -66,12 +58,12 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
         start_date: dateRange[0],
         end_date: dateRange[1],
         platforms,
-        top_count: topCount,
       });
 
       if (response.success && response.data) {
-        setReportData(response.data);
-        const content = formatReportContent(response.data, dateRange[0], dateRange[1], topCount);
+        const weeklyData = response.data as unknown as WeeklyReportData;
+        setReportData(weeklyData);
+        const content = formatReportContent(weeklyData, dateRange[0], dateRange[1]);
         setReportContent(content);
         message.success('周报生成成功');
       } else {
@@ -83,7 +75,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, platforms, topCount]);
+  }, [dateRange, platforms]);
 
   // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
   useEffect(() => {
@@ -173,7 +165,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       csvContent += `\n${platform}平台 - 全部线索转化榜\n`;
       csvContent += '排名,服务人员,线索量,开口量,有效线索,开户量,开户率,有效户,有效户率,总资产\n';
 
-      const totalList = rankings[platform]?.total || [];
+      const totalList = withFixedAssistants(rankings[platform]?.total || [], platform);
       totalList.forEach((item, idx) => {
         csvContent += `${idx + 1},${item.employee_name},${item.total_leads},${item.mouth_count || 0},${item.valid_lead_count || 0},${item.opened_count},${(item.opening_rate || 0).toFixed(2)}%,${item.valid_customer_count || 0},${(item.valid_customer_rate || 0).toFixed(2)}%,${item.total_assets || 0}\n`;
       });
@@ -214,15 +206,6 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
                 options={PLATFORM_OPTIONS}
                 style={{ minWidth: 200 }}
                 placeholder="选择平台"
-              />
-            </div>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>榜单人数</label>
-              <Select
-                value={topCount}
-                onChange={setTopCount}
-                options={TOP_COUNT_OPTIONS}
-                style={{ width: 120 }}
               />
             </div>
           </Space>
@@ -309,7 +292,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
           { label: '数据源', value: 'fact_conv_content（员工明细口径）' },
           { label: '主端点', value: 'POST /api/v1/employee-conversion/weekly' },
         ]}
-        notes={'周报榜单仅统计内容平台中已填写员工姓名的线索；内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
+        notes={'周报的概览、趋势和榜单仅统计固定 12 位小助手；不再取 TOP N，名单内人员按各榜单原有指标降序。内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
       />
     </div>
   );
@@ -319,10 +302,9 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
  * 格式化周报内容
  */
 function formatReportContent(
-  data: EmployeeConversionWeeklyData,
+  data: WeeklyReportData,
   startDate: string,
   endDate: string,
-  topCount: number = 10,
 ): string {
   const overview = data.overview || {};
   const rankings = data.rankings || {};
@@ -372,41 +354,35 @@ function formatReportContent(
 
 `;
 
-    // 全部线索榜单
-    const totalList = platformRankings.total || [];
-    if (totalList.length > 0) {
-      content += `【全部线索转化榜 TOP${Math.min(totalList.length, topCount)}】\n`;
-      content += `排名  服务人员    线索量  开户量  开户率\n`;
-      content += `──────────────────────────────────────\n`;
-      totalList.slice(0, topCount).forEach((item, idx) => {
-        content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
-      });
-      content += `\n`;
-    }
+    // 全部线索榜单：固定名单内按后端榜单顺序排名。
+    const totalList = withFixedAssistants(platformRankings.total || [], platform);
+    content += `【全部线索转化榜】\n`;
+    content += `排名  服务人员    线索量  开户量  开户率\n`;
+    content += `──────────────────────────────────────\n`;
+    totalList.forEach((item, idx) => {
+      content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
+    });
+    content += `\n`;
 
-    // 存量线索榜单
-    const existingList = platformRankings.existing || [];
-    if (existingList.length > 0) {
-      content += `【存量线索转化榜 TOP${Math.min(existingList.length, topCount)}】\n`;
-      content += `排名  服务人员    线索量  开户量  开户率\n`;
-      content += `──────────────────────────────────────\n`;
-      existingList.slice(0, topCount).forEach((item, idx) => {
-        content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
-      });
-      content += `\n`;
-    }
 
-    // 新增线索榜单
-    const newList = platformRankings.new || [];
-    if (newList.length > 0) {
-      content += `【新增线索转化榜 TOP${Math.min(newList.length, topCount)}】\n`;
-      content += `排名  服务人员    线索量  开户量  开户率\n`;
-      content += `──────────────────────────────────────\n`;
-      newList.slice(0, topCount).forEach((item, idx) => {
-        content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
-      });
-      content += `\n`;
-    }
+    // 新增线索榜单：固定名单内按后端榜单顺序排名。
+    const newList = withFixedAssistants(platformRankings.new || [], platform);
+    content += `【新增线索转化榜】\n`;
+    content += `排名  服务人员    线索量  开户量  开户率\n`;
+    content += `──────────────────────────────────────\n`;
+    newList.forEach((item, idx) => {
+      content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
+    });
+    content += `\n`;
+
+    const existingNewOpenList = withFixedAssistants(platformRankings.existing_new_open || [], platform);
+    content += `【存量线索新开户榜】\n`;
+    content += `排名  服务人员    线索量  开户量  开户率\n`;
+    content += `──────────────────────────────────────\n`;
+    existingNewOpenList.forEach((item, idx) => {
+      content += `${String(idx + 1).padStart(2, '0')}    ${padRight(item.employee_name, 8)}  ${String(item.total_leads).padStart(5)}  ${String(item.opened_count).padStart(5)}  ${(item.opening_rate || 0).toFixed(2)}%\n`;
+    });
+    content += `\n`;
   }
 
   // 转化之星

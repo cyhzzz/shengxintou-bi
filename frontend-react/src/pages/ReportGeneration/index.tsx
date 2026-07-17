@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 报告生成页面 — v3.1.31 纯数据周报（本周 + 全年 + 环比 + 两堆叠图 + 互联网占比）
  *
  * 改造点（相对 v3.1.30）：
@@ -160,6 +160,30 @@ function buildChannelColorMap(channels: string[]): Record<string, string> {
   return map;
 }
 
+// 大类排序顺序（视觉堆叠顺序：应用市场(蓝) → 内容平台(红) → 本地生活(绿)）
+const CHANNEL_CATEGORY_ORDER: Record<string, number> = {
+  应用市场: 0,
+  内容平台: 1,
+  本地生活: 2,
+};
+
+/**
+ * 按大类分组的渠道排序（防御性排序 — 即使后端 channels 未排序也能保证分组）。
+ * 配合 buildChannelColorMap 使用：
+ * - 第一优先级：大类顺序（应用市场(蓝) → 内容平台(红) → 本地生活(绿)）
+ * - 第二优先级：组内稳定保留入参原顺序
+ *
+ * 入参若来自后端（已按 (cat_idx, -count) 排序），组内顺序即为大数→小数；
+ * 结合 buildChannelColorMap 的 i=0→最深色，视觉上呈现「同一大类挨在一起、组内深→浅向上堆叠」。
+ */
+function sortChannelsByCategory(
+  channels: string[],
+  categoryMap: Record<string, string>,
+): string[] {
+  const rank = (c: string): number => CHANNEL_CATEGORY_ORDER[categoryMap[c]] ?? 99;
+  return [...channels].sort((a, b) => rank(a) - rank(b));
+}
+
 // 3 大类的代表色（用于自定义图例）
 const CATEGORY_REP_COLORS: Record<string, string> = {
   内容平台: '#c0392b',
@@ -282,7 +306,7 @@ const ReportGeneration: React.FC = () => {
     opensChartInstanceRef.current = chart;
 
     const dates = weeklyData.daily_opens_stacked.map((d) => fmtDate(String(d.date)));
-    const channels = weeklyData.channels;
+    const channels = sortChannelsByCategory(weeklyData.channels, CHANNEL_CATEGORY_MAP);
     const colorMap = buildChannelColorMap(channels);
 
     const option: echarts.EChartsOption = {
@@ -323,7 +347,7 @@ const ReportGeneration: React.FC = () => {
     yearlyChartInstanceRef.current = chart;
 
     const weeks = weeklyData.weekly_opens_stacked.map((d) => String(d.week));
-    const channels = weeklyData.channels;
+    const channels = sortChannelsByCategory(weeklyData.channels, CHANNEL_CATEGORY_MAP);
     const colorMap = buildChannelColorMap(channels);
 
     const option: echarts.EChartsOption = {

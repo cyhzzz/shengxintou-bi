@@ -131,7 +131,7 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
     return ranking
 
 
-def get_weekly_trend_data(platforms, start_date=None, end_date=None):
+def get_weekly_trend_data(platforms, start_date=None, end_date=None, employees=None):
     q = db.session.query(
         func.substr(FactConvContent.线索日期, 1, 7).label('period'),
         func.count(FactConvContent.id).label('leads'),
@@ -140,6 +140,8 @@ def get_weekly_trend_data(platforms, start_date=None, end_date=None):
     )
     if start_date and end_date:
         q = q.filter(and_(FactConvContent.线索日期 >= start_date, FactConvContent.线索日期 <= end_date))
+    if employees:
+        q = q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
     pfs = [get_platform_filter(p) for p in platforms]
     if pfs:
         q = q.filter(or_(*pfs))
@@ -176,7 +178,7 @@ def get_latest_data_week_range():
     }
 
 
-def get_platform_overview(platforms, start_date=None, end_date=None):
+def get_platform_overview(platforms, start_date=None, end_date=None, employees=None):
     overview = {}
     for p in platforms:
         q = db.session.query(
@@ -189,6 +191,8 @@ def get_platform_overview(platforms, start_date=None, end_date=None):
         ).filter(get_platform_filter(p))
         if start_date and end_date:
             q = q.filter(and_(FactConvContent.线索日期 >= start_date, FactConvContent.线索日期 <= end_date))
+        if employees:
+            q = q.filter(FactConvContent.添加员工姓名.in_([str(e) for e in employees]))
         r = q.first()
         leads, opened = _i(r.leads), _i(r.opened)
         overview[p] = {
