@@ -168,8 +168,8 @@ def _do_self_update(task_id, force):
             first_line = (out or "").strip().splitlines()
             log("已 stash: " + (first_line[0] if first_line else "OK"))
 
-        log("执行 git fetch origin ...", progress=40)
-        rc, out, err = _run_git(["fetch", "origin"], project_root, timeout=60)
+        log("执行 git fetch origin（github偶尔慢，最多等 3 分钟）...", progress=40)
+        rc, out, err = _run_git(["fetch", "origin"], project_root, timeout=180)
         if rc != 0:
             log("git fetch 失败: " + err)
             with _update_lock:

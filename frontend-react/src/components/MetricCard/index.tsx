@@ -1,15 +1,16 @@
-﻿/**
+/**
  * 统一指标卡片组件
  * 从 Dashboard 指标卡片抽象而来，供各报表头部数据卡片复用。
  */
 import React from 'react';
-import { Card, Tooltip } from 'antd';
+import { Card, Tooltip, Skeleton } from 'antd';
 import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   MinusOutlined,
 } from '@ant-design/icons';
 import type { WowChangeColor, WowChangeTrend } from '@/types/api.schemas';
+import { useCountUp } from '@/hooks/useCountUp';
 import styles from './MetricCard.module.scss';
 
 export interface WowChangeValue {
@@ -33,6 +34,10 @@ export interface MetricCardProps {
   valueColor?: string;
   description?: React.ReactNode;
   className?: string;
+  /** 是否显示骨架屏 */
+  loading?: boolean;
+  /** 卡片在网格中的索引，用于 stagger 入场 */
+  index?: number;
 }
 
 export interface MetricSectionProps {
@@ -59,6 +64,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   valueColor,
   description,
   className,
+  loading = false,
+  index = 0,
 }) => {
   const formatValue = (val?: number): string => {
     if (val === undefined || val === null) return '-';
@@ -78,6 +85,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
         return val.toLocaleString('zh-CN');
     }
   };
+
+  // v3.2.5：数字增长动画
+  const decimals = formatter === 'currency' || formatter === 'percent' ? 2 : 0;
+  const animatedValue = useCountUp(value, { duration: 800, decimals });
 
   const getTrendIcon = (trend?: WowChangeTrend) => {
     switch (trend) {
@@ -137,20 +148,34 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   ].filter(Boolean).join(' ');
 
   return (
-    <Card className={cardClassName} hoverable>
+    <Card
+      className={cardClassName}
+      hoverable
+      style={{ '--stagger-index': index } as React.CSSProperties}
+    >
       <div className={styles.metricContent}>
-        <div className={styles.metricTitle}>
-          {icon && <span className={styles.metricIcon}>{icon}</span>}
-          {titleContent}
-        </div>
-        <div className={styles.metricValue}>
-          {prefix && <span className={styles.metricPrefix}>{prefix}</span>}
-          <span className={styles.metricNumber} style={valueColor ? { color: valueColor } : undefined}>
-            {formatValue(value)}
-          </span>
-          {suffix && <span className={styles.metricSuffix}>{suffix}</span>}
-        </div>
-        {renderFooter()}
+        {loading ? (
+          <>
+            <Skeleton.Button active size="small" style={{ width: 80, height: 16 }} />
+            <Skeleton.Input active size="large" style={{ width: '60%', height: 32, marginTop: 8 }} />
+            <Skeleton.Button active size="small" style={{ width: 100, height: 16, marginTop: 8 }} />
+          </>
+        ) : (
+          <>
+            <div className={styles.metricTitle}>
+              {icon && <span className={styles.metricIcon}>{icon}</span>}
+              {titleContent}
+            </div>
+            <div className={styles.metricValue}>
+              {prefix && <span className={styles.metricPrefix}>{prefix}</span>}
+              <span className={styles.metricNumber} style={valueColor ? { color: valueColor } : undefined}>
+                {formatValue(animatedValue)}
+              </span>
+              {suffix && <span className={styles.metricSuffix}>{suffix}</span>}
+            </div>
+            {renderFooter()}
+          </>
+        )}
       </div>
     </Card>
   );
@@ -167,6 +192,14 @@ export const MetricSection: React.FC<MetricSectionProps> = ({
   const sectionClassName = [styles.metricSection, className].filter(Boolean).join(' ');
   const gridClassNames = [styles.metricGrid, gridClassName].filter(Boolean).join(' ');
 
+  // v3.2.5：自动为子 MetricCard 注入 index，实现 stagger 入场
+  const indexedChildren = React.Children.map(children, (child, idx) => {
+    if (React.isValidElement<MetricCardProps>(child) && child.type === MetricCard) {
+      return React.cloneElement(child, { index: child.props.index ?? idx });
+    }
+    return child;
+  });
+
   return (
     <Card className={sectionClassName} size="small">
       {(title || description) && (
@@ -179,7 +212,7 @@ export const MetricSection: React.FC<MetricSectionProps> = ({
         className={gridClassNames}
         style={{ '--metric-card-min-width': minCardWidth } as React.CSSProperties}
       >
-        {children}
+        {indexedChildren}
       </div>
     </Card>
   );

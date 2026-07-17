@@ -5,7 +5,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import * as echarts from 'echarts';
 import type { ECharts, EChartsOption } from 'echarts';
-import { Spin } from 'antd';
 import { mergeChartTheme } from './themes';
 import styles from './index.module.scss';
 
@@ -26,6 +25,8 @@ export interface EChartsProps {
   style?: React.CSSProperties;
   /** 容器类名 */
   className?: string;
+  /** 是否禁用入场动画（如导出海报） */
+  disableAnimation?: boolean;
 }
 
 const EChartsComponent: React.FC<EChartsProps> = ({
@@ -37,6 +38,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
   onChartReady,
   style,
   className,
+  disableAnimation = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ECharts | null>(null);
@@ -109,6 +111,33 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     const currentTheme = getCurrentTheme();
     const mergedOption = mergeChartTheme(option, currentTheme);
 
+    // v3.2.5：统一注入入场动画（除非显式禁用）
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!disableAnimation && !prefersReduced) {
+      (mergedOption as any).animation = true;
+      (mergedOption as any).animationDuration = (mergedOption as any).animationDuration ?? 800;
+      (mergedOption as any).animationEasing = (mergedOption as any).animationEasing ?? 'cubicOut';
+      const series = (mergedOption as any).series;
+      if (Array.isArray(series)) {
+        (mergedOption as any).series = series.map((s, idx) => ({
+          animation: true,
+          animationDuration: 800,
+          animationEasing: 'cubicOut',
+          animationDelay: idx * 120,
+          ...s,
+        }));
+      } else if (series && typeof series === 'object') {
+        (mergedOption as any).series = {
+          animation: true,
+          animationDuration: 800,
+          animationEasing: 'cubicOut',
+          ...series,
+        };
+      }
+    } else {
+      (mergedOption as any).animation = false;
+    }
+
     console.log('[EChartsComponent] Merged option, setting on chart');
     chartRef.current.setOption(mergedOption, {
       notMerge: true,  // 不合并，完全替换
@@ -160,8 +189,8 @@ const EChartsComponent: React.FC<EChartsProps> = ({
       style={{ height, ...style }}
     >
       {loading && (
-        <div className={styles.loadingOverlay}>
-          <Spin />
+        <div className={styles.skeletonOverlay}>
+          <div className={styles.skeletonShimmer} />
         </div>
       )}
     </div>

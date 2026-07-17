@@ -1,4 +1,4 @@
-﻿@use '../../styles/mixins' as *;
+@use '../../styles/mixins' as *;
 
 .metricSection {
   margin-bottom: var(--spacer-16);
@@ -42,16 +42,33 @@
   overflow: hidden;  // v3.1.25: 截断超长数字 / 描述
   height: 100%;
   border-radius: var(--radius-lg);
-  transition: transform var(--transition-normal) ease, box-shadow var(--transition-normal) ease;
+  transition:
+    transform var(--motion-duration-normal) var(--motion-easing-default),
+    box-shadow var(--motion-duration-normal) var(--motion-easing-default);
+  // v3.2.5：stagger 入场动画
+  opacity: 0;
+  animation: metricCardEnter var(--motion-duration-slow) var(--motion-easing-enter) forwards;
+  animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-gap));
 
   &:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-elevated);
   }
 
   &--asset {
     background: linear-gradient(135deg, var(--color-brand-bg) 0%, rgba(24, 144, 255, 0.04) 100%);
     border-left: 3px solid var(--color-brand);
+  }
+}
+
+@keyframes metricCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
