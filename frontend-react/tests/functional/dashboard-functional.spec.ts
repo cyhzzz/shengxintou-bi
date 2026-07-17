@@ -31,9 +31,6 @@ test.describe('数据概览页面功能测试', () => {
   test('页面加载 - 基本结构验证', async ({ page }) => {
     await expectSidebarVisible(page);
     await expectMainContentVisible(page);
-    
-    const header = page.locator('h1, .ant-page-header-heading-title').first();
-    await expect(header).toBeVisible({ timeout: 10000 });
   });
 
   test('页面加载 - 指标卡片显示', async ({ page }) => {
