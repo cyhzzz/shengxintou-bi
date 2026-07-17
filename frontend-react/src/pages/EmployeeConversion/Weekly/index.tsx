@@ -277,6 +277,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
               startDate={dateRange[0]}
               endDate={dateRange[1]}
               rankings={reportData.rankings?.[posterPlatform] || { total: [], existing: [], new: [] }}
+              yearBreakdown={reportData.year_breakdown?.[posterPlatform]}
             />
           ) : (
             <WeeklyReportPreview content="" loading={loading} mode="poster" />
