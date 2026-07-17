@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
+import { FadeInSection } from '@/components';
 const { Text } = Typography;
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -239,42 +240,47 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.employeeConversionPage}>
-      <Card className={styles.filterCard} size='small'>
-        <div className={styles.filterRow}>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>日期:</span>
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size='small'>
+          <div className={styles.filterRow}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>日期:</span>
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>平台:</span>
+              <Select mode='multiple' allowClear placeholder='全部' value={selectedPlatforms}
+                onChange={setSelectedPlatforms} loading={optionsLoading}
+                options={platformOptions.map((p) => ({ label: p, value: p }))}
+                style={{ minWidth: 180 }} maxTagCount='responsive' />
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>员工:</span>
+              <Select mode='multiple' allowClear placeholder='全部' value={selectedEmployees}
+                onChange={setSelectedEmployees} loading={optionsLoading}
+                options={employeeOptions.map((e) => ({ label: e, value: e }))}
+                style={{ minWidth: 180 }} maxTagCount='responsive' showSearch />
+            </div>
+            <div className={styles.filterActions}>
+              <Button type='primary' icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+            </div>
           </div>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>平台:</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={selectedPlatforms}
-              onChange={setSelectedPlatforms} loading={optionsLoading}
-              options={platformOptions.map((p) => ({ label: p, value: p }))}
-              style={{ minWidth: 180 }} maxTagCount='responsive' />
-          </div>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>员工:</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={selectedEmployees}
-              onChange={setSelectedEmployees} loading={optionsLoading}
-              options={employeeOptions.map((e) => ({ label: e, value: e }))}
-              style={{ minWidth: 180 }} maxTagCount='responsive' showSearch />
-          </div>
-          <div className={styles.filterActions}>
-            <Button type='primary' icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </FadeInSection>
 
       {/* 顶部核心指标：仅内容平台中已填写员工姓名的线索 */}
-      <MetricSection title='内容平台员工转化核心指标' description='仅统计内容平台的员工承接线索，不含应用市场及非员工渠道。'>
-        <MetricCard title='员工线索' description='内容平台' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
-        <MetricCard title='员工开口' description='内容平台' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
-        <MetricCard title='员工开户' description='内容平台' value={data?.core_metrics?.total_opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false} />
-        <MetricCard title='员工有效户' description='内容平台' value={data?.core_metrics?.total_valid_customer || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false} />
-      </MetricSection>
+      <FadeInSection delay={0.15} duration={1.2}>
+        <MetricSection title='内容平台员工转化核心指标' description='仅统计内容平台的员工承接线索，不含应用市场及非员工渠道。'>
+          <MetricCard title='员工线索' description='内容平台' value={data?.core_metrics?.total_leads || 0} suffix='条' valueColor='var(--color-brand)' icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />} showWowChange={false} />
+          <MetricCard title='员工开口' description='内容平台' value={data?.core_metrics?.total_mouth || 0} suffix='条' valueColor='var(--chart-color-6)' icon={<UserOutlined style={{ color: 'var(--chart-color-6)' }} />} showWowChange={false} />
+          <MetricCard title='员工开户' description='内容平台' value={data?.core_metrics?.total_opened || 0} suffix='人' valueColor='var(--chart-color-7)' icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />} showWowChange={false} />
+          <MetricCard title='员工有效户' description='内容平台' value={data?.core_metrics?.total_valid_customer || 0} suffix='人' valueColor='var(--color-success)' icon={<RiseOutlined style={{ color: 'var(--color-success)' }} />} showWowChange={false} />
+        </MetricSection>
+      </FadeInSection>
 
       {/* 独立渠道参考，不并入员工核心指标 */}
+      <FadeInSection delay={0.30} duration={1.2}>
       {channelOverview && (
         <MetricSection
           title='互联网引流渠道参考'
@@ -284,9 +290,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           <MetricCard title='互联网有效户' description='渠道汇总' value={channelOverview.channel_caliber?.valid || 0} suffix='人' valueColor='var(--chart-color-5)' icon={<RiseOutlined style={{ color: 'var(--chart-color-5)' }} />} showWowChange={false}  />
         </MetricSection>
       )}
+      </FadeInSection>
 
       <Spin spinning={loading}>
         {/* 整体走势 */}
+        <FadeInSection delay={0.45} duration={1.2}>
         <Card className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>📊 整体转化走势（月度）</Text>
@@ -298,8 +306,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
             <Empty description='暂无走势数据' />
           )}
         </Card>
+        </FadeInSection>
 
         {/* 员工开户转化率走势 */}
+        <FadeInSection delay={0.60} duration={1.2}>
         <Card className={styles.chartCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>📈 员工开户转化率走势</Text>
@@ -319,8 +329,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
             <Empty description='暂无转化率数据' />
           )}
         </Card>
+        </FadeInSection>
 
         {/* 排行榜 */}
+        <FadeInSection delay={0.75} duration={1.2}>
         <Card className={styles.tableCard}>
           <div className={styles.cardHeader}>
             <Text type='secondary' className={styles.cardTitle}>🏆 员工转化排行榜</Text>
@@ -337,8 +349,10 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
             pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`, pageSizeOptions: ['10', '20', '50', '100'] }}
           />
         </Card>
+        </FadeInSection>
       </Spin>
 
+      <FadeInSection delay={0.90} duration={1.2}>
       <ReportFooter
         sources={[
           { label: '口径', value: '内容平台' + (defaultPlatforms.length ? '（' + defaultPlatforms.join(' / ') + '）' : '') + ' —— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },
@@ -347,6 +361,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         ]}
         notes={'本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标。内容平台 = 小红书 / 腾讯 / 抖音 / 快手 / 财联社（员工承接营销转化的核心口径），不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径。平台筛选器默认 = 内容平台全集，清空后将自动恢复。员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。'}
       />
+      </FadeInSection>
     </div>
   );
 };

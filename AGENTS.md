@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.6`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.7`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -390,6 +390,15 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.2.7 已落地（2026-07-18） 容器级顺序浮现 + 慢节奏动效 + 全局美学优化
+
+- **容器级顺序浮现**：新增 `FadeInSection` 组件（`frontend-react/src/components/FadeInSection/`），报表各大容器（筛选卡 / 指标区 / 图表区 / 表格区 / 页脚）按顺序淡入上浮浮现，替代容器内小卡片的细碎 stagger；支持 `delay` / `duration` / `direction` 配置与 `prefers-reduced-motion`。
+- **核心动效调慢到 1~2 秒级**：`useCountUp` 默认 1500ms；`EChartsComponent` / `FunnelChart` 入场 1200ms、series stagger 200ms；`MetricCard` 入场 1200ms；`tokens.css` 新增 `--motion-duration-reveal` 与 `--motion-easing-smooth`。
+- **全局美学优化**：`MainLayout` 内容区加顶部光照渐变增强层次；`global.scss` 新增 `sectionTitleBar` 带左侧色条的章节标题；卡片悬浮改为阴影 + 边框微亮，避免 transform 叠加入场动画；按钮上移收为 `-2px`；输入框 focus ring、Segmented 滑动、表格行 hover、排序图标放大等交互反馈保持克制。
+- **覆盖全部报表页**：Dashboard、OmniChannel、ConversionFunnel、LeadsDetail、AgencyAnalysis、XhsNotes List/Operation、EmployeeConversion Analysis/Weekly、Live Funnel/AnchorCluster、Reports/AppMarket Funnel/Comparison/Detail/Creative、Reports/OmniChannel、ReportGeneration。
+- **修复 7 个功能测试用例**：账号管理搜索 selector、Dashboard 无数据检查、数据导入页 5 个用例适配新组件。
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，37.46s）；API 冒烟 33/33 通过。
 
 ### v3.2.6 已落地（2026-07-18） UI 动效节奏与性能调优（更优雅、更流畅）
 

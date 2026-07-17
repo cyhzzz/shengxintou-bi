@@ -9,6 +9,7 @@ import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Empty, Modal
 import { ReloadOutlined, EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import { dataServiceReports } from "@/services/dataService";
+import { FadeInSection } from '@/components';
 import styles from "./index.module.scss";
 
 const { RangePicker } = DatePicker;
@@ -61,74 +62,78 @@ const AppMarketDetailPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size="small">
-        <div className={styles.filterRow}>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>日期区间:</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size="small">
+          <div className={styles.filterRow}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>日期区间:</span>
+              <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>应用市场:</span>
+              <Select mode="multiple" allowClear placeholder="全部" value={appMarketFilter}
+                onChange={setAppMarketFilter}
+                options={opts.app_markets.map((m) => ({ label: m, value: m }))}
+                style={{ minWidth: 200 }} maxTagCount="responsive" />
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>渠道类型:</span>
+              <Select mode="multiple" allowClear placeholder="全部" value={channelType}
+                onChange={setChannelType}
+                options={opts.channel_types.map((t) => ({ label: t, value: t }))}
+                style={{ minWidth: 180 }} maxTagCount="responsive" />
+            </div>
+            <div className={styles.filterActions}>
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => load(1, detail.page_size)}>查询</Button>
+              <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+            </div>
           </div>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>应用市场:</span>
-            <Select mode="multiple" allowClear placeholder="全部" value={appMarketFilter}
-              onChange={setAppMarketFilter}
-              options={opts.app_markets.map((m) => ({ label: m, value: m }))}
-              style={{ minWidth: 200 }} maxTagCount="responsive" />
-          </div>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>渠道类型:</span>
-            <Select mode="multiple" allowClear placeholder="全部" value={channelType}
-              onChange={setChannelType}
-              options={opts.channel_types.map((t) => ({ label: t, value: t }))}
-              style={{ minWidth: 180 }} maxTagCount="responsive" />
-          </div>
-          <div className={styles.filterActions}>
-            <Button type="primary" icon={<SearchOutlined />} onClick={() => load(1, detail.page_size)}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      </FadeInSection>
 
-      <Card className={styles.tableCard}>
-        <div className={styles.tableHeader}>
-          <span className={styles.tableTitle}>设备明细</span>
-          <span className={styles.statText}>共 {detail.total.toLocaleString()} 条</span>
-        </div>
-        <Spin spinning={loading}>
-          <Table size="small" rowKey="id" dataSource={detail.rows}
-            scroll={{ x: "max-content" }}
-            pagination={{
-              current: detail.page, pageSize: detail.page_size, total: detail.total,
-              showSizeChanger: true,
-              showTotal: (t) => "共 " + t.toLocaleString() + " 条",
-              pageSizeOptions: ["20", "50", "100", "200"],
-              onChange: (p, ps) => load(p, ps),
-            }}
-            columns={[
-              { title: "下载日期", dataIndex: "下载日期", key: "下载日期", width: 110 },
-              { title: "应用市场", dataIndex: "应用市场", key: "应用市场", width: 100 },
-              { title: "应用市场名称", dataIndex: "应用市场名称", key: "应用市场名称", width: 140, render: (v: any) => v || "-" },
-              { title: "渠道类型", dataIndex: "渠道类型", key: "渠道类型", width: 110 },
-              { title: "设备号", dataIndex: "设备号", key: "设备号", width: 180, ellipsis: true },
-              { title: "资金账号", dataIndex: "资金账号", key: "资金账号", width: 180, render: (v: any) => v || "-" },
-              { title: "激活APP", dataIndex: "激活APP", key: "激活APP", align: "center", width: 90, render: renderBool },
-              { title: "开户成功", dataIndex: "开户成功", key: "开户成功", align: "center", width: 90, render: renderBool },
-              { title: "新开户", dataIndex: "新开户", key: "新开户", align: "center", width: 80, render: renderBool },
-              { title: "入金", dataIndex: "入金", key: "入金", align: "center", width: 80, render: renderBool },
-              { title: "有效户", dataIndex: "有效户", key: "有效户", align: "center", width: 80, render: renderBool },
-              {
-                title: "操作", key: "action", width: 80, fixed: "right" as const, align: "center",
-                render: (_: any, record: any) => (
-                  <Button type="link" size="small" icon={<EyeOutlined />}
-                    onClick={() => { setSelectedRow(record); setDetailModalOpen(true); }}>
-                    详情
-                  </Button>
-                ),
-              },
-            ]}
-            locale={{ emptyText: <Empty description="无明细" /> }}
-          />
-        </Spin>
-      </Card>
+      <FadeInSection delay={0.2} duration={1.2}>
+        <Card className={styles.tableCard}>
+          <div className={styles.tableHeader}>
+            <span className={styles.tableTitle}>设备明细</span>
+            <span className={styles.statText}>共 {detail.total.toLocaleString()} 条</span>
+          </div>
+          <Spin spinning={loading}>
+            <Table size="small" rowKey="id" dataSource={detail.rows}
+              scroll={{ x: "max-content" }}
+              pagination={{
+                current: detail.page, pageSize: detail.page_size, total: detail.total,
+                showSizeChanger: true,
+                showTotal: (t) => "共 " + t.toLocaleString() + " 条",
+                pageSizeOptions: ["20", "50", "100", "200"],
+                onChange: (p, ps) => load(p, ps),
+              }}
+              columns={[
+                { title: "下载日期", dataIndex: "下载日期", key: "下载日期", width: 110 },
+                { title: "应用市场", dataIndex: "应用市场", key: "应用市场", width: 100 },
+                { title: "应用市场名称", dataIndex: "应用市场名称", key: "应用市场名称", width: 140, render: (v: any) => v || "-" },
+                { title: "渠道类型", dataIndex: "渠道类型", key: "渠道类型", width: 110 },
+                { title: "设备号", dataIndex: "设备号", key: "设备号", width: 180, ellipsis: true },
+                { title: "资金账号", dataIndex: "资金账号", key: "资金账号", width: 180, render: (v: any) => v || "-" },
+                { title: "激活APP", dataIndex: "激活APP", key: "激活APP", align: "center", width: 90, render: renderBool },
+                { title: "开户成功", dataIndex: "开户成功", key: "开户成功", align: "center", width: 90, render: renderBool },
+                { title: "新开户", dataIndex: "新开户", key: "新开户", align: "center", width: 80, render: renderBool },
+                { title: "入金", dataIndex: "入金", key: "入金", align: "center", width: 80, render: renderBool },
+                { title: "有效户", dataIndex: "有效户", key: "有效户", align: "center", width: 80, render: renderBool },
+                {
+                  title: "操作", key: "action", width: 80, fixed: "right" as const, align: "center",
+                  render: (_: any, record: any) => (
+                    <Button type="link" size="small" icon={<EyeOutlined />}
+                      onClick={() => { setSelectedRow(record); setDetailModalOpen(true); }}>
+                      详情
+                    </Button>
+                  ),
+                },
+              ]}
+              locale={{ emptyText: <Empty description="无明细" /> }}
+            />
+          </Spin>
+        </Card>
+      </FadeInSection>
 
       <Modal
         title="设备明细详情"

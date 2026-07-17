@@ -86,9 +86,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     }
   };
 
-  // v3.2.6：数字增长动画，更从容的 1000ms
+  // v3.2.7：数字增长动画，1.5s 慢节奏
   const decimals = formatter === 'currency' || formatter === 'percent' ? 2 : 0;
-  const animatedValue = useCountUp(value, { duration: 1000, decimals });
+  const animatedValue = useCountUp(value, { duration: 1500, decimals });
 
   const getTrendIcon = (trend?: WowChangeTrend) => {
     switch (trend) {
