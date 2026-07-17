@@ -10,6 +10,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { FadeInSection } from '@/components';
 
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -61,106 +62,114 @@ const AppMarketFunnelPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size='small'>
-        <Space size='middle' wrap>
-          <span className={styles.label}>日期区间</span>
-          <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-          <span className={styles.label}>应用市场</span>
-          <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
-            onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
-            style={{ minWidth: 220 }} maxTagCount='responsive' />
-          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-        </Space>
-      </Card>
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size='small'>
+          <Space size='middle' wrap>
+            <span className={styles.label}>日期区间</span>
+            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+            <span className={styles.label}>应用市场</span>
+            <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
+              onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
+              style={{ minWidth: 220 }} maxTagCount='responsive' />
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+          </Space>
+        </Card>
+      </FadeInSection>
       <Spin spinning={loading}>
         {/* v3.1.25: 4 卡片概览，核心业务产出导向 */}
-        <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出）">
-          <MetricCard
-            title="激活APP"
-            value={downloads}
-            valueColor="var(--color-brand)"
-            icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
-            description={`激活 APP 数量 · 应用市场漏斗顶端基数`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新开户"
-            value={newOpenCount}
-            valueColor="var(--chart-color-7)"
-            icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
-            description={`首次开户客户数 · 剔除存量，核心获客产出`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="有效户"
-            value={validCount}
-            valueColor="var(--color-success)"
-            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
-            description={`入金且资产达标有效户`}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="新开户引进资产"
-            value={newOpenAssets}
-            formatter="currency"
-            valueColor="var(--color-error)"
-            icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
-            description={`新开户客户对应的总资产 · 引进资产是核心业务产出`}
-            showWowChange={false}
-          />
-        </MetricSection>
+        <FadeInSection delay={0.15} duration={1.2}>
+          <MetricSection title="应用市场获客概览" description="激活APP / 新开户 / 有效户 / 新开户引进资产（核心业务产出）">
+            <MetricCard
+              title="激活APP"
+              value={downloads}
+              valueColor="var(--color-brand)"
+              icon={<MobileOutlined style={{ color: 'var(--color-brand)' }} />}
+              description={`激活 APP 数量 · 应用市场漏斗顶端基数`}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="新开户"
+              value={newOpenCount}
+              valueColor="var(--chart-color-7)"
+              icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+              description={`首次开户客户数 · 剔除存量，核心获客产出`}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="有效户"
+              value={validCount}
+              valueColor="var(--color-success)"
+              icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+              description={`入金且资产达标有效户`}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="新开户引进资产"
+              value={newOpenAssets}
+              formatter="currency"
+              valueColor="var(--color-error)"
+              icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+              description={`新开户客户对应的总资产 · 引进资产是核心业务产出`}
+              showWowChange={false}
+            />
+          </MetricSection>
+        </FadeInSection>
 
-        <Row className={styles.funnelSplitRow}>
-          <Col span={12} className={styles.funnelSplitCol}>
-            <Card title='9 阶段转化漏斗' size='small' className={styles.h100Card}>
-              <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={520} useLogScale />
-            </Card>
-          </Col>
-          <Col span={12} className={styles.funnelSplitCol}>
-            <Card title='各阶段转化详情' size='small' className={styles.h100Card}>
-              <table className={styles.stageTable}>
-                <thead>
-                  <tr>
-                    <th className={styles.colNum}>#</th>
-                    <th>阶段</th>
-                    <th className={styles.colNum}>累计人数</th>
-                    <th className={styles.colNum}>阶段转化率</th>
-                    <th className={styles.colNum}>累计转化率</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {funnel.map((s: any, idx: number) => (
-                    <tr key={s.step}>
-                      <td className={styles.colNum}>{idx + 1}</td>
-                      <td>{s.step}</td>
-                      <td className={styles.colNum}>{s.count?.toLocaleString() || 0}</td>
-                      <td className={styles.colNum}>
-                        <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
-                          {s.rate?.toFixed(2) || 0}%
-                        </Tag>
-                      </td>
-                      <td className={styles.colNum}>
-                        <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
-                          {s.step_rate?.toFixed(2) || 0}%
-                        </Tag>
-                      </td>
+        <FadeInSection delay={0.3} duration={1.2}>
+          <Row className={styles.funnelSplitRow}>
+            <Col span={12} className={styles.funnelSplitCol}>
+              <Card title='9 阶段转化漏斗' size='small' className={styles.h100Card}>
+                <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={520} useLogScale />
+              </Card>
+            </Col>
+            <Col span={12} className={styles.funnelSplitCol}>
+              <Card title='各阶段转化详情' size='small' className={styles.h100Card}>
+                <table className={styles.stageTable}>
+                  <thead>
+                    <tr>
+                      <th className={styles.colNum}>#</th>
+                      <th>阶段</th>
+                      <th className={styles.colNum}>累计人数</th>
+                      <th className={styles.colNum}>阶段转化率</th>
+                      <th className={styles.colNum}>累计转化率</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
-          </Col>
-        </Row>
+                  </thead>
+                  <tbody>
+                    {funnel.map((s: any, idx: number) => (
+                      <tr key={s.step}>
+                        <td className={styles.colNum}>{idx + 1}</td>
+                        <td>{s.step}</td>
+                        <td className={styles.colNum}>{s.count?.toLocaleString() || 0}</td>
+                        <td className={styles.colNum}>
+                          <Tag color={s.rate > 30 ? 'green' : s.rate > 5 ? 'gold' : 'default'}>
+                            {s.rate?.toFixed(2) || 0}%
+                          </Tag>
+                        </td>
+                        <td className={styles.colNum}>
+                          <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
+                            {s.step_rate?.toFixed(2) || 0}%
+                          </Tag>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </Col>
+          </Row>
+        </FadeInSection>
 
-        <ReportFooter
-          sources={[
-            { label: '数据源', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },
-            { label: '端点', value: 'POST /api/v1/reports/app-market/summary（v3.1.24 起走 _funnel_filters，业务限渠道类型=互联网引流；新开户作为漏斗阶段呈现）' },
-            { label: '漏斗顶端', value: '激活APP人数（衡量获客容量）' },
-          ]}
-          notes={'v3.1.24 业务口径：仅统计 渠道类型=互联网引流；「新开户」作为漏斗阶段（开户成功→新开户）呈现存量剔除（不用 WHERE 过滤，否则是否新开户=1 的设备行前置阶段字段全=1，SUM 后漏斗变平），与转化漏斗页口径完全一致。rate = 此阶段/上一阶段，step_rate = 此阶段/顶端，漏斗采用 log10 映射缓解各级数据偏差过大问题。'}
-        />
+        <FadeInSection delay={0.45} duration={1.2}>
+          <ReportFooter
+            sources={[
+              { label: '数据源', value: 'fact_conv_appmarket（9 阶段：激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户）' },
+              { label: '端点', value: 'POST /api/v1/reports/app-market/summary（v3.1.24 起走 _funnel_filters，业务限渠道类型=互联网引流；新开户作为漏斗阶段呈现）' },
+              { label: '漏斗顶端', value: '激活APP人数（衡量获客容量）' },
+            ]}
+            notes={'v3.1.24 业务口径：仅统计 渠道类型=互联网引流；「新开户」作为漏斗阶段（开户成功→新开户）呈现存量剔除（不用 WHERE 过滤，否则是否新开户=1 的设备行前置阶段字段全=1，SUM 后漏斗变平），与转化漏斗页口径完全一致。rate = 此阶段/上一阶段，step_rate = 此阶段/顶端，漏斗采用 log10 映射缓解各级数据偏差过大问题。'}
+          />
+        </FadeInSection>
       </Spin>
     </div>
   );

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 全渠道获客 (v3.1 §二.5 重构)
  * 数据源：agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket 独立）
  *
@@ -36,6 +36,7 @@ import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { FadeInSection } from '@/components';
 import metricStyles from '@/components/MetricCard/MetricCard.module.scss';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
@@ -367,162 +368,172 @@ const OmniChannelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       {/* 筛选条：仅日期区间 + 刷新 */}
-      <Card className={styles.filterCard} size="small">
-        <Space size="middle" wrap>
-          <span className={styles.label}>日期区间</span>
-          <RangePicker
-            value={dateRange}
-            onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])}
-            allowClear={false}
-          />
-          <span className={styles.label}>渠道类别</span>
-          <Select
-            mode="multiple"
-            placeholder="全部类别"
-            value={selectedCategories}
-            onChange={setSelectedCategories}
-            style={{ minWidth: 180 }}
-            allowClear
-            maxTagCount="responsive"
-          >
-            {channelCategoryOptions.map((c) => (
-              <Select.Option key={c} value={c}>{c}</Select.Option>
-            ))}
-          </Select>
-          <span className={styles.label}>子渠道</span>
-          <Select
-            mode="multiple"
-            placeholder="全部子渠道"
-            value={selectedSubChannels}
-            onChange={setSelectedSubChannels}
-            style={{ minWidth: 220 }}
-            allowClear
-            maxTagCount="responsive"
-            showSearch
-          >
-            {subChannelOptions.map((s) => (
-              <Select.Option key={s} value={s}>{s}</Select.Option>
-            ))}
-          </Select>
-          <Button type="primary" icon={<SearchOutlined />} onClick={load}>
-            查询
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-        </Space>
-      </Card>
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size="small">
+          <Space size="middle" wrap>
+            <span className={styles.label}>日期区间</span>
+            <RangePicker
+              value={dateRange}
+              onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])}
+              allowClear={false}
+            />
+            <span className={styles.label}>渠道类别</span>
+            <Select
+              mode="multiple"
+              placeholder="全部类别"
+              value={selectedCategories}
+              onChange={setSelectedCategories}
+              style={{ minWidth: 180 }}
+              allowClear
+              maxTagCount="responsive"
+            >
+              {channelCategoryOptions.map((c) => (
+                <Select.Option key={c} value={c}>{c}</Select.Option>
+              ))}
+            </Select>
+            <span className={styles.label}>子渠道</span>
+            <Select
+              mode="multiple"
+              placeholder="全部子渠道"
+              value={selectedSubChannels}
+              onChange={setSelectedSubChannels}
+              style={{ minWidth: 220 }}
+              allowClear
+              maxTagCount="responsive"
+              showSearch
+            >
+              {subChannelOptions.map((s) => (
+                <Select.Option key={s} value={s}>{s}</Select.Option>
+              ))}
+            </Select>
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>
+              查询
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+          </Space>
+        </Card>
+      </FadeInSection>
 
       <Spin spinning={loading}>
         {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
-        <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
-          <MetricCard
-            title="开户成功"
-            value={totals.opens}
-            suffix="人"
-            valueColor="var(--color-brand)"
-            icon={<TeamOutlined style={{ color: 'var(--color-brand)' }} />}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="入金户数"
-            value={totals.deposit}
-            suffix="人"
-            valueColor="var(--chart-color-7)"
-            icon={<BankOutlined style={{ color: 'var(--chart-color-7)' }} />}
-            showWowChange={false}
-          />
-          <MetricCard
-            title="有效户数"
-            value={totals.valid}
-            suffix="人"
-            valueColor="var(--color-success)"
-            icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
-            showWowChange={false}
-          />
-          {(() => {
-            const internetRow = (summary?.by_category || []).find((c) => c.channel_category === '互联网引流');
-            const openedCount = internetRow?.opens ?? 0;
-            const validCnt = internetRow?.valid ?? 0;
-            const depositCnt = internetRow?.deposit ?? 0;
-            const now = new Date();
-            const year = now.getFullYear();
-            const yearStart = new Date(year, 0, 1).getTime();
-            const yearEnd = new Date(year + 1, 0, 1).getTime();
-            const elapsedRatio = Math.min(1, Math.max(0, (now.getTime() - yearStart) / (yearEnd - yearStart)));
-            const openTarget = 20000 * elapsedRatio;
-            const validTarget = 10000 * elapsedRatio;
-            const openRate = openTarget > 0 ? Math.min(openedCount / openTarget, 2) : 0;
-            const validRate = validTarget > 0 ? Math.min(validCnt / validTarget, 2) : 0;
-            const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
-            return (
-              <MetricCard
-                title="互联网开户"
-                value={openedCount}
-                suffix="户"
-                valueColor="var(--chart-color-2)"
-                icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
-                description={`KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天） · 互联网引流入金 ${depositCnt.toLocaleString()} 户 / 有效 ${validCnt.toLocaleString()} 户`}
-                showWowChange={false}
-              />
-            );
-          })()}
-        </MetricSection>
+        <FadeInSection delay={0.15} duration={1.2}>
+          <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
+            <MetricCard
+              title="开户成功"
+              value={totals.opens}
+              suffix="人"
+              valueColor="var(--color-brand)"
+              icon={<TeamOutlined style={{ color: 'var(--color-brand)' }} />}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="入金户数"
+              value={totals.deposit}
+              suffix="人"
+              valueColor="var(--chart-color-7)"
+              icon={<BankOutlined style={{ color: 'var(--chart-color-7)' }} />}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="有效户数"
+              value={totals.valid}
+              suffix="人"
+              valueColor="var(--color-success)"
+              icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />}
+              showWowChange={false}
+            />
+            {(() => {
+              const internetRow = (summary?.by_category || []).find((c) => c.channel_category === '互联网引流');
+              const openedCount = internetRow?.opens ?? 0;
+              const validCnt = internetRow?.valid ?? 0;
+              const depositCnt = internetRow?.deposit ?? 0;
+              const now = new Date();
+              const year = now.getFullYear();
+              const yearStart = new Date(year, 0, 1).getTime();
+              const yearEnd = new Date(year + 1, 0, 1).getTime();
+              const elapsedRatio = Math.min(1, Math.max(0, (now.getTime() - yearStart) / (yearEnd - yearStart)));
+              const openTarget = 20000 * elapsedRatio;
+              const validTarget = 10000 * elapsedRatio;
+              const openRate = openTarget > 0 ? Math.min(openedCount / openTarget, 2) : 0;
+              const validRate = validTarget > 0 ? Math.min(validCnt / validTarget, 2) : 0;
+              const dayOfYear = Math.ceil((now.getTime() - yearStart) / 86400000);
+              return (
+                <MetricCard
+                  title="互联网开户"
+                  value={openedCount}
+                  suffix="户"
+                  valueColor="var(--chart-color-2)"
+                  icon={<TrophyOutlined style={{ color: 'var(--chart-color-2)' }} />}
+                  description={`KPI 完成率 开户 ${(openRate * 100).toFixed(1)}% / 有效户 ${(validRate * 100).toFixed(1)}% · 时间进度 ${(elapsedRatio * 100).toFixed(1)}%（第 ${dayOfYear} 天） · 互联网引流入金 ${depositCnt.toLocaleString()} 户 / 有效 ${validCnt.toLocaleString()} 户`}
+                  showWowChange={false}
+                />
+              );
+            })()}
+          </MetricSection>
+        </FadeInSection>
 
         {/* ② 趋势图：支持一级/二级渠道切换 + 开户/有效户 维度切换 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={24}>
-            <Card size="small">
-              <div className={metricStyles.sectionHeader}>
-                <div className={metricStyles.sectionTitle}>{trendCardTitle}</div>
-                <div className={metricStyles.sectionDesc}>日级开户 / 有效户趋势</div>
-              </div>
-              <Space size="small" wrap style={{ marginBottom: "var(--spacer-12)" }}>
-                <Segmented
-                  value={trendLevel}
-                  onChange={(v) => setTrendLevel(v as 'L1' | 'L2')}
-                  options={[
-                    { label: '一级渠道', value: 'L1' },
-                    { label: '二级渠道', value: 'L2' },
-                  ]}
-                />
-                <Segmented
-                  value={trendMetric}
-                  onChange={(v) => setTrendMetric(v as 'opens' | 'valid')}
-                  options={[
-                    { label: '开户人数', value: 'opens' },
-                    { label: '有效户人数', value: 'valid' },
-                  ]}
-                />
-                {trendLevel === 'L2' && (
-                  <Select
-                    value={trendCategory}
-                    style={{ width: 140 }}
-                    onChange={setTrendCategory}
-                    options={CATEGORY_ORDER.map((c) => ({ label: c, value: c }))}
+        <FadeInSection delay={0.3} duration={1.2}>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={24}>
+              <Card size="small">
+                <div className={metricStyles.sectionHeader}>
+                  <div className={metricStyles.sectionTitle}>{trendCardTitle}</div>
+                  <div className={metricStyles.sectionDesc}>日级开户 / 有效户趋势</div>
+                </div>
+                <Space size="small" wrap style={{ marginBottom: "var(--spacer-12)" }}>
+                  <Segmented
+                    value={trendLevel}
+                    onChange={(v) => setTrendLevel(v as 'L1' | 'L2')}
+                    options={[
+                      { label: '一级渠道', value: 'L1' },
+                      { label: '二级渠道', value: 'L2' },
+                    ]}
                   />
+                  <Segmented
+                    value={trendMetric}
+                    onChange={(v) => setTrendMetric(v as 'opens' | 'valid')}
+                    options={[
+                      { label: '开户人数', value: 'opens' },
+                      { label: '有效户人数', value: 'valid' },
+                    ]}
+                  />
+                  {trendLevel === 'L2' && (
+                    <Select
+                      value={trendCategory}
+                      style={{ width: 140 }}
+                      onChange={setTrendCategory}
+                      options={CATEGORY_ORDER.map((c) => ({ label: c, value: c }))}
+                    />
+                  )}
+                </Space>
+                {chartData.series.length === 0 ? (
+                  <Empty description="该渠道下暂无二级渠道明细" />
+                ) : (
+                  <EChartsComponent option={trendChartOption} height={380} />
                 )}
-              </Space>
-              {chartData.series.length === 0 ? (
-                <Empty description="该渠道下暂无二级渠道明细" />
-              ) : (
-                <EChartsComponent option={trendChartOption} height={380} />
-              )}
-            </Card>
-          </Col>
-        </Row>
+              </Card>
+            </Col>
+          </Row>
+        </FadeInSection>
 
         {/* ③ 4 Tabs 子渠道明细 */}
-        <Card title="4 大类 · 子渠道明细" size="small">
-          <Tabs items={tabItems} />
-        </Card>
+        <FadeInSection delay={0.45} duration={1.2}>
+          <Card title="4 大类 · 子渠道明细" size="small">
+            <Tabs items={tabItems} />
+          </Card>
+        </FadeInSection>
 
-        <ReportFooter
-          sources={[
-            { label: '数据源', value: 'agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket / agg_vendor_daily 独立）' },
-            { label: '总开户/入金/有效户', value: `总 ${totals.opens.toLocaleString()} 开户 / ${totals.deposit.toLocaleString()} 入金 / ${totals.valid.toLocaleString()} 有效户` },
-            { label: '主端点', value: 'POST /api/v1/reports/omni-channel/{summary, daily-trend, by-channel, filter-options}' },
-          ]}
-          notes={'顶部 TOP 渠道类别占比由后端按开户成功人数 SUM 降序算出（现阶段坚持严格只查 agg_daily_channel_open，不与其他表混查）。'}
-        />
+        <FadeInSection delay={0.6} duration={1.2}>
+          <ReportFooter
+            sources={[
+              { label: '数据源', value: 'agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket / agg_vendor_daily 独立）' },
+              { label: '总开户/入金/有效户', value: `总 ${totals.opens.toLocaleString()} 开户 / ${totals.deposit.toLocaleString()} 入金 / ${totals.valid.toLocaleString()} 有效户` },
+              { label: '主端点', value: 'POST /api/v1/reports/omni-channel/{summary, daily-trend, by-channel, filter-options}' },
+            ]}
+            notes={'顶部 TOP 渠道类别占比由后端按开户成功人数 SUM 降序算出（现阶段坚持严格只查 agg_daily_channel_open，不与其他表混查）。'}
+          />
+        </FadeInSection>
       </Spin>
     </div>
   );

@@ -21,7 +21,7 @@ import {
   RiseOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { FilterBar } from '@/components';
+import { FilterBar, FadeInSection } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import TrendChart, { type MetricType } from './components/TrendChart';
 import CalendarHeatmap from './components/CalendarHeatmap';
@@ -227,221 +227,231 @@ const DashboardPage: React.FC = () => {
     <div className={styles.dashboardPage}>
       <Spin spinning={loading}>
         {/* 筛选器 */}
-        <FilterBar
-          showPlatform
-          showAgency
-          showBusinessModel
-          onSearch={handleSearch}
-          onReset={handleReset}
-        />
+        <FadeInSection delay={0} duration={1.2}>
+          <FilterBar
+            showPlatform
+            showAgency
+            showBusinessModel
+            onSearch={handleSearch}
+            onReset={handleReset}
+          />
+        </FadeInSection>
 
-{/* 前端投放指标卡片 */}
-        <MetricSection
-          title={
-            <>
-              <AimOutlined style={{ color: 'var(--color-brand)' }} /> <Text type="secondary">前端投放</Text>
-            </>
-          }
-          description="广告投放与获取效果"
-        >
-
-                          <MetricCard
-                title="阶段投入金额"
-                value={coreMetrics?.investment}
-                wowChange={wowChanges?.investment ? {
-                  value: wowChanges.investment.value,
-                  trend: wowChanges.investment.trend,
-                  color: wowChanges.investment.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
-              />
-                          <MetricCard
-                title="总展示数"
-                value={coreMetrics?.total_impressions}
-                wowChange={wowChanges?.total_impressions ? {
-                  value: wowChanges.total_impressions.value,
-                  trend: wowChanges.total_impressions.trend,
-                  color: wowChanges.total_impressions.color,
-                } : undefined}
-                formatter="number"
-                icon={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
-              />
-                          <MetricCard
-                title="企微数"
-                value={coreMetrics?.leads_wechat}
-                wowChange={wowChanges?.leads_wechat ? {
-                  value: wowChanges.leads_wechat.value,
-                  trend: wowChanges.leads_wechat.trend,
-                  color: wowChanges.leads_wechat.color,
-                } : undefined}
-                formatter="number"
-                icon={<UserOutlined style={{ color: METRIC_COLORS.leadsWechat }} />}
-              />
-              <MetricCard
-                title="APP下载激活数"
-                value={coreMetrics?.leads_app}
-                wowChange={wowChanges?.leads_app ? {
-                  value: wowChanges.leads_app.value,
-                  trend: wowChanges.leads_app.trend,
-                  color: wowChanges.leads_app.color,
-                } : undefined}
-                formatter="number"
-                icon={<AimOutlined style={{ color: METRIC_COLORS.leadsApp }} />}
-              />
-        </MetricSection>
+        {/* 前端投放指标卡片 */}
+        <FadeInSection delay={0.15} duration={1.2}>
+          <MetricSection
+            title={
+              <>
+                <AimOutlined style={{ color: 'var(--color-brand)' }} /> <Text type="secondary">前端投放</Text>
+              </>
+            }
+            description="广告投放与获取效果"
+          >
+            <MetricCard
+              title="阶段投入金额"
+              value={coreMetrics?.investment}
+              wowChange={wowChanges?.investment ? {
+                value: wowChanges.investment.value,
+                trend: wowChanges.investment.trend,
+                color: wowChanges.investment.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
+            />
+            <MetricCard
+              title="总展示数"
+              value={coreMetrics?.total_impressions}
+              wowChange={wowChanges?.total_impressions ? {
+                value: wowChanges.total_impressions.value,
+                trend: wowChanges.total_impressions.trend,
+                color: wowChanges.total_impressions.color,
+              } : undefined}
+              formatter="number"
+              icon={<EyeOutlined style={{ color: METRIC_COLORS.impressions }} />}
+            />
+            <MetricCard
+              title="企微数"
+              value={coreMetrics?.leads_wechat}
+              wowChange={wowChanges?.leads_wechat ? {
+                value: wowChanges.leads_wechat.value,
+                trend: wowChanges.leads_wechat.trend,
+                color: wowChanges.leads_wechat.color,
+              } : undefined}
+              formatter="number"
+              icon={<UserOutlined style={{ color: METRIC_COLORS.leadsWechat }} />}
+            />
+            <MetricCard
+              title="APP下载激活数"
+              value={coreMetrics?.leads_app}
+              wowChange={wowChanges?.leads_app ? {
+                value: wowChanges.leads_app.value,
+                trend: wowChanges.leads_app.trend,
+                color: wowChanges.leads_app.color,
+              } : undefined}
+              formatter="number"
+              icon={<AimOutlined style={{ color: METRIC_COLORS.leadsApp }} />}
+            />
+          </MetricSection>
+        </FadeInSection>
 
         {/* 后端转化指标卡片 */}
-        <MetricSection
-          title={
-            <>
-              <TrophyOutlined style={{ color: 'var(--color-success)' }} /> <Text type="secondary">后端转化</Text>
-            </>
-          }
-          description="客户获取与价值创造"
-        >
-              <MetricCard
-                title="新开客户数"
-                value={coreMetrics?.new_customers}
-                wowChange={wowChanges?.new_customers ? {
-                  value: wowChanges.new_customers.value,
-                  trend: wowChanges.new_customers.trend,
-                  color: wowChanges.new_customers.color,
-                } : undefined}
-                formatter="number"
-                icon={<TeamOutlined style={{ color: METRIC_COLORS.openedAccounts }} />}
-              />
-              <MetricCard
-                title="新增有效户数"
-                value={coreMetrics?.new_valid_accounts}
-                wowChange={wowChanges?.new_valid_accounts ? {
-                  value: wowChanges.new_valid_accounts.value,
-                  trend: wowChanges.new_valid_accounts.trend,
-                  color: wowChanges.new_valid_accounts.color,
-                } : undefined}
-                formatter="number"
-                icon={<TrophyOutlined style={{ color: METRIC_COLORS.validCustomers }} />}
-              />
-              <MetricCard
-                title={
-                  <Tooltip title="新开客户的资产总额">
-                    <span>客户资产</span>
-                  </Tooltip>
-                }
-                value={coreMetrics?.customer_assets}
-                wowChange={wowChanges?.customer_assets ? {
-                  value: wowChanges.customer_assets.value,
-                  trend: wowChanges.customer_assets.trend,
-                  color: wowChanges.customer_assets.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<AccountBookOutlined style={{ color: METRIC_COLORS.customerAssets }} />}
-              />
-              <MetricCard
-                title={
-                  <Tooltip title="客户今年创收金额">
-                    <span>客户贡献</span>
-                  </Tooltip>
-                }
-                value={coreMetrics?.customer_contribution}
-                wowChange={wowChanges?.customer_contribution ? {
-                  value: wowChanges.customer_contribution.value,
-                  trend: wowChanges.customer_contribution.trend,
-                  color: wowChanges.customer_contribution.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<RiseOutlined style={{ color: METRIC_COLORS.contribution }} />}
-              />
-        </MetricSection>
+        <FadeInSection delay={0.3} duration={1.2}>
+          <MetricSection
+            title={
+              <>
+                <TrophyOutlined style={{ color: 'var(--color-success)' }} /> <Text type="secondary">后端转化</Text>
+              </>
+            }
+            description="客户获取与价值创造"
+          >
+            <MetricCard
+              title="新开客户数"
+              value={coreMetrics?.new_customers}
+              wowChange={wowChanges?.new_customers ? {
+                value: wowChanges.new_customers.value,
+                trend: wowChanges.new_customers.trend,
+                color: wowChanges.new_customers.color,
+              } : undefined}
+              formatter="number"
+              icon={<TeamOutlined style={{ color: METRIC_COLORS.openedAccounts }} />}
+            />
+            <MetricCard
+              title="新增有效户数"
+              value={coreMetrics?.new_valid_accounts}
+              wowChange={wowChanges?.new_valid_accounts ? {
+                value: wowChanges.new_valid_accounts.value,
+                trend: wowChanges.new_valid_accounts.trend,
+                color: wowChanges.new_valid_accounts.color,
+              } : undefined}
+              formatter="number"
+              icon={<TrophyOutlined style={{ color: METRIC_COLORS.validCustomers }} />}
+            />
+            <MetricCard
+              title={
+                <Tooltip title="新开客户的资产总额">
+                  <span>客户资产</span>
+                </Tooltip>
+              }
+              value={coreMetrics?.customer_assets}
+              wowChange={wowChanges?.customer_assets ? {
+                value: wowChanges.customer_assets.value,
+                trend: wowChanges.customer_assets.trend,
+                color: wowChanges.customer_assets.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<AccountBookOutlined style={{ color: METRIC_COLORS.customerAssets }} />}
+            />
+            <MetricCard
+              title={
+                <Tooltip title="客户今年创收金额">
+                  <span>客户贡献</span>
+                </Tooltip>
+              }
+              value={coreMetrics?.customer_contribution}
+              wowChange={wowChanges?.customer_contribution ? {
+                value: wowChanges.customer_contribution.value,
+                trend: wowChanges.customer_contribution.trend,
+                color: wowChanges.customer_contribution.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<RiseOutlined style={{ color: METRIC_COLORS.contribution }} />}
+            />
+          </MetricSection>
+        </FadeInSection>
 
         {/* 运营效率指标卡片 */}
-        <MetricSection
-          title={
-            <>
-              <ThunderboltOutlined style={{ color: 'var(--color-warning)' }} /> <Text type="secondary">运营效率</Text>
-            </>
-          }
-          description="单位成本分析"
-        >
-
-                          <MetricCard
-                title="单企微成本"
-                value={coreMetrics?.cost_per_wechat_lead}
-                wowChange={wowChanges?.cost_per_wechat_lead ? {
-                  value: wowChanges.cost_per_wechat_lead.value,
-                  trend: wowChanges.cost_per_wechat_lead.trend,
-                  color: wowChanges.cost_per_wechat_lead.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costWechat }} />}
-              />
-              <MetricCard
-                title="单APP下载激活成本"
-                value={coreMetrics?.cost_per_app_activation}
-                wowChange={wowChanges?.cost_per_app_activation ? {
-                  value: wowChanges.cost_per_app_activation.value,
-                  trend: wowChanges.cost_per_app_activation.trend,
-                  color: wowChanges.cost_per_app_activation.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costApp }} />}
-              />
-                          <MetricCard
-                title="单开户成本"
-                value={costPerAccount}
-                wowChange={wowChanges?.cost_per_account ? {
-                  value: wowChanges.cost_per_account.value,
-                  trend: wowChanges.cost_per_account.trend,
-                  color: wowChanges.cost_per_account.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
-              />
-                          <MetricCard
-                title="单有效户成本"
-                value={coreMetrics?.cost_per_valid_account}
-                wowChange={wowChanges?.cost_per_valid_account ? {
-                  value: wowChanges.cost_per_valid_account.value,
-                  trend: wowChanges.cost_per_valid_account.trend,
-                  color: wowChanges.cost_per_valid_account.color,
-                } : undefined}
-                prefix="¥"
-                formatter="currency"
-                icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
-              />
-        </MetricSection>
+        <FadeInSection delay={0.45} duration={1.2}>
+          <MetricSection
+            title={
+              <>
+                <ThunderboltOutlined style={{ color: 'var(--color-warning)' }} /> <Text type="secondary">运营效率</Text>
+              </>
+            }
+            description="单位成本分析"
+          >
+            <MetricCard
+              title="单企微成本"
+              value={coreMetrics?.cost_per_wechat_lead}
+              wowChange={wowChanges?.cost_per_wechat_lead ? {
+                value: wowChanges.cost_per_wechat_lead.value,
+                trend: wowChanges.cost_per_wechat_lead.trend,
+                color: wowChanges.cost_per_wechat_lead.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costWechat }} />}
+            />
+            <MetricCard
+              title="单APP下载激活成本"
+              value={coreMetrics?.cost_per_app_activation}
+              wowChange={wowChanges?.cost_per_app_activation ? {
+                value: wowChanges.cost_per_app_activation.value,
+                trend: wowChanges.cost_per_app_activation.trend,
+                color: wowChanges.cost_per_app_activation.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<ThunderboltOutlined style={{ color: METRIC_COLORS.costApp }} />}
+            />
+            <MetricCard
+              title="单开户成本"
+              value={costPerAccount}
+              wowChange={wowChanges?.cost_per_account ? {
+                value: wowChanges.cost_per_account.value,
+                trend: wowChanges.cost_per_account.trend,
+                color: wowChanges.cost_per_account.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
+            />
+            <MetricCard
+              title="单有效户成本"
+              value={coreMetrics?.cost_per_valid_account}
+              wowChange={wowChanges?.cost_per_valid_account ? {
+                value: wowChanges.cost_per_valid_account.value,
+                trend: wowChanges.cost_per_valid_account.trend,
+                color: wowChanges.cost_per_valid_account.color,
+              } : undefined}
+              prefix="¥"
+              formatter="currency"
+              icon={<DollarOutlined style={{ color: METRIC_COLORS.cost }} />}
+            />
+          </MetricSection>
+        </FadeInSection>
 
         {/* 趋势图 */}
-        <Row gutter={[16, 16]} className={styles.chartsRow}>
-          <Col xs={24} lg={24}>
-            <TrendChart
-              data={trendData?.trend_data || []}
-              metricType={trendMetricType}
-              loading={trendLoading}
-              height={350}
-              onMetricTypeChange={handleTrendMetricChange}
-              onGranularityChange={handleTrendGranularityChange}
-            />
-          </Col>
-        </Row>
+        <FadeInSection delay={0.6} duration={1.2}>
+          <Row gutter={[16, 16]} className={styles.chartsRow}>
+            <Col xs={24} lg={24}>
+              <TrendChart
+                data={trendData?.trend_data || []}
+                metricType={trendMetricType}
+                loading={trendLoading}
+                height={350}
+                onMetricTypeChange={handleTrendMetricChange}
+                onGranularityChange={handleTrendGranularityChange}
+              />
+            </Col>
+          </Row>
+        </FadeInSection>
 
         {/* 互联网渠道开户日历热力图（7 行 × N 列布局，表头与 Dashboard 其他卡组一致） */}
-        <MetricSection
-          title={
-            <>
-              🔥 <Text type="secondary">开户日历热力图</Text>
-            </>
-          }
-          description="过去一年每日互联网引流开户密度（蓝色越深 = 当日开户数越多）"
-        >
-          <CalendarHeatmap data={calendarData} loading={calendarLoading} />
-        </MetricSection>
+        <FadeInSection delay={0.75} duration={1.2}>
+          <MetricSection
+            title={
+              <>
+                🔥 <Text type="secondary">开户日历热力图</Text>
+              </>
+            }
+            description="过去一年每日互联网引流开户密度（蓝色越深 = 当日开户数越多）"
+          >
+            <CalendarHeatmap data={calendarData} loading={calendarLoading} />
+          </MetricSection>
+        </FadeInSection>
       </Spin>
     </div>
   );

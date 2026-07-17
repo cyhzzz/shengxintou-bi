@@ -28,6 +28,7 @@ import dayjs from 'dayjs';
 import { dataService } from '@/services/dataService';
 import type { XhsNotesListItem } from '@/types/api.schemas';
 import styles from './List.module.scss';
+import { FadeInSection } from '@/components';
 
 const { Link } = Typography;
 const { RangePicker } = DatePicker;
@@ -677,6 +678,7 @@ const XhsNotesListPage: React.FC = () => {
   return (
     <div className={styles.notesListPage}>
       {/* 筛选器卡片 */}
+      <FadeInSection delay={0} duration={1.2}>
       <Card className={styles.filterCard} size="small">
         <Space wrap size="middle">
           {/* 数据时间 */}
@@ -804,9 +806,11 @@ const XhsNotesListPage: React.FC = () => {
           </div>
         </Space>
       </Card>
+      </FadeInSection>
 
       {/* 数据表格卡片 */}
-      <Card className={styles.tableCard}>
+      <FadeInSection delay={0.15} duration={1.2}>
+        <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <span className={styles.tableTitle}>笔记列表</span>
           <Space>
@@ -850,6 +854,7 @@ const XhsNotesListPage: React.FC = () => {
           }}
         />
       </Card>
+      </FadeInSection>
 
       {/* 详情弹窗 */}
       <Modal

@@ -9,6 +9,7 @@ import { Card, Row, Col, Select, DatePicker, Space, Spin, Table, Tag, Button } f
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import EChartsComponent from '@/components/Chart/ECharts';
+import { FadeInSection } from '@/components';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -120,93 +121,101 @@ const AppMarketComparisonPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size='small'>
-        <Space size='middle' wrap>
-          <span className={styles.label}>日期区间</span>
-          <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-          <span className={styles.label}>渠道类型</span>
-          <Select mode='multiple' allowClear placeholder='全部'
-            value={channelType} onChange={setChannelType}
-            options={opts.channel_types.map((t) => ({ label: t, value: t }))}
-            style={{ minWidth: 180 }} maxTagCount='responsive' />
-          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-        </Space>
-      </Card>
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size='small'>
+          <Space size='middle' wrap>
+            <span className={styles.label}>日期区间</span>
+            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+            <span className={styles.label}>渠道类型</span>
+            <Select mode='multiple' allowClear placeholder='全部'
+              value={channelType} onChange={setChannelType}
+              options={opts.channel_types.map((t) => ({ label: t, value: t }))}
+              style={{ minWidth: 180 }} maxTagCount='responsive' />
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+          </Space>
+        </Card>
+      </FadeInSection>
       <Spin spinning={loading}>
-        <Row gutter={16} style={{ marginTop: 16 }}>
-          <Col span={12}>
-            <Card title='应用市场多维度雷达对比' size='small'>
-              <EChartsComponent option={radarOption} height={400} />
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card title='月度堆叠柱状图（按新开户）' size='small'>
-              <EChartsComponent option={monthlyOption} height={400} />
-            </Card>
-          </Col>
-        </Row>
+        <FadeInSection delay={0.15} duration={1.2}>
+          <Row gutter={16} style={{ marginTop: 16 }}>
+            <Col span={12}>
+              <Card title='应用市场多维度雷达对比' size='small'>
+                <EChartsComponent option={radarOption} height={400} />
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card title='月度堆叠柱状图（按新开户）' size='small'>
+                <EChartsComponent option={monthlyOption} height={400} />
+              </Card>
+            </Col>
+          </Row>
+        </FadeInSection>
 
-        <Card title='应用市场漏斗明细对比表' size='small' style={{ marginTop: 16 }}>
-          <Table size='small' rowKey='app_market' dataSource={data?.by_market || []} pagination={false}
-            scroll={{ x: 'max-content' }}
-            columns={[
-              { title: '应用市场', dataIndex: 'app_market', fixed: 'left', width: 100 },
-              { title: '下载数', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
-              { title: '激活APP', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
-              { title: '开户成功', align: 'right', render: (_: any, r: any) => r.counts['开户成功']?.toLocaleString() || 0 },
-              { title: '新开户', align: 'right', render: (_: any, r: any) => <strong style={{ color: 'var(--color-brand)' }}>{r.counts['新开户']?.toLocaleString() || 0}</strong> },
-              { title: '入金', align: 'right', render: (_: any, r: any) => r.counts['入金']?.toLocaleString() || 0 },
-              { title: '有效户', align: 'right', render: (_: any, r: any) => r.counts['有效户']?.toLocaleString() || 0 },
-              {
-                title: '激活->新开户',
-                align: 'right',
-                render: (_: any, r: any) => {
-                  const base = r.counts['激活APP'] || 0;
-                  const v = r.counts['新开户'] || 0;
-                  const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
-                  return <Tag color={Number(p) > 3 ? 'green' : Number(p) > 0.5 ? 'gold' : 'default'}>{p}%</Tag>;
+        <FadeInSection delay={0.3} duration={1.2}>
+          <Card title='应用市场漏斗明细对比表' size='small' style={{ marginTop: 16 }}>
+            <Table size='small' rowKey='app_market' dataSource={data?.by_market || []} pagination={false}
+              scroll={{ x: 'max-content' }}
+              columns={[
+                { title: '应用市场', dataIndex: 'app_market', fixed: 'left', width: 100 },
+                { title: '下载数', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
+                { title: '激活APP', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
+                { title: '开户成功', align: 'right', render: (_: any, r: any) => r.counts['开户成功']?.toLocaleString() || 0 },
+                { title: '新开户', align: 'right', render: (_: any, r: any) => <strong style={{ color: 'var(--color-brand)' }}>{r.counts['新开户']?.toLocaleString() || 0}</strong> },
+                { title: '入金', align: 'right', render: (_: any, r: any) => r.counts['入金']?.toLocaleString() || 0 },
+                { title: '有效户', align: 'right', render: (_: any, r: any) => r.counts['有效户']?.toLocaleString() || 0 },
+                {
+                  title: '激活->新开户',
+                  align: 'right',
+                  render: (_: any, r: any) => {
+                    const base = r.counts['激活APP'] || 0;
+                    const v = r.counts['新开户'] || 0;
+                    const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
+                    return <Tag color={Number(p) > 3 ? 'green' : Number(p) > 0.5 ? 'gold' : 'default'}>{p}%</Tag>;
+                  },
                 },
-              },
-              {
-                title: '激活->开户',
-                align: 'right',
-                render: (_: any, r: any) => {
-                  const base = r.counts['激活APP'] || 0;
-                  const v = r.counts['开户成功'] || 0;
-                  const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
-                  return <Tag color={Number(p) > 5 ? 'green' : 'default'}>{p}%</Tag>;
+                {
+                  title: '激活->开户',
+                  align: 'right',
+                  render: (_: any, r: any) => {
+                    const base = r.counts['激活APP'] || 0;
+                    const v = r.counts['开户成功'] || 0;
+                    const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
+                    return <Tag color={Number(p) > 5 ? 'green' : 'default'}>{p}%</Tag>;
+                  },
                 },
-              },
-              {
-                title: '激活->有效',
-                align: 'right',
-                render: (_: any, r: any) => {
-                  const base = r.counts['激活APP'] || 0;
-                  const v = r.counts['有效户'] || 0;
-                  const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
-                  return <Tag color={Number(p) > 1 ? 'green' : 'default'}>{p}%</Tag>;
+                {
+                  title: '激活->有效',
+                  align: 'right',
+                  render: (_: any, r: any) => {
+                    const base = r.counts['激活APP'] || 0;
+                    const v = r.counts['有效户'] || 0;
+                    const p = base > 0 ? (v / base * 100).toFixed(2) : '0.00';
+                    return <Tag color={Number(p) > 1 ? 'green' : 'default'}>{p}%</Tag>;
+                  },
                 },
-              },
-            ]}
-          />
-        </Card>
+              ]}
+            />
+          </Card>
+        </FadeInSection>
 
-        <Card title='渠道类型 × 应用市场分布' size='small' style={{ marginTop: 16 }}>
-          <Table size='small' rowKey={(r: any) => `${r.channel_type}-${r.app_market}`}
-            dataSource={data?.by_channel_type || []} pagination={false}
-            scroll={{ x: 'max-content' }}
-            columns={[
-              { title: '渠道类型', dataIndex: 'channel_type', width: 110 },
-              { title: '应用市场', dataIndex: 'app_market', width: 100 },
-              { title: '下载', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
-              { title: '激活APP', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
-              { title: '开户成功', align: 'right', render: (_: any, r: any) => r.counts['开户成功']?.toLocaleString() || 0 },
-              { title: '新开户', align: 'right', render: (_: any, r: any) => <strong style={{ color: 'var(--color-brand)' }}>{r.counts['新开户']?.toLocaleString() || 0}</strong> },
-              { title: '有效户', align: 'right', render: (_: any, r: any) => r.counts['有效户']?.toLocaleString() || 0 },
-            ]}
-          />
-        </Card>
+        <FadeInSection delay={0.45} duration={1.2}>
+          <Card title='渠道类型 × 应用市场分布' size='small' style={{ marginTop: 16 }}>
+            <Table size='small' rowKey={(r: any) => `${r.channel_type}-${r.app_market}`}
+              dataSource={data?.by_channel_type || []} pagination={false}
+              scroll={{ x: 'max-content' }}
+              columns={[
+                { title: '渠道类型', dataIndex: 'channel_type', width: 110 },
+                { title: '应用市场', dataIndex: 'app_market', width: 100 },
+                { title: '下载', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
+                { title: '激活APP', align: 'right', render: (_: any, r: any) => r.counts['激活APP']?.toLocaleString() || 0 },
+                { title: '开户成功', align: 'right', render: (_: any, r: any) => r.counts['开户成功']?.toLocaleString() || 0 },
+                { title: '新开户', align: 'right', render: (_: any, r: any) => <strong style={{ color: 'var(--color-brand)' }}>{r.counts['新开户']?.toLocaleString() || 0}</strong> },
+                { title: '有效户', align: 'right', render: (_: any, r: any) => r.counts['有效户']?.toLocaleString() || 0 },
+              ]}
+            />
+          </Card>
+        </FadeInSection>
       </Spin>
     </div>
   );

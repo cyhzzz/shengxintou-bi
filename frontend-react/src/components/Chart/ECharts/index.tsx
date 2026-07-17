@@ -97,25 +97,25 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     const currentTheme = getCurrentTheme();
     const mergedOption = mergeChartTheme(option, currentTheme);
 
-    // v3.2.6：统一注入更从容的入场动画（除非显式禁用）
+    // v3.2.7：统一注入更慢、更从容的入场动画（1~2 秒级）
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!disableAnimation && !prefersReduced) {
       (mergedOption as any).animation = true;
-      (mergedOption as any).animationDuration = (mergedOption as any).animationDuration ?? 1000;
+      (mergedOption as any).animationDuration = (mergedOption as any).animationDuration ?? 1200;
       (mergedOption as any).animationEasing = (mergedOption as any).animationEasing ?? 'cubicOut';
       const series = (mergedOption as any).series;
       if (Array.isArray(series)) {
         (mergedOption as any).series = series.map((s, idx) => ({
           animation: true,
-          animationDuration: 1000,
+          animationDuration: 1200,
           animationEasing: 'cubicOut',
-          animationDelay: idx * 150,
+          animationDelay: idx * 200,
           ...s,
         }));
       } else if (series && typeof series === 'object') {
         (mergedOption as any).series = {
           animation: true,
-          animationDuration: 1000,
+          animationDuration: 1200,
           animationEasing: 'cubicOut',
           ...series,
         };

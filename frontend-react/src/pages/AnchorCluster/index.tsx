@@ -23,6 +23,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceLeadsAnchor } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
+import { FadeInSection } from '@/components';
 import { sanitizeText, sanitizeList } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
 
@@ -260,25 +261,28 @@ const AnchorClusterPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size='small'>
-        <Space size='middle' wrap>
-          <span className={styles.label}>日期区间</span>
-          <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-          <span className={styles.label}>主播平台</span>
-          <Select mode='multiple' allowClear placeholder='全部' value={platformFilter}
-            onChange={setPlatformFilter} options={platforms.map((p) => ({ label: p, value: p }))}
-            style={{ minWidth: 180 }} maxTagCount='responsive' />
-          <span className={styles.label}>主播</span>
-          <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
-            onChange={setAnchorFilter} options={anchorOptions.map((a) => ({ label: a, value: a }))}
-            style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
-          <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-          <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-        </Space>
-      </Card>
+      <FadeInSection delay={0} duration={1.2}>
+        <Card className={styles.filterCard} size='small'>
+          <Space size='middle' wrap>
+            <span className={styles.label}>日期区间</span>
+            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
+            <span className={styles.label}>主播平台</span>
+            <Select mode='multiple' allowClear placeholder='全部' value={platformFilter}
+              onChange={setPlatformFilter} options={platforms.map((p) => ({ label: p, value: p }))}
+              style={{ minWidth: 180 }} maxTagCount='responsive' />
+            <span className={styles.label}>主播</span>
+            <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
+              onChange={setAnchorFilter} options={anchorOptions.map((a) => ({ label: a, value: a }))}
+              style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
+            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
+            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
+          </Space>
+        </Card>
+      </FadeInSection>
 
       <Spin spinning={loading}>
-        <MetricSection title="主播分析概览" description="主播引流链路的线索、开口、有效线索与成功开户核心表现（v3.1.26 起新开户作为核心获客产出，存量客户线索与资产分项辅助呈现）">
+        <FadeInSection delay={0.15} duration={1.2}>
+          <MetricSection title="主播分析概览" description="主播引流链路的线索、开口、有效线索与成功开户核心表现（v3.1.26 起新开户作为核心获客产出，存量客户线索与资产分项辅助呈现）">
           <MetricCard
             title="主播数"
             value={totals.anchors}
@@ -373,37 +377,42 @@ const AnchorClusterPage: React.FC = () => {
             showWowChange={false}
           />
         </MetricSection>
+        </FadeInSection>
 
-        <Card title={`主播分析明细（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size='small'
-          extra={
-            <Space>
-              <Tooltip title='同名主播跨平台自动聚合，覆盖平台列展开为多 Tag；支持上方平台/主播多选筛选'>
-                <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
-              </Tooltip>
-              <Tooltip title='导出为 CSV'>
-                <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!anchorAggRows.length}>导出 CSV</Button>
-              </Tooltip>
-            </Space>
-          }>
-          {anchorAggRows.length > 0 ? (
-            <Table<AnchorAggRow> size='small' rowKey='anchor' dataSource={anchorAggRows}
-              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }}
-              columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
-          ) : (
-            <Empty description={'暂无主播聚类数据（请检查日期区间是否覆盖主播引流时段）'} />
-          )}
-        </Card>
+        <FadeInSection delay={0.3} duration={1.2}>
+          <Card title={`主播分析明细（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size='small'
+            extra={
+              <Space>
+                <Tooltip title='同名主播跨平台自动聚合，覆盖平台列展开为多 Tag；支持上方平台/主播多选筛选'>
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+                <Tooltip title='导出为 CSV'>
+                  <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!anchorAggRows.length}>导出 CSV</Button>
+                </Tooltip>
+              </Space>
+            }>
+            {anchorAggRows.length > 0 ? (
+              <Table<AnchorAggRow> size='small' rowKey='anchor' dataSource={anchorAggRows}
+                pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }}
+                columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
+            ) : (
+              <Empty description={'暂无主播聚类数据（请检查日期区间是否覆盖主播引流时段）'} />
+            )}
+          </Card>
+        </FadeInSection>
 
-        <ReportFooter
-          sources={[
-            { label: '数据源', value: 'fact_conv_content.客户来源 字段中符合 [平台]引流-[主播名字] 模式的记录（例如 视频号引流-姚立琦、抖音引流-赵茜、财联社引流-谭记恩 等）' },
-            { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
-            { label: '默认 top_n', value: '200' },
-            { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
-            { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台/主播多选筛选' },
-          ]}
-          notes={'v3.1.26 起新开户作为核心获客产出：指标卡区分存量客户/新客户/新开户/新有效户/新开户资产/存量资产；明细表新增 存量客户/新客户/有效(非存量)/新开户/存量开户/新有效户/新开户资产/存量资产 列。非引流类客户来源（如 广告投放-新客权益）不参与聚类。'}
-        />
+        <FadeInSection delay={0.45} duration={1.2}>
+          <ReportFooter
+            sources={[
+              { label: '数据源', value: 'fact_conv_content.客户来源 字段中符合 [平台]引流-[主播名字] 模式的记录（例如 视频号引流-姚立琦、抖音引流-赵茜、财联社引流-谭记恩 等）' },
+              { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
+              { label: '默认 top_n', value: '200' },
+              { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
+              { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台/主播多选筛选' },
+            ]}
+            notes={'v3.1.26 起新开户作为核心获客产出：指标卡区分存量客户/新客户/新开户/新有效户/新开户资产/存量资产；明细表新增 存量客户/新客户/有效(非存量)/新开户/存量开户/新有效户/新开户资产/存量资产 列。非引流类客户来源（如 广告投放-新客权益）不参与聚类。'}
+          />
+        </FadeInSection>
       </Spin>
     </div>
   );

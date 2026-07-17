@@ -4,15 +4,15 @@
   margin-bottom: var(--spacer-16);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  // v3.2.6：整组卡片区域先淡入，为内部 stagger 做层次铺垫
+  // v3.2.7：整组卡片区域先淡入，为内部 stagger 做层次铺垫；默认跟随父级 FadeInSection 的节奏
   opacity: 0;
-  animation: sectionEnter var(--motion-duration-slow) var(--motion-easing-smooth) both;
+  animation: sectionEnter var(--motion-duration-slow, 800ms) var(--motion-easing-smooth) both;
 }
 
 @keyframes sectionEnter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -58,10 +58,10 @@
   border-radius: var(--radius-lg);
   // v3.2.6：hover 仅改阴影，避免 transform 触发 layout/paint；入场动画使用 transform + opacity
   transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
-  // v3.2.6：更从容的 stagger 入场（从上到下淡入 + 轻微上浮 + 缩放归位）
+  // v3.2.7：更慢的 stagger 入场（大容器内卡片依次浮现，1~2 秒级）
   opacity: 0;
   will-change: transform, opacity;
-  animation: metricCardEnter var(--motion-duration-slow) var(--motion-easing-smooth) both;
+  animation: metricCardEnter var(--motion-duration-slower, 1200ms) var(--motion-easing-smooth) both;
   animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-gap));
 
   &:hover {
