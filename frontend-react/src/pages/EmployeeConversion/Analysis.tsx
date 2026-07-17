@@ -9,11 +9,11 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty, Alert,
+  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty,
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, DollarOutlined, RiseOutlined,
-  DownloadOutlined, SearchOutlined, ReloadOutlined, InfoCircleOutlined,
+  DownloadOutlined, SearchOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -23,12 +23,6 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
 import { http } from '@/services/http';
 import styles from './Analysis.module.scss';
-
-const LEAD_TYPE_OPTIONS = [
-  { label: '全部线索', value: 'all' },
-  { label: '存量线索', value: 'existing' },
-  { label: '新增线索', value: 'new' },
-];
 
 interface TrendItem {
   period: string;
@@ -49,11 +43,9 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [leadType, setLeadType] = useState<string>('all');
   const [rateTrendGranularity, setRateTrendGranularity] = useState<'weekly' | 'monthly'>('weekly');
 
   const [platformOptions, setPlatformOptions] = useState<string[]>([]);
-  const [contentPlatformLabel, setContentPlatformLabel] = useState<string>("");
   const [defaultPlatforms, setDefaultPlatforms] = useState<string[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -69,7 +61,6 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
       if (res?.success && res.data) {
         setPlatformOptions(res.data.platforms || []);
         setEmployeeOptions(res.data.employees || []);
-        setContentPlatformLabel(res.data.content_platform_label || "");
         const dp = res.data.default_platforms || res.data.platforms || [];
         setDefaultPlatforms(dp);
         if (!selectedPlatforms.length) {
@@ -91,7 +82,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     setLoading(true);
     try {
       const params: Record<string, unknown> = {
-        lead_type: leadType,
+        lead_type: 'all',
         granularity: rateTrendGranularity,
       };
       if (dateRange[0] && dateRange[1]) {
@@ -115,11 +106,11 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, selectedPlatforms, selectedEmployees, leadType, rateTrendGranularity, defaultPlatforms]);
+  }, [dateRange, selectedPlatforms, selectedEmployees, rateTrendGranularity, defaultPlatforms]);
 
   const fetchChannelOverview = useCallback(async () => {
     try {
-      const params: Record<string, unknown> = { lead_type: leadType };
+      const params: Record<string, unknown> = { lead_type: 'all' };
       if (dateRange[0] && dateRange[1]) {
         params.start_date = dateRange[0];
         params.end_date = dateRange[1];
@@ -133,7 +124,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     } catch (err) {
       console.warn('channel overview fetch failed', err);
     }
-  }, [dateRange, selectedEmployees, selectedPlatforms, leadType, defaultPlatforms]);
+  }, [dateRange, selectedEmployees, selectedPlatforms, defaultPlatforms]);
 
   // 初始加载 + 任何筛选项变化都重取
   useEffect(() => {
@@ -209,7 +200,6 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     setDateRange(['', '']);
     setSelectedPlatforms([]);
     setSelectedEmployees([]);
-    setLeadType('all');
   };
 
   const exportRanking = () => {
@@ -249,19 +239,6 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.employeeConversionPage}>
-      {/* v3.1.27: 口径说明 Alert — 业务实质是「内容平台」新开户营销转化 */}
-      <Alert
-        type="info"
-        showIcon
-        icon={<InfoCircleOutlined />}
-        message="本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标"
-        description={
-          <span>
-            内容平台 = {defaultPlatforms.join(' / ') || '抖音/小红书/腾讯/快手/财联社'} 、【{contentPlatformLabel || '默认平台筛选器 = 内容平台全集，清空后将自动恢复'}】。仅统计需要员工承接营销转化的核心口径。
-          </span>
-        }
-        style={{ marginBottom: 12 }}
-      />
       <Card className={styles.filterCard} size='small'>
         <div className={styles.filterRow}>
           <div className={styles.filterGroup}>
@@ -281,12 +258,6 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
               onChange={setSelectedEmployees} loading={optionsLoading}
               options={employeeOptions.map((e) => ({ label: e, value: e }))}
               style={{ minWidth: 180 }} maxTagCount='responsive' showSearch />
-          </div>
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>线索类型:</span>
-            <Radio.Group value={leadType} onChange={(e) => setLeadType(e.target.value)} optionType='button' buttonStyle='solid'>
-              {LEAD_TYPE_OPTIONS.map((o) => <Radio.Button key={o.value} value={o.value}>{o.label}</Radio.Button>)}
-            </Radio.Group>
           </div>
           <div className={styles.filterActions}>
             <Button type='primary' icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
@@ -374,7 +345,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
           { label: '数据源', value: 'fact_conv_content（员工明细口径）+ agg_daily_channel_open（渠道口径，独立数据源）' },
           { label: '主端点', value: 'POST /api/v1/employee-conversion/{analysis, weekly, analysis-channel-overview}' },
         ]}
-        notes={'员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。内容平台限定为小红书/腾讯/抖音/快手/财联社，不含云极（yj）等非员工承接渠道。'}
+        notes={'本报表业务口径仅统计内容平台客户的新开户 / 有效户 / 资产指标。内容平台 = 小红书 / 腾讯 / 抖音 / 快手 / 财联社（员工承接营销转化的核心口径），不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径。平台筛选器默认 = 内容平台全集，清空后将自动恢复。员工转化核心指标只统计内容平台员工承接线索；互联网引流渠道汇总为独立参考口径，不与员工核心指标相加。'}
       />
     </div>
   );
