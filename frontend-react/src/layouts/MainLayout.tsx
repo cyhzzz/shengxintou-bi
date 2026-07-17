@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Layout, Menu, Tooltip } from 'antd';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { LazyMotion, domAnimation } from 'framer-motion';
 import {
   DashboardOutlined,
   FunnelPlotOutlined,
@@ -26,6 +27,7 @@ import {
   MoonOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
+import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
 import type { MenuProps } from 'antd';
 import styles from './MainLayout.module.scss';
@@ -205,7 +207,9 @@ export default function MainLayout() {
           </div>
         </Header>
         <Content className={styles.content}>
-          <Outlet />
+          <LazyMotion features={domAnimation} strict>
+            <AnimatedOutlet />
+          </LazyMotion>
         </Content>
       </Layout>
     </Layout>

@@ -152,13 +152,12 @@ test.describe('账号管理页面功能测试', () => {
   });
 
   test('功能 - 搜索功能', async ({ page }) => {
-    const searchInput = page.locator('.ant-input-search, input[placeholder*="搜索"]').first();
+    // 账号管理页使用普通 <Input> + SearchOutlined 前缀，onChange 实时过滤，无搜索按钮
+    const searchInput = page.locator('input[placeholder*="搜索"]').first();
     if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
       await searchInput.fill('测试');
       await page.waitForTimeout(1000);
-      
-      const searchButton = page.locator('.ant-input-search-button').first();
-      await searchButton.click();
+      // 实时过滤无需点击按钮，只要表格仍在即可
       await waitForDataLoad(page);
     }
   });

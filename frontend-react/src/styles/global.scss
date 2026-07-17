@@ -131,3 +131,124 @@ a {
     margin-left: 0;
   }
 }
+
+// ========================================
+// v3.2.5 全局动效增强
+// ========================================
+
+// 按钮悬浮：轻微上移 + 阴影
+.ant-btn {
+  transition:
+    transform var(--motion-duration-fast) var(--motion-easing-default),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-default),
+    background-color var(--motion-duration-fast) var(--motion-easing-default),
+    border-color var(--motion-duration-fast) var(--motion-easing-default),
+    color var(--motion-duration-fast) var(--motion-easing-default);
+
+  &:not(:disabled):not(.ant-btn-disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  &:not(:disabled):not(.ant-btn-disabled):active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+
+// 图标按钮悬浮旋转
+.ant-btn-icon-only {
+  .anticon-reload {
+    transition: transform var(--motion-duration-normal) var(--motion-easing-default);
+  }
+
+  &:hover .anticon-reload {
+    transform: rotate(180deg);
+  }
+}
+
+// 卡片悬浮 lift
+.ant-card {
+  transition:
+    transform var(--motion-duration-normal) var(--motion-easing-default),
+    box-shadow var(--motion-duration-normal) var(--motion-easing-default);
+
+  &:hover {
+    box-shadow: var(--shadow-elevated);
+  }
+}
+
+// 输入框/选择器 focus ring
+.ant-input,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-picker,
+.ant-input-number,
+.ant-input-affix-wrapper {
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-easing-default),
+    box-shadow var(--motion-duration-fast) var(--motion-easing-default);
+
+  &:focus,
+  &:hover,
+  &-focused {
+    box-shadow: 0 0 0 3px var(--color-brand-bg);
+  }
+}
+
+// Segmented 切换滑动效果
+.ant-segmented {
+  .ant-segmented-item-selected {
+    transition: background-color var(--motion-duration-normal) var(--motion-easing-default);
+  }
+
+  .ant-segmented-thumb {
+    transition:
+      transform var(--motion-duration-normal) var(--motion-easing-spring),
+      width var(--motion-duration-normal) var(--motion-easing-spring);
+  }
+
+  .ant-segmented-item-label {
+    transition: color var(--motion-duration-fast) var(--motion-easing-default);
+  }
+}
+
+// 表格行 hover
+.ant-table-tbody {
+  > tr {
+    transition: background-color var(--motion-duration-fast) var(--motion-easing-default);
+
+    > td {
+      transition: background-color var(--motion-duration-fast) var(--motion-easing-default);
+    }
+
+    &:hover > td {
+      background-color: var(--bg-hover);
+    }
+  }
+}
+
+// 排序图标动画
+.ant-table-column-sorter {
+  .anticon {
+    transition: transform var(--motion-duration-fast) var(--motion-easing-default);
+  }
+
+  &-up.active,
+  &-down.active {
+    .anticon {
+      transform: scale(1.2);
+    }
+  }
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

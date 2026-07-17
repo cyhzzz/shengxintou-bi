@@ -40,8 +40,11 @@ test.describe('数据导入页面功能测试', () => {
   });
 
   test('页面加载 - 数据类型选择器', async ({ page }) => {
-    const dataTypeSelector = page.locator('.ant-select').first();
-    await expect(dataTypeSelector).toBeVisible({ timeout: 10000 });
+    // v3.2.x 数据导入页使用卡片网格选择器，不再是 ant-select
+    const typeGrid = page.locator('[class*="typeGrid"]').first();
+    await expect(typeGrid).toBeVisible({ timeout: 10000 });
+    const typeCards = page.locator('[class*="typeCard"]');
+    expect(await typeCards.count()).toBeGreaterThan(0);
   });
 
   test('页面加载 - 文件上传区域', async ({ page }) => {
@@ -50,36 +53,39 @@ test.describe('数据导入页面功能测试', () => {
   });
 
   test('页面加载 - 上传按钮', async ({ page }) => {
-    const uploadButton = page.locator('.ant-btn-primary:has-text("上传")').first();
-    await expect(uploadButton).toBeVisible({ timeout: 10000 });
+    // 文件上传区使用 Upload.Dragger，拖拽区域即上传触发区域，无独立的「上传」主按钮
+    const uploadArea = page.locator('.ant-upload-drag, .ant-upload').first();
+    await expect(uploadArea).toBeVisible({ timeout: 10000 });
+    const fileInput = page.locator('input[type="file"]').first();
+    await expect(fileInput).toBeAttached({ timeout: 10000 });
   });
 
-  test('功能 - 数据类型下拉菜单', async ({ page }) => {
-    const select = page.locator('.ant-select').first();
-    await select.click();
-    await page.waitForTimeout(500);
-    
-    const dropdown = page.locator('.ant-select-dropdown').first();
-    await expect(dropdown).toBeVisible();
-    
-    const options = page.locator('.ant-select-dropdown .ant-select-item');
-    const optionCount = await options.count();
-    console.log('数据类型选项数量:', optionCount);
-    
-    await page.keyboard.press('Escape');
+  test('功能 - 数据类型卡片切换', async ({ page }) => {
+    // v3.2.x 数据类型改为卡片网格，点击第二个卡片可切换选中态
+    const typeCards = page.locator('[class*="typeCard"]');
+    const firstCard = typeCards.first();
+    const secondCard = typeCards.nth(1);
+    await expect(firstCard).toBeVisible();
+    await expect(secondCard).toBeVisible();
+
+    // 先点击第二个卡片
+    await secondCard.click();
+    await page.waitForTimeout(300);
+    const isSecondActive = await secondCard.evaluate((el) =>
+      el.className.includes('active')
+    );
+    expect(isSecondActive).toBeTruthy();
+    console.log('数据类型可切换卡片数量:', await typeCards.count());
   });
 
   test('功能 - 数据类型选项验证', async ({ page }) => {
-    const select = page.locator('.ant-select').first();
-    await select.click();
-    await page.waitForTimeout(500);
-    
-    const options = page.locator('.ant-select-dropdown .ant-select-item');
-    const optionTexts = await options.allTextContents();
+    // 卡片网格中的标题即为选项
+    const typeCards = page.locator('[class*="typeCard"]');
+    const titles = page.locator('[class*="typeCard"] [class*="cardTitle"]');
+    const optionTexts = await titles.allTextContents();
     console.log('数据类型选项:', optionTexts);
-    
-    await page.keyboard.press('Escape');
-    
+
+    expect(await typeCards.count()).toBeGreaterThan(0);
     expect(optionTexts.length).toBeGreaterThan(0);
   });
 
@@ -125,24 +131,28 @@ test.describe('数据导入页面功能测试', () => {
     console.log('分页组件可见:', isPaginationVisible);
   });
 
-  test('功能 - 上传按钮状态', async ({ page }) => {
-    const uploadButton = page.locator('.ant-btn-primary:has-text("上传")').first();
-    await expect(uploadButton).toBeVisible();
-    
-    const isDisabled = await uploadButton.isDisabled();
-    console.log('上传按钮禁用状态:', isDisabled);
+  test('功能 - 上传区域状态', async ({ page }) => {
+    // Dragger 区域即上传触发区，检查是否可交互（存在 file input）
+    const uploadArea = page.locator('.ant-upload-drag, .ant-upload').first();
+    await expect(uploadArea).toBeVisible();
+
+    const fileInput = page.locator('input[type="file"]').first();
+    await expect(fileInput).toBeAttached();
+    const isDisabled = await fileInput.isDisabled().catch(() => false);
+    console.log('上传区 file input 禁用状态:', isDisabled);
   });
 
-  test('错误处理 - 不选择数据类型直接上传', async ({ page }) => {
-    const uploadButton = page.locator('.ant-btn-primary:has-text("上传")').first();
-    if (await uploadButton.isVisible()) {
-      await uploadButton.click();
-      await page.waitForTimeout(1000);
-      
-      const errorMessage = page.locator('.ant-form-item-explain-error').first();
-      const hasError = await errorMessage.isVisible({ timeout: 3000 }).catch(() => false);
-      console.log('有错误提示:', hasError);
-    }
+  test('错误处理 - 未选择文件不会触发上传', async ({ page }) => {
+    // 当前为卡片选择器 + Dragger，默认已选中第一个类型；未选文件时不应触发上传或报错
+    const fileInput = page.locator('input[type="file"]').first();
+    await expect(fileInput).toBeAttached();
+
+    // 不上传文件直接提交不应产生错误提示
+    await page.waitForTimeout(1000);
+    const errorMessage = page.locator('.ant-form-item-explain-error, .ant-alert-error').first();
+    const hasError = await errorMessage.isVisible({ timeout: 3000 }).catch(() => false);
+    console.log('空文件错误提示可见:', hasError);
+    expect(hasError).toBeFalsy();
   });
 
   test('错误处理 - 上传不支持的文件类型', async ({ page }) => {

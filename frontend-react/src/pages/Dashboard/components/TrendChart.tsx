@@ -42,9 +42,9 @@ interface TrendChartProps {
 
 // 指标标签映射
 const METRIC_LABELS: Record<MetricType, string> = {
-  cost_split: '线索成本对比',
+  cost_split: '线索成本',
   cost_per_wechat_lead: '企微成本',
-  cost_per_app_activation: 'APP下载激活成本',
+  cost_per_app_activation: 'APP激活成本',
   cost_per_customer: '开户成本',
   cost_per_valid_account: '有效户成本',
   investment: '阶段投入',
@@ -52,7 +52,7 @@ const METRIC_LABELS: Record<MetricType, string> = {
   clicks: '点击数',
   leads: '线索数',
   leads_wechat: '企微数',
-  leads_app: 'APP下载激活数',
+  leads_app: 'APP激活数',
   new_customers: '新开客户',
   valid_customers: '有效户',
 };
@@ -69,7 +69,7 @@ const METRIC_GROUPS = [
   },
   {
     label: '⚡ 运营效率',
-    metrics: ['cost_split', 'cost_per_wechat_lead', 'cost_per_app_activation', 'cost_per_customer', 'cost_per_valid_account'] as MetricType[],
+    metrics: ['cost_per_customer', 'cost_per_valid_account'] as MetricType[],
   },
 ];
 
@@ -91,7 +91,7 @@ const GRANULARITY_LABELS: Record<Granularity, string> = {
 
 const TrendChart: React.FC<TrendChartProps> = ({
   data,
-  metricType = 'cost_per_lead',
+  metricType = 'cost_per_customer',
   loading = false,
   height = 350,
   showControls = true,
@@ -180,7 +180,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
         ? [
             // 线索成本对比：2 条线，从 _derived.cost_wechat / _derived.cost_app 取值
             {
-              name: '单企微成本',
+              name: METRIC_LABELS.cost_per_wechat_lead,
               type: 'line' as const,
               smooth: true,
               data: allDates.map(date => {
@@ -194,7 +194,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
               lineStyle: { color: pickEChartsColor(0), width: 2 },
             },
             {
-              name: '单APP下载激活成本',
+              name: METRIC_LABELS.cost_per_app_activation,
               type: 'line' as const,
               smooth: true,
               data: allDates.map(date => {
@@ -376,3 +376,4 @@ const TrendChart: React.FC<TrendChartProps> = ({
 };
 
 export default TrendChart;
+

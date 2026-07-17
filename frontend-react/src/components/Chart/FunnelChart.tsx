@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 漏斗图组件（v3.1.2：@ant-design/plots Funnel + CSS 横条降级）
  *
  * - 主实现：@ant-design/plots 的 Funnel（@ant-design/charts v2 透传）
@@ -154,6 +154,18 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
             height={chartHeight}
             style={{ fillOpacity: 0.92, stroke: '#fff', lineWidth: 2 }}
             scale={{ color: { range: colors.slice(0, clean.length) } }}
+            animation={{
+              appear: {
+                animation: 'wave-in',
+                duration: 700,
+                delay: (d: any, index: number) => index * 120,
+                easing: 'ease-out',
+              },
+              enter: {
+                animation: 'fade-in',
+                duration: 400,
+              },
+            }}
             label={{
               text: (d: { stage?: string; value?: number }, index?: number) => {
                 const orig = clean[index ?? 0]?.count ?? 0;

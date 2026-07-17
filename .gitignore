@@ -59,6 +59,8 @@ python-3.9-embed/
 # ===== IDE 配置 =====
 .vscode/
 .idea/
+# Trae IDE spec (本地配置，不入库)
+.trae/
 *.swp
 *.swo
 
@@ -72,6 +74,9 @@ desktop.ini
 *.backup
 *~
 
+# 截图(调试临时产物，不入库)
+screenshots/
+
 # ===== 测试和覆盖率 =====
 .pytest_cache/
 .coverage
@@ -79,7 +84,7 @@ htmlcov/
 
 # Playwright 产物
 frontend-react/playwright-report/
-frontend-react/test-results/
+frontend-react/**/test-results/
 frontend-react/.playwright/
 
 # superpowers（技能相关，不入主仓）
