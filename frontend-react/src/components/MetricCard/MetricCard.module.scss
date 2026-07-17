@@ -4,6 +4,20 @@
   margin-bottom: var(--spacer-16);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  // v3.2.6：整组卡片区域先淡入，为内部 stagger 做层次铺垫
+  opacity: 0;
+  animation: sectionEnter var(--motion-duration-slow) var(--motion-easing-smooth) both;
+}
+
+@keyframes sectionEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sectionHeader {
@@ -42,16 +56,15 @@
   overflow: hidden;  // v3.1.25: 截断超长数字 / 描述
   height: 100%;
   border-radius: var(--radius-lg);
-  transition:
-    transform var(--motion-duration-normal) var(--motion-easing-default),
-    box-shadow var(--motion-duration-normal) var(--motion-easing-default);
-  // v3.2.5：stagger 入场动画
+  // v3.2.6：hover 仅改阴影，避免 transform 触发 layout/paint；入场动画使用 transform + opacity
+  transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
+  // v3.2.6：更从容的 stagger 入场（从上到下淡入 + 轻微上浮 + 缩放归位）
   opacity: 0;
-  animation: metricCardEnter var(--motion-duration-slow) var(--motion-easing-enter) forwards;
+  will-change: transform, opacity;
+  animation: metricCardEnter var(--motion-duration-slow) var(--motion-easing-smooth) both;
   animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-gap));
 
   &:hover {
-    transform: translateY(-3px);
     box-shadow: var(--shadow-elevated);
   }
 
@@ -64,11 +77,11 @@
 @keyframes metricCardEnter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -97,18 +110,6 @@
 }
 
 
-  .metricValue {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-  .metricNumber {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 .metricValue {
   display: flex;
   align-items: baseline;
