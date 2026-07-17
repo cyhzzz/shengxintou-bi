@@ -6,12 +6,12 @@
 import React, { useState } from 'react';
 import { Button, Space } from 'antd';
 import { PictureOutlined } from '@ant-design/icons';
-import type { EmployeeConversionWeeklyData, EmployeeConversionWeeklyRankings } from '@/types/api.schemas';
+import type { WeeklyPlatformRankings, WeeklyReportData } from '../weeklyRanking';
 import PosterModal from './PosterModal';
 import styles from './PosterExportButtons.module.scss';
 
 interface PosterExportButtonsProps {
-  reportData: EmployeeConversionWeeklyData;
+  reportData: WeeklyReportData;
   dateRange: [string, string];
 }
 
@@ -25,11 +25,7 @@ const PosterExportButtons: React.FC<PosterExportButtonsProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
 
   // 获取平台对应的榜单数据
-  const getRankingsForPlatform = (platform: string): {
-    total: EmployeeConversionWeeklyRankings[];
-    existing: EmployeeConversionWeeklyRankings[];
-    new: EmployeeConversionWeeklyRankings[];
-  } => {
+  const getRankingsForPlatform = (platform: string): WeeklyPlatformRankings => {
     const rankings = reportData?.rankings?.[platform];
     return {
       total: rankings?.total || [],
@@ -53,7 +49,7 @@ const PosterExportButtons: React.FC<PosterExportButtonsProps> = ({
   // 获取有数据的平台列表
   const platformsWithData = reportData?.overview
     ? Object.keys(reportData.overview).filter(
-        platform => reportData.overview[platform]?.leads > 0
+        platform => (reportData.overview[platform]?.leads ?? 0) > 0
       )
     : [];
 

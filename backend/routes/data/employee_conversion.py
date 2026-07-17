@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', '快手', '财联社']
 bp = Blueprint('employee_conversion', __name__)
 
+WEEKLY_ASSISTANTS = [
+    '陈鸿', '荣杜娟', '贾芳', '赵梅', '袁孝春', '张杰明',
+    '吴茂秋', '何泳萍', '李兆俊', '史菡漾', '朱橙青', '杨华',
+]
+
 
 @bp.route('/employee-conversion/analysis', methods=['POST'])
 @handle_exceptions
@@ -70,24 +75,21 @@ def get_weekly_data():
     platforms = data.get('platforms') or CONTENT_PLATFORMS  # v3.1.27：未传 platforms 默认全量内容平台，体现「只看内容平台」口径
     start_date = data.get('start_date')
     end_date = data.get('end_date')
-    # v3.1：接受前端 top_count（默认 10），不再硬编码 [:10]
-    try:
-        top_count = max(1, min(50, int(data.get('top_count') or 10)))
-    except (TypeError, ValueError):
-        top_count = 10
     return jsonify({
         'success': True,
         'data': {
-            'top_count': top_count,
+            'roster_count': len(WEEKLY_ASSISTANTS),
             'rankings': {p: {
-                'total': get_employee_conversion_ranking([p], start_date, end_date, 'all')[:top_count],
-                'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing')[:top_count],
-                'new': get_employee_conversion_ranking([p], start_date, end_date, 'new')[:top_count],
+                'total': get_employee_conversion_ranking([p], start_date, end_date, 'all', WEEKLY_ASSISTANTS),
+                'existing': get_employee_conversion_ranking([p], start_date, end_date, 'existing', WEEKLY_ASSISTANTS),
+                'new': get_employee_conversion_ranking([p], start_date, end_date, 'new', WEEKLY_ASSISTANTS),
                 # v3.1.30: 存量线索新开户榜 — 线索日期在区间前 + 开户时间落在区间内
-                'existing_new_open': get_employee_conversion_ranking([p], start_date, end_date, 'existing_new_open')[:top_count],
+                'existing_new_open': get_employee_conversion_ranking(
+                    [p], start_date, end_date, 'existing_new_open', WEEKLY_ASSISTANTS
+                ),
             } for p in platforms},
-            'overview': get_platform_overview(platforms, start_date, end_date),
-            'trend': get_weekly_trend_data(platforms, start_date, end_date),
+            'overview': get_platform_overview(platforms, start_date, end_date, WEEKLY_ASSISTANTS),
+            'trend': get_weekly_trend_data(platforms, start_date, end_date, WEEKLY_ASSISTANTS),
         }
     })
 
