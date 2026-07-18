@@ -102,7 +102,7 @@
   --transition-fast: 0.12s;
   --transition-normal: 0.2s;
 
-  /* 动效系统：v3.2.7 大容器慢节奏浮现（1~2s） */
+  /* 动效系统：v3.2.5 大容器慢节奏浮现（1~2s） */
   --motion-duration-fast: 200ms;
   --motion-duration-normal: 350ms;
   --motion-duration-slow: 800ms;

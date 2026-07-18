@@ -16,7 +16,7 @@
 html,
 body {
   height: 100%;
-  // v3.2.8：彻底阻止 body 级滚动条出现/消失导致的宽度跳变
+  // v3.2.5：彻底阻止 body 级滚动条出现/消失导致的宽度跳变
   // 滚动由 .content 内部 overflow-y: auto 处理
   overflow: hidden;
   font-family: var(--font-family);
@@ -140,7 +140,7 @@ a {
 // v3.2.5 全局动效增强
 // ========================================
 
-// 按钮悬浮：更克制的上移 + 阴影（v3.2.6：只改 transform/opacity，避免触发 layout）
+// 按钮悬浮：更克制的上移 + 阴影（v3.2.5：只改 transform/opacity，避免触发 layout）
 .ant-btn {
   transition:
     transform var(--motion-duration-normal) var(--motion-easing-default),
@@ -183,7 +183,7 @@ a {
   }
 }
 
-// v3.2.7：带左侧色条的章节标题（用于卡片内子模块）
+// v3.2.5：带左侧色条的章节标题（用于卡片内子模块）
 .sectionTitleBar {
   display: flex;
   align-items: center;
@@ -265,7 +265,7 @@ a {
   }
 }
 
-// 减少动画偏好支持（v3.2.6：避免 * 选择器造成大面积重绘，仅命中常用动效元素）
+// 减少动画偏好支持（v3.2.5：避免 * 选择器造成大面积重绘，仅命中常用动效元素）
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

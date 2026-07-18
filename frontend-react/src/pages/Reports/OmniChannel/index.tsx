@@ -416,7 +416,7 @@ const OmniChannelPage: React.FC = () => {
 
       <Spin spinning={loading}>
         {/* ① 4 指标卡（v3.1 §二.5）：总开户 / 总入金 / 总有效户 / 4 类渠道开户 TOP + 占比 */}
-        <FadeInSection delay={0.12} duration={0.8}>
+        <FadeInSection delay={0.4} duration={0.8}>
           <MetricSection title="全渠道获客概览" description="开户、入金与有效户核心表现">
             <MetricCard
               title="开户成功"
@@ -473,7 +473,7 @@ const OmniChannelPage: React.FC = () => {
         </FadeInSection>
 
         {/* ② 趋势图：支持一级/二级渠道切换 + 开户/有效户 维度切换 */}
-        <FadeInSection delay={0.24} duration={0.8}>
+        <FadeInSection delay={0.8} duration={0.8}>
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={24}>
               <Card size="small">
@@ -518,13 +518,13 @@ const OmniChannelPage: React.FC = () => {
         </FadeInSection>
 
         {/* ③ 4 Tabs 子渠道明细 */}
-        <FadeInSection delay={0.36} duration={0.8}>
+        <FadeInSection delay={1.2} duration={0.8}>
           <Card title="4 大类 · 子渠道明细" size="small">
             <Tabs items={tabItems} />
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={0.48} duration={0.8}>
+        <FadeInSection delay={1.6} duration={0.8}>
           <ReportFooter
             sources={[
               { label: '数据源', value: 'agg_daily_channel_open（唯一独立数据源，与 fact_conv_content / fact_conv_appmarket / agg_vendor_daily 独立）' },

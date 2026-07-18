@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.7`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.2.5`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -391,71 +391,52 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 13. 版本历史
 
-### v3.2.7 已落地（2026-07-18） 容器级顺序浮现 + 慢节奏动效 + 全局美学优化（含多轮迭代修复）
+### v3.2.5 已落地（2026-07-18） 系统性 UI 动效优化（数据呈现生动化 + 多轮迭代调优）
 
-- **动效四层体系**：页面级（AnimatedOutlet 0.5s 纯淡入，去掉 y 位移避免与 FadeInSection 叠加）→ 容器级（FadeInSection 0.8s 淡入+上浮 12px，delay 间隔 0.12s）→ 组件级（ECharts 1.5s 线 clip 从左到右绘制/柱 scaleY 从底到顶生长、useCountUp 1.5s 数字增长、FunnelChart 1.5s wave-in）→ 细节级（hover/focus 0.2-0.35s 交互反馈）。
+本次版本统一了 UI 动效系统的设计与节奏，并修复多个动效引发的副作用（企微数曲线为0 / 报告生成页布局 / 漏斗页间距）。
+
+- **动效四层体系**：页面级（`AnimatedOutlet` 0.5s 纯淡入，去掉 y 位移避免与 FadeInSection 叠加）→ 容器级（`FadeInSection` 0.8s 淡入+上浮 12px，IntersectionObserver 滚动触发，delay 间隔 0.4s 大卡片依次浮现）→ 组件级（ECharts 1.5s 线 clip 从左到右绘制/柱 scaleY 从底到顶生长、`useCountUp` 1.5s 数字增长、FunnelChart 1.5s wave-in）→ 细节级（hover/focus 0.2-0.35s 交互反馈）。
+
+- **新增动效 Design Token**：`tokens.css` 追加 `--motion-duration-*`、`--motion-easing-*`、`--motion-stagger-gap`，统一全站动效时长与缓动曲线；`--motion-stagger-gap` 调到 90ms；新增 `--motion-duration-page` 与 `--motion-easing-smooth`。
+
 - **FadeInSection 基于 IntersectionObserver 滚动触发**：报表各大容器（筛选卡/指标区/图表区/表格区/页脚）按顺序淡入上浮浮现，视口外不开始动画，真正实现从上到下依次浮现；动画用 transition 而非 animation，避免 will-change 创建层叠上下文。
-- **修复宽度跳变**：`html/body/#root` 加 `overflow: hidden`，彻底阻止 body 级滚动条出现/消失；`MainLayout .content` 加 `scrollbar-gutter: stable` 预留滚动条空间。
-- **ECharts 线/柱缓慢绘制**：只设置 option 级别 `animationDuration=1500ms`，不在 series 级别覆盖 `animationDuration`，让 ECharts 用默认入场动画类型（line: clip, bar: scaleY）；series 级别仅设置短 stagger delay（`idx*60ms`）；`notMerge: true` 确保每次 setOption 触发完整入场动画。
-- **移除小卡片 stagger 动画**：移除 `MetricCard` 的 `metricCardEnter` stagger 入场动画和 `MetricSection` 的 `sectionEnter` 动画，避免与大容器 `FadeInSection` 叠加导致视觉混乱；小卡片即时显示，由外层 `FadeInSection` 控制大容器浮现。
-- **全局美学优化**：`MainLayout` 内容区加顶部光照渐变增强层次；`global.scss` 新增 `sectionTitleBar` 带左侧色条的章节标题；卡片悬浮改为阴影 + 边框微亮；按钮上移收为 `-2px`。
-- **覆盖全部报表页**：Dashboard、OmniChannel、ConversionFunnel、LeadsDetail、AgencyAnalysis、XhsNotes List/Operation、EmployeeConversion Analysis/Weekly、Live Funnel/AnchorCluster、Reports/AppMarket Funnel/Comparison/Detail/Creative、Reports/OmniChannel、ReportGeneration。
-- **修复 7 个功能测试用例**：账号管理搜索 selector、Dashboard 无数据检查、数据导入页 5 个用例适配新组件。
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，36s）；API 冒烟 33/33 通过。
 
-### v3.2.6 已落地（2026-07-18） UI 动效节奏与性能调优（更优雅、更流畅）
-
-- **调慢全局动效节奏**，避免急促感：
-  - `tokens.css`：`--motion-duration-fast/normal/slow/slower` 整体上调 20%~50%；`--motion-stagger-gap` 从 60ms 提到 90ms；新增 `--motion-duration-page` 与 `--motion-easing-smooth`。
-  - `useCountUp` 默认 duration 从 800ms 改为 1000ms，缓动从 `easeOutQuart` 改为更柔和的 `easeOutCubic`。
-  - `EChartsComponent` 与 `FunnelChart` 入场动画从 700~800ms 提到 900~1000ms，series stagger delay 从 120ms 提到 150~160ms。
-
-- **页面路由过渡更自然**：`AnimatedOutlet` duration 0.4s + smooth easing；`AnimatePresence` 的 `mode` 从 `wait` 改为 `popLayout`，避免旧页完全退出后新页才进入的空档，显著降低 perceived delay。
-
-- **报表卡片层次入场（从上到下依次落下）**：
-  - `MetricSection` 整组先淡入上浮（`sectionEnter`），为内部卡片做层次铺垫。
-  - `MetricCard` stagger 入场改为 `translateY(16px) scale(0.98) -> translateY(0) scale(1)`，配合 90ms 递增 delay，形成「卡片从上到下依次落下并归位」的微动效。
-  - hover 去掉 transform，仅保留阴影提升，避免入场与 hover 动画叠加造成的凌乱感。
-
-- **性能优化**：
-  - `EChartsComponent` 移除所有 `console.log`；`setOption` 默认走 `notMerge: false` + `lazyUpdate: true`，避免每次数据更新都全量重绘；`ResizeObserver` 增加 100ms debounce。
-  - 全局 `.ant-card` hover 不再 `translateY`，仅改 `box-shadow`；按钮上移从 `-3px` 收为 `-2px`。
-  - `prefers-reduced-motion` 不再使用 `*` 全局选择器，改为精确命中动效元素，避免大面积重绘；同时强制 `opacity: 1`，防止默认 `opacity: 0` 在关闭动画时导致元素不可见。
-
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6391 modules，35s）；API 冒烟 33/33 通过。
-
-### v3.2.5 已落地（2026-07-17） 系统性 UI 动效优化（数据呈现生动化）
-
-- **新增动效 Design Token**：`tokens.css` 追加 `--motion-duration-*`、`--motion-easing-*`、`--motion-stagger-gap`，统一全站动效时长与缓动曲线。
-
-- **图表入场动画**：`EChartsComponent` 统一注入 `animationDuration: 800ms` + `cubicOut`；多 series 按索引 stagger delay 120ms；loading 状态从 Spin 改为 shimmer 骨架屏（`skeletonOverlay` + `skeletonShimmer`）。
+- **图表入场动画**：`EChartsComponent` 统一注入 `animationDuration: 1500ms` + `cubicOut`，多 series 按索引 stagger delay（`idx*60ms`）；不在 series 级别覆盖 `animationDuration`，让 ECharts 用默认入场动画类型（line: clip, bar: scaleY）；`notMerge: true` 确保每次 setOption 触发完整入场动画；loading 状态从 Spin 改为 shimmer 骨架屏（`skeletonOverlay` + `skeletonShimmer`）；`ResizeObserver` 增加 100ms debounce。
 
 - **指标卡动效**：
-  - 新增 `useCountUp` hook，数字从 0 平滑增长到目标值，duration 800ms，easeOutQuart。
-  - `MetricCard` 支持 `loading` 骨架屏；`MetricSection` 自动为子卡片注入 `index` 实现 stagger 入场。
-  - hover lift 增强：`translateY(-3px)` + `shadow-elevated`。
+  - 新增 `useCountUp` hook，数字从 0 平滑增长到目标值，duration 1500ms，easeOutCubic。
+  - `MetricCard` 支持 `loading` 骨架屏；移除 `metricCardEnter` stagger 入场动画避免与外层 FadeInSection 叠加导致视觉混乱；hover 改为仅改 box-shadow（移除 transform 避免与入场动画叠加）。
 
 - **全局交互反馈**：
-  - 按钮悬浮上移 + 阴影；`ReloadOutlined` 图标按钮悬浮旋转 180°。
-  - 卡片悬浮阴影提升。
+  - 按钮悬浮上移 -2px + 阴影；`ReloadOutlined` 图标按钮悬浮旋转 180°。
+  - 卡片悬浮阴影提升（不再 `translateY`）。
   - 输入框 / 选择器 / 日期选择器 focus ring（`box-shadow: 0 0 0 3px var(--color-brand-bg)`）。
   - `Segmented` 切换时高亮条滑动。
   - 表格行 hover 背景过渡 + 排序图标 active 放大 1.2 倍。
 
-- **漏斗图阶段展开**：`@ant-design/plots` Funnel 配置 `wave-in` appear 动画 + 索引递增 delay；降级 CSS 横条带宽度展开动画。
+- **漏斗图动效**：`@ant-design/plots` Funnel 改用 antv g2 v5 正确 API（`animate` prop + camelCase `waveIn`）+ IntersectionObserver + CSS 兜底（`.chartWrapVisible` / `.stageListVisible` / `.overallVisible` 容器级 transition）。
 
 - **表格 shimmer loading**：新增 `SkeletonTable` / `AnimatedTable` 组件，加载时呈现结构骨架而非 Spin。
 
-- **页面路由过渡**：引入 `framer-motion`，新增 `AnimatedOutlet` 组件封装 `AnimatePresence` + `m.div` 路由切换动画；`MainLayout` 改用 `LazyMotion` + `domAnimation` 按需加载动效运行时，避免引入完整 motion 包，主包 index 块从 1660 kB 降至 1613 kB。
+- **页面路由过渡**：引入 `framer-motion`，新增 `AnimatedOutlet` 组件封装 `AnimatePresence` + `m.div` 路由切换动画（duration 0.5s + smooth easing，mode 从 `wait` 改为 `popLayout` 降低 perceived delay）；`MainLayout` 改用 `LazyMotion` + `domAnimation` 按需加载动效运行时，避免引入完整 motion 包，主包 index 块从 1660 kB 降至 1613 kB。
 
-- **可访问性**：全局支持 `prefers-reduced-motion: reduce`，自动关闭所有动画。
+- **可访问性**：全局支持 `prefers-reduced-motion: reduce`，自动关闭所有动画；改用精确选择器而非 `*` 全局选择器，避免大面积重绘。
 
-- **修复 7 个功能测试用例**（测试用例与当前页面结构不匹配，未改代码）：
-  - 账号管理搜索功能：改用 `input[placeholder*="搜索"]` 实时过滤。
-  - Dashboard 无数据场景：检查 MetricCard 数值而非表格。
-  - 数据导入页 5 个用例：适配卡片网格选择器 + `Upload.Dragger`。
+- **修复宽度跳变**：`html/body/#root` 加 `overflow: hidden`，彻底阻止 body 级滚动条出现/消失；`MainLayout .content` 加 `scrollbar-gutter: stable` 预留滚动条空间。
 
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6391 modules，36s）；API 冒烟 33/33 通过。
+- **修复企微数曲线为0**：移除 `ECharts/index.module.scss` 中 `.container` 的 `opacity:0 + chartFadeIn animation`（动画未触发时容器一直不可见，误以为曲线为0）；ECharts 内部已有 `option.animationDuration=1500ms` 的线/柱绘制动画，外层不再需要额外的 opacity 动画。
+
+- **修复报告生成页布局**：`ReportGeneration/index.tsx` 的 `.container` 是 `display: flex` 横向布局（左 320px 控制面板 + 右 flex:1 预览画布），但 FadeInSection 默认 `fullWidth=true`（width:100%）破坏 flex 横向布局；改为给两个 FadeInSection 加 `fullWidth={false}` + style 控制 flex（`0 0 320px` / `1 1 0%`），左右并排布局恢复。
+
+- **修复漏斗页大卡片间距**：`ConversionFunnel.module.scss` 新增 `:global(.ant-tabs-tabpane) [class*='metricSection'] { margin-bottom: 0; }`，让 antd Row gutter 单独控制垂直间距。原 `MetricSection` 自带 `margin-bottom: var(--spacer-16)` (16px) 叠加 Row gutter=[16,16] 的垂直 16px rowGap，导致上下间距 = 32px（左右间距仅 16px）。同时移除两个 Tab 内冗余的 4 个嵌套 `FadeInSection`（原 delay 0.1/0.15 与外层 Tabs delay 0.4 叠加导致内层卡片比外层 Tabs 先出现的顺序错乱）。
+
+- **全局美学优化**：`MainLayout` 内容区加顶部光照渐变增强层次；`global.scss` 新增 `sectionTitleBar` 带左侧色条的章节标题；卡片悬浮改为阴影 + 边框微亮；按钮上移收为 `-2px`。
+
+- **覆盖全部报表页**：Dashboard、OmniChannel、ConversionFunnel、LeadsDetail、AgencyAnalysis、XhsNotes List/Operation、EmployeeConversion Analysis/Weekly、Live Funnel/AnchorCluster、Reports/AppMarket Funnel/Comparison/Detail/Creative、Reports/OmniChannel、ReportGeneration。
+
+- **修复 7 个功能测试用例**（测试用例与当前页面结构不匹配，未改代码）：账号管理搜索 selector、Dashboard 无数据检查、数据导入页 5 个用例适配新组件。
+
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，36s）；API 冒烟 33/33 通过。
 
 ### v3.2.4 已落地（2026-07-17） 小红书运营分析报表改造（Web/H5 双视图 + 数据准确性 + 杂志风数据块）
 

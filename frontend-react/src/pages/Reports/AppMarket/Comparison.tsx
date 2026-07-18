@@ -137,7 +137,7 @@ const AppMarketComparisonPage: React.FC = () => {
         </Card>
       </FadeInSection>
       <Spin spinning={loading}>
-        <FadeInSection delay={0.12} duration={0.8}>
+        <FadeInSection delay={0.4} duration={0.8}>
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={12}>
               <Card title='应用市场多维度雷达对比' size='small'>
@@ -152,7 +152,7 @@ const AppMarketComparisonPage: React.FC = () => {
           </Row>
         </FadeInSection>
 
-        <FadeInSection delay={0.24} duration={0.8}>
+        <FadeInSection delay={0.8} duration={0.8}>
           <Card title='应用市场漏斗明细对比表' size='small' style={{ marginTop: 16 }}>
             <Table size='small' rowKey='app_market' dataSource={data?.by_market || []} pagination={false}
               scroll={{ x: 'max-content' }}
@@ -199,7 +199,7 @@ const AppMarketComparisonPage: React.FC = () => {
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={0.36} duration={0.8}>
+        <FadeInSection delay={1.2} duration={0.8}>
           <Card title='渠道类型 × 应用市场分布' size='small' style={{ marginTop: 16 }}>
             <Table size='small' rowKey={(r: any) => `${r.channel_type}-${r.app_market}`}
               dataSource={data?.by_channel_type || []} pagination={false}

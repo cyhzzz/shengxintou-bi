@@ -809,7 +809,7 @@ const XhsNotesListPage: React.FC = () => {
       </FadeInSection>
 
       {/* 数据表格卡片 */}
-      <FadeInSection delay={0.12} duration={0.8}>
+      <FadeInSection delay={0.4} duration={0.8}>
         <Card className={styles.tableCard}>
         <div className={styles.tableHeader}>
           <span className={styles.tableTitle}>笔记列表</span>

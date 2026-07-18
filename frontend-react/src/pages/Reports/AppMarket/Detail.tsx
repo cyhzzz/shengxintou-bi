@@ -91,7 +91,7 @@ const AppMarketDetailPage: React.FC = () => {
         </Card>
       </FadeInSection>
 
-      <FadeInSection delay={0.2} duration={0.8}>
+      <FadeInSection delay={0.4} duration={0.8}>
         <Card className={styles.tableCard}>
           <div className={styles.tableHeader}>
             <span className={styles.tableTitle}>设备明细</span>

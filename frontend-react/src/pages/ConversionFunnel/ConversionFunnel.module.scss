@@ -6,6 +6,14 @@
   padding: 0;
 }
 
+// v3.2.5：修复 MetricSection 在 antd Row gutter 场景下与 rowGap 叠加导致上下间距过大
+// MetricCard.module.scss 的 .metricSection 自带 margin-bottom: 16px，
+// 叠加 Row gutter=[16,16] 的垂直 16px rowGap，导致上下间距 = 32px（左右间距仅 16px）
+// 在 Tab pane 内强制 margin-bottom: 0，让 Row gutter 单独控制垂直间距
+:global(.ant-tabs-tabpane) [class*='metricSection'] {
+  margin-bottom: 0;
+}
+
 .funnelTable {
   display: flex;
   flex-direction: column;
@@ -246,7 +254,7 @@
   }
 }
 
-/* v3.2.9 修复:局部覆盖 MetricSection 默认 margin-bottom，避免与外层 Row gutter y 间距叠加成 32px */
+/* v3.2.5 修复:局部覆盖 MetricSection 默认 margin-bottom，避免与外层 Row gutter y 间距叠加成 32px */
 .funnelMetricSection {
   margin-bottom: 0;
 }
