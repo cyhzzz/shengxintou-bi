@@ -30,6 +30,7 @@ import {
 } from '@ant-design/icons';
 import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
+import { FadeInSection } from '@/components';
 import { DateRangePicker } from '@/components/Filter';
 import { postXhsOperationAnalysis } from '@/types/api';
 import { metadataService } from '@/services/metadataService';
