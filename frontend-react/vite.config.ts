@@ -31,17 +31,26 @@ export default defineConfig({
     minify: 'esbuild',
     // Target modern browsers
     target: 'esnext',
-    // Chunk size warnings
-    chunkSizeWarningLimit: 1000,
+    // Chunk size warnings（v3.2.5：从 1000 调回 800，让重型 chunk 给出提醒）
+    chunkSizeWarningLimit: 800,
     // Rollup options
     rollupOptions: {
       output: {
         // Manual chunk splitting for better caching
+        // v3.2.5：补全重型库分包，避免落到任意页面 chunk 影响长缓存命中率
         manualChunks: {
           // React core
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          // Ant Design
-          'antd-vendor': ['antd', '@ant-design/icons', '@ant-design/charts'],
+          // Ant Design 全家桶
+          'antd-vendor': ['antd', '@ant-design/icons', '@ant-design/plots', '@ant-design/charts'],
+          // ECharts 按需后的 core runtime（约 200-300KB）
+          'echarts-vendor': ['echarts', 'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers'],
+          // framer-motion 运行时（LazyMotion + domAnimation）
+          'motion-vendor': ['framer-motion'],
+          // 导出库（动态 import，但单独分包便于缓存）
+          'export-vendor': ['html2canvas', 'jspdf'],
+          // Markdown 渲染（GuideModal 用到）
+          'markdown-vendor': ['react-markdown', 'remark-gfm', 'rehype-sanitize'],
           // State management
           'state-vendor': ['zustand'],
           // Utilities
@@ -59,7 +68,14 @@ export default defineConfig({
     cssMinify: true,
   },
   // Optimize dependencies
+  // v3.2.5：补全 antd 全家桶 + echarts + framer-motion，首次 dev 启动不重新预构建
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'antd', 'zustand', 'dayjs'],
+    include: [
+      'react', 'react-dom', 'react-router-dom',
+      'antd', '@ant-design/icons', '@ant-design/plots',
+      'echarts', 'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers',
+      'framer-motion',
+      'zustand', 'dayjs',
+    ],
   },
 })

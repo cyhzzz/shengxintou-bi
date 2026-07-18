@@ -42,7 +42,9 @@ import type {
   XhsEmployeeConversionItem,
 } from '@/types/api.schemas';
 import styles from './Operation.module.scss';
-import html2canvas from 'html2canvas';
+
+// v3.2.5：html2canvas 改动态 import，避免页面进入即加载 ~200KB 导出库
+// 仅在用户点击「导出图片/PDF」时才按需拉取
 
 const { Link, Text } = Typography;
 
@@ -94,6 +96,8 @@ const XhsNotesOperationPage: React.FC = () => {
       }
 
       const element = pageRef.current;
+      // v3.2.5：动态加载 html2canvas（~200KB），仅在导出时按需拉取
+      const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,

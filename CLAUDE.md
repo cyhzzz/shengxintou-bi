@@ -391,9 +391,9 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 ## 13. 版本历史
 
-### v3.2.5 已落地（2026-07-18） 系统性 UI 动效优化（数据呈现生动化 + 多轮迭代调优）
+### v3.2.5 已落地（2026-07-18） 系统性 UI 动效优化 + 页面加载性能优化
 
-本次版本统一了 UI 动效系统的设计与节奏，并修复多个动效引发的副作用（企微数曲线为0 / 报告生成页布局 / 漏斗页间距）。
+本次版本统一了 UI 动效系统的设计与节奏，并修复多个动效引发的副作用（企微数曲线为0 / 报告生成页布局 / 漏斗页间距）；随后做了一轮页面加载性能优化（不改样式）。
 
 - **动效四层体系**：页面级（`AnimatedOutlet` 0.5s 纯淡入，去掉 y 位移避免与 FadeInSection 叠加）→ 容器级（`FadeInSection` 0.8s 淡入+上浮 12px，IntersectionObserver 滚动触发，delay 间隔 0.4s 大卡片依次浮现）→ 组件级（ECharts 1.5s 线 clip 从左到右绘制/柱 scaleY 从底到顶生长、`useCountUp` 1.5s 数字增长、FunnelChart 1.5s wave-in）→ 细节级（hover/focus 0.2-0.35s 交互反馈）。
 
@@ -436,7 +436,12 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 - **修复 7 个功能测试用例**（测试用例与当前页面结构不匹配，未改代码）：账号管理搜索 selector、Dashboard 无数据检查、数据导入页 5 个用例适配新组件。
 
-- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，36s）；API 冒烟 33/33 通过。
+- **页面加载性能优化（不改样式）**：
+  - **router 19 个页面全部改 `React.lazy`**：`router/index.tsx` 中除 `MainLayout` 外的 19 个页面全部改 `lazy(() => import(...))` + 统一 `withSuspense` 包装（一个 Suspense 边界 + `PageFallback` 占位）。首屏只拉当前路由对应的 chunk，主入口 `index-[hash].js` 从 **~1613KB 降到 54KB**（gzip 19KB）。
+  - **ECharts 改按需 import**：`components/Chart/ECharts/index.tsx` 从 `import * as echarts from 'echarts'`（全量 ~1MB）改为 `echarts/core` + 只注册项目实际使用的图表（Line/Bar/Pie/Radar）+ 组件（Title/Tooltip/Grid/Legend/DataZoom/VisualMap/AxisPointer/Aria）+ 渲染器（Canvas）+ 特性（UniversalTransition/LabelLayout）。echarts 块从 ~1MB 降到 **663KB**（gzip 223KB）。`ReportGeneration/index.tsx` 同步改为 `echarts/core` + 触发 `EChartsComponent` 模块副作用（echarts.use 幂等）。
+  - **vite.config.ts manualChunks 补全**：新增 `echarts-vendor` / `motion-vendor` / `export-vendor`（html2canvas+jspdf）/ `markdown-vendor`（react-markdown+remark-gfm+rehype-sanitize）四个分包；`antd-vendor` 补入 `@ant-design/plots`；`chunkSizeWarningLimit` 从 1000 调回 800；`optimizeDeps.include` 补全 `@ant-design/icons` / `@ant-design/plots` / `echarts` / `framer-motion`，首次 dev 启动不再重新预构建。
+  - **XhsNotes/Operation html2canvas 改动态 import**：原 `import html2canvas from 'html2canvas'`（静态，进入页面即加载 ~200KB）改为 `const html2canvas = (await import('html2canvas')).default`，仅在用户点击「导出图片/PDF」时按需拉取。
+- **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6393 modules，40s）；API 冒烟 33/33 通过。
 
 ### v3.2.4 已落地（2026-07-17） 小红书运营分析报表改造（Web/H5 双视图 + 数据准确性 + 杂志风数据块）
 

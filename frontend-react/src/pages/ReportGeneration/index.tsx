@@ -15,7 +15,11 @@ import {
   SettingOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
-import * as echarts from 'echarts';
+// v3.2.5：按需 import（echarts/core），图表/组件/渲染器由 EChartsComponent 模块副作用注册
+// 这里只触发副作用 + 拿到 echarts core API（init / EChartsOption type）
+import * as echarts from 'echarts/core';
+import type { ECharts, EChartsOption } from 'echarts';
+import '@/components/Chart/ECharts'; // 触发 echarts.use 副作用（幂等）
 import { pickEChartsColor } from '@/utils/echartsColors';
 import { FadeInSection } from '@/components';
 import styles from './index.module.scss';
@@ -238,8 +242,8 @@ const ReportGeneration: React.FC = () => {
   const posterRef = useRef<HTMLDivElement>(null);
   const opensChartRef = useRef<HTMLDivElement>(null);
   const yearlyChartRef = useRef<HTMLDivElement>(null);
-  const opensChartInstanceRef = useRef<echarts.ECharts | null>(null);
-  const yearlyChartInstanceRef = useRef<echarts.ECharts | null>(null);
+  const opensChartInstanceRef = useRef<ECharts | null>(null);
+  const yearlyChartInstanceRef = useRef<ECharts | null>(null);
 
   // 加载报告期选项
   const loadWeekOptions = useCallback(async () => {
@@ -310,7 +314,7 @@ const ReportGeneration: React.FC = () => {
     const channels = sortChannelsByCategory(weeklyData.channels, CHANNEL_CATEGORY_MAP);
     const colorMap = buildChannelColorMap(channels);
 
-    const option: echarts.EChartsOption = {
+    const option: EChartsOption = {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { show: false },
       grid: { top: 8, left: 36, right: 16, bottom: 24, containLabel: true },
@@ -351,7 +355,7 @@ const ReportGeneration: React.FC = () => {
     const channels = sortChannelsByCategory(weeklyData.channels, CHANNEL_CATEGORY_MAP);
     const colorMap = buildChannelColorMap(channels);
 
-    const option: echarts.EChartsOption = {
+    const option: EChartsOption = {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },

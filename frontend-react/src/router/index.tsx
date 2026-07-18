@@ -1,34 +1,49 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, ReactNode } from 'react';
 import MainLayout from '@/layouts/MainLayout';
-import DashboardPage from '@/pages/Dashboard';
-import ConversionFunnelPage from '@/pages/ConversionFunnel';
-import LeadsDetailPage from '@/pages/LeadsDetail';
-import AgencyAnalysisPage from '@/pages/AgencyAnalysis';
-import XhsNotesListPage from '@/pages/XhsNotes/List';
-import EmployeeConversionAnalysisPage from '@/pages/EmployeeConversion/Analysis';
-import EmployeeConversionWeeklyPage from '@/pages/EmployeeConversion/Weekly';
-import DataImportPage from '@/pages/System/DataImport';
-import AccountManagementPage from '@/pages/System/AccountManagement';
-import DatabaseBackupPage from '@/pages/System/DatabaseBackup';
-import OmniChannelReportPage from '@/pages/Reports/OmniChannel';
 
-// 应用市场 v3.1: 拆为 4 个独立子报表 (v3.1 §六)
-import AppMarketFunnelPage from '@/pages/Reports/AppMarket/Funnel';
-import AppMarketComparisonPage from '@/pages/Reports/AppMarket/Comparison';
-import AppMarketDetailPage from '@/pages/Reports/AppMarket/Detail';
-import AppMarketCreativePage from '@/pages/Reports/AppMarket/Creative';
+// v3.2.5：所有页面改 React.lazy 按需加载，主包只保留 MainLayout，
+// 首屏只拉当前路由对应的 chunk，避免一次加载全部 21 个页面 + 重型依赖（echarts/plots/framer-motion）。
+// Suspense fallback 用一个轻量占位，避免闪烁的 antd Spin。
+const PageFallback = () => (
+  <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
+    加载中...
+  </div>
+);
 
-// 直播 v3.1 占位 (v3.1 §八)
-import LiveFunnelPage from '@/pages/Live/Funnel';
-import AnchorClusterPage from '@/pages/AnchorCluster';
+// 统一 lazy 包装：Suspense 边界 + 错误边界
+function withSuspense(Comp: React.ComponentType<any>): ReactNode {
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Comp />
+    </Suspense>
+  );
+}
 
-// React.lazy 包装用于运营分析 + 报告生成 等大页面，按需加载 (v3.1 §四)
-const LazyXhsNotesOperation = lazy(() => import('@/pages/XhsNotes/Operation').then((m) => ({ default: m.default })));
-const LazyReportGeneration = lazy(() => import('@/pages/ReportGeneration').then((m) => ({ default: m.default })));
+const DashboardPage = lazy(() => import('@/pages/Dashboard'));
+const ConversionFunnelPage = lazy(() => import('@/pages/ConversionFunnel'));
+const LeadsDetailPage = lazy(() => import('@/pages/LeadsDetail'));
+const AgencyAnalysisPage = lazy(() => import('@/pages/AgencyAnalysis'));
+const XhsNotesListPage = lazy(() => import('@/pages/XhsNotes/List'));
+const XhsNotesOperationPage = lazy(() => import('@/pages/XhsNotes/Operation'));
+const EmployeeConversionAnalysisPage = lazy(() => import('@/pages/EmployeeConversion/Analysis'));
+const EmployeeConversionWeeklyPage = lazy(() => import('@/pages/EmployeeConversion/Weekly'));
+const DataImportPage = lazy(() => import('@/pages/System/DataImport'));
+const AccountManagementPage = lazy(() => import('@/pages/System/AccountManagement'));
+const DatabaseBackupPage = lazy(() => import('@/pages/System/DatabaseBackup'));
+const OmniChannelReportPage = lazy(() => import('@/pages/Reports/OmniChannel'));
 
-const PageFallback = () => <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-tertiary)' }}>加载中...</div>;
+// 应用市场 v3.1: 拆为 4 个独立子报表
+const AppMarketFunnelPage = lazy(() => import('@/pages/Reports/AppMarket/Funnel'));
+const AppMarketComparisonPage = lazy(() => import('@/pages/Reports/AppMarket/Comparison'));
+const AppMarketDetailPage = lazy(() => import('@/pages/Reports/AppMarket/Detail'));
+const AppMarketCreativePage = lazy(() => import('@/pages/Reports/AppMarket/Creative'));
+
+// 直播 v3.1
+const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
+const AnchorClusterPage = lazy(() => import('@/pages/AnchorCluster'));
+const ReportGenerationPage = lazy(() => import('@/pages/ReportGeneration'));
 
 export const router = createBrowserRouter([
   {
@@ -37,31 +52,27 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Navigate to="/omni-channel" replace /> },
-      { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'dashboard', element: withSuspense(DashboardPage) },
 
       // v3.1 顶级菜单
-      { path: 'omni-channel', element: <OmniChannelReportPage /> },
+      { path: 'omni-channel', element: withSuspense(OmniChannelReportPage) },
 
-      { path: 'conversion-funnel', element: <ConversionFunnelPage /> },
-      { path: 'leads-detail', element: <LeadsDetailPage /> },
-      { path: 'anchor-clusters', element: <AnchorClusterPage /> },
-      { path: 'agency-analysis', element: <AgencyAnalysisPage /> },
+      { path: 'conversion-funnel', element: withSuspense(ConversionFunnelPage) },
+      { path: 'leads-detail', element: withSuspense(LeadsDetailPage) },
+      { path: 'anchor-clusters', element: withSuspense(AnchorClusterPage) },
+      { path: 'agency-analysis', element: withSuspense(AgencyAnalysisPage) },
       {
         path: 'xhs-notes',
         children: [
-          { path: 'list', element: <XhsNotesListPage /> },
-          { path: 'operation', element: (
-            <Suspense fallback={<PageFallback />}>
-              <LazyXhsNotesOperation />
-            </Suspense>
-          ) },
+          { path: 'list', element: withSuspense(XhsNotesListPage) },
+          { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
         ],
       },
       {
         path: 'employee-conversion',
         children: [
-          { path: 'analysis', element: <EmployeeConversionAnalysisPage /> },
-          { path: 'weekly', element: <EmployeeConversionWeeklyPage /> },
+          { path: 'analysis', element: withSuspense(EmployeeConversionAnalysisPage) },
+          { path: 'weekly', element: withSuspense(EmployeeConversionWeeklyPage) },
         ],
       },
       // 应用市场 v3.1: 顶级菜单 + 4 子页
@@ -69,10 +80,10 @@ export const router = createBrowserRouter([
         path: 'app-market',
         children: [
           { index: true, element: <Navigate to="/app-market/funnel" replace /> },
-          { path: 'funnel', element: <AppMarketFunnelPage /> },
-          { path: 'comparison', element: <AppMarketComparisonPage /> },
-          { path: 'detail', element: <AppMarketDetailPage /> },
-          { path: 'creative', element: <AppMarketCreativePage /> },
+          { path: 'funnel', element: withSuspense(AppMarketFunnelPage) },
+          { path: 'comparison', element: withSuspense(AppMarketComparisonPage) },
+          { path: 'detail', element: withSuspense(AppMarketDetailPage) },
+          { path: 'creative', element: withSuspense(AppMarketCreativePage) },
         ],
       },
       // 直播 v3.1 占位
@@ -80,14 +91,10 @@ export const router = createBrowserRouter([
         path: 'live',
         children: [
           { index: true, element: <Navigate to="/live/funnel" replace /> },
-          { path: 'funnel', element: <LiveFunnelPage /> },
+          { path: 'funnel', element: withSuspense(LiveFunnelPage) },
         ],
       },
-      { path: 'report-generation', element: (
-        <Suspense fallback={<PageFallback />}>
-          <LazyReportGeneration />
-        </Suspense>
-      ) },
+      { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
 
       // v3.1 老路由重定向 (兼容旧链接)
       { path: 'reports/app-market', element: <Navigate to="/app-market/funnel" replace /> },
@@ -96,9 +103,9 @@ export const router = createBrowserRouter([
       {
         path: 'system',
         children: [
-          { path: 'data-import', element: <DataImportPage /> },
-          { path: 'account-management', element: <AccountManagementPage /> },
-          { path: 'database-backup', element: <DatabaseBackupPage /> },
+          { path: 'data-import', element: withSuspense(DataImportPage) },
+          { path: 'account-management', element: withSuspense(AccountManagementPage) },
+          { path: 'database-backup', element: withSuspense(DatabaseBackupPage) },
         ],
       },
     ],
