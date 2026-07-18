@@ -245,3 +245,9 @@
     text-align: right;
   }
 }
+
+/* v3.2.9 修复:局部覆盖 MetricSection 默认 margin-bottom，避免与外层 Row gutter y 间距叠加成 32px */
+.funnelMetricSection {
+  margin-bottom: 0;
+}
+
