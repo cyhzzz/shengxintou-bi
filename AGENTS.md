@@ -441,8 +441,8 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
   - **ECharts 改按需 import**：`components/Chart/ECharts/index.tsx` 从 `import * as echarts from 'echarts'`（全量 ~1MB）改为 `echarts/core` + 只注册项目实际使用的图表（Line/Bar/Pie/Radar）+ 组件（Title/Tooltip/Grid/Legend/DataZoom/VisualMap/AxisPointer/Aria）+ 渲染器（Canvas）+ 特性（UniversalTransition/LabelLayout）。echarts 块从 ~1MB 降到 **663KB**（gzip 223KB）。`ReportGeneration/index.tsx` 同步改为 `echarts/core` + 触发 `EChartsComponent` 模块副作用（echarts.use 幂等）。
   - **vite.config.ts manualChunks 补全**：新增 `echarts-vendor` / `motion-vendor` / `export-vendor`（html2canvas+jspdf）/ `markdown-vendor`（react-markdown+remark-gfm+rehype-sanitize）四个分包；`antd-vendor` 补入 `@ant-design/plots`；`chunkSizeWarningLimit` 从 1000 调回 800；`optimizeDeps.include` 补全 `@ant-design/icons` / `@ant-design/plots` / `echarts` / `framer-motion`，首次 dev 启动不再重新预构建。
   - **XhsNotes/Operation html2canvas 改动态 import**：原 `import html2canvas from 'html2canvas'`（静态，进入页面即加载 ~200KB）改为 `const html2canvas = (await import('html2canvas')).default`，仅在用户点击「导出图片/PDF」时按需拉取。
-  - **本地服务器模式优化：热门路由空闲预加载**：`main.tsx` 在首屏渲染后用 `requestIdleCallback` 预加载 Dashboard / 转化漏斗 / 线索明细 3 个最常访问的路由 chunk（3 秒超时兜底）。本地模式下 HTTP 延迟低（<5ms），但 V8 解析 JS 仍是 CPU 阻塞操作（大 chunk 解析 50-100ms），预解析+预执行让切换路由"零延迟"。
-  - **FadeInSection 卡顿修复**：`IntersectionObserver` 的 `threshold` 从 0.1 调到 0，并加 `rootMargin: '200px 0px 200px 0px'` 提前 200px 预触发动画。用户滚动到位置时动画已完成或进行中，消除"滚动到才加载"的卡顿感。
+  - **本地服务器模式优化：热门路由空闲预加载**：`main.tsx` 在首屏渲染后用 `requestIdleCallback` 预加载 Dashboard / 转化漏斗 / 线索明细 3 个最常访问的路由 chunk（3 秒超时兜底）。本地模式下 HTTP 延迟低（<5ms），但 V8 解析 JS 仍是 CPU 阻塞操作（大 chunk 解析 50-100ms），预解析+预执行让切换路由「零延迟」。
+  - **FadeInSection 卡顿修复**：`IntersectionObserver` 的 `threshold` 从 0.1 调到 0，并加 `rootMargin: '200px 0px 200px 0px'` 提前 200px 预触发动画。用户滚动到位置时动画已完成或进行中，消除「滚动到才加载」的卡顿感。
 - **员工转化分析报表：排行榜按平台分 Tab**：原 100+ 行所有平台员工混排的表格，改为按 platform 分 Tab 渲染。每个 Tab 标签显示「平台名 + 员工数 + 线索总量」；剔除总线索量 < 10 的平台（数据量太少无对比意义）；按线索量降序排列 Tab；默认选中线索量最大的平台；CSV 导出按当前平台导出。原始 `exportRanking` 函数被 `exportRankingByPlatform` 替代。
 - **校验**：`npx tsc --noEmit` 0 错；`npm run build` 0 错（6397 modules，47s）；API 冒烟 33/33 通过。
 
