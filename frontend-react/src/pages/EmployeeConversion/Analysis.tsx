@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty,
+  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Row, Col, Tag, Empty, Tabs,
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, DollarOutlined, RiseOutlined,
@@ -203,24 +203,6 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     setSelectedEmployees([]);
   };
 
-  const exportRanking = () => {
-    const ranking = data?.ranking || [];
-    if (!ranking.length) return;
-    const headers = ['员工姓名', '平台', '线索量', '开口量', '有效线索', '开户量', '有效户', '开户率%', '资产'];
-    const rows = ranking.map((r: any) => [
-      r.employee_name, r.platform, r.total_leads, r.mouth_count, r.valid_lead_count,
-      r.opened_count, r.valid_customer_count, r.opening_rate, r.total_assets,
-    ]);
-    const csv = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `员工转化分析_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const rankingColumns = [
     { title: '排名', width: 60, align: 'center' as const, render: (_: any, __: any, idx: number) => (
       <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
@@ -237,6 +219,57 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     ) },
     { title: '总资产', dataIndex: 'total_assets', align: 'right' as const, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
   ];
+
+  // v3.2.5：按平台分组渲染 Tab，剔除线索量 < 10 的平台（数据量太少无对比意义）
+  // 每个平台一个 Tab，按线索量降序排列；用户可切换平台对比查看
+  const PLATFORM_MIN_LEADS = 10;
+  const [activePlatform, setActivePlatform] = useState<string>('');
+
+  const platformStats = useMemo(() => {
+    const ranking = data?.ranking || [];
+    const stats: Record<string, { leads: number; employees: number; rows: any[] }> = {};
+    ranking.forEach((r: any) => {
+      const p = r.platform || '未知';
+      if (!stats[p]) stats[p] = { leads: 0, employees: 0, rows: [] };
+      stats[p].leads += r.total_leads || 0;
+      stats[p].employees += 1;
+      stats[p].rows.push(r);
+    });
+    // 剔除线索量 < PLATFORM_MIN_LEADS 的平台
+    const filtered = Object.entries(stats).filter(([, v]) => v.leads >= PLATFORM_MIN_LEADS);
+    // 按线索量降序
+    filtered.sort((a, b) => b[1].leads - a[1].leads);
+    return filtered;
+  }, [data?.ranking]);
+
+  // 默认选中线索量最大的平台（首次加载或数据变化时）
+  useEffect(() => {
+    if (platformStats.length && !platformStats.find(([p]) => p === activePlatform)) {
+      setActivePlatform(platformStats[0][0]);
+    }
+  }, [platformStats, activePlatform]);
+
+  const activeRanking = useMemo(() => {
+    const found = platformStats.find(([p]) => p === activePlatform);
+    return found ? found[1].rows : [];
+  }, [platformStats, activePlatform]);
+
+  const exportRankingByPlatform = () => {
+    if (!activeRanking.length) return;
+    const headers = ['员工姓名', '平台', '线索量', '开口量', '有效线索', '开户量', '有效户', '开户率%', '资产'];
+    const rows = activeRanking.map((r: any) => [
+      r.employee_name, r.platform, r.total_leads, r.mouth_count, r.valid_lead_count,
+      r.opened_count, r.valid_customer_count, r.opening_rate, r.total_assets,
+    ]);
+    const csv = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `员工转化分析_${activePlatform}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className={styles.employeeConversionPage}>
@@ -331,23 +364,40 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
         </Card>
         </FadeInSection>
 
-        {/* 排行榜 */}
+        {/* 排行榜 — v3.2.5 按 platform 分 Tab，剔除线索量 < 10 的平台（数据量太少无对比意义） */}
         <FadeInSection delay={2.0} duration={0.8}>
         <Card className={styles.tableCard}>
           <div className={styles.cardHeader}>
-            <Text type='secondary' className={styles.cardTitle}>🏆 员工转化排行榜</Text>
-            <Text type='secondary' className={styles.cardDesc}>共 {data?.ranking?.length || 0} 人</Text>
+            <Text type='secondary' className={styles.cardTitle}>🏆 员工转化排行榜（按平台分 Tab）</Text>
+            <Text type='secondary' className={styles.cardDesc}>
+              {activePlatform ? `当前：${activePlatform} · ${activeRanking.length} 人` : `共 ${data?.ranking?.length || 0} 人`}
+            </Text>
             <Space style={{ marginLeft: 'auto' }}>
-              <Button icon={<DownloadOutlined />} onClick={exportRanking} disabled={!data?.ranking?.length}>导出 CSV</Button>
+              <Button icon={<DownloadOutlined />} onClick={exportRankingByPlatform} disabled={!activeRanking.length}>导出当前平台 CSV</Button>
             </Space>
           </div>
-          <Table
-            columns={rankingColumns}
-            dataSource={data?.ranking || []}
-            rowKey={(r: any) => `${r.employee_name}-${r.platform}`}
-            scroll={{ x: 1100 }}
-            pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`, pageSizeOptions: ['10', '20', '50', '100'] }}
-          />
+          {platformStats.length ? (
+            <Tabs
+              activeKey={activePlatform}
+              onChange={setActivePlatform}
+              size='small'
+              items={platformStats.map(([p, s]) => ({
+                key: p,
+                label: <span>{p} <Tag style={{ marginLeft: 4 }}>{s.employees}人 / {s.leads}条</Tag></span>,
+                children: (
+                  <Table
+                    columns={rankingColumns}
+                    dataSource={s.rows}
+                    rowKey={(r: any) => `${r.employee_name}-${r.platform}`}
+                    scroll={{ x: 1100 }}
+                    pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 条`, pageSizeOptions: ['10', '20', '50', '100'] }}
+                  />
+                ),
+              }))}
+            />
+          ) : (
+            <Empty description='暂无排行数据' />
+          )}
         </Card>
         </FadeInSection>
       </Spin>

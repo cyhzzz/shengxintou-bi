@@ -79,9 +79,11 @@ export const FadeInSection: React.FC<FadeInSectionProps> = ({
         });
       },
       {
-        // 进入视口 10% 即触发，提前一点启动动画让滚动更流畅
-        threshold: 0.1,
-        // rootMargin: '0px 0px -10% 0px', // 底部留点余量，让元素更靠近视口中央才触发
+        // v3.2.5：提前 200px 预触发动画，避免用户滚动到位置时才看到淡入的"卡顿感"
+        // 配合 threshold 0，只要元素边缘进入"视口外扩 200px"区域就启动动画
+        // 这样用户滚到位置时动画已完成或进行中，视觉上更流畅
+        threshold: 0,
+        rootMargin: '200px 0px 200px 0px',
       }
     );
 
