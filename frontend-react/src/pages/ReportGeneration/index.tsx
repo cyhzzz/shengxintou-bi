@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import * as echarts from 'echarts';
 import { pickEChartsColor } from '@/utils/echartsColors';
+import { FadeInSection } from '@/components';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -551,7 +552,7 @@ const ReportGeneration: React.FC = () => {
       </FadeInSection>
 
       {/* 右侧预览画布 */}
-      <FadeInSection delay={0.12} duration={0.8}>
+      <FadeInSection delay={0.4} duration={0.8}>
       <div className={styles.previewPanel}>
         <div className={styles.previewHeader}>
           <div className={styles.cardHeader}>
