@@ -1,20 +1,9 @@
 .container {
   position: relative;
   width: 100%;
-  opacity: 0;
-  // v3.2.7：图表容器 1.2s 级淡入上浮
-  animation: chartFadeIn var(--motion-duration-reveal, 1200ms) var(--motion-easing-smooth) both;
-}
-
-@keyframes chartFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  // v3.2.5：移除 .container 级 opacity:0 + chartFadeIn 动画
+  // 原因：动画未完成时容器不可见（opacity:0），导致用户看到"曲线为0"的错觉
+  // ECharts 内部已有 option.animationDuration=1500ms 的线/柱绘制入场动画，外层不再需要额外的 opacity 动画
 }
 
 .skeletonOverlay {

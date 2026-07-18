@@ -4,7 +4,7 @@
   margin-bottom: var(--spacer-16);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  // v3.2.8：移除 sectionEnter 动画，由外层 FadeInSection 控制大容器浮现
+  // v3.2.5：移除 sectionEnter 动画，由外层 FadeInSection 控制大容器浮现
   // 小卡片不再单独 stagger，避免与 FadeInSection 叠加导致"一起加载"的视觉混乱
 }
 
@@ -44,9 +44,9 @@
   overflow: hidden;  // v3.1.25: 截断超长数字 / 描述
   height: 100%;
   border-radius: var(--radius-lg);
-  // v3.2.6：hover 仅改阴影，避免 transform 触发 layout/paint
+  // v3.2.5：hover 仅改阴影，避免 transform 触发 layout/paint
   transition: box-shadow var(--motion-duration-normal) var(--motion-easing-default);
-  // v3.2.8：移除 metricCardEnter stagger 入场动画，由外层 FadeInSection 控制大容器浮现
+  // v3.2.5：移除 metricCardEnter stagger 入场动画，由外层 FadeInSection 控制大容器浮现
   // 小卡片即时显示，避免与 FadeInSection 叠加
 
   &:hover {
@@ -59,7 +59,7 @@
   }
 }
 
-// v3.2.8：metricCardEnter keyframes 保留但不再被 .metricCard 引用（向后兼容）
+// v3.2.5：metricCardEnter keyframes 保留但不再被 .metricCard 引用（向后兼容）
 
 .metricContent {
   display: flex;

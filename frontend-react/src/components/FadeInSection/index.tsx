@@ -34,7 +34,7 @@ export interface FadeInSectionProps {
 }
 
 /**
- * 大容器顺序浮现组件（v3.2.7 → v3.2.8 重构）
+ * 大容器顺序浮现组件（v3.2.5 引入，基于 IntersectionObserver 滚动触发）
  *
  * 设计要点：
  * 1. 使用 IntersectionObserver 滚动触发，视口外的容器不开始动画

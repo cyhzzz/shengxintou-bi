@@ -18,6 +18,53 @@
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
+  // v3.2.5：容器级 CSS 动画（IntersectionObserver 触发），不依赖 antd-plots 内置 animate
+  opacity: 0;
+  transform: translateY(20px) scale(0.96);
+  transition:
+    opacity 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+    transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  will-change: transform, opacity;
+}
+
+.chartWrapVisible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.stageListVisible {
+  // 阶段标签随容器淡入，但延迟 0.4s 让漏斗图先开始
+  animation: stageTagEnter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  animation-delay: 0.4s;
+}
+
+@keyframes stageTagEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.overallVisible {
+  animation: stageTagEnter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  animation-delay: 0.6s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chartWrap {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .stageListVisible,
+  .overallVisible {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .stageList {

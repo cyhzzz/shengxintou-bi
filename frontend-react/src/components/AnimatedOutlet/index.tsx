@@ -12,7 +12,7 @@ export default function AnimatedOutlet() {
   const outlet = useOutlet();
 
   return (
-    // v3.2.8：动效层次梳理——AnimatedOutlet 只做纯淡入（去掉 y 位移），避免与 FadeInSection 的 translateY 叠加
+    // v3.2.5：动效层次梳理——AnimatedOutlet 只做纯淡入（去掉 y 位移），避免与 FadeInSection 的 translateY 叠加
     // 页面级（0.5s 纯淡入） → 容器级（FadeInSection 0.8s 淡入+上浮） → 组件级（ECharts 1.5s 线/柱绘制） → 细节级（hover/focus）
     <AnimatePresence mode="popLayout">
       <m.div
