@@ -1,7 +1,8 @@
 @use '../../styles/mixins' as *;
 
 .container {
-  display: flex;
+  display: grid;
+  grid-template-columns: 320px 1fr;
   gap: var(--spacer-20);
   height: calc(100vh - var(--header-height) - var(--spacer-32) - var(--spacer-32));
   padding: 0;
@@ -10,8 +11,9 @@
 
 /* 左侧控制面板 */
 .controlPanel {
-  width: 320px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   background: var(--bg-content);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
@@ -110,7 +112,8 @@
 
 /* 右侧预览画布 */
 .previewPanel {
-  flex: 1;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
