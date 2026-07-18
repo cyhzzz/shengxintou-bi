@@ -1,12 +1,41 @@
 /**
  * ECharts React 封装组件
  * 支持自动 resize、主题切换、响应式更新
+ *
+ * v3.2.5：改按需 import（echarts/core + charts + components + renderers），
+ * echarts 块从 ~1MB 降到 ~300KB。只注册项目中实际使用的图表类型与组件：
+ *   charts:   Line / Bar / Pie / Radar
+ *   components: Title / Tooltip / Grid / Legend / DataZoom / VisualMap / AxisPointer
+ *   renderers: Canvas
+ *   features:  UniversalTransition（line-bar 切换动画）/ LabelLayout
  */
 import React, { useRef, useEffect, useCallback } from 'react';
-import * as echarts from 'echarts';
+import * as echarts from 'echarts/core';
 import type { ECharts, EChartsOption } from 'echarts';
+import { LineChart, BarChart, PieChart, RadarChart } from 'echarts/charts';
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DataZoomComponent,
+  VisualMapComponent,
+  AriaComponent,
+} from 'echarts/components';
+import { AxisPointerComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import { UniversalTransition, LabelLayout } from 'echarts/features';
 import { mergeChartTheme } from './themes';
 import styles from './index.module.scss';
+
+// 注册所有用到的图表、组件、渲染器、特性（多次调用幂等，会被 tree-shake 优化）
+echarts.use([
+  LineChart, BarChart, PieChart, RadarChart,
+  TitleComponent, TooltipComponent, GridComponent, LegendComponent,
+  DataZoomComponent, VisualMapComponent, AxisPointerComponent, AriaComponent,
+  CanvasRenderer,
+  UniversalTransition, LabelLayout,
+]);
 
 /** 简易 debounce */
 function debounce<T extends (...args: any[]) => void>(fn: T, wait: number) {
