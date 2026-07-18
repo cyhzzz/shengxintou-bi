@@ -86,7 +86,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     }
   };
 
-  // v3.2.7：数字增长动画，1.5s 慢节奏
+  // v3.2.5：数字增长动画，1.5s 慢节奏
   const decimals = formatter === 'currency' || formatter === 'percent' ? 2 : 0;
   const animatedValue = useCountUp(value, { duration: 1500, decimals });
 

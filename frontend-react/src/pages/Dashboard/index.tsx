@@ -238,7 +238,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 前端投放指标卡片 */}
-        <FadeInSection delay={0.12} duration={0.8}>
+        <FadeInSection delay={0.4} duration={0.8}>
           <MetricSection
             title={
               <>
@@ -296,7 +296,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 后端转化指标卡片 */}
-        <FadeInSection delay={0.24} duration={0.8}>
+        <FadeInSection delay={0.8} duration={0.8}>
           <MetricSection
             title={
               <>
@@ -363,7 +363,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 运营效率指标卡片 */}
-        <FadeInSection delay={0.36} duration={0.8}>
+        <FadeInSection delay={1.2} duration={0.8}>
           <MetricSection
             title={
               <>
@@ -424,7 +424,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 趋势图 */}
-        <FadeInSection delay={0.48} duration={0.8}>
+        <FadeInSection delay={1.6} duration={0.8}>
           <Row gutter={[16, 16]} className={styles.chartsRow}>
             <Col xs={24} lg={24}>
               <TrendChart
@@ -440,7 +440,7 @@ const DashboardPage: React.FC = () => {
         </FadeInSection>
 
         {/* 互联网渠道开户日历热力图（7 行 × N 列布局，表头与 Dashboard 其他卡组一致） */}
-        <FadeInSection delay={0.75} duration={0.8}>
+        <FadeInSection delay={2.0} duration={0.8}>
           <MetricSection
             title={
               <>

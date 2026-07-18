@@ -97,7 +97,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     const currentTheme = getCurrentTheme();
     const mergedOption = mergeChartTheme(option, currentTheme);
 
-    // v3.2.8：让线/柱缓慢绘制出现（非整图淡入）
+    // v3.2.5：让线/柱缓慢绘制出现（非整图淡入）
     // - 折线图默认入场动画是 clip：clipRect 从左到右展开，线被逐渐"绘制"出来
     // - 柱状图默认入场动画是 scaleY：柱子从底部往上生长
     // - 只设置 option 级别的 animationDuration，不在 series 级别覆盖，让 ECharts 用默认入场动画类型
@@ -132,7 +132,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
     });
   }, [option, getCurrentTheme]);
 
-  // 自动 resize（v3.2.6：debounce 100ms，避免连续触发重绘）
+  // 自动 resize（v3.2.5：debounce 100ms，避免连续触发重绘）
   useEffect(() => {
     if (!autoResize || !containerRef.current) return;
 

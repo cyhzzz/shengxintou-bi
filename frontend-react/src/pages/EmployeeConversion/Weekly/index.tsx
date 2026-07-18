@@ -219,7 +219,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       </FadeInSection>
 
       {/* 周报内容卡片 */}
-      <FadeInSection delay={0.12} duration={0.8}>
+      <FadeInSection delay={0.4} duration={0.8}>
         <Card className={styles.reportCard}>
         <div className={styles.cardHeader}>
           <Text type="secondary" className={styles.cardTitle}>
@@ -292,7 +292,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       </Card>
       </FadeInSection>
 
-      <FadeInSection delay={0.30} duration={0.8}>
+      <FadeInSection delay={0.8} duration={0.8}>
       <ReportFooter
         sources={[
           { label: '口径', value: '内容平台（小红书 / 腾讯 / 抖音 / 快手 / 财联社）—— 业务实质：内容平台客户由员工承接营销转化；不含云极（yj）/高德等非内容平台，故开户数小于转化漏斗的全平台口径' },

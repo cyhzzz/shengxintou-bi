@@ -9,7 +9,7 @@
  * - antd-charts v2.6.7 + antv g2 v5 修复了旧版的 conversionTag.style 抛错
  * - 但即便偶发报错（数据缺字段 / props 类型不兼容），用户感知到的是 CSS 横条，不会白屏
  */
-import React, { Component, ReactNode } from 'react';
+import React, { Component, ReactNode, useEffect, useRef, useState } from 'react';
 import { Card, Empty, Tag, Tooltip } from 'antd';
 import { ArrowDownOutlined } from '@ant-design/icons';
 import FunnelChartAntd from '@ant-design/plots/es/components/funnel';
@@ -112,6 +112,33 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
   showOverall = true,
   useLogScale = false,
 }) => {
+  // v3.2.5：漏斗图容器级动效 — IntersectionObserver 触发后给 chartWrap 加 visible 类
+  // 用 CSS 动画让漏斗图整体淡入 + 上浮，不依赖 @ant-design/plots 内置 animate（v5 API 与 plots 透传链路不稳定）
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   if (!data || data.length === 0) {
     return (
       <Card size="small" className={styles.emptyCard} style={{ minHeight: height }}>
@@ -144,7 +171,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
 
   return (
     <div className={styles.funnelChart} style={{ minHeight: height }}>
-      <div className={styles.chartWrap}>
+      <div ref={wrapRef} className={`${styles.chartWrap} ${visible ? styles.chartWrapVisible : ''}`}>
         <ChartErrorBoundary data={clean} palette={colors} height={chartHeight} useLogScale={useLogScale}>
           <FunnelChartAntd
             data={chartData}
@@ -154,16 +181,15 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
             height={chartHeight}
             style={{ fillOpacity: 0.92, stroke: '#fff', lineWidth: 2 }}
             scale={{ color: { range: colors.slice(0, clean.length) } }}
-            animation={{
-              appear: {
-                animation: 'wave-in',
-                duration: 1500,
-                delay: (d: any, index: number) => index * 80,
-                easing: 'ease-out',
-              },
+            // v3.2.5：antv g2 v5 mark 动画字段是 animate（不是 animation），
+            // 类型用 camelCase（waveIn / fadeIn，不是 wave-in / fade-in）。
+            // 同时容器级 CSS 动画兜底（chartWrapVisible），即使 plots 不透传 animate 也能有动效
+            animate={{
               enter: {
-                animation: 'fade-in',
-                duration: 800,
+                type: 'waveIn',
+                duration: 1500,
+                delay: (_d: any, index: number) => index * 80,
+                easing: 'ease-out',
               },
             }}
             label={{
@@ -193,12 +219,16 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
       </div>
 
       {/* 阶段明细 + 阶段转化率 */}
-      <div className={styles.stageList}>
+      <div className={`${styles.stageList} ${visible ? styles.stageListVisible : ''}`}>
         {clean.map((stage, idx) => {
           const prev = idx > 0 ? clean[idx - 1] : null;
           const stepRate = prev && prev.count > 0 ? (stage.count / prev.count) * 100 : null;
           return (
-            <span key={`${stage.name}-${idx}`} className={styles.stageTag}>
+            <span
+              key={`${stage.name}-${idx}`}
+              className={styles.stageTag}
+              style={{ animationDelay: `${0.4 + idx * 0.12}s` }}
+            >
               <Tag color="blue">{idx + 1}. {stage.name}</Tag>
               {stepRate != null && (
                 <Tooltip title={`${prev?.name} → ${stage.name}`}>
@@ -213,7 +243,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
       </div>
 
       {showOverall && firstCount > 0 && (
-        <div className={styles.overall}>
+        <div className={`${styles.overall} ${visible ? styles.overallVisible : ''}`}>
           <span className={styles.overallLabel}>整体转化</span>
           <Tag color={overallRate > 20 ? 'green' : overallRate > 3 ? 'gold' : 'default'}>
             {clean[0].name} → {clean[clean.length - 1].name}：{overallRate.toFixed(2)}%
