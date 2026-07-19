@@ -1,0 +1,76 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "主播直播类型映射权威源（v3.3.0+）。JSON 是权威源，随 git 走；启动时 upsert 到 dim_anchor_live_type 表作为查询缓存。修改映射请直接编辑本文件并提交，不要通过管理页面或改库维护。",
+    "live_type_enum": ["分析师", "投顾IP", "投顾配合做带货", "带货直播"],
+    "rules": [
+      "纯人名（如「黄天平」）→ 投顾IP（分支投顾自IP线索）",
+      "视频号引流-人名 / 财联社引流-人名 → 投顾IP",
+      "抖音引流-人名（分支投顾）→ 投顾配合做带货",
+      "抖音引流-人名（总部投顾/分析师/带货主播）→ 按主播本身类型",
+      "抖音引流-直播带货-人名 → 投顾配合做带货",
+      "直播带货-人名（主播=带货主播）→ 带货直播",
+      "直播带货-人名（主播=投顾）→ 投顾配合做带货",
+      "小鹅通直播-人名 → 按主播本身类型"
+    ],
+    "anchors": {
+      "带货主播": ["吴晓宇", "杨毅", "周乐意"],
+      "总部投顾": ["余荩", "谭记恩", "胡磊"],
+      "分析师": ["蒋亦凡", "王路", "姚立琦", "王晓亮", "钱启敏"]
+    }
+  },
+  "mappings": [
+    {"source_token": "视频号引流-蒋亦凡", "anchor_name": "蒋亦凡", "live_type": "分析师", "remark": "总部分析师"},
+    {"source_token": "抖音引流-蒋亦凡", "anchor_name": "蒋亦凡", "live_type": "分析师", "remark": "总部分析师（尝试抖音）"},
+    {"source_token": "小鹅通直播-蒋亦凡", "anchor_name": "蒋亦凡", "live_type": "分析师", "remark": "总部分析师"},
+    {"source_token": "视频号引流-姚立琦", "anchor_name": "姚立琦", "live_type": "分析师", "remark": "总部分析师"},
+    {"source_token": "视频号引流-王路", "anchor_name": "王路", "live_type": "分析师", "remark": "总部分析师"},
+    {"source_token": "视频号引流-王晓亮", "anchor_name": "王晓亮", "live_type": "分析师", "remark": "总部分析师"},
+    {"source_token": "视频号引流-钱启敏", "anchor_name": "钱启敏", "live_type": "分析师", "remark": "总部分析师"},
+
+    {"source_token": "小鹅通直播-余荩", "anchor_name": "余荩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "视频号引流-余荩", "anchor_name": "余荩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "财联社引流-余荩", "anchor_name": "余荩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "抖音引流-余荩", "anchor_name": "余荩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "视频号引流-谭记恩", "anchor_name": "谭记恩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "财联社引流-谭记恩", "anchor_name": "谭记恩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "抖音引流-谭记恩", "anchor_name": "谭记恩", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "视频号引流-胡磊", "anchor_name": "胡磊", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "财联社引流-胡磊", "anchor_name": "胡磊", "live_type": "投顾IP", "remark": "总部投顾"},
+    {"source_token": "抖音引流-胡磊", "anchor_name": "胡磊", "live_type": "投顾IP", "remark": "总部投顾"},
+
+    {"source_token": "抖音引流-吴晓宇", "anchor_name": "吴晓宇", "live_type": "带货直播", "remark": "带货主播"},
+    {"source_token": "抖音引流-周乐意", "anchor_name": "周乐意", "live_type": "带货直播", "remark": "带货主播"},
+    {"source_token": "抖音引流-杨毅", "anchor_name": "杨毅", "live_type": "带货直播", "remark": "带货主播"},
+
+    {"source_token": "黄天平", "anchor_name": "黄天平", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "视频号引流-黄天平", "anchor_name": "黄天平", "live_type": "投顾IP", "remark": "分支投顾（自IP）"},
+    {"source_token": "抖音引流-黄天平", "anchor_name": "黄天平", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "赵茜", "anchor_name": "赵茜", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "视频号引流-赵茜", "anchor_name": "赵茜", "live_type": "投顾IP", "remark": "分支投顾（自IP）"},
+    {"source_token": "抖音引流-赵茜", "anchor_name": "赵茜", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "张靖月", "anchor_name": "张靖月", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "视频号引流-张靖月", "anchor_name": "张靖月", "live_type": "投顾IP", "remark": "分支投顾（自IP）"},
+    {"source_token": "抖音引流-张靖月", "anchor_name": "张靖月", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "汤凯", "anchor_name": "汤凯", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "抖音引流-汤凯", "anchor_name": "汤凯", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "陈小芳", "anchor_name": "陈小芳", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "抖音引流-陈小芳", "anchor_name": "陈小芳", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "刘贝", "anchor_name": "刘贝", "live_type": "投顾IP", "remark": "分支投顾（纯人名=自IP）"},
+    {"source_token": "抖音引流-刘贝", "anchor_name": "刘贝", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+
+    {"source_token": "抖音引流-何慧敏", "anchor_name": "何慧敏", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "抖音引流-盛睿雪", "anchor_name": "盛睿雪", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "抖音引流-张永强", "anchor_name": "张永强", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+    {"source_token": "抖音引流-李荣志", "anchor_name": "李荣志", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+
+    {"source_token": "抖音引流-直播带货-胡磊", "anchor_name": "胡磊", "live_type": "投顾配合做带货", "remark": "总部投顾（参与带货）"},
+    {"source_token": "抖音引流-直播带货-谭记恩", "anchor_name": "谭记恩", "live_type": "投顾配合做带货", "remark": "总部投顾（参与带货）"},
+    {"source_token": "直播带货-李荣志", "anchor_name": "李荣志", "live_type": "投顾配合做带货", "remark": "分支投顾（参与带货）"},
+
+    {"source_token": "直播带货-周乐意", "anchor_name": "周乐意", "live_type": "带货直播", "remark": "带货主播"},
+    {"source_token": "直播带货-杨毅", "anchor_name": "杨毅", "live_type": "带货直播", "remark": "带货主播"},
+
+    {"source_token": "直播带货-吴晓字", "anchor_name": "吴晓宇", "live_type": "带货直播", "remark": "错字校正：吴晓字→吴晓宇"}
+  ]
+}
