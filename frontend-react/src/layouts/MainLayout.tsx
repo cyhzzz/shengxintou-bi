@@ -23,6 +23,7 @@ import {
   AppstoreOutlined,
   GlobalOutlined,
   VideoCameraOutlined,
+  ShoppingCartOutlined,
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
@@ -99,6 +100,7 @@ const menuItems: MenuProps['items'] = [
     label: '直播获客',
     children: [
       { key: '/live/funnel', label: '直播漏斗', icon: <FunnelPlotOutlined /> },
+      { key: '/live/direct-sales', label: '直播带货', icon: <ShoppingCartOutlined /> },
       { key: '/anchor-clusters', label: '主播分析', icon: <UserOutlined /> },
     ],
   },

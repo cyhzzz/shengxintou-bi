@@ -605,7 +605,7 @@ const LiveFunnelPage: React.FC = () => {
               { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly，v3.3.0 起支持 live_types 过滤）' },
               { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
               { label: '直播类型', value: 'v3.3.0 起 4 类：分析师 / 投顾IP / 投顾配合做带货 / 带货直播，由 dim_anchor_live_type 表按 source_token 映射' },
-              { label: '配置入口', value: '系统配置 → 主播直播类型（管理 source_token → 主播名/直播类型 映射）' },
+              { label: '配置方式', value: 'backend/config/anchor_live_types.json（JSON 权威源，启动时自动 upsert 到 DB）' },
             ]}
             notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。v3.3.0 起新增直播类型筛选与「直播类型」列：主播名通过 dim_anchor_live_type 表归一化（含错字校正，如「直播带货-吴晓字」→ 吴晓宇），同一主播跨 token 涉及多种类型时 primary 取第一个非空、其余放 secondary_live_types。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
           />
