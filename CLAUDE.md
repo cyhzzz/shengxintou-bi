@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.1`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.2`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -417,6 +417,15 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.2 已落地（2026-07-19） 直播带货报表页 bug 修复（存量指标移除 + 热力图切换）
+
+- **主播详情表移除「存量客户」「存量资产」两列**：直播带货不服务存量客户价值，存量数据对决策无意义。`AnchorItem` / `AnchorAggRow` / `totals` 等接口字段保留 `existing_*`（后端返回 + 前端聚合但不展示，无副作用），仅删除列定义。
+- **后端 `anchor-clusters-trend` 端点加 `new_leads` 字段**：与 `new_opened` 同口径（非存量），用于热力图切换。`pt` / `pp` defaultdict 与聚合逻辑同步加 `new_leads`。
+- **热力图加 Segmented 切换「线索数(new_leads) / 开户数(new_opened)」**，默认线索数。开户数通常较少（转化率 1-5%），切到线索数查看更丰富的热力分布。Tooltip 提示「可切到线索数查看更丰富的热力分布」。标题从「365 天带货主播新开户日历」改为「365 天带货主播日历」。
+- **ReportFooter 热力图口径说明同步更新**：「支持『线索数 / 开户数』切换（取 totals[period].new_leads 或 new_opened）」。
+- **API 冒烟测试 test_64 增强**：验证 `totals[first_period]` 同时包含 `new_leads` 和 `new_opened` 字段。
+- **校验**：tsc 0 错；npm run build 0 错（6400 modules，49.02s）；API 冒烟 36/36 通过。
 
 ### v3.3.1 已落地（2026-07-19） 直播带货二级报表页（Live/DirectSales）— 走势+热力图+漏斗组合分析
 
