@@ -368,3 +368,154 @@ def app_market_creative():
         },
         'meta': {**_META, 'version': 'v3.1-creative', 'group_by': '广告计划ID+投放账号'},
     })
+
+
+@bp.route('/plan-analysis', methods=['POST'])
+@handle_exceptions
+def app_market_plan_analysis():
+    # v3.3.5 应用市场 · 计划分析（按周度走势 + 按平台单选）
+    # 业务诉求：
+    #   1. 拿量能力：开户数 / APP激活数 / 是否衰减（周度量趋势）
+    #   2. 精准性变化：各转化节点转化率是否稳定（周度率趋势）
+    # 入参：
+    #   filters: { start_date, end_date, app_market (单值字符串，可为 None=全部) }
+    #   top_n: int，Top N 计划（默认 30）
+    # 返回：
+    #   platforms: 所有应用市场列表（供前端单选）
+    #   weekly_totals: 该筛选范围的整体周度走势 [{week_start, 激活, 开户, 新开户, 入金, 有效户, 各率}]
+    #   plan_items: [{plan_id, 投放账号, totals: {...}, weekly: [{week_start, ...}]}]
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    top_n = int(data.get('top_n', 30))
+    app_market = filters.get('app_market')  # 单值字符串
+
+    # 平台列表（用于前端单选）
+    platform_rows = db.session.query(FactConvAppmarket.应用市场).distinct().filter(
+        FactConvAppmarket.应用市场.isnot(None),
+        FactConvAppmarket.应用市场 != '',
+        FactConvAppmarket.渠道类型 == '互联网引流',
+    ).order_by(FactConvAppmarket.应用市场).all()
+    platforms = [r[0] for r in platform_rows]
+
+    # 周起始日表达式：SQLite date(d, 'weekday 0', '-6 days') = d 所在周的周一
+    week_start_expr = func.date(FactConvAppmarket.下载日期, 'weekday 0', '-6 days').label('week_start')
+
+    # 广告计划ID 归一化（与 /creative 一致）
+    plan_expr = case(
+        (or_(FactConvAppmarket.广告计划ID.is_(None), FactConvAppmarket.广告计划ID == 0),
+         func.coalesce(FactConvAppmarket.投放账号, '未归因')),
+        else_=FactConvAppmarket.广告计划ID
+    ).label('plan_key')
+
+    funnels = [
+        ('是否激活APP', '激活APP'),
+        ('是否开户成功', '开户成功'),
+        ('是否新开户', '新开户'),
+        ('是否入金', '入金'),
+        ('是否有效户', '有效户'),
+    ]
+
+    # 按 (plan, week_start) 分组聚合
+    q = db.session.query(
+        plan_expr,
+        FactConvAppmarket.投放账号,
+        week_start_expr,
+        *[func.coalesce(func.sum(getattr(FactConvAppmarket, col)), 0).label(alias) for col, alias in funnels]
+    )
+    # 复用 _funnel_filters（强制渠道类型=互联网引流 + 日期 + app_markets 兼容）
+    inner_filters = dict(filters)
+    if app_market:
+        inner_filters['app_markets'] = [app_market]
+    q = _funnel_filters(q, inner_filters)
+    q = q.group_by(plan_expr, FactConvAppmarket.投放账号, week_start_expr).order_by(week_start_expr)
+    rows = q.all()
+
+    def _calc_rates(activate, opened, new_open, valid):
+        return {
+            '激活_开户率': round(opened / activate * 100, 2) if activate > 0 else 0,
+            '激活_新开户率': round(new_open / activate * 100, 2) if activate > 0 else 0,
+            '激活_有效率': round(valid / activate * 100, 2) if activate > 0 else 0,
+            '开户_新开户率': round(new_open / opened * 100, 2) if opened > 0 else 0,
+            '开户_有效率': round(valid / opened * 100, 2) if opened > 0 else 0,
+        }
+
+    # 按 plan 聚合 weekly
+    plan_map = {}
+    weekly_agg = {}  # week_start -> totals
+    for r in rows:
+        plan_key = str(r.plan_key) if r.plan_key is not None else '未归因'
+        week = str(r.week_start) if r.week_start is not None else '未知周'
+        activate = int(r.激活APP or 0)
+        opened = int(r.开户成功 or 0)
+        new_open = int(r.新开户 or 0)
+        deposit = int(r.入金 or 0)
+        valid = int(r.有效户 or 0)
+        weekly_point = {
+            'week_start': week,
+            '激活APP': activate, '开户成功': opened, '新开户': new_open,
+            '入金': deposit, '有效户': valid,
+            **_calc_rates(activate, opened, new_open, valid),
+        }
+        if plan_key not in plan_map:
+            plan_map[plan_key] = {
+                'plan_id': plan_key,
+                '投放账号': r.投放账号 or '-',
+                'totals': {'激活APP': 0, '开户成功': 0, '新开户': 0, '入金': 0, '有效户': 0},
+                'weekly': [],
+            }
+        p = plan_map[plan_key]
+        p['totals']['激活APP'] += activate
+        p['totals']['开户成功'] += opened
+        p['totals']['新开户'] += new_open
+        p['totals']['入金'] += deposit
+        p['totals']['有效户'] += valid
+        p['weekly'].append(weekly_point)
+        # 周度汇总
+        if week not in weekly_agg:
+            weekly_agg[week] = {'激活APP': 0, '开户成功': 0, '新开户': 0, '入金': 0, '有效户': 0}
+        for k in ('激活APP', '开户成功', '新开户', '入金', '有效户'):
+            weekly_agg[week][k] += weekly_point[k]
+
+    # 排序 Top N（按新开户 + 开户 + 激活）
+    plan_items = list(plan_map.values())
+    for p in plan_items:
+        t = p['totals']
+        p['totals'] = {**t, **_calc_rates(t['激活APP'], t['开户成功'], t['新开户'], t['有效户'])}
+        p['weekly'].sort(key=lambda x: x['week_start'])
+    plan_items.sort(key=lambda x: (x['totals']['新开户'], x['totals']['开户成功'], x['totals']['激活APP']), reverse=True)
+    top_plans = plan_items[:top_n]
+
+    # 周度整体走势
+    weekly_totals = []
+    for week, t in sorted(weekly_agg.items()):
+        weekly_totals.append({
+            'week_start': week,
+            **t,
+            **_calc_rates(t['激活APP'], t['开户成功'], t['新开户'], t['有效户']),
+        })
+
+    # 整体汇总
+    totals = {
+        'total_plans': len(plan_items),
+        'top_plans': len(top_plans),
+        'total_activate': sum(p['totals']['激活APP'] for p in plan_items),
+        'total_open': sum(p['totals']['开户成功'] for p in plan_items),
+        'total_new_open': sum(p['totals']['新开户'] for p in plan_items),
+        'total_deposit': sum(p['totals']['入金'] for p in plan_items),
+        'total_valid': sum(p['totals']['有效户'] for p in plan_items),
+        'total_weeks': len(weekly_totals),
+    }
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'platforms': platforms,
+            'selected_platform': app_market,
+            'weekly_totals': weekly_totals,
+            'plan_items': top_plans,
+            'totals': totals,
+            'top_n': top_n,
+            'all_count': len(plan_items),
+        },
+        'meta': {**_META, 'version': 'v3.3.5-plan-analysis', 'group_by': '广告计划ID × 周起始日'},
+    })

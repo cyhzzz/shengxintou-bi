@@ -201,6 +201,10 @@ export const dataServiceReports = {
   getAppMarketCreative: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
     return http.post('/reports/app-market/creative', params);
   },
+  // v3.3.5 计划分析（按周度走势 + 按平台单选）
+  getAppMarketPlanAnalysis: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
+    return http.post('/reports/app-market/plan-analysis', params);
+  },
 };
 
 

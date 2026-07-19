@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.4`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.5`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -58,8 +58,8 @@ v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生�
 
 #### 各报表口径要求（含待修复项）
 
-- **应用市场 · 漏斗/总览/市场对比/明细/创意**：统一走 `_funnel_filters`，仅限 `渠道类型=互联网引流`，新开户作为阶段/指标呈现。✅ 市场对比表已展示「新开户」列 + 「激活→新开户」率 + 月度堆叠图改用新开户。
-- **应用市场 · 创意效果**（`/creative`）：✅ 已修复（v3.1.25）——走 `_funnel_filters` + 新开户 SUM + 前端新开户指标卡/列/默认排序。
+- **应用市场 · 漏斗/总览/市场对比/明细/计划分析**：统一走 `_funnel_filters`，仅限 `渠道类型=互联网引流`，新开户作为阶段/指标呈现。✅ 市场对比表已展示「新开户」列 + 「激活→新开户」率 + 月度堆叠图改用新开户。
+- **应用市场 · 计划分析**（`/app-market/creative`，v3.3.5 起由「创意效果」改造）：✅ 走 `_funnel_filters` + 新开户 SUM；按 (广告计划ID × 周起始日) 聚合 + 平台单选 + 拿量能力/精准性双视角走势图 + 计划×周长表展开行。
 - **员工转化 / 直播获客 / 小红书**：涉及开户量、资产指标时，新开户（新增 + 引进资产）与存量客户（服务 + 存量资产）分开呈现，新开户为主指标、存量为辅助。
 
 #### 主播直播类型分类（v3.3.0 新增：投顾 / 分析师 / 带货直播）
@@ -418,6 +418,29 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.5 已落地（2026-07-19） 应用市场 · 计划分析（按平台单选 + 周度走势 + 拿量能力/精准性双视角）
+
+将原「创意效果」列表页（`pages/Reports/AppMarket/Creative.tsx`）改造为「计划分析」周度走势页，回答两个核心业务问题：计划拿量能力（激活/开户/新开户量是否衰减）+ 精准性变化（各转化节点转化率是否稳定）。路由 `/app-market/creative` 保持不变（不破坏书签），菜单文案「创意效果」改为「计划分析」。
+
+- **后端新增端点** `POST /api/v1/reports/app-market/plan-analysis`（`backend/routes/reports/app_market.py`）：
+  - 按 `(广告计划ID × 周起始日)` 分组聚合，周起始日用 SQLite 表达式 `func.date(下载日期, 'weekday 0', '-6 days')`（取该日期所在周一）。
+  - `plan_expr` 归一化：`CASE WHEN 广告计划ID IS NULL OR = 0 THEN COALESCE(投放账号, '未归因') ELSE 广告计划ID END`（与 `/creative` 端点一致）。
+  - `filters.app_market` 单值字符串（不传=全部平台）；复用 `_funnel_filters` 强制 `渠道类型=互联网引流` + 日期 + app_markets 过滤。
+  - 返回字段：`platforms`（所有应用市场列表，供前端单选）/ `selected_platform` / `weekly_totals`（整体周度走势）/ `plan_items`（Top N 计划，含 `weekly` 数组）/ `totals` / `top_n` / `all_count`。
+  - 每条 weekly 记录含 5 个量指标（激活APP/开户成功/新开户/入金/有效户）+ 5 个转化率（激活_开户率 / 激活_新开户率 / 激活_有效率 / 开户_新开户率 / 开户_有效率，由 `_calc_rates` 辅助函数计算）。
+- **前端 Creative.tsx 完全重写**：
+  - 筛选器：日期 RangePicker（默认 2026 全年）+ 应用市场 Select（`allowClear + showSearch`，单选，undefined=全部）+ Top N Select（10/30/50/100，默认 30）。
+  - 核心指标卡 5 张：计划数 / 总激活APP / 总新开户 / 总有效户 / 激活→新开户率。
+  - 走势图 1（拿量能力，双 Y 轴）：左轴=激活APP柱图 + 右轴=开户成功/新开户折线；含 `decayInfo` useMemo 首尾周对比，激活或新开户下降时显示红色「量能衰减」Tag（FallOutlined），上升时显示绿色「量能增长」Tag（RiseOutlined）。
+  - 走势图 2（精准性，多线）：5 条转化率折线（激活→开户 / 激活→新开户 / 开户→新开户 / 激活→有效 / 开户→有效）。
+  - 计划详情表：按新开户降序，列含排名/广告计划ID/投放账号/激活APP/开户成功/新开户/有效户/激活→新开户/开户→有效/覆盖周数；`expandable` 行展开显示该计划每周明细 Table。
+  - CSV 导出：按计划 × 周长表导出（含 13 列）。
+- **菜单文案更新**：`MainLayout.tsx` 的 `/app-market/creative` 菜单 label 由「创意效果」改为「计划分析」，图标改为 `FileTextOutlined`。
+- **dataService 新增方法** `getAppMarketPlanAnalysis`：`POST /reports/app-market/plan-analysis`。
+- **ReportFooter**：5 条 sources + 单句 notes（无版本信息，遵循 v3.3.4 简化口径）。
+- **API 冒烟测试 +2 条**：`test_46`（默认全部，验证 `platforms` / `weekly_totals` / `plan_items` / `totals` 字段结构）+ `test_47`（指定平台筛选，验证 `selected_platform == '华为'`）。
+- **校验**：tsc 0 错；npm run build 0 错；API 冒烟 38/38 通过；Playwright 路由冒烟 22/22 通过。
 
 ### v3.3.4 已落地（2026-07-19） 投顾IP / 分析师专项报表（复用 DirectSales 通用组件）
 
