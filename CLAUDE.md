@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.2`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.3`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -417,6 +417,23 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.3 已落地（2026-07-19） 直播带货报表页业务优化（10 项量质效率分析增强）
+
+基于直播带货数据画像（3 位主播·1847 条线索·54 个新开户·¥143 万资产·月度开户率分化 13 倍），从「量、质、效率」三个维度展开 10 项优化：
+
+- **P0-1 新开户率走势图**：与现有新开户数走势并排（量质双图，左量右质）。新增 `trendRateOption` useMemo，按平台拆多 series + 合计新开户率折线，yAxis formatter 加 `%`。
+- **P0-4 主播产能对比柱图**：横向柱图 + Segmented 切换 5 指标（线索量/新开户/新有效户/新开户资产/单线索产能）。新增 `anchorCompareMetric` state + `anchorCompareOption` useMemo，最大值在顶部。
+- **P1-9 月度量质剪刀差**：双 Y 轴图（左线索量柱 + 右开户率折线）。新增 `scissorOption` useMemo，tooltip formatter 区分柱/线显示格式，折线 label 显示百分比。
+- **P1-10 主播 × 漏斗阶段热力图**：横向 6 阶段 × 纵向主播矩阵，单元格 = 阶段转化率%。新增 `anchorFunnelHeatmapOption` useMemo，5 档色阶（粉红→深红）+ visualMap 0-100%。
+- **P2-7 热力图加「开户率」第三选项**：`heatmapMetric` state 加 `'opening_rate'` 类型，`loadHeatmap` 计算 `opening_rate = new_opened / new_leads * 100`，Segmented 加选项。
+- **P2-3 主播详情表加「质效分级」Tag 列**：分级规则——高质效（开户率≥5% 且线索量≥50）/ 中质效（1-5%）/ 低质效（<1% 且线索量≥50）/ 待观察（样本不足）。Tooltip 解释分级依据。
+- **P3-5 主播多维画像雷达图**：5 维度（线索量/开口率/新有效率/新开户率/单线索资产）按各自 max 归一化。新增 `radarOption` useMemo + FadeInSection delay 2.2。
+- **P3-8 质效双高日 Top 10 列表**：筛选线索量>10 且 开户率≥5% 且 新开户数>0，按开户数降序 Top 10，前 3 名 Tag gold。新增 `topQualityDays` state + `loadTopQualityDays` + 独立 useEffect + Table。
+- **P3-11 漏斗对比模式**：漏斗 Card extra 加 Segmented「整体 FunnelChart / 按主播 堆叠柱图」。新增 `funnelMode` state + `funnelByAnchorOption` useMemo。
+- **P3-12 主播详情表 expandable 行**：展开显示「覆盖平台 / 直播类型 / token 列表 + 口径说明」。新增 `expandedRowRender` 函数 + Table expandable 配置。
+- **ReportFooter 同步补充**：5 条新 sources（质效分级规则 / 质效双高日定义 / 雷达图归一化 / 漏斗对比模式 / 热力图口径更新）+ 详细 notes（业务定位 + v3.3.1/v3.3.2/v3.3.3 三个版本变更概述）。
+- **校验**：tsc 0 错；npm run build 0 错（45.38s）；API 冒烟 36/36 通过；Playwright 路由冒烟 20/20 通过。
 
 ### v3.3.2 已落地（2026-07-19） 直播带货报表页 bug 修复（存量指标移除 + 热力图切换）
 
