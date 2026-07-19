@@ -33,6 +33,11 @@ import {
   CheckCircleOutlined,
   UserAddOutlined,
   ShoppingCartOutlined,
+  BarChartOutlined,
+  ScissorOutlined,
+  HeatMapOutlined,
+  RadarChartOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
@@ -133,10 +138,16 @@ const DirectSalesPage: React.FC = () => {
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [trendLoading, setTrendLoading] = useState(false);
 
-  // 热力图（固定 daily + 365 天滚动窗口，支持「线索数 / 开户数」切换）
+  // 热力图（固定 daily + 365 天滚动窗口，支持「线索数 / 开户数 / 开户率」切换）
   const [heatmapData, setHeatmapData] = useState<{ date: string; value: number }[]>([]);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
-  const [heatmapMetric, setHeatmapMetric] = useState<'new_leads' | 'new_opened'>('new_leads');
+  const [heatmapMetric, setHeatmapMetric] = useState<'new_leads' | 'new_opened' | 'opening_rate'>('new_leads');
+
+  // v3.3.3 P3-8: 质效双高日 Top 10（开户率>5% AND 线索量>10，按开户数降序）
+  const [topQualityDays, setTopQualityDays] = useState<
+    Array<{ date: string; leads: number; new_opened: number; opening_rate: number; new_assets: number }>
+  >([]);
+  const [topQualityLoading, setTopQualityLoading] = useState(false);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
@@ -201,10 +212,17 @@ const DirectSalesPage: React.FC = () => {
         granularity: 'daily',
       });
       if (res?.success && res.data?.totals) {
-        const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => ({
-          date,
-          value: Number(v?.[heatmapMetric] || 0),
-        }));
+        const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => {
+          let value: number;
+          if (heatmapMetric === 'opening_rate') {
+            const opened = Number(v?.new_opened || 0);
+            const leads = Number(v?.new_leads || v?.leads || 0);
+            value = leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
+          } else {
+            value = Number(v?.[heatmapMetric] || 0);
+          }
+          return { date, value };
+        });
         setHeatmapData(arr);
       }
     } catch (err) {
@@ -217,6 +235,37 @@ const DirectSalesPage: React.FC = () => {
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
   useEffect(() => { loadTrend(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
   useEffect(() => { loadHeatmap(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, heatmapMetric]);
+
+  // v3.3.3 P3-8: 质效双高日 Top 10
+  const loadTopQualityDays = async () => {
+    setTopQualityLoading(true);
+    try {
+      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
+        filters,
+        granularity: 'daily',
+      });
+      if (res?.success && res.data?.totals) {
+        const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => {
+          const leads = Number(v?.new_leads || v?.leads || 0);
+          const new_opened = Number(v?.new_opened || 0);
+          const new_assets = Number(v?.new_assets || 0);
+          const opening_rate = leads > 0 ? +((new_opened / leads) * 100).toFixed(2) : 0;
+          return { date, leads, new_opened, opening_rate, new_assets };
+        });
+        // 筛选：线索量 > 10 AND 开户率 >= 5% AND 开户数 > 0
+        const filtered = arr
+          .filter((d) => d.leads > 10 && d.opening_rate >= 5 && d.new_opened > 0)
+          .sort((a, b) => b.new_opened - a.new_opened || b.opening_rate - a.opening_rate)
+          .slice(0, 10);
+        setTopQualityDays(filtered);
+      }
+    } catch (err) {
+      console.warn('direct-sales top-quality-days load failed', err);
+    } finally {
+      setTopQualityLoading(false);
+    }
+  };
+  useEffect(() => { loadTopQualityDays(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   // 主播名多选筛选（前端二次过滤 items）
   const filteredItems = useMemo(() => {
@@ -300,6 +349,62 @@ const DirectSalesPage: React.FC = () => {
     };
   }, [trendData, trendGranularity]);
 
+  // v3.3.3 P0-1: 新开户率走势图 option
+  // 新开户率 = new_opened / leads * 100（按平台拆多 series，右图为合计）
+  const trendRateOption: EChartsOption = useMemo(() => {
+    if (!trendData?.periods?.length || !trendData?.by_platform) return {};
+    const periods = trendData.periods as string[];
+    const platformsList = (trendData.platforms || []) as string[];
+    const by_platform: Record<string, any> = trendData.by_platform;
+    const totals: Record<string, any> = trendData.totals || {};
+    const rate = (p: string, period: string) => {
+      const opened = Number(by_platform?.[period]?.[p]?.new_opened ?? 0);
+      const leads = Number(by_platform?.[period]?.[p]?.leads ?? 0);
+      return leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
+    };
+    const series = platformsList.map((p, idx) => ({
+      name: p,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: pickEChartsColor(idx) },
+      lineStyle: { width: 2 },
+      data: periods.map((period) => rate(p, period)),
+    }));
+    const totalRateSeries = {
+      name: '合计新开户率',
+      type: 'line',
+      smooth: true,
+      symbol: 'diamond',
+      symbolSize: 8,
+      itemStyle: { color: ECHARTS_COLORS[7] },
+      lineStyle: { width: 3, type: 'dashed' },
+      data: periods.map((p) => {
+        const opened = Number(totals[p]?.new_opened ?? 0);
+        const leads = Number(totals[p]?.leads ?? 0);
+        return leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
+      }),
+    };
+    return {
+      tooltip: {
+        trigger: 'axis',
+        valueFormatter: (v: any) => (v == null ? '-' : `${Number(v).toFixed(2)}%`),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },
+      yAxis: [
+        {
+          type: 'value',
+          name: '新开户率(%)',
+          axisLabel: { formatter: '{value}%' },
+        },
+      ],
+      series: [...series, totalRateSeries],
+    };
+  }, [trendData, trendGranularity]);
+
   // 汇总指标
   const totals = useMemo(() => {
     const sum = (sel: (i: AnchorItem) => number) => filteredItems.reduce((s, i) => s + (sel(i) || 0), 0);
@@ -370,8 +475,375 @@ const DirectSalesPage: React.FC = () => {
     return rows;
   }, [filteredItems, platformFilter]);
 
+  // v3.3.3 P3-12: 主播详情表 expandable 行展开内容（token 来源拆分）
+  const expandedRowRender = (r: AnchorAggRow) => {
+    const platforms = r.platforms || [];
+    const sources = r.sources || [];
+    const allLiveTypes = r.live_types || [];
+    const secondaryTypes = r.secondary_live_types || [];
+    return (
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <div>
+          <span style={{ color: 'var(--color-text-tertiary)', marginRight: 8, fontSize: 'var(--text-sm)' }}>覆盖平台（{platforms.length}）:</span>
+          {platforms.length ? (
+            <Space size={[4, 4]} wrap>
+              {platforms.map((p) => <Tag key={p} color="cyan">{sanitizeText(p)}</Tag>)}
+            </Space>
+          ) : <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>}
+        </div>
+        <div>
+          <span style={{ color: 'var(--color-text-tertiary)', marginRight: 8, fontSize: 'var(--text-sm)' }}>直播类型（{allLiveTypes.length}）:</span>
+          {allLiveTypes.length ? (
+            <Space size={[4, 4]} wrap>
+              {allLiveTypes.map((t) => (
+                <Tag key={t} color={t === r.live_type ? (LIVE_TYPE_COLOR[t] || 'default') : 'default'}>
+                  {t}{t === r.live_type ? ' (主)' : ''}
+                </Tag>
+              ))}
+              {secondaryTypes.length > 0 && (
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  · 二级类型 {secondaryTypes.length} 个
+                </span>
+              )}
+            </Space>
+          ) : <span style={{ color: 'var(--color-text-tertiary)' }}>未配置</span>}
+        </div>
+        <div>
+          <span style={{ color: 'var(--color-text-tertiary)', marginRight: 8, fontSize: 'var(--text-sm)' }}>
+            涉及 token 来源（{sources.length}，去重后）:
+          </span>
+          {sources.length ? (
+            <Space size={[4, 4]} wrap>
+              {sources.map((s) => <Tag key={s} color="magenta">{sanitizeText(s)}</Tag>)}
+            </Space>
+          ) : <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>}
+        </div>
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+          口径：以上 token 来自 fact_conv_content.客户来源 字段，按 [,，;；、] 分隔后单段，已通过 dim_anchor_live_type 归一化到当前主播名「{r.anchor}」。
+        </div>
+      </Space>
+    );
+  };
+
+  // v3.3.3 P0-4: 主播产能对比柱图（横向柱状图，可切换 5 指标）
+  const [anchorCompareMetric, setAnchorCompareMetric] = useState<
+    'leads' | 'new_opened' | 'new_valid' | 'new_assets' | 'per_lead_assets'
+  >('new_opened');
+  const anchorCompareOption: EChartsOption = useMemo(() => {
+    const metricConfig: Record<string, { name: string; fmt: (r: AnchorAggRow) => number; isCurrency?: boolean; isRate?: boolean }> = {
+      leads: { name: '线索量', fmt: (r) => r.leads },
+      new_opened: { name: '新开户数', fmt: (r) => r.new_opened },
+      new_valid: { name: '新有效户', fmt: (r) => r.new_valid },
+      new_assets: { name: '新开户资产', fmt: (r) => Math.round(r.new_assets), isCurrency: true },
+      per_lead_assets: { name: '单线索产能', fmt: (r) => (r.leads > 0 ? +(r.new_assets / r.leads).toFixed(0) : 0), isCurrency: true },
+    };
+    const cfg = metricConfig[anchorCompareMetric];
+    const sorted = [...anchorAggRows].sort((a, b) => cfg.fmt(a) - cfg.fmt(b)); // 横向柱图升序，最大在上
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        valueFormatter: (v: any) => {
+          if (v == null) return '-';
+          if (cfg.isCurrency) return `¥${Number(v).toLocaleString()}`;
+          return Number(v).toLocaleString();
+        },
+      },
+      grid: { left: '3%', right: '6%', bottom: '5%', top: '8%', containLabel: true },
+      xAxis: {
+        type: 'value',
+        name: cfg.isCurrency ? '¥' : cfg.name,
+        axisLabel: {
+          formatter: (v: number) => (cfg.isCurrency ? `${(v / 10000).toFixed(0)}万` : `${v}`),
+        },
+      },
+      yAxis: {
+        type: 'category',
+        data: sorted.map((r) => r.anchor),
+        axisLabel: { fontSize: 12 },
+      },
+      series: [
+        {
+          name: cfg.name,
+          type: 'bar',
+          data: sorted.map((r) => cfg.fmt(r)),
+          itemStyle: { color: 'var(--color-brand)' },
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (p: any) => {
+              const v = p.value as number;
+              if (cfg.isCurrency) return `¥${v.toLocaleString()}`;
+              return v.toLocaleString();
+            },
+          },
+          barMaxWidth: 24,
+        },
+      ],
+    };
+  }, [anchorAggRows, anchorCompareMetric]);
+
+  // v3.3.3 P1-9: 月度量质剪刀差（双 Y 轴：左线索量柱图 + 右开户率折线）
+  // 复用 trendData，跟随 trendGranularity；展示「量大质差」或「量质双高」的反向关系
+  const scissorOption: EChartsOption = useMemo(() => {
+    if (!trendData?.periods?.length || !trendData?.totals) return {};
+    const periods = trendData.periods as string[];
+    const totals: Record<string, any> = trendData.totals || {};
+    const leadsData = periods.map((p) => Number(totals[p]?.new_leads ?? totals[p]?.leads ?? 0));
+    const rateData = periods.map((p) => {
+      const opened = Number(totals[p]?.new_opened ?? 0);
+      const leads = Number(totals[p]?.new_leads ?? totals[p]?.leads ?? 0);
+      return leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
+    });
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        formatter: (params: any) => {
+          if (!Array.isArray(params) || !params.length) return '';
+          const title = params[0].axisValueLabel;
+          const lines = [title];
+          params.forEach((p: any) => {
+            const val = p.seriesName === '新开户率'
+              ? `${Number(p.value).toFixed(2)}%`
+              : Number(p.value).toLocaleString();
+            lines.push(`${p.marker} ${p.seriesName}: ${val}`);
+          });
+          return lines.join('<br/>');
+        },
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '6%', bottom: '12%', top: '12%', containLabel: true },
+      xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },
+      yAxis: [
+        {
+          type: 'value',
+          name: '新客户线索量',
+          position: 'left',
+          axisLine: { show: true, lineStyle: { color: pickEChartsColor(0) } },
+          axisLabel: { formatter: '{value}' },
+        },
+        {
+          type: 'value',
+          name: '新开户率(%)',
+          position: 'right',
+          axisLine: { show: true, lineStyle: { color: ECHARTS_COLORS[7] } },
+          axisLabel: { formatter: '{value}%' },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        {
+          name: '新客户线索量',
+          type: 'bar',
+          yAxisIndex: 0,
+          data: leadsData,
+          itemStyle: { color: pickEChartsColor(0), opacity: 0.75 },
+          barMaxWidth: 40,
+        },
+        {
+          name: '新开户率',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 8,
+          itemStyle: { color: ECHARTS_COLORS[7] },
+          lineStyle: { width: 3 },
+          data: rateData,
+          label: {
+            show: true,
+            position: 'top',
+            formatter: (p: any) => `${Number(p.value).toFixed(2)}%`,
+          },
+        },
+      ],
+    };
+  }, [trendData, trendGranularity]);
+
+  // v3.3.3 P1-10: 主播 × 漏斗阶段热力图（横向 6 阶段 × 纵向 N 主播，单元格 = 阶段转化率）
+  const anchorFunnelHeatmapOption: EChartsOption = useMemo(() => {
+    if (!anchorAggRows.length) return {};
+    const stages = [
+      { key: 'leads', label: '客户线索' },
+      { key: 'mouth', label: '客户开口' },
+      { key: 'valid_lead', label: '有效线索' },
+      { key: 'new_valid_lead', label: '有效(非存量)' },
+      { key: 'new_opened', label: '成功开户(新)' },
+      { key: 'new_valid', label: '有效户(新)' },
+    ] as const;
+    const rows = [...anchorAggRows].sort((a, b) => b.leads - a.leads);
+    const data: Array<[number, number, number]> = [];
+    rows.forEach((r, yIdx) => {
+      const values: Record<string, number> = {
+        leads: r.leads, mouth: r.mouth, valid_lead: r.valid_lead,
+        new_valid_lead: r.new_valid_lead, new_opened: r.new_opened, new_valid: r.new_valid,
+      };
+      stages.forEach((s, xIdx) => {
+        const cur = values[s.key] || 0;
+        const prev = xIdx > 0 ? values[stages[xIdx - 1].key] || 0 : cur;
+        const rate = prev > 0 ? +((cur / prev) * 100).toFixed(2) : 0;
+        data.push([xIdx, yIdx, rate]);
+      });
+    });
+    return {
+      tooltip: {
+        position: 'top',
+        formatter: (p: any) => {
+          const xName = stages[p.value[0]].label;
+          const yName = rows[p.value[1]]?.anchor || '-';
+          return `${yName}<br/>${xName}<br/>阶段转化率: <b>${Number(p.value[2]).toFixed(2)}%</b>`;
+        },
+      },
+      grid: { left: '3%', right: '4%', bottom: '5%', top: '5%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: stages.map((s) => s.label),
+        splitArea: { show: true },
+        axisLabel: { fontSize: 11, interval: 0, rotate: 0 },
+      },
+      yAxis: {
+        type: 'category',
+        data: rows.map((r) => r.anchor),
+        splitArea: { show: true },
+        axisLabel: { fontSize: 12 },
+      },
+      visualMap: {
+        min: 0,
+        max: 100,
+        calculable: true,
+        orient: 'horizontal',
+        left: 'center',
+        bottom: 0,
+        inRange: { color: ['#f5f5f5', '#ffd6e7', '#ff85c0', '#eb2f96', '#9e1068'] },
+        text: ['高', '低'],
+        textStyle: { fontSize: 11 },
+      },
+      series: [
+        {
+          name: '阶段转化率',
+          type: 'heatmap',
+          data,
+          label: {
+            show: true,
+            formatter: (p: any) => `${Number(p.value[2]).toFixed(0)}%`,
+            fontSize: 11,
+          },
+          emphasis: {
+            itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' },
+          },
+        },
+      ],
+    };
+  }, [anchorAggRows]);
+
+  // v3.3.3 P3-5: 主播雷达图（5 维度归一化对比）
+  // 维度：线索量/开口率/有效率/开户率/单线索资产，按各自维度 max 归一化到 0-100
+  const radarOption: EChartsOption = useMemo(() => {
+    if (!anchorAggRows.length) return {};
+    const rows = [...anchorAggRows].sort((a, b) => b.leads - a.leads);
+    const indicators = [
+      { name: '线索量', max: Math.max(...rows.map((r) => r.leads), 1) },
+      { name: '开口率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.mouth / r.leads) * 100 : 0)), 100) },
+      { name: '新有效率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.new_valid / r.leads) * 100 : 0)), 100) },
+      { name: '新开户率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.new_opened / r.leads) * 100 : 0)), 100) },
+      { name: '单线索资产', max: Math.max(...rows.map((r) => (r.leads ? r.new_assets / r.leads : 0)), 1) },
+    ];
+    const series = rows.map((r, idx) => ({
+      name: r.anchor,
+      value: [
+        r.leads,
+        r.leads ? +((r.mouth / r.leads) * 100).toFixed(2) : 0,
+        r.leads ? +((r.new_valid / r.leads) * 100).toFixed(2) : 0,
+        r.leads ? +((r.new_opened / r.leads) * 100).toFixed(2) : 0,
+        r.leads ? +(r.new_assets / r.leads).toFixed(0) : 0,
+      ],
+      itemStyle: { color: pickEChartsColor(idx) },
+      areaStyle: { opacity: 0.1 },
+      lineStyle: { width: 2 },
+    }));
+    return {
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0, type: 'scroll' },
+      radar: {
+        indicator: indicators,
+        center: ['50%', '50%'],
+        radius: '62%',
+        axisName: { color: 'var(--color-text-secondary)', fontSize: 12 },
+        splitArea: {
+          areaStyle: { color: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.04)'] },
+        },
+      },
+      series: [
+        {
+          type: 'radar',
+          data: series,
+        },
+      ],
+    };
+  }, [anchorAggRows]);
+
+  // v3.3.3 P3-11: 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱图）
+  const [funnelMode, setFunnelMode] = useState<'overall' | 'by_anchor'>('overall');
+  const funnelByAnchorOption: EChartsOption = useMemo(() => {
+    if (!anchorAggRows.length) return {};
+    const stages = [
+      { key: 'leads', label: '客户线索' },
+      { key: 'mouth', label: '客户开口' },
+      { key: 'valid_lead', label: '有效线索' },
+      { key: 'new_valid_lead', label: '有效(非存量)' },
+      { key: 'new_opened', label: '成功开户(新)' },
+      { key: 'new_valid', label: '有效户(新)' },
+    ] as const;
+    const rows = [...anchorAggRows].sort((a, b) => b.leads - a.leads);
+    const series = rows.map((r, idx) => ({
+      name: r.anchor,
+      type: 'bar',
+      stack: 'anchor',
+      itemStyle: { color: pickEChartsColor(idx) },
+      barMaxWidth: 60,
+      data: stages.map((s) => Number((r as any)[s.key] || 0)),
+    }));
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: stages.map((s) => s.label),
+        axisLabel: { fontSize: 11, interval: 0, rotate: 0 },
+      },
+      yAxis: { type: 'value', name: '人数' },
+      series,
+    };
+  }, [anchorAggRows]);
+
   const anchorAggColumns = [
     { title: '主播', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+    {
+      title: '质效分级',
+      key: 'quality_grade',
+      width: 110,
+      align: 'center' as const,
+      render: (_: any, r: AnchorAggRow) => {
+        const leads = r.leads || 0;
+        const rate = r.opening_rate || 0;
+        if (leads < 50) {
+          return <Tooltip title={`线索量 ${leads} < 50，样本不足，不评级`}><Tag color="default">待观察</Tag></Tooltip>;
+        }
+        if (rate >= 5) {
+          return <Tooltip title={`开户率 ${rate.toFixed(2)}% ≥ 5%，量大质优·核心产能`}><Tag color="green">高质效</Tag></Tooltip>;
+        }
+        if (rate >= 1) {
+          return <Tooltip title={`开户率 ${rate.toFixed(2)}% 处于 1-5%，中等水平`}><Tag color="gold">中质效</Tag></Tooltip>;
+        }
+        return <Tooltip title={`开户率 ${rate.toFixed(2)}% < 1%，量大质差·需优化转化`}><Tag color="red">低质效</Tag></Tooltip>;
+      },
+    },
     {
       title: '直播类型',
       dataIndex: 'live_type',
@@ -462,9 +934,9 @@ const DirectSalesPage: React.FC = () => {
               <Col flex="auto">
                 <Space size={8} align="center">
                   <RiseOutlined style={{ color: 'var(--color-brand)' }} />
-                  <strong>带货主播引流走势</strong>
+                  <strong>带货主播量质走势</strong>
                   <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-                    按 {trendData?.granularity || 'monthly'} 口径汇总，按平台拆多 series (新开户)
+                    按 {trendData?.granularity || 'monthly'} 口径汇总 · 左：新开户数(量) · 右：新开户率(质)
                   </span>
                 </Space>
               </Col>
@@ -481,8 +953,86 @@ const DirectSalesPage: React.FC = () => {
                 />
               </Col>
             </Row>
+            <Row gutter={12}>
+              <Col xs={24} lg={12}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  <UserAddOutlined style={{ color: 'var(--color-brand)' }} /> 新开户数走势（量）
+                </div>
+                {trendData?.periods?.length ? (
+                  <EChartsComponent option={trendOption} height={300} loading={trendLoading} />
+                ) : (
+                  <Empty description={trendLoading ? '加载中...' : '暂无走势数据'} />
+                )}
+              </Col>
+              <Col xs={24} lg={12}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                  <RiseOutlined style={{ color: 'var(--color-success)' }} /> 新开户率走势（质 = 新开户 ÷ 线索）
+                </div>
+                {trendData?.periods?.length ? (
+                  <EChartsComponent option={trendRateOption} height={300} loading={trendLoading} />
+                ) : (
+                  <Empty description={trendLoading ? '加载中...' : '暂无走势数据'} />
+                )}
+              </Col>
+            </Row>
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={1.0} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <BarChartOutlined style={{ color: 'var(--color-brand)' }} />
+                <span>主播产能对比</span>
+                <Tooltip title="横向柱图对比带货主播的核心产出指标。可切换 5 个指标；最大值在顶部。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+            extra={
+              <Segmented
+                size="small"
+                value={anchorCompareMetric}
+                onChange={(v) => setAnchorCompareMetric(v as typeof anchorCompareMetric)}
+                options={[
+                  { label: '线索量', value: 'leads' },
+                  { label: '新开户', value: 'new_opened' },
+                  { label: '新有效户', value: 'new_valid' },
+                  { label: '新开户资产', value: 'new_assets' },
+                  { label: '单线索产能', value: 'per_lead_assets' },
+                ]}
+              />
+            }
+          >
+            {anchorAggRows.length > 0 ? (
+              <EChartsComponent option={anchorCompareOption} height={Math.max(220, anchorAggRows.length * 60 + 60)} />
+            ) : (
+              <Empty description={'暂无主播数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={1.1} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <ScissorOutlined style={{ color: 'var(--color-error)' }} />
+                <span>量质剪刀差</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  柱：新客户线索量(量) · 线：新开户率(质) · 反向关系暴露「量大质差」/「量质双高」
+                </span>
+                <Tooltip title="左轴线索量越大表示吸引越多人；右轴开户率越高表示转化越有效。两线背离时说明量大质差，常出现于 6·18 / 双 11 / 大促节点后。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
             {trendData?.periods?.length ? (
-              <EChartsComponent option={trendOption} height={320} loading={trendLoading} />
+              <EChartsComponent option={scissorOption} height={320} loading={trendLoading} />
             ) : (
               <Empty description={trendLoading ? '加载中...' : '暂无走势数据'} />
             )}
@@ -506,10 +1056,11 @@ const DirectSalesPage: React.FC = () => {
               <Segmented
                 size="small"
                 value={heatmapMetric}
-                onChange={(v) => setHeatmapMetric(v as 'new_leads' | 'new_opened')}
+                onChange={(v) => setHeatmapMetric(v as 'new_leads' | 'new_opened' | 'opening_rate')}
                 options={[
                   { label: '线索数', value: 'new_leads' },
                   { label: '开户数', value: 'new_opened' },
+                  { label: '开户率', value: 'opening_rate' },
                 ]}
               />
             }
@@ -521,11 +1072,39 @@ const DirectSalesPage: React.FC = () => {
         <FadeInSection delay={1.6} duration={0.8}>
           <Row className={styles.funnelSplitRow}>
             <Col span={12} className={styles.funnelSplitCol}>
-              <Card title="6 阶段直播带货业务漏斗" size="small" className={styles.h100Card} extra={<Tooltip title="占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率"><InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} /></Tooltip>}>
-                {funnelChartData.length > 0 && funnelChartData[0].count > 0 ? (
-                  <FunnelChart data={funnelChartData} height={440} useLogScale />
+              <Card
+                title="6 阶段直播带货业务漏斗"
+                size="small"
+                className={styles.h100Card}
+                extra={
+                  <Space size={8}>
+                    <Segmented
+                      size="small"
+                      value={funnelMode}
+                      onChange={(v) => setFunnelMode(v as 'overall' | 'by_anchor')}
+                      options={[
+                        { label: '整体', value: 'overall' },
+                        { label: '按主播', value: 'by_anchor' },
+                      ]}
+                    />
+                    <Tooltip title={funnelMode === 'overall' ? '占比 = 当前阶段人数 ÷ 最大阶段人数（条形长度按比例绘制，已启用对数尺度缓解各级数据偏差）；阶段间百分比 = 上一阶段 → 当前阶段的转化率' : '横轴 6 阶段，3 位主播叠加柱图对比各阶段贡献。'}>
+                      <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                {funnelMode === 'overall' ? (
+                  funnelChartData.length > 0 && funnelChartData[0].count > 0 ? (
+                    <FunnelChart data={funnelChartData} height={440} useLogScale />
+                  ) : (
+                    <Empty description="该日期区间内无带货主播引流记录" />
+                  )
                 ) : (
-                  <Empty description="该日期区间内无带货主播引流记录" />
+                  anchorAggRows.length > 0 ? (
+                    <EChartsComponent option={funnelByAnchorOption} height={440} />
+                  ) : (
+                    <Empty description="该日期区间内无带货主播引流记录" />
+                  )
                 )}
               </Card>
             </Col>
@@ -566,13 +1145,104 @@ const DirectSalesPage: React.FC = () => {
           </Row>
         </FadeInSection>
 
+        <FadeInSection delay={1.8} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <HeatMapOutlined style={{ color: 'var(--color-error)' }} />
+                <span>主播 × 漏斗阶段 热力图</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  横向 6 阶段 × 纵向主播 · 单元格 = 阶段转化率(%)
+                </span>
+                <Tooltip title="单元格颜色越深表示该主播在该阶段转化率越高。便于一眼看出哪位主播在哪个阶段断档、哪位主播在开户阶段最强。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            {anchorAggRows.length > 0 ? (
+              <EChartsComponent option={anchorFunnelHeatmapOption} height={Math.max(280, anchorAggRows.length * 80 + 80)} />
+            ) : (
+              <Empty description={'暂无主播数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
         <FadeInSection delay={2.0} duration={0.8}>
           <Card title={`带货主播详情（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序</span>}>
             {anchorAggRows.length > 0 ? (
-              <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={false} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
+              <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={false} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} expandable={{ expandedRowRender, rowExpandable: (r) => (r.sources?.length || 0) > 0 }} />
             ) : (
               <Empty description={'暂无带货主播数据（请检查日期区间是否覆盖直播带货时段）'} />
             )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={2.2} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <RadarChartOutlined style={{ color: 'var(--color-success)' }} />
+                <span>主播多维画像雷达</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  5 维度按各自 max 归一化 · 直观对比主播能力分布
+                </span>
+                <Tooltip title="5 维度：线索量 / 开口率 / 新有效率 / 新开户率 / 单线索资产。每个维度按所有主播中的最大值归一化，便于对比主播能力分布。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            {anchorAggRows.length > 0 ? (
+              <EChartsComponent option={radarOption} height={360} />
+            ) : (
+              <Empty description={'暂无主播数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={2.3} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <TrophyOutlined style={{ color: 'var(--color-warning)' }} />
+                <span>质效双高日 Top 10</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  筛选：线索量 &gt; 10 且 新开户率 ≥ 5% · 按新开户数降序
+                </span>
+                <Tooltip title="用于发现「量质双优」的日期，可能对应优质直播场次或有效营销策略。可对比主播当日的开播节奏、内容选题，复制成功经验。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Spin spinning={topQualityLoading}>
+              {topQualityDays.length > 0 ? (
+                <Table
+                  size="small"
+                  rowKey="date"
+                  dataSource={topQualityDays}
+                  pagination={false}
+                  scroll={{ x: 'max-content' }}
+                  columns={[
+                    { title: '#', width: 50, align: 'center' as const, render: (_: any, __: any, idx: number) => <Tag color={idx < 3 ? 'gold' : 'default'}>{idx + 1}</Tag> },
+                    { title: '日期', dataIndex: 'date', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+                    { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+                    { title: '新开户数', dataIndex: 'new_opened', align: 'right' as const, width: 100, render: (v: number) => <strong style={{ color: 'var(--color-error)' }}>{v}</strong> },
+                    { title: '新开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v >= 10 ? 'green' : 'gold'}>{v.toFixed(2)}%</Tag> },
+                    { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+                  ]}
+                />
+              ) : (
+                <Empty description={topQualityLoading ? '加载中...' : '当前日期范围内无质效双高日（线索量>10 且 开户率≥5%）'} />
+              )}
+            </Spin>
           </Card>
         </FadeInSection>
 
@@ -582,12 +1252,16 @@ const DirectSalesPage: React.FC = () => {
               { label: '数据源', value: 'fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type=\'带货直播\' 的记录（如 直播带货-吴晓宇 / 直播带货-杨毅 / 直播带货-周乐意 / 抖音引流-吴晓宇 等）' },
               { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters（filters.live_types=[\'带货直播\']）' },
               { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly，filters.live_types=[\'带货直播\']）' },
-              { label: '热力图口径', value: '滚动 365 天窗口 + daily 粒度，支持「线索数 / 开户数」切换（取 totals[period].new_leads 或 new_opened）' },
+              { label: '热力图口径', value: '滚动 365 天窗口 + daily 粒度，支持「线索数 / 开户数 / 开户率」切换（v3.3.3 加开户率：opening_rate = new_opened / new_leads * 100）' },
               { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
               { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方主播平台/主播多选筛选' },
               { label: '配置方式', value: 'backend/config/anchor_live_types.json（JSON 权威源，启动时 _sync_anchor_live_types_from_json 自动 upsert 到 DB）' },
+              { label: '质效分级规则', value: '高质效=开户率≥5% 且线索量≥50；中质效=开户率1-5%；低质效=开户率<1% 且线索量≥50；其余为「待观察」（样本不足）' },
+              { label: '质效双高日定义', value: '线索量>10 且 新开户率≥5% 且 新开户数>0，按新开户数降序 Top 10（v3.3.3 新增）' },
+              { label: '雷达图归一化', value: '5 维度（线索量/开口率/新有效率/新开户率/单线索资产）按各自维度 max 归一化（v3.3.3 新增）' },
+              { label: '漏斗对比模式', value: '整体 FunnelChart / 按主播 堆叠柱图（v3.3.3 新增）' },
             ]}
-            notes={'v3.3.1 新增：作为「直播获客」二级报表页，专门为带货主播服务，与「直播漏斗」(全主播)、「主播分析」(全主播) 区分。直播类型固定为「带货直播」，不可切换。新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标。'}
+            notes={'业务定位：直播带货是「量大质差」与「量质双高」并存的获客场景——3 位主播（吴晓宇/杨毅/周乐意）贡献 1847 条去重线索、54 个新开户、¥143 万新开户资产，但月度开户率分化大（2025-12 双高 10% vs 2026-05 量大质差 0.74%）。报表从「量、质、效率」三个维度展开。\n\nv3.3.1 新增：作为「直播获客」二级报表页，专门为带货主播服务，与「直播漏斗」(全主播)、「主播分析」(全主播) 区分。直播类型固定为「带货直播」，不可切换。新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标。\n\nv3.3.2 修复：移除主播详情表「存量客户/存量资产」列（带货场景无服务存量客户价值）；热力图加「线索数/开户数」切换（开户率 1-5% 时开户数热力分布过于稀疏）。\n\nv3.3.3 业务优化（10 项）：\n• P0-1 新开户率走势图（量质走势并排，左量右质）\n• P0-4 主播产能对比柱图（5 指标可切换：线索量/新开户/新有效户/新开户资产/单线索产能）\n• P1-9 月度量质剪刀差（双 Y 轴：左线索量柱 + 右开户率线）\n• P1-10 主播 × 漏斗阶段热力图（6 阶段 × 主播矩阵，单元格 = 阶段转化率%）\n• P2-7 热力图加「开户率」第三选项\n• P2-3 主播详情表加「质效分级」Tag（高/中/低/待观察）\n• P3-5 主播多维画像雷达图（5 维度归一化）\n• P3-8 质效双高日 Top 10 列表\n• P3-11 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱）\n• P3-12 主播详情表 expandable 行展开 token 来源拆分（覆盖平台/直播类型/token）'}
           />
         </FadeInSection>
       </Spin>
