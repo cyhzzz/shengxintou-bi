@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.2.5`（2026-07-18）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.0`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -62,6 +62,33 @@ v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生�
 - **应用市场 · 创意效果**（`/creative`）：✅ 已修复（v3.1.25）——走 `_funnel_filters` + 新开户 SUM + 前端新开户指标卡/列/默认排序。
 - **员工转化 / 直播获客 / 小红书**：涉及开户量、资产指标时，新开户（新增 + 引进资产）与存量客户（服务 + 存量资产）分开呈现，新开户为主指标、存量为辅助。
 
+#### 主播直播类型分类（v3.3.0 新增：投顾 / 分析师 / 带货直播）
+
+直播获客类报表（主播分析 / 直播漏斗）按主播身份拆 4 类直播类型，便于分群对比获客产出。映射规则固化在 `dim_anchor_live_type` 配置表中（DIM 层），不在 ETL 上游做。
+
+- **4 种 live_type 取值**：`分析师` / `投顾IP` / `投顾配合做带货` / `带货直播`
+- **主键**：`source_token`（`fact_conv_content.客户来源` 按 `[,，;；、]` 分隔后的单段，如 `抖音引流-黄天平` / `直播带货-胡磊`）
+- **字段**：`source_token` → `anchor_name`（归一化主播名，含错字校正如「直播带货-吴晓字」→ 吴晓宇）→ `live_type` → `remark`
+- **token 规则映射**：
+  - 纯人名（如 `黄天平`）→ `投顾IP`（分支投顾自IP线索）
+  - `视频号引流-人名` / `财联社引流-人名` → `投顾IP`
+  - `抖音引流-人名`（分支投顾）→ `投顾配合做带货`
+  - `抖音引流-人名`（总部投顾 / 分析师 / 带货主播）→ 按主播本身类型
+  - `抖音引流-直播带货-人名` → `投顾配合做带货`
+  - `直播带货-人名`（主播=带货主播）→ `带货直播`
+  - `直播带货-人名`（主播=投顾）→ `投顾配合做带货`
+  - `小鹅通直播-人名` → 按主播本身类型
+- **主播固定名单**：
+  - 带货主播：吴晓宇、杨毅、周乐意（仅 3 人）
+  - 总部投顾：余荩、谭记恩、胡磊（3 人）
+  - 分析师：蒋亦凡、王路、姚立琦、王晓亮、钱启敏（5 人）
+  - 其余未配置的主播默认归 `分支投顾`（按 token 规则映射 `投顾IP` 或 `投顾配合做带货`）
+- **配置方式**：`backend/config/anchor_live_types.json`（JSON 权威源，随 git 走）；启动时 `_sync_anchor_live_types_from_json` 自动 upsert 到 DB 表（JSON 有 DB 无 → 插入；JSON 有 DB 有 → 更新；JSON 无 DB 有 → 软删除 is_active=0）。**没有管理页面**，修改映射请直接编辑 JSON 并 git commit。
+- **应用端点**：`POST /api/v1/leads-detail/anchor-clusters`（+ `live_type` / `live_types` / `secondary_live_types` 字段 + `live_types` 筛选 + `live_type_breakdown` 汇总）、`POST /api/v1/leads-detail/anchor-clusters-trend`（v3.3.0 起支持 `live_types` 过滤，通过 `wanted_tokens` 集合命中 token）
+- **前端落地页**：
+  - `pages/AnchorCluster/index.tsx`：直播类型筛选 + 「直播类型」列 + breakdown 表（按 4 类分组对比 anchors/leads/new_opened/new_valid/new_assets）
+  - `pages/Live/Funnel.tsx`：直播类型筛选 + 「直播类型」列（不渲染 breakdown 表，保持漏斗页核心定位）
+
 ## 3. 共享组件
 
 | 组件                             | 路径                                                    | 职责                                                  |
@@ -78,7 +105,7 @@ v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生�
 
 ```
 backend/
-├── models.py / models_v2.py   # 系统表 + 9 张新表 ORM（列名 1:1 含中文）
+├── models.py / models_v2.py   # 系统表 + 10 张新表 ORM（含 v3.3.0 新增 dim_anchor_live_type 配置表，列名 1:1 含中文）
 ├── database.py                # 单例 SQLAlchemy(db)
 ├── __init__.py                # 启动时 import models_v2 注册到 metadata
 ├── processors/v2/raw_import.py # v2 原样导入
@@ -390,6 +417,52 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.0 已落地（2026-07-19） 直播分类分析（投顾 / 分析师 / 带货直播）— 主播身份分群 + JSON 权威源 + 跨报表筛选
+
+新增第 9 张业务表 `dim_anchor_live_type`（DIM 层配置表，主键 source_token），把直播获客类报表按主播身份拆 4 类直播类型分群分析。映射规则以 `backend/config/anchor_live_types.json` 为权威源（随 git 走），启动时 upsert 到 DB 表作为查询缓存，不支持运行时 CRUD 维护。
+
+- **新增 `dim_anchor_live_type` 表 + ORM**：`source_token`（主键，原始线索来源单段）/ `anchor_name`（归一化主播名，含错字校正）/ `live_type`（4 类取值）/ `remark` / `is_active` / `updated_at`。SQLite 不支持 BigInteger autoincrement，`id` 用 `Integer + autoincrement=True`。`app.py` 启动时 `db.create_all()` 幂等建表 + 调用 `_sync_anchor_live_types_from_json()` 同步 JSON → DB。
+- **JSON 权威源**：`backend/config/anchor_live_types.json`，含 `_meta`（rules + anchors 名单 + live_type_enum）+ `mappings` 数组（45 条 source_token → anchor_name/live_type/remark）。修改映射请直接编辑本文件并 git commit，不要改库。
+- **启动同步逻辑**（`app.py::_sync_anchor_live_types_from_json`）：每次启动都 upsert：JSON 有 DB 无 → 插入；JSON 有 DB 有 → 更新 anchor_name/live_type/remark/is_active=1；JSON 无 DB 有 → 软删除（is_active=0，保留历史）。git pull 后启动即自动同步新映射，无需手动改库。
+- **主播固定名单**：
+  - 带货主播（3 人）：吴晓宇、杨毅、周乐意 → `带货直播`（如 `直播带货-吴晓宇`）
+  - 总部投顾（3 人）：余荩、谭记恩、胡磊 → `投顾IP`（如 `抖音引流-余荩`）/ `投顾配合做带货`（如 `直播带货-胡磊`）
+  - 分析师（5 人）：蒋亦凡、王路、姚立琦、王晓亮、钱启敏 → `分析师`（如 `抖音引流-蒋亦凡`）
+  - 分支投顾（其余）：纯人名/视频号引流/财联社引流 → `投顾IP`；抖音引流-人名 → `投顾配合做带货`
+- **anchor-clusters 端点扩展**（`backend/routes/data/leads.py`）：
+  - 加载 `dim_anchor_live_type` 表构建 `token_to_anchor` / `token_to_live_type` / `anchor_to_live_types` 三个 dict
+  - token 匹配时用 `token_to_anchor.get(segment, raw_anchor_name)` 做归一化（含错字校正）
+  - 每个 (platform, anchor) 聚类项加 `live_types` set 字段（该主播跨 token 涉及的所有类型）
+  - 返回 items 加 `live_type`（primary，第一个非空）/ `live_types` / `secondary_live_types` 字段
+  - 支持 `filters.live_types` 多选筛选（items 过滤 `set(live_types) & wanted`）
+  - 新增 `live_type_breakdown` 按 4 类 live_type 分组汇总（anchors/leads/new_leads/new_opened/new_valid/new_assets/opening_rate/valid_rate）
+  - 新增 `live_types` 字段返回配置表中所有出现的 live_type 列表（供前端 Select options）
+  - `meta.version: 'v3.3.0-anchor-cluster-with-live-type'`
+- **anchor-clusters-trend 端点扩展**（`backend/routes/data/leads.py`）：
+  - 加载 `dim_anchor_live_type` 表得到 `wanted_tokens` 集合（按 live_types 筛选）
+  - group_by 改为包含 `客户来源`（原仅 period + 平台来源）
+  - Python 端用 `SPLIT_PATTERN` 拆 token 命中 `wanted_tokens`，命中任意一个即计入
+  - 支持 daily/weekly/monthly 三种粒度，与原走势图口径一致
+- **前端 AnchorCluster 改造**（`pages/AnchorCluster/index.tsx`）：
+  - AnchorItem / AnchorAggRow 接口加 `live_type` / `live_types` / `secondary_live_types`
+  - `anchorAggRows` useMemo 合并 live_types 取并集，primary 取第一个非空，secondary 为剩余
+  - 「直播类型」Select multiple 筛选 + 「直播类型」列（带 secondary 类型提示）
+  - breakdown 表（按 4 类 live_type 分组对比 anchors/leads/new_opened/new_valid/new_assets/opening_rate/valid_rate/new_assets）
+  - CSV 导出加「直播类型」「次要类型」列
+  - ReportFooter 加 v3.3.0 说明（数据源 / 端点 / 直播类型 / JSON 配置路径）
+  - 移除「排名限制」筛选器（Top 200 静态固定）
+- **前端 Live/Funnel 改造**（`pages/Live/Funnel.tsx`）：
+  - AnchorItem / AnchorAggRow 接口加 `live_type` / `live_types` / `secondary_live_types`
+  - `anchorAggRows` useMemo 合并 live_types（与 AnchorCluster 同口径）
+  - 「直播类型」Select multiple 筛选 + 「直播类型」列（与 AnchorCluster 同款，带 secondary 提示）
+  - ReportFooter 加 v3.3.0 说明（数据源 / 端点 / 走势图端点 / 直播类型 / JSON 配置路径）
+  - 移除「排名限制」筛选器
+  - 不渲染 breakdown 表（保持漏斗页核心定位，breakdown 在 AnchorCluster 看）
+- **API 冒烟测试 +2 条**（`tests/api/test_smoke.py`）：
+  - `test_62_anchor_clusters_with_live_type`：anchor-clusters 返回 live_type/live_types/secondary_live_types 字段
+  - `test_63_anchor_clusters_live_type_filter`：live_types=['带货直播'] 筛选返回 ≤3 项（吴晓宇/杨毅/周乐意）
+- **校验**：tsc 0 错；npm run build 0 错（6399 modules，47.43s）；API 冒烟 35/35 通过（2 个新增 v3.3.0 测试 + 33 个原有测试）。
 
 ### v3.2.5 已落地（2026-07-18） 系统性 UI 动效优化 + 页面加载性能优化
 

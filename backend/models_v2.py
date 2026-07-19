@@ -34,6 +34,39 @@ class DimAccount(db.Model):
     business_model = Column(Text)            # 业务模式
 
 
+class DimAnchorLiveType(db.Model):
+    """主播直播类型映射维度（v3.3.0 新增）
+
+    每行 = 一个 source_token（fact_conv_content.客户来源 字段按 [,，;；] 分隔后的单段）
+    → 主播名 + 直播类型 的映射关系。
+
+    业务规则：
+    - source_token 是原始字符串，如 "抖音引流-黄天平" / "黄天平" / "直播带货-吴晓字"
+    - anchor_name 是归一化后的主播名（含错字校正，如 "直播带货-吴晓字" → anchor_name="吴晓宇"）
+    - live_type 取值：分析师 / 投顾IP / 投顾配合做带货 / 带货直播
+    - remark 备注（如"总部投顾""分支投顾""错字校正"等）
+
+    token 形式 → live_type 规则：
+    - 纯人名（"黄天平"）→ 投顾IP（分支投顾自IP）
+    - 视频号引流-人名 / 财联社引流-人名 → 投顾IP
+    - 抖音引流-人名（分支投顾）→ 投顾配合做带货
+    - 抖音引流-人名（总部投顾/分析师/带货主播）→ 按其本身类型
+    - 抖音引流-直播带货-人名 → 投顾配合做带货
+    - 直播带货-人名（主播=带货主播）→ 带货直播
+    - 直播带货-人名（主播=投顾）→ 投顾配合做带货
+    - 小鹅通直播-人名 → 按主播本身类型
+    """
+    __tablename__ = 'dim_anchor_live_type'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_token = Column(Text, unique=True, nullable=False, index=True)   # 原始 token，主键
+    anchor_name = Column(Text, nullable=False, index=True)                 # 归一化主播名
+    live_type = Column(Text, nullable=False, index=True)                   # 分析师/投顾IP/投顾配合做带货/带货直播
+    remark = Column(Text)                                                   # 备注
+    is_active = Column(Integer, default=1, nullable=False)                  # 1=启用 0=禁用
+    updated_at = Column(DateTime, nullable=False)                          # 最后修改时间
+
+
 # ============================================================================
 # DWD 明细层
 # ============================================================================

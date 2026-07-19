@@ -30,9 +30,15 @@ import styles from './Funnel.module.scss';
 
 const { RangePicker } = DatePicker;
 
+// v3.3.0: 直播类型（4 类，由 dim_anchor_live_type 表映射）
+type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
+
 interface AnchorItem {
   platform: string;
   anchor: string;
+  live_type: LiveType | null;
+  live_types: LiveType[];
+  secondary_live_types: LiveType[];
   leads: number;
   existing_leads: number;
   new_leads: number;
@@ -82,6 +88,9 @@ interface PlatformRow {
 // 同名主播跨平台聚合行（v3.1.26 问题2）
 interface AnchorAggRow {
   anchor: string;
+  live_type: LiveType | null;
+  live_types: LiveType[];
+  secondary_live_types: LiveType[];
   platforms: string[];
   leads: number;
   existing_leads: number;
@@ -103,9 +112,26 @@ interface AnchorAggRow {
   sources: string[];
 }
 
+// v3.3.0: live_type 配色
+const LIVE_TYPE_COLOR: Record<string, string> = {
+  '分析师': 'purple',
+  '投顾IP': 'geekblue',
+  '投顾配合做带货': 'gold',
+  '带货直播': 'magenta',
+  '未映射': 'default',
+};
+
+const renderLiveTypeTag = (lt: string | null) => {
+  if (!lt) return <Tag color="default">未映射</Tag>;
+  return <Tag color={LIVE_TYPE_COLOR[lt] || 'default'}>{lt}</Tag>;
+};
+
 const LiveFunnelPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  // v3.3.0: 直播类型筛选
+  const [liveTypeFilter, setLiveTypeFilter] = useState<LiveType[]>([]);
+  const [liveTypeOptions, setLiveTypeOptions] = useState<string[]>([]);
   const [items, setItems] = useState<AnchorItem[]>([]);
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -117,11 +143,14 @@ const LiveFunnelPage: React.FC = () => {
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     platforms: platformFilter.length ? platformFilter : undefined,
-  }), [dateRange, platformFilter]);
+    // v3.3.0: 把直播类型筛选传给后端
+    live_types: liveTypeFilter.length ? liveTypeFilter : undefined,
+  }), [dateRange, platformFilter, liveTypeFilter]);
 
   const resetFilters = () => {
     setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
     setPlatformFilter([]);
+    setLiveTypeFilter([]);
   };
 
   const load = async () => {
@@ -131,6 +160,7 @@ const LiveFunnelPage: React.FC = () => {
       if (res?.success) {
         setItems(res.data.items || []);
         setPlatforms(res.data.platforms || []);
+        setLiveTypeOptions(res.data.live_types || []);
       }
     } finally {
       setLoading(false);
@@ -301,13 +331,15 @@ const LiveFunnelPage: React.FC = () => {
   }, [items]);
 
   // v3.1.26 问题2: 同名主播跨平台聚合（支持平台多选筛选）
+  // v3.3.0: 合并 live_types（取所有 token 的并集），primary 取第一个非空
   const anchorAggRows: AnchorAggRow[] = useMemo(() => {
     const map = new Map<string, AnchorAggRow>();
     items.forEach((it) => {
       // 平台筛选：选中平台时只聚合命中平台的主播行
       if (platformFilter.length && !platformFilter.includes(it.platform)) return;
       const r = map.get(it.anchor) || {
-        anchor: it.anchor, platforms: [], leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
+        anchor: it.anchor, platforms: [], live_type: null, live_types: [], secondary_live_types: [],
+        leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
         valid_lead: 0, new_valid_lead: 0,
         opened: 0, new_opened: 0, existing_opened: 0,
         valid: 0, new_valid: 0, existing_valid: 0,
@@ -315,6 +347,10 @@ const LiveFunnelPage: React.FC = () => {
         opening_rate: 0, valid_rate: 0, sources: [],
       };
       if (!r.platforms.includes(it.platform)) r.platforms.push(it.platform);
+      // v3.3.0: 主播级 live_type 取所有 token 的并集
+      const mergedTypes = Array.from(new Set([...r.live_types, ...(it.live_types || [])])) as LiveType[];
+      r.live_types = mergedTypes;
+      if (!r.live_type && it.live_type) r.live_type = it.live_type;
       r.leads += it.leads;
       r.existing_leads += it.existing_leads || 0;
       r.new_leads += it.new_leads || 0;
@@ -337,6 +373,8 @@ const LiveFunnelPage: React.FC = () => {
     rows.forEach((r) => {
       r.opening_rate = r.leads ? +(r.new_opened / r.leads * 100).toFixed(2) : 0;
       r.valid_rate = r.leads ? +(r.new_valid / r.leads * 100).toFixed(2) : 0;
+      // v3.3.0: 二级类型 = 全部类型去掉 primary 后剩下的
+      r.secondary_live_types = r.live_types.filter((t) => t !== r.live_type);
     });
     rows.sort((a, b) => b.leads - a.leads);
     return rows;
@@ -361,8 +399,26 @@ const LiveFunnelPage: React.FC = () => {
   ];
 
   // v3.1.26 问题2: 主播详情表改为同名跨平台聚合，"平台"列改为"覆盖平台"多 Tag
+  // v3.3.0: 新增「直播类型」列
   const anchorAggColumns = [
     { title: '主播', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+    {
+      title: '直播类型',
+      dataIndex: 'live_type',
+      width: 130,
+      render: (_: any, r: AnchorAggRow) => (
+        <Space direction="vertical" size={2}>
+          {renderLiveTypeTag(r.live_type)}
+          {(r.secondary_live_types || []).length > 0 && (
+            <Tooltip title={`该主播跨 token 涉及多种直播类型：${r.live_types.join('、')}`}>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                +{r.secondary_live_types.length} 类型
+              </span>
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
     { title: '覆盖平台', dataIndex: 'platforms', width: 200, render: (v: string[]) => (
       <Space size={[4, 4]} wrap>
         {v.map((p) => <Tag key={p} color="cyan">{sanitizeText(p)}</Tag>)}
@@ -401,12 +457,16 @@ const LiveFunnelPage: React.FC = () => {
               style={{ minWidth: 200 }}
               maxTagCount="responsive"
             />
-            <span className={styles.label}>排名限制</span>
+            <span className={styles.label}>直播类型</span>
             <Select
-              value={'200'}
-              options={[{ label: 'Top 200', value: '200' }]}
-              disabled
-              style={{ minWidth: 100 }}
+              mode="multiple"
+              allowClear
+              placeholder={'全部类型'}
+              value={liveTypeFilter}
+              onChange={(v) => setLiveTypeFilter(v as LiveType[])}
+              options={liveTypeOptions.map((t) => ({ label: t, value: t }))}
+              style={{ minWidth: 200 }}
+              maxTagCount="responsive"
             />
             <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
@@ -537,15 +597,17 @@ const LiveFunnelPage: React.FC = () => {
         <FadeInSection delay={2.8} duration={0.8}>
           <ReportFooter
             sources={[
-              { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）' },
+              { label: '数据源', value: 'fact_conv_content.客户来源 中“平台引流-主播”模式的记录（如 视频号引流-姚立琦、抖音引流-赵芳、财联社引流-谭记恩）+ dim_anchor_live_type（v3.3.0 新增配置表）' },
               { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters' },
               { label: '粒度', value: 'Top 200 主播引流聚合' },
               { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
-              { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台多选筛选' },
-            { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly）' },
-            { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
+              { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方平台/直播类型多选筛选' },
+              { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly，v3.3.0 起支持 live_types 过滤）' },
+              { label: '走势图口径', value: '同 anchor-clusters：存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量' },
+              { label: '直播类型', value: 'v3.3.0 起 4 类：分析师 / 投顾IP / 投顾配合做带货 / 带货直播，由 dim_anchor_live_type 表按 source_token 映射' },
+              { label: '配置入口', value: '系统配置 → 主播直播类型（管理 source_token → 主播名/直播类型 映射）' },
             ]}
-            notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
+            notes={'v3.1.26 起新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标；存量客户线索数与存量资产作为辅助呈现（存量客户已在别处开户，本次引流通常不再开户，但其资产仍统计）。v3.3.0 起新增直播类型筛选与「直播类型」列：主播名通过 dim_anchor_live_type 表归一化（含错字校正，如「直播带货-吴晓字」→ 吴晓宇），同一主播跨 token 涉及多种类型时 primary 取第一个非空、其余放 secondary_live_types。直播明细表数据源未接入（v3.2 待补 观看UV 阶段）；现以主播引流链路作为“直播业务漏斗”替代口径。'}
           />
         </FadeInSection>
       </Spin>
