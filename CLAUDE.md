@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.0`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.1`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -417,6 +417,27 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.1 已落地（2026-07-19） 直播带货二级报表页（Live/DirectSales）— 走势+热力图+漏斗组合分析
+
+作为「直播获客」二级报表页，专门为带货主播（吴晓宇/杨毅/周乐意 等）服务，与「直播漏斗」(全主播)、「主播分析」(全主播) 区分。本页 `filters.live_types` 固定为 `['带货直播']`，不可切换。
+
+- **新增页面** `pages/Live/DirectSales.tsx`（复用 `Funnel.module.scss` 样式，不另起 scss）。路由 `/live/direct-sales`（lazy import），菜单「直播获客 → 直播带货」（`ShoppingCartOutlined`）。
+- **6 个 FadeInSection 章节**（delay 0/0.4/0.8/1.2/1.6/2.0/2.4）：
+  1. **筛选器**：日期区间 / 主播平台 / 主播多选（支持搜索，options 来自 anchor-clusters 返回）+ 固定 `直播类型：带货直播` Tag 提示
+  2. **核心产出 5 卡**（MetricSection + MetricCard）：带货主播数 / 新客户 / 新开户 / 新有效户 / 新开户资产
+  3. **走势图**（daily/weekly/monthly Segmented 切换，按平台拆多 series + 合计新开户）
+  4. **365 天开户日历热力图**（复用 `Dashboard/components/CalendarHeatmap`，独立请求 daily + 滚动 365 天，取 `totals[period].new_opened` 作为每日开户数）
+  5. **6 阶段业务漏斗 + 阶段转化明细表**（与 Live/Funnel 同款 stageTable）
+  6. **主播详情表**（跨平台聚合，含直播类型列）+ **ReportFooter**
+- **复用现有端点**（无后端改动）：
+  - `POST /api/v1/leads-detail/anchor-clusters`（filters.live_types=['带货直播']，主指标 + 主播详情 + breakdown）
+  - `POST /api/v1/leads-detail/anchor-clusters-trend`（filters.live_types=['带货直播']，走势图 + 热力图数据源；v3.3.0 起已支持 live_types 过滤）
+- **修复 Live/Funnel.tsx ReportFooter**：残留的「配置入口：系统配置 → 主播直播类型」改为「配置方式：backend/config/anchor_live_types.json（JSON 权威源，启动时自动 upsert 到 DB）」（v3.3.0 收尾时漏改的项）。
+- **API 冒烟测试 +1 条**（`tests/api/test_smoke.py`）：
+  - `test_64_direct_sales_trend_with_live_type`：anchor-clusters-trend + live_types=['带货直播'] + monthly 验证返回 periods/totals/by_platform/granularity 字段
+- **路由健康检查 +1 条**（`frontend-react/tests/smoke/route-health.spec.ts`）：`/live/direct-sales`
+- **校验**：tsc 0 错；npm run build 0 错（6400 modules，50.06s）；API 冒烟 36/36 通过；Playwright 路由冒烟 20/20 通过。
 
 ### v3.3.0 已落地（2026-07-19） 直播分类分析（投顾 / 分析师 / 带货直播）— 主播身份分群 + JSON 权威源 + 跨报表筛选
 

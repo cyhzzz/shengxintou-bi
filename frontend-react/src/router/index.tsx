@@ -42,6 +42,7 @@ const AppMarketCreativePage = lazy(() => import('@/pages/Reports/AppMarket/Creat
 
 // 直播 v3.1
 const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
+const LiveDirectSalesPage = lazy(() => import('@/pages/Live/DirectSales'));
 const AnchorClusterPage = lazy(() => import('@/pages/AnchorCluster'));
 const ReportGenerationPage = lazy(() => import('@/pages/ReportGeneration'));
 
@@ -88,12 +89,13 @@ export const router = createBrowserRouter([
       },
       // 直播 v3.1 占位
       {
-        path: 'live',
-        children: [
-          { index: true, element: <Navigate to="/live/funnel" replace /> },
-          { path: 'funnel', element: withSuspense(LiveFunnelPage) },
-        ],
-      },
+    path: 'live',
+    children: [
+      { index: true, element: <Navigate to="/live/funnel" replace /> },
+      { path: 'funnel', element: withSuspense(LiveFunnelPage) },
+      { path: 'direct-sales', element: withSuspense(LiveDirectSalesPage) },
+    ],
+  },
       { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
 
       // v3.1 老路由重定向 (兼容旧链接)
