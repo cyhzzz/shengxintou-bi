@@ -1,62 +1,96 @@
 /**
- * 应用市场 / 创意效果 (v3.1 子报表 4/4, Bug 3 修复)
+ * 应用市场 · 计划分析 (v3.3.5 改造自原「创意效果」)
  *
- * 数据源: fact_conv_appmarket (按 广告计划ID + 投放账号 聚合)
- * 端点: POST /api/v1/reports/app-market/creative
+ * 业务定位：
+ *   原 Creative 是按 plan_id+投放账号聚合 Top N 的「列表页」，看不出周度趋势。
+ *   本页改为「计划分析」——按平台单选 + 周度走势，回答两个核心问题：
+ *   1. 拿量能力：开户数 / APP激活数 是否衰减（周度量趋势）
+ *   2. 精准性变化：各转化节点转化率是否稳定（周度率趋势）
  *
- * 修复:
- * 1. filter-options 原先 http.post 405 -> 已兼容 GET/POST
- * 2. Creative 端点之前没有，后端在 app_market.py 已新增 /creative 端点
+ * 数据源: fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）
+ * 端点:   POST /api/v1/reports/app-market/plan-analysis
+ *
+ * 页面结构:
+ *   1. 筛选器（日期区间 / 应用市场单选 [含全部] / Top N）
+ *   2. 核心指标卡（5 张：计划数 / 总激活 / 总新开户 / 总有效户 / 激活→新开户率）
+ *   3. 周度拿量能力走势（双 Y 轴：左=激活数柱 + 右=开户数/新开户数线）
+ *   4. 周度精准性走势（多线：激活→开户率 / 激活→新开户率 / 开户→有效率 / 激活→有效率）
+ *   5. 计划详情表（计划 × 周 长表 + expandable 行展开每周明细）
+ *   6. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip } from 'antd';
-import { CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty } from 'antd';
+import {
+  CheckCircleOutlined, DownloadOutlined, MobileOutlined, ReloadOutlined,
+  RiseOutlined, SearchOutlined, ThunderboltOutlined, UserOutlined,
+  LineChartOutlined, AimOutlined, FallOutlined,
+} from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import EChartsComponent from '@/components/Chart/ECharts';
+import type { EChartsOption } from 'echarts';
+import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { dataServiceReports } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection } from '@/components';
+import { sanitizeText } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
 
+interface PlanWeeklyPoint {
+  week_start: string;
+  '激活APP': number;
+  '开户成功': number;
+  '新开户': number;
+  '入金': number;
+  '有效户': number;
+  '激活_开户率': number;
+  '激活_新开户率': number;
+  '激活_有效率': number;
+  '开户_新开户率': number;
+  '开户_有效率': number;
+}
+
+interface PlanItem {
+  plan_id: string;
+  '投放账号': string;
+  totals: PlanWeeklyPoint & { 激活_开户率: number; 激活_新开户率: number; 激活_有效率: number; 开户_新开户率: number; 开户_有效率: number };
+  weekly: PlanWeeklyPoint[];
+}
+
 const AppMarketCreativePage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
-  const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });
-  const [data, setData] = useState<any[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, top_plans: 0, total_activate: 0, total_open: 0, total_new_open: 0, total_deposit: 0, total_valid: 0 });
+  const [platform, setPlatform] = useState<string | undefined>(undefined); // undefined = 全部
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
+  const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0 });
   const [loading, setLoading] = useState(false);
-  const [topN, setTopN] = useState(50);
-
-  useEffect(() => {
-    dataServiceReports.getAppMarketFilterOptions().then((res: any) => {
-      if (res?.success) setOpts(res.data);
-    }).catch(() => undefined);
-  }, []);
+  const [topN, setTopN] = useState(30);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    app_markets: appMarketFilter.length ? appMarketFilter : undefined,
-  }), [dateRange, appMarketFilter]);
+    app_market: platform || undefined,
+  }), [dateRange, platform]);
 
   const resetFilters = () => {
     setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setAppMarketFilter([]);
-    setTopN(50);
+    setPlatform(undefined);
+    setTopN(30);
   };
 
   const load = async () => {
     setLoading(true);
     try {
-      const res: any = await dataServiceReports.getAppMarketCreative({ filters, top_n: topN });
+      const res: any = await dataServiceReports.getAppMarketPlanAnalysis({ filters, top_n: topN });
       if (res?.success) {
-        setData((res.data.items || []).map((item: any, index: number) => ({
-          ...item,
-          row_id: `${index}-${item.plan_id}-${item['应用市场']}-${item['投放账号']}-${item['渠道类型']}`,
-        })));
-        setTotals(res.data.totals || {});
+        const d = res.data || {};
+        setPlatforms(d.platforms || []);
+        setPlanItems((d.plan_items || []).map((p: PlanItem, idx: number) => ({ ...p, row_id: `${idx}-${p.plan_id}` })));
+        setWeeklyTotals(d.weekly_totals || []);
+        setTotals(d.totals || {});
       }
     } finally {
       setLoading(false);
@@ -65,22 +99,189 @@ const AppMarketCreativePage: React.FC = () => {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, topN]);
 
+  // 周度拿量能力走势（双 Y 轴：左=激活数柱 + 右=开户/新开户数线）
+  const volumeOption: EChartsOption = useMemo(() => {
+    if (!weeklyTotals.length) return {};
+    const weeks = weeklyTotals.map((w) => w.week_start);
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '6%', bottom: '12%', top: '12%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: weeks,
+        axisLabel: { rotate: 30, fontSize: 11 },
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '激活APP(柱)',
+          position: 'left',
+          axisLine: { show: true, lineStyle: { color: pickEChartsColor(0) } },
+        },
+        {
+          type: 'value',
+          name: '开户/新开户(线)',
+          position: 'right',
+          axisLine: { show: true, lineStyle: { color: ECHARTS_COLORS[7] } },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        {
+          name: '激活APP',
+          type: 'bar',
+          yAxisIndex: 0,
+          data: weeklyTotals.map((w) => w['激活APP']),
+          itemStyle: { color: pickEChartsColor(0), opacity: 0.55 },
+          barMaxWidth: 32,
+        },
+        {
+          name: '开户成功',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: { color: ECHARTS_COLORS[5] },
+          lineStyle: { width: 2 },
+          data: weeklyTotals.map((w) => w['开户成功']),
+        },
+        {
+          name: '新开户',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'diamond',
+          symbolSize: 8,
+          itemStyle: { color: ECHARTS_COLORS[7] },
+          lineStyle: { width: 3 },
+          data: weeklyTotals.map((w) => w['新开户']),
+          label: {
+            show: true,
+            position: 'top',
+            formatter: (p: any) => Number(p.value).toLocaleString(),
+          },
+        },
+      ],
+    };
+  }, [weeklyTotals]);
+
+  // 周度精准性走势（多线转化率）
+  const rateOption: EChartsOption = useMemo(() => {
+    if (!weeklyTotals.length) return {};
+    const weeks = weeklyTotals.map((w) => w.week_start);
+    const series = [
+      { key: '激活_开户率' as const, name: '激活→开户', color: pickEChartsColor(0) },
+      { key: '激活_新开户率' as const, name: '激活→新开户', color: ECHARTS_COLORS[7] },
+      { key: '开户_新开户率' as const, name: '开户→新开户', color: ECHARTS_COLORS[5] },
+      { key: '激活_有效率' as const, name: '激活→有效', color: ECHARTS_COLORS[3] },
+      { key: '开户_有效率' as const, name: '开户→有效', color: ECHARTS_COLORS[2] },
+    ].map((s, idx) => ({
+      name: s.name,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: s.color },
+      lineStyle: { width: 2 },
+      data: weeklyTotals.map((w) => Number(w[s.key] || 0)),
+      _idx: idx,
+    }));
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        valueFormatter: (v: any) => (v == null ? '-' : `${Number(v).toFixed(2)}%`),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: weeks,
+        axisLabel: { rotate: 30, fontSize: 11 },
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '转化率(%)',
+          axisLabel: { formatter: '{value}%' },
+        },
+      ],
+      series: series as any,
+    };
+  }, [weeklyTotals]);
+
+  // 是否衰减提示：首尾周对比
+  const decayInfo = useMemo(() => {
+    if (weeklyTotals.length < 2) return null;
+    const first = weeklyTotals[0];
+    const last = weeklyTotals[weeklyTotals.length - 1];
+    const activateDiff = last['激活APP'] - first['激活APP'];
+    const newOpenDiff = last['新开户'] - first['新开户'];
+    const isDecay = activateDiff < 0 || newOpenDiff < 0;
+    return {
+      firstWeek: first.week_start,
+      lastWeek: last.week_start,
+      activateDiff,
+      newOpenDiff,
+      isDecay,
+    };
+  }, [weeklyTotals]);
+
   const exportCsv = () => {
-    if (!data.length) return;
-    const headers = ['广告计划ID', '投放账号', '应用市场', '渠道类型', '激活APP', '开户成功', '新开户', '入金', '有效户', '激活->开户%', '激活->新开户%', '激活->有效%', '开户->有效%', '开户->新开户%'];
-    const rows = data.map((r) => [
-      r.plan_id, r['投放账号'], r['应用市场'], r['渠道类型'],
-      r['激活APP'], r['开户成功'], r['新开户'], r['入金'], r['有效户'],
-      r['激活_开户率'], r['激活_新开户率'], r['激活_有效率'], r['开户_有效率'], r['开户_新开户率'],
-    ]);
-    const csv = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    if (!planItems.length) return;
+    const headers = ['广告计划ID', '投放账号', '周起始日', '激活APP', '开户成功', '新开户', '入金', '有效户',
+      '激活→开户%', '激活→新开户%', '激活→有效%', '开户→新开户%', '开户→有效%'];
+    const rows: string[] = [];
+    planItems.forEach((p) => {
+      p.weekly.forEach((w) => {
+        rows.push([
+          p.plan_id, p['投放账号'], w.week_start,
+          w['激活APP'], w['开户成功'], w['新开户'], w['入金'], w['有效户'],
+          w['激活_开户率'], w['激活_新开户率'], w['激活_有效率'],
+          w['开户_新开户率'], w['开户_有效率'],
+        ].join(','));
+      });
+    });
+    const csv = '\ufeff' + [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `应用市场创意效果_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `应用市场计划分析_${platform || '全部'}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const expandedRowRender = (r: PlanItem) => {
+    if (!r.weekly?.length) {
+      return <Empty description="该计划无周度数据" />;
+    }
+    return (
+      <Table
+        size="small"
+        rowKey={(w: PlanWeeklyPoint) => w.week_start}
+        dataSource={r.weekly}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+        columns={[
+          { title: '周起始日', dataIndex: 'week_start', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+          { title: '激活APP', dataIndex: '激活APP', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+          { title: '开户成功', dataIndex: '开户成功', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+          { title: '新开户', dataIndex: '新开户', align: 'right' as const, width: 100, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
+          { title: '有效户', dataIndex: '有效户', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+          { title: '激活→开户', dataIndex: '激活_开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '激活→新开户', dataIndex: '激活_新开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 0.5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '开户→新开户', dataIndex: '开户_新开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 80 ? 'green' : v > 50 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '开户→有效', dataIndex: '开户_有效率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 50 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+        ]}
+      />
+    );
   };
 
   return (
@@ -91,15 +292,22 @@ const AppMarketCreativePage: React.FC = () => {
             <span className={styles.label}>日期区间</span>
             <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
             <span className={styles.label}>应用市场</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
-              onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
-              style={{ minWidth: 220 }} maxTagCount='responsive' />
+            <Select
+              allowClear
+              placeholder="全部平台"
+              value={platform}
+              onChange={(v) => setPlatform(v || undefined)}
+              options={platforms.map((m) => ({ label: m, value: m }))}
+              style={{ minWidth: 180 }}
+              showSearch
+              optionFilterProp="label"
+            />
             <span className={styles.label}>Top</span>
             <Select value={topN} onChange={setTopN} options={[
-              { value: 20, label: 'Top 20' },
+              { value: 10, label: 'Top 10' },
+              { value: 30, label: 'Top 30' },
               { value: 50, label: 'Top 50' },
               { value: 100, label: 'Top 100' },
-              { value: 200, label: 'Top 200' },
             ]} style={{ width: 110 }} />
             <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
@@ -108,13 +316,16 @@ const AppMarketCreativePage: React.FC = () => {
       </FadeInSection>
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>
-          <MetricSection title="创意效果概览" description="广告计划规模、激活、开户、有效户与整体转化率">
+          <MetricSection
+            title={`${platform || '全部平台'} · 计划分析概览`}
+            description="周度走势下的计划拿量能力与精准性概览（仅统计互联网引流）"
+          >
             <MetricCard
-              title="创意计划数"
+              title="计划数"
               value={totals.total_plans || 0}
               valueColor="var(--color-brand)"
               icon={<ThunderboltOutlined style={{ color: 'var(--color-brand)' }} />}
-              description={`当前展示 Top ${data.length}`}
+              description={`当前展示 Top ${planItems.length} / 共 ${totals.total_plans || 0} 个`}
               showWowChange={false}
             />
             <MetricCard
@@ -122,13 +333,7 @@ const AppMarketCreativePage: React.FC = () => {
               value={totals.total_activate || 0}
               valueColor="var(--color-success)"
               icon={<MobileOutlined style={{ color: 'var(--color-success)' }} />}
-              showWowChange={false}
-            />
-            <MetricCard
-              title="总开户成功"
-              value={totals.total_open || 0}
-              valueColor="var(--chart-color-7)"
-              icon={<TeamOutlined style={{ color: 'var(--chart-color-7)' }} />}
+              description={`跨 ${totals.total_weeks || 0} 周`}
               showWowChange={false}
             />
             <MetricCard
@@ -136,7 +341,7 @@ const AppMarketCreativePage: React.FC = () => {
               value={totals.total_new_open || 0}
               valueColor="var(--color-brand)"
               icon={<UserOutlined style={{ color: 'var(--color-brand)' }} />}
-              description={`新增开户客户（剔除存量），核心业务产出`}
+              description={`核心业务产出（剔除存量）`}
               showWowChange={false}
             />
             <MetricCard
@@ -147,64 +352,154 @@ const AppMarketCreativePage: React.FC = () => {
               showWowChange={false}
             />
             <MetricCard
-              title="激活→有效"
+              title="激活→新开户"
               value={
-                totals.total_activate > 0
-                  ? Number(((totals.total_valid / totals.total_activate) * 100).toFixed(2))
+                (totals.total_activate || 0) > 0
+                  ? Number((((totals.total_new_open || 0) / totals.total_activate) * 100).toFixed(2))
                   : 0
               }
               formatter="percent"
               valueColor="var(--color-error)"
               icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
+              description={`整体精准性主指标`}
               showWowChange={false}
             />
           </MetricSection>
         </FadeInSection>
 
         <FadeInSection delay={0.8} duration={0.8}>
-          <Card title='广告创意效果（按广告计划ID + 投放账号聚合）' size='small'
-            extra={<Tooltip title='导出为 CSV'><Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!data.length}>导出 CSV</Button></Tooltip>}>
-            <Table size='small' rowKey={(r: any) => r.row_id}
-              dataSource={data} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <LineChartOutlined style={{ color: 'var(--color-brand)' }} />
+                <span>周度拿量能力走势</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  左轴：激活APP(柱) · 右轴：开户成功 / 新开户(线)
+                </span>
+                {decayInfo && (
+                  <Tooltip title={`首周 ${decayInfo.firstWeek} → 末周 ${decayInfo.lastWeek}：激活 ${decayInfo.activateDiff >= 0 ? '+' : ''}${decayInfo.activateDiff}，新开户 ${decayInfo.newOpenDiff >= 0 ? '+' : ''}${decayInfo.newOpenDiff}`}>
+                    <Tag color={decayInfo.isDecay ? 'red' : 'green'} style={{ marginLeft: 8 }}>
+                      {decayInfo.isDecay ? <><FallOutlined /> 量能衰减</> : <><RiseOutlined /> 量能增长</>}
+                    </Tag>
+                  </Tooltip>
+                )}
+              </Space>
+            }
+          >
+            {weeklyTotals.length > 0 ? (
+              <EChartsComponent option={volumeOption} height={320} />
+            ) : (
+              <Empty description={loading ? '加载中...' : '暂无周度数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={1.0} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <AimOutlined style={{ color: 'var(--color-error)' }} />
+                <span>周度精准性走势</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  各转化节点转化率周度稳定性（波动越小说明精准性越稳）
+                </span>
+                <Tooltip title="若某周转化率突降，可能对应：素材质量下降 / 投放人群偏移 / 平台流量策略调整。建议结合「拿量能力走势」一起看——量增率降通常是流量泛化。">
+                  <span style={{ color: 'var(--color-text-tertiary)', cursor: 'help' }}>?</span>
+                </Tooltip>
+              </Space>
+            }
+          >
+            {weeklyTotals.length > 0 ? (
+              <EChartsComponent option={rateOption} height={320} />
+            ) : (
+              <Empty description={loading ? '加载中...' : '暂无周度数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={1.2} duration={0.8}>
+          <Card
+            title={`计划详情（${planItems.length} 个计划 · 按新开户降序 · 展开查看周度明细）`}
+            size="small"
+            extra={
+              <Tooltip title="导出为 CSV（按计划 × 周长表）">
+                <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!planItems.length}>导出 CSV</Button>
+              </Tooltip>
+            }
+          >
+            <Table
+              size="small"
+              rowKey={(r: any) => r.row_id}
+              dataSource={planItems}
+              pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
               scroll={{ x: 'max-content' }}
+              expandable={{
+                expandedRowRender,
+                rowExpandable: (r: PlanItem) => (r.weekly?.length || 0) > 0,
+              }}
               columns={[
                 { title: '排名', width: 60, align: 'center', render: (_: any, __: any, idx: number) => (
                   <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
                 ) },
-                { title: '广告计划ID', dataIndex: 'plan_id', width: 140, render: (v: any, r: any) => v === r['投放账号'] ? <Tag>{v}</Tag> : <strong>{v}</strong> },
-                { title: '投放账号', dataIndex: '投放账号', width: 160, ellipsis: true },
-                { title: '应用市场', dataIndex: '应用市场', width: 100 },
-                { title: '渠道类型', dataIndex: '渠道类型', width: 110 },
-                { title: '激活APP', dataIndex: '激活APP', align: 'right', sorter: (a: any, b: any) => a['激活APP'] - b['激活APP'], render: (v: number) => v.toLocaleString() },
-                { title: '开户成功', dataIndex: '开户成功', align: 'right', sorter: (a: any, b: any) => a['开户成功'] - b['开户成功'], render: (v: number) => v.toLocaleString() },
-                { title: '新开户', dataIndex: '新开户', align: 'right', sorter: (a: any, b: any) => a['新开户'] - b['新开户'], defaultSortOrder: 'descend' as const, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
-                { title: '入金', dataIndex: '入金', align: 'right', render: (v: number) => v.toLocaleString() },
-                { title: '有效户', dataIndex: '有效户', align: 'right', render: (v: number) => v.toLocaleString() },
-                { title: '激活→开户', dataIndex: '激活_开户率', align: 'right', render: (v: number) => (
-                  <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
-                ) },
-                { title: '激活→新开户', dataIndex: '激活_新开户率', align: 'right', render: (v: number) => (
-                  <Tag color={v > 3 ? 'green' : v > 0.5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
-                ) },
-                { title: '激活→有效', dataIndex: '激活_有效率', align: 'right', render: (v: number) => (
-                  <Tag color={v > 3 ? 'green' : v > 0.5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
-                ) },
-                { title: '开户→有效', dataIndex: '开户_有效率', align: 'right', render: (v: number) => (
-                  <Tag color={v > 50 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>
-                ) },
+                { title: '广告计划ID', dataIndex: 'plan_id', width: 160, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+                { title: '投放账号', dataIndex: '投放账号', width: 160, ellipsis: true, render: (v: string) => sanitizeText(v) },
+                {
+                  title: '激活APP', key: 't_activate', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['激活APP'] - b.totals['激活APP'],
+                  render: (_: any, r: PlanItem) => r.totals['激活APP'].toLocaleString(),
+                },
+                {
+                  title: '开户成功', key: 't_open', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['开户成功'] - b.totals['开户成功'],
+                  render: (_: any, r: PlanItem) => r.totals['开户成功'].toLocaleString(),
+                },
+                {
+                  title: '新开户', key: 't_new_open', align: 'right', width: 100,
+                  defaultSortOrder: 'descend' as const,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['新开户'] - b.totals['新开户'],
+                  render: (_: any, r: PlanItem) => <strong style={{ color: 'var(--color-brand)' }}>{r.totals['新开户'].toLocaleString()}</strong>,
+                },
+                {
+                  title: '有效户', key: 't_valid', align: 'right', width: 90,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['有效户'] - b.totals['有效户'],
+                  render: (_: any, r: PlanItem) => r.totals['有效户'].toLocaleString(),
+                },
+                {
+                  title: '激活→新开户', key: 't_rate', align: 'right', width: 120,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['激活_新开户率'] - b.totals['激活_新开户率'],
+                  render: (_: any, r: PlanItem) => {
+                    const v = r.totals['激活_新开户率'] || 0;
+                    return <Tag color={v > 3 ? 'green' : v > 0.5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>;
+                  },
+                },
+                {
+                  title: '开户→有效', key: 't_vrate', align: 'right', width: 110,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['开户_有效率'] - b.totals['开户_有效率'],
+                  render: (_: any, r: PlanItem) => {
+                    const v = r.totals['开户_有效率'] || 0;
+                    return <Tag color={v > 50 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>;
+                  },
+                },
+                { title: '覆盖周数', key: 'weeks', align: 'center', width: 90, render: (_: any, r: PlanItem) => <Tag color="cyan">{r.weekly?.length || 0}</Tag> },
               ]}
             />
           </Card>
         </FadeInSection>
       </Spin>
-      <FadeInSection delay={1.2} duration={0.8}>
+      <FadeInSection delay={1.4} duration={0.8}>
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'fact_conv_appmarket（明细聚合）' },
-            { label: '端点', value: 'POST /api/v1/reports/app-market/creative（v3.1.25 起走 _funnel_filters，业务限渠道类型=互联网引流）' },
-            { label: '聚合粒度', value: '广告计划ID + 投放账号' },
+            { label: '数据源', value: 'fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）' },
+            { label: '端点', value: 'POST /api/v1/reports/app-market/plan-analysis' },
+            { label: '周起始日', value: 'SQLite date(下载日期, \'weekday 0\', \'-6 days\') = 该日期所在周的周一' },
+            { label: '存量剔除', value: '非互联网引流设备需剔除（与存量客户同理）' },
+            { label: '平台筛选', value: 'app_market 单选（不选 = 全部平台汇总），选中后只看该平台内计划' },
           ]}
-          notes={'v3.1.25 业务口径：仅统计渠道类型=互联网引流；非互联网引流的设备（其他渠道引流后误点应用市场广告）需剔除，与存量客户同理。新开户作为核心业务产出指标，排序默认按新开户降序。'}
+          notes={`计划分析按周度走势看两类指标：拿量能力（激活/开户/新开户量是否衰减）+ 精准性（各转化节点转化率是否稳定）。量增率降通常意味着流量泛化。`}
         />
       </FadeInSection>
     </div>

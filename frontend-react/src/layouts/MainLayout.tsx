@@ -83,7 +83,7 @@ const menuItems: MenuProps['items'] = [
       { key: '/app-market/funnel', label: '获客漏斗', icon: <FunnelPlotOutlined /> },
       { key: '/app-market/comparison', label: '市场对比', icon: <AppstoreOutlined /> },
       { key: '/app-market/detail', label: '明细查询', icon: <UnorderedListOutlined /> },
-      { key: '/app-market/creative', label: '创意效果', icon: <FileTextOutlined /> },
+      { key: '/app-market/creative', label: '计划分析', icon: <FileTextOutlined /> },
     ],
   },
   {
