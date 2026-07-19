@@ -242,6 +242,41 @@ class ApiSmokeTest(unittest.TestCase):
             '/reports/app-market/filter-options')
         self.assertIsInstance(data, dict)
 
+    def test_46_app_market_plan_analysis(self):
+        # v3.3.5 计划分析（按周度 + 按平台单选）
+        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END}, 'top_n': 10}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/plan-analysis', payload),
+            '/reports/app-market/plan-analysis')
+        self.assertIsInstance(data, dict)
+        self.assertIn('platforms', data)
+        self.assertIn('weekly_totals', data)
+        self.assertIn('plan_items', data)
+        self.assertIn('totals', data)
+        # 验证周度走势结构
+        if data['weekly_totals']:
+            w = data['weekly_totals'][0]
+            self.assertIn('week_start', w)
+            self.assertIn('激活APP', w)
+            self.assertIn('新开户', w)
+            self.assertIn('激活_新开户率', w)
+        # 验证计划项结构
+        if data['plan_items']:
+            p = data['plan_items'][0]
+            self.assertIn('plan_id', p)
+            self.assertIn('totals', p)
+            self.assertIn('weekly', p)
+
+    def test_47_app_market_plan_analysis_with_platform(self):
+        # v3.3.5 计划分析（指定平台筛选）
+        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END, 'app_market': '华为'}, 'top_n': 5}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/plan-analysis', payload),
+            '/reports/app-market/plan-analysis?app_market=华为')
+        self.assertIsInstance(data, dict)
+        # 若返回了 selected_platform，应等于请求的平台
+        self.assertEqual(data.get('selected_platform'), '华为')
+
     # ============================================================
     #  员工转化 / 线索明细 / 小红书
     # ============================================================
