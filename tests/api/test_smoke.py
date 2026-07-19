@@ -279,6 +279,48 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIsInstance(data, (list, dict))
 
     # ============================================================
+    #  v3.3.0: 主播聚类 live_type（映射表由 JSON 同步到 DB，无独立 CRUD API）
+    # ============================================================
+
+    def test_62_anchor_clusters_with_live_type(self):
+        payload = {
+            'filters': {
+                'start_date': '2026-01-01',
+                'end_date': '2026-12-31',
+            },
+            'top_n': 50,
+        }
+        data = self._ok(
+            self._post('/api/v1/leads-detail/anchor-clusters', payload),
+            '/leads-detail/anchor-clusters')
+        self.assertIsInstance(data, dict)
+        self.assertIn('items', data)
+        self.assertIn('live_types', data)
+        self.assertIn('live_type_breakdown', data)
+        # 至少应有一项带 live_type 标签（配置表已种子化）
+        if data['items']:
+            item = data['items'][0]
+            self.assertIn('live_type', item)
+            self.assertIn('live_types', item)
+            self.assertIn('secondary_live_types', item)
+
+    def test_63_anchor_clusters_live_type_filter(self):
+        # 仅看「带货直播」：应只剩 3 位带货主播
+        payload = {
+            'filters': {
+                'start_date': '2026-01-01',
+                'end_date': '2026-12-31',
+                'live_types': ['带货直播'],
+            },
+            'top_n': 50,
+        }
+        data = self._ok(
+            self._post('/api/v1/leads-detail/anchor-clusters', payload),
+            '/leads-detail/anchor-clusters (live_types=带货直播)')
+        items = data.get('items', [])
+        self.assertLessEqual(len(items), 3, '带货直播主播应≤3位')
+
+    # ============================================================
     #  边界：空 payload 不应 500
     # ============================================================
 

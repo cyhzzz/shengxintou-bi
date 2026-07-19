@@ -180,6 +180,78 @@ def configure_sqlite_optimization():
 with app.app_context():
     configure_sqlite_optimization()
 
+def _sync_anchor_live_types_from_json():
+    """v3.3.0: 从 backend/config/anchor_live_types.json 同步映射到 dim_anchor_live_type 表。
+
+    JSON 是权威源（随 git 走），DB 表是查询缓存。每次启动都 upsert：
+      - JSON 有 DB 无 → 插入
+      - JSON 有 DB 有 → 更新 anchor_name/live_type/remark/is_active=1
+      - JSON 无 DB 有 → 标记为 is_active=0（不删除，保留历史）
+    返回 upsert 的行数（插入 + 更新 + 软删除）。
+    """
+    import json
+    from datetime import datetime
+    from backend.models_v2 import DimAnchorLiveType
+    from backend.database import db
+
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'backend', 'config', 'anchor_live_types.json')
+    if not os.path.exists(config_path):
+        logger.warning(f"主播直播类型映射 JSON 不存在: {config_path}")
+        return 0
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    mappings = data.get('mappings') or []
+    if not mappings:
+        return 0
+
+    now = datetime.utcnow()
+    json_tokens = {m['source_token'] for m in mappings}
+
+    # 查询现有数据
+    existing = {r.source_token: r for r in db.session.query(DimAnchorLiveType).all()}
+
+    changes = 0
+    # 1. upsert JSON 中的 token
+    for m in mappings:
+        tok = m['source_token']
+        row = existing.get(tok)
+        if row is None:
+            db.session.add(DimAnchorLiveType(
+                source_token=tok,
+                anchor_name=m['anchor_name'],
+                live_type=m['live_type'],
+                remark=m.get('remark'),
+                is_active=1,
+                updated_at=now,
+            ))
+            changes += 1
+        else:
+            if (row.anchor_name != m['anchor_name']
+                    or row.live_type != m['live_type']
+                    or (row.remark or None) != (m.get('remark') or None)
+                    or row.is_active != 1):
+                row.anchor_name = m['anchor_name']
+                row.live_type = m['live_type']
+                row.remark = m.get('remark')
+                row.is_active = 1
+                row.updated_at = now
+                changes += 1
+
+    # 2. JSON 无 DB 有 → 软删除（is_active=0）
+    for tok, row in existing.items():
+        if tok not in json_tokens and row.is_active == 1:
+            row.is_active = 0
+            row.updated_at = now
+            changes += 1
+
+    if changes > 0:
+        db.session.commit()
+    return changes
+
+
 def ensure_database_exists():
     """确保数据库和所有表存在"""
     try:
@@ -194,16 +266,24 @@ def ensure_database_exists():
             if db_dir and not os.path.exists(db_dir):
                 os.makedirs(db_dir)
                 logger.info(f"创建数据库目录: {db_dir}")
-
-            # 创建所有表
-            with app.app_context():
-                db.create_all()
-                logger.info("✓ 数据库表创建成功!")
-
-                # 记录数据库文件位置
-                logger.info(f"✓ 数据库位置: {database_path}")
         else:
             logger.info(f"数据库文件已存在: {database_path}")
+
+        # create_all 幂等：已存在的表不受影响，新表会自动创建
+        with app.app_context():
+            db.create_all()
+            logger.info("✓ 数据库表结构已就绪")
+
+            # v3.3.0: 主播直播类型映射同步（JSON 权威源 → DB 缓存，每次启动都 upsert）
+            try:
+                synced = _sync_anchor_live_types_from_json()
+                if synced > 0:
+                    logger.info(f"✓ 主播直播类型映射已同步: {synced} 条")
+            except Exception as e:
+                logger.warning(f"主播直播类型映射同步失败（不影响启动）: {e}")
+
+            # 记录数据库文件位置
+            logger.info(f"✓ 数据库位置: {database_path}")
 
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")
@@ -302,7 +382,7 @@ from backend.routes.data import (
     account_mapping,
     xhs_operation,
     employee_conversion,
-    weekly_report_poster
+    weekly_report_poster,
 )
 
 # 注意：已移除模块缓存清除和reload逻辑，避免"module not in sys.modules"错误
@@ -323,8 +403,6 @@ app.register_blueprint(account_mapping.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
 app.register_blueprint(employee_conversion.bp, url_prefix=API_PREFIX)
 app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
-
-# 其他Blueprint
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
