@@ -24,6 +24,8 @@ import {
   GlobalOutlined,
   VideoCameraOutlined,
   ShoppingCartOutlined,
+  SolutionOutlined,
+  BulbOutlined,
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
@@ -101,6 +103,8 @@ const menuItems: MenuProps['items'] = [
     children: [
       { key: '/live/funnel', label: '直播漏斗', icon: <FunnelPlotOutlined /> },
       { key: '/live/direct-sales', label: '直播带货', icon: <ShoppingCartOutlined /> },
+      { key: '/live/advisor-ip', label: '投顾IP', icon: <SolutionOutlined /> },
+      { key: '/live/analyst', label: '分析师', icon: <BulbOutlined /> },
       { key: '/anchor-clusters', label: '主播分析', icon: <UserOutlined /> },
     ],
   },

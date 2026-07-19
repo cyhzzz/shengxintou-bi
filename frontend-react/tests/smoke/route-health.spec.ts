@@ -29,6 +29,8 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '应用市场-创意', path: '/app-market/creative' },
   { name: '直播-漏斗', path: '/live/funnel' },
   { name: '直播-带货', path: '/live/direct-sales' },
+  { name: '直播-投顾IP', path: '/live/advisor-ip' },
+  { name: '直播-分析师', path: '/live/analyst' },
   { name: '报告生成', path: '/report-generation' },
   { name: '系统-数据导入', path: '/system/data-import' },
   { name: '系统-账号管理', path: '/system/account-management' },

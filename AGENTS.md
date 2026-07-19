@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.3`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.4`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 ## 2. 产品与数据方向
 
@@ -88,6 +88,7 @@ v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生�
 - **前端落地页**：
   - `pages/AnchorCluster/index.tsx`：直播类型筛选 + 「直播类型」列 + breakdown 表（按 4 类分组对比 anchors/leads/new_opened/new_valid/new_assets）
   - `pages/Live/Funnel.tsx`：直播类型筛选 + 「直播类型」列（不渲染 breakdown 表，保持漏斗页核心定位）
+  - `pages/Live/DirectSales.tsx`（v3.3.4 起为通用组件，接收 `liveType` prop）：3 个专项报表页共用同一 lazy import，路由 `/live/direct-sales`（带货直播）/ `/live/advisor-ip`（投顾IP）/ `/live/analyst`（分析师）传不同 `liveType`。每页含 10 项量质效率分析（走势/产能对比/剪刀差/阶段热力图/雷达/质效双高日/漏斗对比/token 拆分等），`LIVE_TYPE_META` 配置 4 种类型的颜色/图标/文案。
 
 ## 3. 共享组件
 
@@ -417,6 +418,18 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 ## 13. 版本历史
+
+### v3.3.4 已落地（2026-07-19） 投顾IP / 分析师专项报表（复用 DirectSales 通用组件）
+
+将 `pages/Live/DirectSales.tsx` 参数化为通用组件，复用同一份代码服务 3 类主播：
+
+- **参数化**：组件接收 `liveType` prop（默认 `'带货直播'`），新增 `LIVE_TYPE_META` 配置表（4 种直播类型的颜色 / 图标 / 页面标题 / 主播称谓 / 漏斗标题 / Tag 文案）。
+- **路由复用**：`router/index.tsx` 的 `withSuspense` 加可选 `props` 参数，3 个路由 `/live/direct-sales`、`/live/advisor-ip`、`/live/analyst` 共用同一 `lazy(() => import('@/pages/Live/DirectSales'))` 传不同 `liveType`，零新增文件。
+- **菜单新增**：`MainLayout.tsx` 在「直播获客」下加「投顾IP」(`SolutionOutlined` / geekblue) 与「分析师」(`BulbOutlined` / purple) 两个菜单项。
+- **路由健康检查**：`tests/smoke/route-health.spec.ts` 加 2 条（直播-投顾IP / 直播-分析师）。
+- **ReportFooter 简化**：按用户要求「文案不要太多、不含版本信息」——sources 从 11 条减到 5 条（数据源 / 端点 / 存量剔除 / 主播聚合 / 配置方式），notes 简化为单句业务定位，全部移除版本信息。
+- **文案全面动态化**：pageTitle / anchorLabel / funnelTitle / descTag / Empty description / MetricCard title / 走势图标题 / 漏斗标题 / 详情表标题等均按 `liveType` 切换。
+- **校验**：tsc 0 错；npm run build 0 错；API 冒烟 36/36 通过；Playwright 路由冒烟 22/22 通过（新增 2 条）。
 
 ### v3.3.3 已落地（2026-07-19） 直播带货报表页业务优化（10 项量质效率分析增强）
 
