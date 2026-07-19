@@ -1,23 +1,24 @@
 /**
- * 直播带货 · 业务分析报表 (v3.3.1)
+ * 直播类型 · 业务分析报表（通用组件，v3.3.4 参数化）
  *
- * 作为「直播获客」二级报表页，专门为带货主播（吴晓宇/杨毅/周乐意）服务，
- * 与「直播漏斗」(全主播)、「主播分析」(全主播) 区分。
+ * 作为「直播获客」二级报表页，按 liveType prop 过滤，复用同一份代码服务 3 类主播：
+ *   - 带货直播 (吴晓宇/杨毅/周乐意) → /live/direct-sales
+ *   - 投顾IP (总部投顾 IP 线索) → /live/advisor-ip
+ *   - 分析师 (分析师 IP 线索) → /live/analyst
  *
- * 数据源: fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type='带货直播' 的记录
+ * 数据源: fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type=liveType 的记录
  * 端点:   POST /api/v1/leads-detail/anchor-clusters         (主指标 + 主播详情 + breakdown)
  *         POST /api/v1/leads-detail/anchor-clusters-trend     (走势图 + 热力图)
  *
  * 页面结构（参考 Dashboard + Live/Funnel）:
- *   1. 筛选器（日期 / 主播平台 / 主播多选，直播类型固定为「带货直播」）
+ *   1. 筛选器（日期 / 主播平台 / 主播多选，直播类型固定为 liveType）
  *   2. 核心产出指标卡（5 张：主播数 / 新客户 / 新开户 / 新有效户 / 新开户资产）
- *   3. 主播引流走势图（daily/weekly/monthly 切换）
- *   4. 365 天开户日历热力图（复用 CalendarHeatmap 组件）
- *   5. 6 阶段业务漏斗 + 阶段转化明细表（与 Live/Funnel 同款）
- *   6. 主播详情表（仅带货主播，跨平台聚合）
- *   7. ReportFooter
- *
- * v3.3.1 新增。
+ *   3. 主播引流走势图（daily/weekly/monthly 切换）+ 新开户率走势（量质并排）
+ *   4. 365 天日历热力图（线索数 / 开户数 / 开户率 切换）
+ *   5. 6 阶段业务漏斗 + 阶段转化明细表（整体/按主播 对比）
+ *   6. 主播详情表（跨平台聚合 + 质效分级 Tag + expandable token 拆分）
+ *   7. 主播产能对比柱图 / 量质剪刀差 / 主播×阶段热力图 / 雷达图 / 质效双高日 Top 10
+ *   8. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
@@ -38,6 +39,8 @@ import {
   HeatMapOutlined,
   RadarChartOutlined,
   TrophyOutlined,
+  BulbOutlined,
+  SolutionOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
@@ -54,9 +57,43 @@ import styles from './Funnel.module.scss';
 
 const { RangePicker } = DatePicker;
 
-// 固定 4 类直播类型枚举（本页固定为「带货直播」）
+// 4 类直播类型枚举
 type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
-const FIXED_LIVE_TYPE: LiveType = '带货直播';
+
+// 各 liveType 的展示配置（颜色 / 图标 / 文案）
+const LIVE_TYPE_META: Record<LiveType, {
+  color: string;
+  icon: React.ReactNode;
+  pageTitle: string;       // 浏览器标签 / 面包屑
+  anchorLabel: string;     // 主播称谓（如「带货主播」）
+  funnelTitle: string;     // 漏斗标题
+  descTag: string;         // 顶部 Tag 文案
+}> = {
+  '带货直播': {
+    color: 'magenta',
+    icon: <ShoppingCartOutlined />,
+    pageTitle: '直播带货 · 业务分析报表',
+    anchorLabel: '带货主播',
+    funnelTitle: '6 阶段直播带货业务漏斗',
+    descTag: '直播类型：带货直播（固定）',
+  },
+  '投顾IP': {
+    color: 'geekblue',
+    icon: <SolutionOutlined />,
+    pageTitle: '投顾IP · 业务分析报表',
+    anchorLabel: '投顾IP主播',
+    funnelTitle: '6 阶段投顾IP业务漏斗',
+    descTag: '直播类型：投顾IP（固定）',
+  },
+  '分析师': {
+    color: 'purple',
+    icon: <BulbOutlined />,
+    pageTitle: '分析师 · 业务分析报表',
+    anchorLabel: '分析师主播',
+    funnelTitle: '6 阶段分析师业务漏斗',
+    descTag: '直播类型：分析师（固定）',
+  },
+};
 
 // 配色（与 AnchorCluster / Live/Funnel 一致）
 const LIVE_TYPE_COLOR: Record<string, string> = {
@@ -124,7 +161,12 @@ interface AnchorAggRow {
   sources: string[];
 }
 
-const DirectSalesPage: React.FC = () => {
+interface DirectSalesPageProps {
+  liveType?: LiveType;
+}
+
+const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直播' }) => {
+  const meta = LIVE_TYPE_META[liveType];
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
   const [platformFilter, setPlatformFilter] = useState<string[]>([]);
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
@@ -153,9 +195,9 @@ const DirectSalesPage: React.FC = () => {
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     platforms: platformFilter.length ? platformFilter : undefined,
-    // v3.3.1: 固定 live_types = ['带货直播']
-    live_types: [FIXED_LIVE_TYPE] as LiveType[],
-  }), [dateRange, platformFilter]);
+    // v3.3.4: 固定 live_types = [liveType]，由路由 prop 决定
+    live_types: [liveType] as LiveType[],
+  }), [dateRange, platformFilter, liveType]);
 
   const resetFilters = () => {
     setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
@@ -902,7 +944,7 @@ const DirectSalesPage: React.FC = () => {
               mode="multiple"
               allowClear
               showSearch
-              placeholder={'全部带货主播'}
+              placeholder={`全部${meta.anchorLabel}`}
               value={anchorFilter}
               onChange={(v) => setAnchorFilter(v as string[])}
               options={anchorOptions.map((a) => ({ label: a, value: a }))}
@@ -910,7 +952,7 @@ const DirectSalesPage: React.FC = () => {
               maxTagCount="responsive"
               filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
             />
-            <Tag color="magenta" style={{ marginLeft: 4 }}>直播类型：带货直播（固定）</Tag>
+            <Tag color={meta.color} style={{ marginLeft: 4 }}>{meta.descTag}</Tag>
             <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
           </Space>
@@ -919,8 +961,8 @@ const DirectSalesPage: React.FC = () => {
 
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>
-          <MetricSection title="直播带货核心产出" description="带货主播（吴晓宇/杨毅/周乐意 等）的新客户获客主指标（仅统计非存量客户）">
-            <MetricCard title="带货主播数" value={totals.anchors} valueColor="var(--color-brand)" icon={<ShoppingCartOutlined style={{ color: 'var(--color-brand)' }} />} description={`直播类型=带货直播的主播数`} showWowChange={false} />
+          <MetricSection title={`${liveType}核心产出`} description={`${meta.anchorLabel}的新客户获客主指标（仅统计非存量客户）`}>
+            <MetricCard title={`${meta.anchorLabel}数`} value={totals.anchors} valueColor="var(--color-brand)" icon={React.cloneElement(meta.icon as React.ReactElement, { style: { color: 'var(--color-brand)' } })} description={`直播类型=${liveType}的主播数`} showWowChange={false} />
             <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
             <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
             <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />
@@ -934,7 +976,7 @@ const DirectSalesPage: React.FC = () => {
               <Col flex="auto">
                 <Space size={8} align="center">
                   <RiseOutlined style={{ color: 'var(--color-brand)' }} />
-                  <strong>带货主播量质走势</strong>
+                  <strong>{meta.anchorLabel}量质走势</strong>
                   <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
                     按 {trendData?.granularity || 'monthly'} 口径汇总 · 左：新开户数(量) · 右：新开户率(质)
                   </span>
@@ -986,7 +1028,7 @@ const DirectSalesPage: React.FC = () => {
               <Space size={8} align="center">
                 <BarChartOutlined style={{ color: 'var(--color-brand)' }} />
                 <span>主播产能对比</span>
-                <Tooltip title="横向柱图对比带货主播的核心产出指标。可切换 5 个指标；最大值在顶部。">
+                <Tooltip title={`横向柱图对比${meta.anchorLabel}的核心产出指标。可切换 5 个指标；最大值在顶部。`}>
                   <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
                 </Tooltip>
               </Space>
@@ -1046,7 +1088,7 @@ const DirectSalesPage: React.FC = () => {
             title={
               <Space size={8} align="center">
                 <VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />
-                <span>365 天带货主播日历</span>
+                <span>365 天{meta.anchorLabel}日历</span>
                 <Tooltip title="滚动 365 天窗口；颜色越深表示当日数量越多，便于发现直播节奏。开户数通常较少（转化率 1-5%），可切到「线索数」查看更丰富的热力分布">
                   <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
                 </Tooltip>
@@ -1073,7 +1115,7 @@ const DirectSalesPage: React.FC = () => {
           <Row className={styles.funnelSplitRow}>
             <Col span={12} className={styles.funnelSplitCol}>
               <Card
-                title="6 阶段直播带货业务漏斗"
+                title={meta.funnelTitle}
                 size="small"
                 className={styles.h100Card}
                 extra={
@@ -1097,13 +1139,13 @@ const DirectSalesPage: React.FC = () => {
                   funnelChartData.length > 0 && funnelChartData[0].count > 0 ? (
                     <FunnelChart data={funnelChartData} height={440} useLogScale />
                   ) : (
-                    <Empty description="该日期区间内无带货主播引流记录" />
+                    <Empty description={`该日期区间内无${meta.anchorLabel}引流记录`} />
                   )
                 ) : (
                   anchorAggRows.length > 0 ? (
                     <EChartsComponent option={funnelByAnchorOption} height={440} />
                   ) : (
-                    <Empty description="该日期区间内无带货主播引流记录" />
+                    <Empty description={`该日期区间内无${meta.anchorLabel}引流记录`} />
                   )
                 )}
               </Card>
@@ -1171,11 +1213,11 @@ const DirectSalesPage: React.FC = () => {
         </FadeInSection>
 
         <FadeInSection delay={2.0} duration={0.8}>
-          <Card title={`带货主播详情（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序</span>}>
+          <Card title={`${meta.anchorLabel}详情（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序</span>}>
             {anchorAggRows.length > 0 ? (
               <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={false} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} expandable={{ expandedRowRender, rowExpandable: (r) => (r.sources?.length || 0) > 0 }} />
             ) : (
-              <Empty description={'暂无带货主播数据（请检查日期区间是否覆盖直播带货时段）'} />
+              <Empty description={`暂无${meta.anchorLabel}数据（请检查日期区间是否覆盖${liveType}时段）`} />
             )}
           </Card>
         </FadeInSection>
@@ -1249,19 +1291,13 @@ const DirectSalesPage: React.FC = () => {
         <FadeInSection delay={2.4} duration={0.8}>
           <ReportFooter
             sources={[
-              { label: '数据源', value: 'fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type=\'带货直播\' 的记录（如 直播带货-吴晓宇 / 直播带货-杨毅 / 直播带货-周乐意 / 抖音引流-吴晓宇 等）' },
-              { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters（filters.live_types=[\'带货直播\']）' },
-              { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly，filters.live_types=[\'带货直播\']）' },
-              { label: '热力图口径', value: '滚动 365 天窗口 + daily 粒度，支持「线索数 / 开户数 / 开户率」切换（v3.3.3 加开户率：opening_rate = new_opened / new_leads * 100）' },
-              { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
-              { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方主播平台/主播多选筛选' },
-              { label: '配置方式', value: 'backend/config/anchor_live_types.json（JSON 权威源，启动时 _sync_anchor_live_types_from_json 自动 upsert 到 DB）' },
-              { label: '质效分级规则', value: '高质效=开户率≥5% 且线索量≥50；中质效=开户率1-5%；低质效=开户率<1% 且线索量≥50；其余为「待观察」（样本不足）' },
-              { label: '质效双高日定义', value: '线索量>10 且 新开户率≥5% 且 新开户数>0，按新开户数降序 Top 10（v3.3.3 新增）' },
-              { label: '雷达图归一化', value: '5 维度（线索量/开口率/新有效率/新开户率/单线索资产）按各自维度 max 归一化（v3.3.3 新增）' },
-              { label: '漏斗对比模式', value: '整体 FunnelChart / 按主播 堆叠柱图（v3.3.3 新增）' },
+              { label: '数据源', value: `fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type='${liveType}' 的记录` },
+              { label: '端点', value: `POST /api/v1/leads-detail/anchor-clusters（filters.live_types=['${liveType}']）` },
+              { label: '存量剔除', value: '非存量 = 是否为存量客户==0 OR IS NULL' },
+              { label: '主播聚合', value: '同名主播跨平台聚合，支持上方主播平台/主播多选筛选' },
+              { label: '配置方式', value: 'backend/config/anchor_live_types.json（JSON 权威源，启动时自动 upsert 到 DB）' },
             ]}
-            notes={'业务定位：直播带货是「量大质差」与「量质双高」并存的获客场景——3 位主播（吴晓宇/杨毅/周乐意）贡献 1847 条去重线索、54 个新开户、¥143 万新开户资产，但月度开户率分化大（2025-12 双高 10% vs 2026-05 量大质差 0.74%）。报表从「量、质、效率」三个维度展开。\n\nv3.3.1 新增：作为「直播获客」二级报表页，专门为带货主播服务，与「直播漏斗」(全主播)、「主播分析」(全主播) 区分。直播类型固定为「带货直播」，不可切换。新开户作为核心获客产出：漏斗第 4 阶段起剔除存量客户，「成功开户(新)」「有效户(新)」「新开户资产」为主指标。\n\nv3.3.2 修复：移除主播详情表「存量客户/存量资产」列（带货场景无服务存量客户价值）；热力图加「线索数/开户数」切换（开户率 1-5% 时开户数热力分布过于稀疏）。\n\nv3.3.3 业务优化（10 项）：\n• P0-1 新开户率走势图（量质走势并排，左量右质）\n• P0-4 主播产能对比柱图（5 指标可切换：线索量/新开户/新有效户/新开户资产/单线索产能）\n• P1-9 月度量质剪刀差（双 Y 轴：左线索量柱 + 右开户率线）\n• P1-10 主播 × 漏斗阶段热力图（6 阶段 × 主播矩阵，单元格 = 阶段转化率%）\n• P2-7 热力图加「开户率」第三选项\n• P2-3 主播详情表加「质效分级」Tag（高/中/低/待观察）\n• P3-5 主播多维画像雷达图（5 维度归一化）\n• P3-8 质效双高日 Top 10 列表\n• P3-11 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱）\n• P3-12 主播详情表 expandable 行展开 token 来源拆分（覆盖平台/直播类型/token）'}
+            notes={`${meta.anchorLabel}专项报表：直播类型固定为「${liveType}」，新开户作为核心获客产出指标。漏斗第 4 阶段起剔除存量客户，质效分级与质效双高日用于辅助识别优质主播与节点。`}
           />
         </FadeInSection>
       </Spin>

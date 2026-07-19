@@ -13,10 +13,11 @@ const PageFallback = () => (
 );
 
 // 统一 lazy 包装：Suspense 边界 + 错误边界
-function withSuspense(Comp: React.ComponentType<any>): ReactNode {
+// v3.3.4：支持可选 props（用于 DirectSales 通用组件复用同一 lazy import 传不同 liveType）
+function withSuspense(Comp: React.ComponentType<any>, props?: Record<string, any>): ReactNode {
   return (
     <Suspense fallback={<PageFallback />}>
-      <Comp />
+      <Comp {...(props || {})} />
     </Suspense>
   );
 }
@@ -93,7 +94,10 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/live/funnel" replace /> },
       { path: 'funnel', element: withSuspense(LiveFunnelPage) },
-      { path: 'direct-sales', element: withSuspense(LiveDirectSalesPage) },
+      { path: 'direct-sales', element: withSuspense(LiveDirectSalesPage, { liveType: '带货直播' }) },
+      // v3.3.4: 投顾IP / 分析师 专项报表，复用 DirectSales 通用组件
+      { path: 'advisor-ip', element: withSuspense(LiveDirectSalesPage, { liveType: '投顾IP' }) },
+      { path: 'analyst', element: withSuspense(LiveDirectSalesPage, { liveType: '分析师' }) },
     ],
   },
       { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
