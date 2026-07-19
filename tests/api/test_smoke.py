@@ -320,6 +320,25 @@ class ApiSmokeTest(unittest.TestCase):
         items = data.get('items', [])
         self.assertLessEqual(len(items), 3, '带货直播主播应≤3位')
 
+    def test_64_direct_sales_trend_with_live_type(self):
+        # v3.3.1: 直播带货报表页走势图端点（live_types=['带货直播'] + daily）
+        payload = {
+            'filters': {
+                'start_date': '2026-01-01',
+                'end_date': '2026-12-31',
+                'live_types': ['带货直播'],
+            },
+            'granularity': 'monthly',
+        }
+        data = self._ok(
+            self._post('/api/v1/leads-detail/anchor-clusters-trend', payload),
+            '/leads-detail/anchor-clusters-trend (live_types=带货直播)')
+        self.assertIsInstance(data, dict)
+        self.assertIn('periods', data)
+        self.assertIn('totals', data)
+        self.assertIn('by_platform', data)
+        self.assertEqual(data.get('granularity'), 'monthly')
+
     # ============================================================
     #  边界：空 payload 不应 500
     # ============================================================
