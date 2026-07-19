@@ -133,9 +133,10 @@ const DirectSalesPage: React.FC = () => {
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [trendLoading, setTrendLoading] = useState(false);
 
-  // 热力图（固定 daily + 365 天滚动窗口）
+  // 热力图（固定 daily + 365 天滚动窗口，支持「线索数 / 开户数」切换）
   const [heatmapData, setHeatmapData] = useState<{ date: string; value: number }[]>([]);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [heatmapMetric, setHeatmapMetric] = useState<'new_leads' | 'new_opened'>('new_leads');
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
@@ -202,7 +203,7 @@ const DirectSalesPage: React.FC = () => {
       if (res?.success && res.data?.totals) {
         const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => ({
           date,
-          value: Number(v?.new_opened || 0),
+          value: Number(v?.[heatmapMetric] || 0),
         }));
         setHeatmapData(arr);
       }
@@ -215,7 +216,7 @@ const DirectSalesPage: React.FC = () => {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
   useEffect(() => { loadTrend(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
-  useEffect(() => { loadHeatmap(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { loadHeatmap(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, heatmapMetric]);
 
   // 主播名多选筛选（前端二次过滤 items）
   const filteredItems = useMemo(() => {
@@ -395,7 +396,6 @@ const DirectSalesPage: React.FC = () => {
     ) },
     { title: '平台数', width: 80, align: 'center' as const, render: (_: any, r: AnchorAggRow) => <Tag color="blue">{r.platforms.length}</Tag> },
     { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
-    { title: '存量客户', dataIndex: 'existing_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
@@ -405,7 +405,6 @@ const DirectSalesPage: React.FC = () => {
     { title: '新开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.opening_rate - b.opening_rate, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
     { title: '新有效率', dataIndex: 'valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
     { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_assets - b.new_assets, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
-    { title: '存量资产', dataIndex: 'existing_assets', align: 'right' as const, width: 140, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
   ];
 
   return (
@@ -497,11 +496,22 @@ const DirectSalesPage: React.FC = () => {
             title={
               <Space size={8} align="center">
                 <VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />
-                <span>365 天带货主播新开户日历</span>
-                <Tooltip title="滚动 365 天窗口（最近 365 天的每日新开户数）；颜色越深表示当日开户越多，便于发现直播节奏">
+                <span>365 天带货主播日历</span>
+                <Tooltip title="滚动 365 天窗口；颜色越深表示当日数量越多，便于发现直播节奏。开户数通常较少（转化率 1-5%），可切到「线索数」查看更丰富的热力分布">
                   <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
                 </Tooltip>
               </Space>
+            }
+            extra={
+              <Segmented
+                size="small"
+                value={heatmapMetric}
+                onChange={(v) => setHeatmapMetric(v as 'new_leads' | 'new_opened')}
+                options={[
+                  { label: '线索数', value: 'new_leads' },
+                  { label: '开户数', value: 'new_opened' },
+                ]}
+              />
             }
           >
             <CalendarHeatmap data={heatmapData} loading={heatmapLoading} days={365} />
@@ -572,7 +582,7 @@ const DirectSalesPage: React.FC = () => {
               { label: '数据源', value: 'fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type=\'带货直播\' 的记录（如 直播带货-吴晓宇 / 直播带货-杨毅 / 直播带货-周乐意 / 抖音引流-吴晓宇 等）' },
               { label: '端点', value: 'POST /api/v1/leads-detail/anchor-clusters（filters.live_types=[\'带货直播\']）' },
               { label: '走势图端点', value: 'POST /api/v1/leads-detail/anchor-clusters-trend（daily/weekly/monthly，filters.live_types=[\'带货直播\']）' },
-              { label: '热力图口径', value: '滚动 365 天窗口 + daily 粒度，取 totals[period].new_opened 作为每日开户数' },
+              { label: '热力图口径', value: '滚动 365 天窗口 + daily 粒度，支持「线索数 / 开户数」切换（取 totals[period].new_leads 或 new_opened）' },
               { label: '存量剔除口径', value: '非存量 = 是否为存量客户==0 OR IS NULL，与 cost_analysis/conversion-funnel/split 一致' },
               { label: '主播聚合', value: '同名主播跨平台聚合（覆盖平台 + 平台数列展开），支持上方主播平台/主播多选筛选' },
               { label: '配置方式', value: 'backend/config/anchor_live_types.json（JSON 权威源，启动时 _sync_anchor_live_types_from_json 自动 upsert 到 DB）' },

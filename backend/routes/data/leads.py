@@ -438,6 +438,7 @@ def get_anchor_clusters_trend():
         FactConvContent.平台来源.label('platform'),
         FactConvContent.客户来源,
         func.count(FactConvContent.id).label('leads'),
+        func.coalesce(func.sum(case((non_existing, 1), else_=0)), 0).label('new_leads'),
         func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
         func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
         func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), 1), else_=0)), 0).label('new_opened'),
@@ -472,8 +473,8 @@ def get_anchor_clusters_trend():
                 wanted_tokens.add(lt_row.source_token)
 
     rows = q.group_by('period', FactConvContent.平台来源, FactConvContent.客户来源).order_by('period', FactConvContent.平台来源).all()
-    pt = defaultdict(lambda: {'leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0})
-    pp = defaultdict(lambda: defaultdict(lambda: {'leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0}))
+    pt = defaultdict(lambda: {'leads':0,'new_leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0})
+    pp = defaultdict(lambda: defaultdict(lambda: {'leads':0,'new_leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0}))
     all_platforms = set()
     SPLIT_PATTERN = re.compile(r"[,，;；、]+")
     for r in rows:
@@ -488,6 +489,7 @@ def get_anchor_clusters_trend():
         all_platforms.add(platform)
         b = pt[period]
         b['leads'] += int(r.leads or 0)
+        b['new_leads'] += int(r.new_leads or 0)
         b['mouth'] += int(r.mouth or 0)
         b['valid_lead'] += int(r.valid_lead or 0)
         b['new_opened'] += int(r.new_opened or 0)
@@ -495,6 +497,7 @@ def get_anchor_clusters_trend():
         b['new_assets'] += float(r.new_assets or 0)
         bx = pp[period][platform]
         bx['leads'] += int(r.leads or 0)
+        bx['new_leads'] += int(r.new_leads or 0)
         bx['mouth'] += int(r.mouth or 0)
         bx['valid_lead'] += int(r.valid_lead or 0)
         bx['new_opened'] += int(r.new_opened or 0)

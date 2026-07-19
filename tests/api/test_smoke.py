@@ -338,6 +338,12 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIn('totals', data)
         self.assertIn('by_platform', data)
         self.assertEqual(data.get('granularity'), 'monthly')
+        # v3.3.2: totals 应包含 new_leads 字段（用于热力图切换）
+        if data['periods']:
+            first_period = data['periods'][0]
+            totals_first = data['totals'].get(first_period, {})
+            self.assertIn('new_leads', totals_first, 'totals 应包含 new_leads 字段')
+            self.assertIn('new_opened', totals_first, 'totals 应包含 new_opened 字段')
 
     # ============================================================
     #  边界：空 payload 不应 500
