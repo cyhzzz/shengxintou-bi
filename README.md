@@ -13,7 +13,7 @@
 ### 业务价值
 
 - 一屏聚合跨渠道开户数据，避免在多个投放后台与 CRM 之间手工对账。
-- 双漏斗（内容平台 7 阶段 + 应用市场 8 阶段）独立呈现，定位转化卡点。
+- 双漏斗（内容平台 8 阶段 + 应用市场 9 阶段，含新开户 / 入金 / 有效户延伸）独立呈现，定位转化卡点。
 - 互联网渠道开户日历热力图 + 年度 KPI 完成率时间折算，辅助进度管理。
 - 数据新鲜度监控 + 坚果云 WebDAV 自动备份，降低运维风险。
 
@@ -63,10 +63,12 @@ cd frontend-react && npm run dev
 
 1. **双链路转化漏斗**：内容平台（抖音 / 腾讯 / 小红书 / 快手）与应用市场（小米 / 华为 / OPPO / VIVO / 荣耀 / 苹果）两套独立漏斗，支持日期与平台筛选联动。
 2. **全渠道获客概览**：跨渠道类别聚合 + 年度 KPI 完成率 + 互联网渠道开户日历热力图。
-3. **应用市场专项**：漏斗 / 对比 / 明细 / 创意四个子页，设备明细支持详情查看。
-4. **线索明细与主播分析**：线索行级数据详情查看；主播跨平台聚合分析。
-5. **小红书与厂商员工分析**：小红书笔记列表与运营分析；代理商投放对比；员工转化双源口径。
-6. **数据导入与运维**：6 类 v2 数据导入；数据新鲜度监控；坚果云自动备份；一键 GitHub 自更新。
+3. **应用市场专项**：漏斗 / 对比 / 明细 / 计划分析四个子页，设备明细支持详情查看。
+4. **线索明细与主播分析**：线索行级数据详情查看；主播跨平台聚合分析，按 4 类直播类型（分析师 / 投顾IP / 投顾配合做带货 / 带货直播）分群对比获客产出。
+5. **直播获客专项**：3 个直播类型页（带货直播 / 投顾IP / 分析师）共用通用组件，每页 10 项量质效率分析（走势 / 产能对比 / 剪刀差 / 阶段热力图 / 雷达 / 质效双高日 / 漏斗对比 / token 拆分等）。
+6. **小红书与厂商员工分析**：小红书笔记列表与运营分析；代理商投放对比；员工转化双源口径。
+7. **抖音青鸟对账**：抖音引流线索与青鸟 CRM 线索按批次对账，支持微信昵称归一化匹配（剥零宽字符 + NFKC 全角转半角 + 去标点 + 小写）+ 日期容差（默认 ±7 天）+ 批次筛选与导出。
+8. **数据导入与运维**：7 类 v2 数据导入（含青鸟线索 append 模式）；数据新鲜度监控；坚果云自动备份；一键 GitHub 自更新。
 
 ## 数据流与架构
 
@@ -149,6 +151,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 | `vendor_daily` | 厂商广告投放分析 | `agg_vendor_daily` | `vendor_daily_guide.md` |
 | `xhs_note` | 小红书笔记 | `agg_xhs_note` | `xhs_note_guide.md` |
 | `channel_open` | 开户渠道分析明细 | `agg_daily_channel_open` | `channel_open_guide.md` |
+| `qingniao_leads` | 青鸟线索（append 模式保留历史批次） | `fact_qingniao_leads` | `qingniao_leads_guide.md` |
 
 旧 v1 上传类型（tencent_ads / douyin_ads / xiaohongshu_ads / backend_conversion / xhs_* 等）已退役，请求返回 `410 Gone`。
 
@@ -163,13 +166,13 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 ├── version.json                    # 当前版本与变更记录
 ├── AGENTS.md / CLAUDE.md           # 项目工作说明（规则 + 守则 + 架构）
 ├── backend/
-│   ├── models.py / models_v2.py    # ORM（9 张新表，列名 1:1 含中文）
+│   ├── models.py / models_v2.py    # ORM（2 张系统表 + 8 张业务表，列名 1:1 含中文）
 │   ├── database.py                 # 单例 SQLAlchemy
 │   ├── processors/v2/raw_import.py # v2 原样导入
 │   ├── routes/
 │   │   ├── upload.py               # v2 上传入口
 │   │   ├── metadata.py             # 元数据 + 数据新鲜度
-│   │   ├── data/                   # 14 个查询蓝图
+│   │   ├── data/                   # 13 个查询蓝图 + 1 个辅助文件
 │   │   ├── reports/                # omni_channel / app_market 报表蓝图
 │   │   ├── system/                 # self_update（git-status / start / status）
 │   │   └── webdav_backup.py        # 坚果云备份
@@ -183,7 +186,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 │   │   ├── stores/                 # zustand 状态管理
 │   │   ├── styles/                 # tokens.css / mixins.scss / variables.scss
 │   │   └── types/                  # orval 生成的 api.ts
-│   └── public/documents/           # 6 个 v2 数据导入指南 .md
+│   └── public/documents/           # 7 个 v2 数据导入指南 .md
 └── docs/                           # 设计文档与部署指南
 ```
 
@@ -210,11 +213,10 @@ npm run test:report
 
 ### 文档索引
 
-- [docs/v3.1_报表重梳方案.md](docs/v3.1_报表重梳方案.md)：v3.1 菜单 / 双漏斗 / 双源 / 应用市场设计。
-- [docs/库表重构设计_v2.md](docs/库表重构设计_v2.md) / [docs/库表重构设计_v3.md](docs/库表重构设计_v3.md)：DIM / DWD / DWS 表设计。
-- [docs/前端UI优化规划PRD.md](docs/前端UI优化规划PRD.md)：设计 token / 日夜模式 / 样式治理规划。
-- [docs/数据库架构文档.md](docs/数据库架构文档.md)：旧 13 表说明（新代码以 v2 / v3 重构文档为准）。
 - [docs/部署指南.md](docs/部署指南.md)：开发、生产、性能优化、监控与故障排查。
+- [docs/design/weekly-poster-philosophy.md](docs/design/weekly-poster-philosophy.md)：周报海报设计哲学。
+- [docs/design/monochrome-data-canvas.pdf](docs/design/monochrome-data-canvas.pdf)：单色数据画布设计稿。
+- 历史设计文档已归档至 `docs/_archive/`：v3.1 报表重梳方案 / 前端 UI 优化 PRD / 前端全栈改造清单 / 库表重构设计 v2 & v3 / 数据库架构文档。新代码以 `AGENTS.md` 为权威源。
 
 
 ## 📦 发布流程

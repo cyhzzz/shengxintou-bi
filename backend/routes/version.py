@@ -3,10 +3,9 @@
 版本管理 API 路由
 """
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, jsonify, current_app
 import os
 import json
-from datetime import datetime
 from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('version', __name__)
@@ -196,52 +195,3 @@ def compare_with_cloud():
         }
     })
 
-
-@bp.route('/sync-to-cloud', methods=['POST'])
-@handle_exceptions
-def sync_version_to_cloud():
-    """
-    将本地版本同步到云端
-
-    会在坚果云备份时自动调用，如果本地版本 > 云端版本
-
-    Response:
-        {
-            "success": true,
-            "message": "版本信息已同步到云端"
-        }
-    """
-    local_version = get_local_version()
-
-    if not local_version:
-        return jsonify({
-            'success': False,
-            'error': 'NO_LOCAL_VERSION',
-            'message': '无法读取本地版本信息'
-        }), 500
-
-    cloud_file = local_version.get('cloud_version_file', 'version_cloud.json')
-    # 使用与本地版本文件相同的路径计算方式
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    backend_dir = os.path.dirname(current_dir)
-    project_root = os.path.dirname(backend_dir)
-    cloud_path = os.path.join(project_root, cloud_file)
-
-    try:
-        # 写入云端版本文件
-        with open(cloud_path, 'w', encoding='utf-8') as f:
-            json.dump(local_version, f, ensure_ascii=False, indent=2)
-
-        current_app.logger.info(f"版本信息已同步到云端: {local_version['version']}")
-
-        return jsonify({
-            'success': True,
-            'message': '版本信息已同步到云端'
-        })
-    except Exception as e:
-        current_app.logger.error(f"同步版本到云端失败: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'SYNC_FAILED',
-            'message': f'同步失败: {str(e)}'
-        }), 500
