@@ -536,25 +536,6 @@ for rule in app.url_map.iter_rules():
 # 通过 before_request 钩子处理，确保在所有其他路由之后检查
 from flask import request, send_from_directory
 
-# 旧版 JS 静态文件路由（新版前端混合模式依赖）
-@app.route('/js/<path:filename>')
-def serve_legacy_js(filename):
-    """服务旧版 JS 文件"""
-    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist'), f'js/{filename}')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
-
-@app.route('/libs/<path:filename>')
-def serve_legacy_libs(filename):
-    """服务旧版 libs 文件"""
-    response = send_from_directory(os.path.join(BASE_DIR, 'frontend-react', 'dist'), f'libs/{filename}')
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
-
 @app.route('/assets/<path:filename>')
 def serve_vite_assets(filename):
     """服务 Vite 构建的资源文件（CSS、JS chunks 等）"""
@@ -588,10 +569,6 @@ def serve_react_app():
 
     # 排除 Vite 构建资源路径（映射到 /static/...）
     if request.path.startswith('/assets/'):
-        return None  # 继续其他匹配
-
-    # 排除旧版 JS 路由（新版前端混合模式依赖）
-    if request.path.startswith('/js/') or request.path.startswith('/libs/'):
         return None  # 继续其他匹配
 
     # 排除 Swagger 文档路由

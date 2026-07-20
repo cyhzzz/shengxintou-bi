@@ -9,7 +9,7 @@
 
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
-- 当前版本基线：`version.json` 为 `3.3.5`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+- 当前版本基线：`version.json` 为 `3.3.8`（2026-07-20）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
 
 
 ### 🚀 AI Quick Start（让 AI clone 后一键搞定依赖）
@@ -145,24 +145,26 @@ v3.1.25 起，内容平台漏斗的存量剔除在**有效线索之后**发生�
 
 ```
 backend/
-├── models.py / models_v2.py   # 系统表 + 10 张新表 ORM（含 v3.3.0 新增 dim_anchor_live_type 配置表，列名 1:1 含中文）
+├── models.py（2 张系统表）/ models_v2.py   # 8 张业务表 ORM（含 v3.3.0 新增 dim_anchor_live_type 配置表 + v3.3.6 新增 fact_qingniao_leads 对账表，列名 1:1 含中文）
 ├── database.py                # 单例 SQLAlchemy(db)
 ├── __init__.py                # 启动时 import models_v2 注册到 metadata
 ├── processors/v2/raw_import.py # v2 原样导入
 ├── routes/
+│   ├── config.py              # 系统配置 CRUD
 │   ├── upload.py              # v2 上传入口，旧类型返回 410 Gone
 │   ├── metadata.py            # 元数据 + 数据新鲜度
 │   ├── webdav_backup.py       # 坚果云 WebDAV
-│   ├── reports/               # v3.1 新增 omni_channel / app_market 蓝图
-│   ├── system/                # v3.1.17 新增 self_update（git-status / start / status）
-│   ├── data/                  # 14 个查询蓝图（全部查新表）
-│   └── version.py / weekly_reports.py / feishu_sync.py
+│   ├── version.py / weekly_reports.py
+│   ├── reports/               # omni_channel / app_market 蓝图
+│   ├── system/                # self_update（git-status / start / status）
+│   ├── data/                  # 13 个查询蓝图 + 1 个辅助文件（employee_conversion_helpers.py），全部查新表
+│   │   └── data_reconciliation.py  # v3.3.6 新增抖音青鸟对账
 └── utils/decorators.py        # @handle_exceptions 等
 ```
 
-**v2 重构**：6 个新数据类型 → `dim_account / dim_vendor / fact_conv_content / fact_conv_appmarket / agg_vendor_daily / agg_xhs_note / agg_daily_channel_open`；13 个查询端点路径零变动，内部从旧表改查新表。
+**v2 重构**：6 个新数据类型 → `dim_account / fact_conv_content / fact_conv_appmarket / agg_vendor_daily / agg_xhs_note / agg_daily_channel_open`（dim_vendor 已在 v3.2.1 删除）；13 个查询端点路径零变动，内部从旧表改查新表。
 
-**v3.1 报表重梳**：顶级菜单重构（全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 线索明细 / 厂商分析 / 小红书 / 应用市场 / 员工转化 / 直播获客 / 报告生成 / 系统配置）+ 双漏斗（content + appmarket）+ 员工转化双源 + 应用市场 4 子页 + 数据新鲜度。
+**v3.1 报表重梳**：三段式菜单（v3.3.6 重构）——业务总览（全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 厂商分析）+ 业务专题（内容平台[线索明细 + 抖音青鸟对账] / 应用市场 / 小红书 / 直播获客 / 员工转化）+ 系统功能（报告生成 / 系统配置）+ 双漏斗（content + appmarket）+ 员工转化双源 + 应用市场 4 子页 + 数据新鲜度。
 
 ### 4.2 路由前缀
 
@@ -174,24 +176,24 @@ backend/
 
 ### 4.4 React Router SPA 兜底
 
-`@app.before_request serve_react_app` 在路由匹配失败时返回 `index.html`；Flask 还显式提供 `/js/`、`/libs/`、`/assets/`、`/icons/` 静态目录。
+`@app.before_request serve_react_app` 在路由匹配失败时返回 `index.html`；Flask 还显式提供 `/assets/`、`/icons/` 静态目录。
 
 ### 4.5 前端结构（frontend-react/src/）
 
 ```
-components/    # Chart / DataFreshness / Filter / GuideModal / Icon / MetricCard / MetricReportFooter
+components/    # Chart / DataFreshness / Filter / GuideModal / MetricCard / MetricReportFooter / ReportFooter / RouteErrorBoundary / FadeInSection
 stores/        # zustand: useAppStore, useFilterStore
 services/      # http / dataService / metadataService / uploadService / orvalMutator
 types/         # api.ts（orval 生成）/ api.schemas.ts / index.ts
-utils/         # filterAdapter / agencyAnalysisChart / legacyLoader / sanitizeText
+utils/         # filterAdapter / agencyAnalysisChart / sanitizeText
 router/        # createBrowserRouter 配置（含旧路径 redirect）
 layouts/MainLayout.tsx
 styles/        # tokens.css + mixins.scss + variables.scss + global.scss
-pages/         # Dashboard / OmniChannel / ConversionFunnel / LeadsDetail / AgencyAnalysis
+pages/         # Dashboard / OmniChannel / ConversionFunnel / LeadsDetail / AgencyAnalysis / AnchorCluster
                # XhsNotes/{List,Operation} / EmployeeConversion/{Analysis,Weekly}
                # Reports/AppMarket/{Funnel,Comparison,Detail,Creative} / Reports/OmniChannel
-               # Live/{Funnel,AnchorCluster} / ReportGeneration
-               # System/{DataImport,AccountManagement,AbbreviationManagement,DatabaseBackup}
+               # Live/{Funnel,DirectSales} / DataReconciliation/DouyinQingniao / ReportGeneration
+               # System/{DataImport,AccountManagement,DatabaseBackup}
 ```
 
 ### 4.6 数据库
@@ -202,7 +204,7 @@ pages/         # Dashboard / OmniChannel / ConversionFunnel / LeadsDetail / Agen
 
 ### 4.7 飞书 / WebDAV 集成
 
-- `feishu_sync.py` 通过 `FEISHU_TABLE_IDS` 做双向同步；启用开关 `FEISHU_ENABLED`。
+- 飞书同步路由已在历史版本中下线，`config.py` 仍保留 `FEISHU_*` 环境变量配置作为预留（生产环境无对应路由消费）。
 - `webdav_backup.py` 用 `webdavclient3` 推送到坚果云；网络层错误（SSL / 连接被重置 / 拒绝）→ **502 + UPSTREAM_UNAVAILABLE**，其它 → 500 + LIST_FAILED。
 
 ## 5. 数据导入流程（v2）
@@ -261,7 +263,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 复制 `.env.example` 为 `.env`（已 gitignored）。重要变量：
 
 - `DATABASE_PATH`、`HOST`、`PORT`(5000)、`DEBUG`、`DEV_MODE`
-- `FEISHU_APP_ID/SECRET/BITABLE_ID`、`FEISHU_ENABLED`
+- `FEISHU_APP_ID/SECRET/BITABLE_ID`、`FEISHU_ENABLED`（保留配置项，路由已下线）
 - `WEBDAV_URL/USERNAME/PASSWORD/BASE_PATH/MAX_BACKUPS/USE_COMPRESSION`、`WEBDAV_VERIFY_SSL`、`WEBDAV_PROXY`
 - `MAX_CONTENT_LENGTH`(MB)、`ALLOWED_EXTENSIONS`、`UPLOAD_FOLDER`、`LOG_FOLDER`、`LOG_LEVEL`
 
@@ -350,9 +352,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - `smoke/` — 路由冒烟（route-health.spec.ts，19 个路由）
 - `functional/` — 页面级功能测试（16 个页面 spec）
 - `regression/` — 历史 bug 回归用例（新增 bug 时补）
-- `comparison/` — 新旧版对比测试（历史遗留，保留备查）
-- `_helpers/` — Python 辅助脚本、截图对比工具
-- `_legacy/` — 旧版零散 spec，功能已被 functional 覆盖
+- `_helpers/` / `_legacy/` / `comparison/` 目录已在 v3.3.9 全部清理（功能已被 functional 覆盖）
 
 ### 提交前快测（pre-commit check）
 
@@ -381,15 +381,11 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 ## 11. 文档索引
 
 - `README.md`：项目简介 + 核心能力（不含版本说明）。
-- `docs/v3.1_报表重梳方案.md`：v3.1 菜单 / 双漏斗 / 双源 / 应用市场 / 直播占位设计。
-- `docs/库表重构设计_v2.md`：v2 DIM/DWD/DWS 设计基线。
-- `docs/库表重构设计_v3.md`：v3 实施与收尾对账。
-- `docs/前端UI优化规划PRD.md`：v3.1.1 设计 token / 日夜模式 / 样式治理规划与验收标准。
-- `docs/前端全栈改造清单.md`：React 迁移要点。
-- `docs/数据库架构文档.md`：旧 13 表说明，查新表时优先看 v2/v3 重构文档。
-- `docs/部署指南.md`：开发、生产、Docker、性能优化、监控与故障排查。
+- `docs/_archive/`：v3.x 历史规划与设计稿归档（v3.1 报表重梳方案 / 库表重构设计 v2+v3 / 前端 UI 优化 PRD / 前端全栈改造清单 / 数据库架构文档），保留备查。
+- `docs/design/`：设计文档（`weekly-poster-philosophy.md` 周报海报设计哲学 + `monochrome-data-canvas.pdf` 单色数据画布）。
+- `docs/部署指南.md`：开发、生产、性能优化、监控与故障排查。
 - `docs/uploads_cleanup_guide.md`：上传目录清理指引。
-- `docs/*_legacy.md`：历史归档，仅作参考。
+- `docs/*_legacy.md`：历史归档（REFACTOR_REPORT / USAGE_GUIDE / VALIDATION_GUIDE），仅作参考。
 
 
 
@@ -398,7 +394,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 - **转化漏斗业务规则统一（5 项）**：
   - **内容平台核心指标加"成功开户"卡**：ConversionFunnel/index.tsx 在"客户开口"MetricCard 后插入"成功开户"MetricCard（`AimOutlined` + `var(--chart-color-3)`），显示 `contentMetrics.opened`（即 `fact_conv_content.是否开户` SUM）。
   - **阶段转化详情新增"阶段转化率"列**：两张 stageTable thead/tbody 在"累计人数"和"累计转化率"之间插入"阶段转化率"列。`stage.rate = 此阶段 / 上一阶段`、`stage.step_rate = 此阶段 / 顶端`，分别用不同色阶 Tag 渲染。后端 cost_analysis.py 把 contentStages + appmarketStages 全部补齐 `rate` + `step_rate` 两个语义字段，并把 list comprehension 改为显式 for 循环保证 prev_count 正确传递。
-  - **应用市场漏斗限定"渠道类型=互联网引流 + 是否新开户=1"**：app_market.py 新增 `_funnel_filters(q, filters)`（在 `_apply_filters` 后追加 `FactConvAppmarket.渠道类型 == '互联网引流'` + `FactConvAppmarket.是否新开户 == 1`），`/summary` (total + month_market + by_market 三个子查询) 和 `/funnel` 两个端点改为走 `_funnel_filters`；detail / comparison / by_channel_type 继续走 `_apply_filters` 不受影响。
+  - **应用市场漏斗限定"渠道类型=互联网引流 + 是否新开户=1"**：app_market.py 新增 `_funnel_filters(q, filters)`（在 `_apply_filters` 后追加 `FactConvAppmarket.渠道类型 == '互联网引流'` + `FactConvAppmarket.是否新开户 == 1`），`/summary` (total + month_market + by_market 三个子查询) 和 `/funnel` 两个端点改为走 `_funnel_filters`；detail / comparison / by_channel_type 继续走 `_apply_filters` 不受影响。**注：v3.1.25 起已移除 `是否新开户 == 1` 过滤，新开户改为漏斗阶段呈现**。
   - **内容平台漏斗排除存量客户仅看新开户**：cost_analysis.py 的 `cq` 查询在 `平台来源.in_(platforms)` 后追加 `or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))`，让聚合口径只看新开户。
   - **应用市场 9 阶段文案同步 + Reports/AppMarket/Funnel.tsx 口径/样式与转化漏斗页对齐**：appmarketStages 显式插入"新开户"阶段（`stage_cols.insert(6, ('新开户', FactConvAppmarket.是否新开户))`）；Funnel.tsx 加 `useLogScale`，详情卡从 `div.funnelList` 改为 `table.stageTable + colNum`（同 ConversionFunnel 风格），文案升级到 9 阶段并标注 `_funnel_filters` 业务限制；AppMarket/index.module.scss 追加 `.stageTable + .colNum` 样式块。
 
