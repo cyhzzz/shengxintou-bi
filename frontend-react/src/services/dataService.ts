@@ -168,6 +168,23 @@ export const dataService = {
   }>> => {
     return http.get('/version/local');
   },
+
+  // v3.3.6 抖音青鸟线索通对账
+  getDouyinQingniaoMatch: async (params: {
+    start_date?: string;
+    end_date?: string;
+    date_tolerance_days?: number;
+    normalization_scheme?: 'A' | 'B' | 'C';
+  }) => {
+    return http.post('/data-reconciliation/douyin-qingniao/match', params);
+  },
+  getDouyinQingniaoDateRange: async () => {
+    return http.get('/data-reconciliation/douyin-qingniao/date-range');
+  },
+  // 查询导入任务状态（用于「导入青鸟数据」按钮轮询）
+  getDouyinQingniaoImportStatus: async (taskId: string) => {
+    return http.get(`/status/${taskId}`);
+  },
 };
 
 // 应用市场专项报表（v2.1）

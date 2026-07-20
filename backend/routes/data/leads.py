@@ -223,6 +223,16 @@ def get_anchor_clusters():
     PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
     SPLIT_PATTERN = re.compile(r"[,，;；、]+")
 
+    # v3.3.6: 平台归一化 — 把正则抽出的引流平台映射到 fact_conv_content.平台来源 的实际值
+    # 数据库 平台来源 字段只有「腾讯/抖音/小红书/财联社/yj/快手/高德」，没有「视频号」/「微信」
+    # 但「视频号引流-XXX」/「微信引流-XXX」的记录在数据库中都归在 平台来源='腾讯' 下
+    # 若不归一化，前端筛选项会出现「视频号」但用 平台来源.in_(['视频号']) 过滤会命中 0 行
+    PLATFORM_NORMALIZE = {
+        '视频号': '腾讯',
+        '视频号直播': '腾讯',
+        '微信': '腾讯',
+    }
+
     agg_map = {}
     for r in rows:
         src = (r.客户来源 or "").strip()
@@ -235,6 +245,8 @@ def get_anchor_clusters():
             if not m:
                 continue
             anchor_platform = m.group(1)
+            # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
+            anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
             raw_anchor_name = m.group(2).strip()
             if not raw_anchor_name:
                 continue

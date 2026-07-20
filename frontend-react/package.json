@@ -25,6 +25,8 @@
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
     "@ant-design/icons": "^6.1.0",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "antd": "^6.3.2",
     "dayjs": "^1.11.19",
     "echarts": "^6.0.0",
@@ -37,6 +39,7 @@
     "react-router-dom": "^7.13.1",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
+    "rollup": "^4.62.2",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, Button, Space, Typography, Alert } from 'antd';
 import { ReloadOutlined, HomeOutlined, BugOutlined } from '@ant-design/icons';
 import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom';
 
 const { Title, Paragraph, Text } = Typography;
+
+// chunk load error 自动重载防抖 key（5 秒窗口内只自动重载一次，避免死循环）
+const RELOAD_KEY = 'route_error_boundary_last_reload';
 
 const RouteErrorBoundary: React.FC = () => {
   const error = useRouteError();
@@ -14,6 +17,7 @@ const RouteErrorBoundary: React.FC = () => {
   let description = '页面加载过程中出现错误，请刷新或重试。';
   let technical = '';
   let isReloadable = true;
+  let isChunkLoadError = false;
 
   if (isRouteErrorResponse(error)) {
     const status = error.status;
@@ -29,6 +33,7 @@ const RouteErrorBoundary: React.FC = () => {
   } else if (error instanceof Error) {
     // chunkLoadError / Failed to fetch dynamically imported module 等
     if (/Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i.test(error.message)) {
+      isChunkLoadError = true;
       title = '资源版本不匹配，需重新加载';
       description = '前端资源 hash 已变更，原本打开的页面资源已不存在。点击下方【刷新本页】重试或【返回首页】。';
       technical = error.message;
@@ -38,6 +43,22 @@ const RouteErrorBoundary: React.FC = () => {
   } else {
     technical = String(error);
   }
+
+  // 自动重载：检测到 chunk load error 时，5 秒窗口内只自动重载一次（避免死循环）
+  useEffect(() => {
+    if (!isChunkLoadError) return;
+    try {
+      const now = Date.now();
+      const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+      if (now - last > 5000) {
+        sessionStorage.setItem(RELOAD_KEY, String(now));
+        // 保留当前 URL，整页刷新拉取最新资源
+        window.location.reload();
+      }
+    } catch (e) {
+      // sessionStorage 不可用时静默降级到手动刷新
+    }
+  }, [isChunkLoadError]);
 
   const handleReload = () => {
     if (typeof window !== 'undefined') {

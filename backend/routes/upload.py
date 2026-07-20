@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 省心投 BI - 文件上传API接口（v2 - 新表原样导入）
 
@@ -40,6 +40,7 @@ DATA_TYPES = {
     'vendor_daily':         '厂商广告投放分析',
     'xhs_note':             '小红书笔记',
     'channel_open':         '开户渠道分析',
+    'qingniao_leads':       '抖音青鸟线索通',
 }
 
 # v1 已退役数据类型（保留识别名但返回 410）
@@ -373,4 +374,5 @@ def _target_tables(data_type: str):
         'vendor_daily':         ['agg_vendor_daily'],
         'xhs_note':             ['agg_xhs_note'],
         'channel_open':         ['agg_daily_channel_open'],
+        'qingniao_leads':       ['fact_qingniao_leads'],
     }.get(data_type, [])
