@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, Button, Space, Table, Modal, message, Alert } from 'antd';
-import { CloudUploadOutlined, CloudDownloadOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import BackupProgress from './components/BackupProgress';
 import VersionUpdateModal from './components/VersionUpdateModal';
 import { http } from '@/services/http';
@@ -52,8 +52,8 @@ const DatabaseBackupPage: React.FC = () => {
 
   const checkVersion = useCallback(async () => {
     try {
-      const response = await http.get<VersionCompareResponse['data']>('/version/compare');
-      if (response.success && response.data?.needs_update) {
+      const response = await http.get<VersionCompareResponse>('/version/compare');
+      if (response.success && response.data?.has_update) {
         setVersionInfo({
           message: response.data.message || '',
           cloudVersion: response.data.cloud_version,
@@ -84,21 +84,22 @@ const DatabaseBackupPage: React.FC = () => {
   const startPolling = (taskId: string) => {
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const response = await http.get<WebdavProgressResponse['data']>(
+        const response = await http.get<WebdavProgressResponse>(
           `/webdav/progress/${taskId}`
         );
         if (response.success && response.data) {
+          const data = response.data;
           setProgress({
-            status: response.data.status,
-            progress: response.data.progress,
-            message: response.data.message,
+            status: data.status,
+            progress: data.progress,
+            message: data.message || '',
           });
 
-          if (response.data.status === 'completed' || response.data.status === 'failed') {
+          if (data.status === 'completed' || data.status === 'failed') {
             stopPolling();
             setTimeout(() => {
               setProgressVisible(false);
-              if (response.data.status === 'completed') {
+              if (data.status === 'completed') {
                 message.success('操作完成');
               }
               loadBackupList();

@@ -26,31 +26,26 @@ export const customMutator = async <T>(config: OrvalRequestConfig): Promise<ApiR
   const requestConfig = headers ? { headers } : undefined;
 
   // 根据 HTTP 方法调用对应的 http 方法
+  // http.* 返回 ApiResponse<T>，与 SuccessResponse 在结构上等价（success/data/error/message）
   switch (method) {
     case 'GET':
-      // get<T>(url, params?, config?)
-      return http.get<T>(url, params, requestConfig);
+      return http.get<T>(url, params, requestConfig) as unknown as ApiResponse<T>;
 
     case 'POST':
-      // post<T>(url, data?, config?)
-      return http.post<T>(url, data, requestConfig);
+      return http.post<T>(url, data, requestConfig) as unknown as ApiResponse<T>;
 
     case 'PUT':
-      // put<T>(url, data?, config?)
-      return http.put<T>(url, data, requestConfig);
+      return http.put<T>(url, data, requestConfig) as unknown as ApiResponse<T>;
 
     case 'DELETE':
-      // delete<T>(url, config?)
-      return http.delete<T>(url, requestConfig);
+      return http.delete<T>(url, requestConfig) as unknown as ApiResponse<T>;
 
     case 'PATCH':
-      // 使用基础 request 方法
-      // request<T>(url, config)
       return http.request<T>(url, {
         method: 'PATCH',
         body: data ? JSON.stringify(data) : undefined,
         ...(headers ? { headers } : {}),
-      });
+      }) as unknown as ApiResponse<T>;
 
     default:
       throw new Error(`Unsupported HTTP method: ${method}`);

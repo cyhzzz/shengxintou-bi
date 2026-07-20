@@ -42,6 +42,14 @@ export interface CoreMetrics {
   customer_contribution?: number;
   /** 存量客户资产 */
   existing_customers_assets?: number;
+  /** 企微线索数（内容平台） */
+  leads_wechat?: number;
+  /** APP激活数（应用市场） */
+  leads_app?: number;
+  /** 企微线索成本 */
+  cost_per_wechat_lead?: number;
+  /** APP激活成本 */
+  cost_per_app_activation?: number;
 }
 
 /**
@@ -219,6 +227,38 @@ export interface LeadsDetailItem {
   is_valid_lead?: boolean;
   is_opened_account?: boolean;
   is_valid_customer?: boolean;
+  // 补充字段（线索明细页面使用）
+  opening_branch?: string | null;
+  customer_gender?: string | null;
+  traffic_type?: string | null;
+  customer_source?: string | null;
+  is_customer_mouth?: boolean | null;
+  is_open_account_interrupted?: boolean | null;
+  open_account_interrupted_date?: string | null;
+  is_existing_customer?: boolean | null;
+  is_existing_valid_customer?: boolean | null;
+  is_delete_enterprise_wechat?: boolean | null;
+  first_contact_time?: string | null;
+  last_contact_time?: string | null;
+  account_opening_time?: string | null;
+  wechat_verify_status?: string | null;
+  wechat_verify_time?: string | null;
+  valid_customer_time?: string | null;
+  ad_click_date?: string | null;
+  interaction_count?: number | null;
+  sales_interaction_count?: number | null;
+  assets?: number | null;
+  customer_contribution?: number | null;
+  add_employee_no?: string | null;
+  add_employee_name?: string | null;
+  ad_id?: string | null;
+  creative_id?: string | null;
+  note_id?: string | null;
+  note_title?: string | null;
+  platform_user_id?: string | null;
+  platform_user_nickname?: string | null;
+  producer?: string | null;
+  enterprise_wechat_tags?: string | null;
 }
 
 export type LeadsDetailResponseAllOfData = {
@@ -332,6 +372,7 @@ export interface AccountMapping {
   account_name?: string;
   main_account_id?: string;
   agency?: string;
+  agency_short?: string;
   business_model?: AccountMappingBusinessModel;
   created_at?: string;
   updated_at?: string;
@@ -511,7 +552,7 @@ export interface EmployeeConversionAnalysisData {
 /**
  * 员工转化分析响应
  */
-export interface EmployeeConversionAnalysisResponse extends SuccessResponse {
+export interface EmployeeConversionAnalysisResponse extends Omit<SuccessResponse, 'data'> {
   data?: EmployeeConversionAnalysisData;
 }
 
@@ -550,7 +591,7 @@ export interface EmployeeConversionWeeklyData {
 /**
  * 员工转化周报响应
  */
-export interface EmployeeConversionWeeklyResponse extends SuccessResponse {
+export interface EmployeeConversionWeeklyResponse extends Omit<SuccessResponse, 'data'> {
   data?: EmployeeConversionWeeklyData;
 }
 
@@ -790,6 +831,10 @@ export interface XhsCreatorConversionItem {
   opened_account_users?: number;
   /** 有效户用户数 */
   valid_customer_users?: number;
+  /** 总花费（与内容表口径一致，合并展示用） */
+  total_cost?: number;
+  /** 总曝光数（与内容表口径一致，合并展示用） */
+  total_impressions?: number;
 }
 
 /**
@@ -1019,4 +1064,43 @@ export interface XhsOperationAnalysisData {
   /** 员工周转化率趋势 */
   employee_weekly_conversion?: XhsEmployeeWeeklyConversion;
 }
+
+// ============================================
+// 数据库备份 / 版本更新（System/DatabaseBackup 用）
+// ============================================
+
+/** WebDAV 备份文件 */
+export interface WebdavBackupFile {
+  /** 文件名 */
+  filename: string;
+  /** 文件大小（字节） */
+  size: number;
+  /** 上传时间（ISO 字符串） */
+  last_modified: string;
+}
+
+/** WebDAV 备份/恢复进度响应 */
+export interface WebdavProgressResponse {
+  /** 任务状态：uploading | downloading | done | error */
+  status: string;
+  /** 进度 0-100 */
+  progress: number;
+  /** 当前消息 */
+  message?: string;
+}
+
+/** 版本对比响应 */
+export interface VersionCompareResponse {
+  /** 是否有新版本 */
+  has_update: boolean;
+  /** 云端版本号 */
+  cloud_version?: string;
+  /** 当前本地版本号 */
+  local_version?: string;
+  /** 更新说明 */
+  message?: string;
+  /** 支持联系方式 */
+  support_contact?: string;
+}
+
 

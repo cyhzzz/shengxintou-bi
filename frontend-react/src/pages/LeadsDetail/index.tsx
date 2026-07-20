@@ -55,7 +55,6 @@ const LeadsDetailPage: React.FC = () => {
 
   // 筛选选项（从API加载）
   const [platformOptions, setPlatformOptions] = useState<FilterOption[]>([]);
-  const [agencyOptions, setAgencyOptions] = useState<FilterOption[]>([]);
   const [employeeOptions, setEmployeeOptions] = useState<FilterOption[]>([]);
 
   // 开户状态选项（固定）
@@ -76,14 +75,13 @@ const LeadsDetailPage: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<LeadsDetailItem | null>(null);
 
-  // 使用 ref 来追踪是否需要触发查询
-  const shouldFetchRef = useRef(false);
   // 使用 ref 来存储最新的筛选条件
   const filtersRef = useRef({
     page: 1,
     pageSize: 20,
     dateRange: ['2026-01-01', '2026-12-31'] as [string, string],
-    platform: '',
+    platforms: [] as string[],
+    agencies: [] as string[],
     employeeName: '',
     isOpenedAccount: '',
   });
@@ -92,11 +90,10 @@ const LeadsDetailPage: React.FC = () => {
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        const response: FilterOptionsResponse = await http.get('/leads-detail/filter-options');
+        const response = await http.get('/leads-detail/filter-options') as unknown as FilterOptionsResponse;
         if (response.success && response.data) {
           // 添加"全部"选项
           setPlatformOptions(response.data.platforms || []);
-          setAgencyOptions(response.data.agencies || []);
           setEmployeeOptions([
             { value: '', label: '全部' },
             ...response.data.employees
@@ -148,7 +145,7 @@ const LeadsDetailPage: React.FC = () => {
         params.is_opened_account = false;
       }
 
-      const response: LeadsDetailResponse = await getLeadsDetail(params);
+      const response = await getLeadsDetail(params) as unknown as LeadsDetailResponse;
 
       if (response.success && response.data) {
         setData(response.data.items || []);
@@ -267,7 +264,7 @@ const LeadsDetailPage: React.FC = () => {
         params.is_opened_account = false;
       }
 
-      const response: LeadsDetailResponse = await getLeadsDetail(params);
+      const response = await getLeadsDetail(params) as unknown as LeadsDetailResponse;
 
       if (response.success && response.data) {
         const items = response.data.items || [];
@@ -400,7 +397,7 @@ const LeadsDetailPage: React.FC = () => {
   };
 
   // 渲染状态标签
-  const renderStatusTag = (value?: boolean) => {
+  const renderStatusTag = (value?: boolean | null) => {
     if (value === true) {
       return <Tag color="success">是</Tag>;
     } else if (value === false) {

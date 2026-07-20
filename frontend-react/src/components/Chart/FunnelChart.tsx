@@ -9,7 +9,8 @@
  * - antd-charts v2.6.7 + antv g2 v5 修复了旧版的 conversionTag.style 抛错
  * - 但即便偶发报错（数据缺字段 / props 类型不兼容），用户感知到的是 CSS 横条，不会白屏
  */
-import React, { Component, ReactNode, useEffect, useRef, useState } from 'react';
+import React, { Component, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Card, Empty, Tag, Tooltip } from 'antd';
 import { ArrowDownOutlined } from '@ant-design/icons';
 import FunnelChartAntd from '@ant-design/plots/es/components/funnel';

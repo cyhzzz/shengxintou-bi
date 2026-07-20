@@ -31,7 +31,8 @@ import type {
   SuccessResponse,
   TrendResponse,
   UploadResponse,
-  XhsNotesListResponse
+  XhsNotesListResponse,
+  XhsOperationAnalysisData
 } from './api.schemas';
 
 import { customMutator } from '../services/orvalMutator';

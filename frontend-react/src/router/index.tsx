@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
-import { lazy, Suspense, ReactNode } from 'react';
+import { lazy, Suspense } from 'react';
+import type { ReactNode } from 'react';
 import MainLayout from '@/layouts/MainLayout';
 
 // v3.2.5：所有页面改 React.lazy 按需加载，主包只保留 MainLayout，

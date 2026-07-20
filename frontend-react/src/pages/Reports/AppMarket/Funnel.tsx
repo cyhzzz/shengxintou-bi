@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Select, DatePicker, Space, Spin, Tag, Button } from 'antd';
-import { BankOutlined, CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';

@@ -95,7 +95,6 @@ const TrendChart: React.FC<TrendChartProps> = ({
   loading = false,
   height = 350,
   showControls = true,
-  title = '趋势分析',
   onMetricTypeChange,
   onGranularityChange,
 }) => {
@@ -129,7 +128,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
   const echartsOption = useMemo((): EChartsOption => {
     // 提取所有日期和类别
     const allDates = [...new Set(data.map(item => item.date))].sort();
-    const categories = [...new Set(data.map(item => item.category).filter(Boolean))];
+    const categories: string[] = [...new Set(data.map(item => item.category).filter((c): c is string => Boolean(c)))];
 
     // 构建系列数据
     const seriesData: Record<string, { date: string; value: number }[]> = {};
@@ -280,7 +279,7 @@ const TrendChart: React.FC<TrendChartProps> = ({
           },
         },
       },
-      series,
+      series: series as any,
       grid: {
         left: '3%',
         right: '4%',

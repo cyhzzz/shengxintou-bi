@@ -20,7 +20,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
-import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
+import { pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
@@ -41,6 +41,7 @@ interface FlattenedSummaryItem {
   platform: string;
   business_model: string;
   agency: string;
+  agency_short?: string;
   is_subtotal?: boolean;
   is_total?: boolean;
   cost: number;
