@@ -18,7 +18,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Button, Card, DatePicker, Empty, message, Segmented, Select, Space, Spin,
+  Button, Card, DatePicker, Empty, Input, message, Modal, Segmented, Select, Space, Spin,
   Table, Tag, Tooltip, Typography, Upload,
 } from 'antd';
 import type { UploadProps } from 'antd';
@@ -71,6 +71,14 @@ interface DateRangeResp {
   total: number;
 }
 
+// v3.3.6：批次列表项
+interface BatchItem {
+  batch_tag: string;
+  total: number;
+  min_date: string | null;
+  max_date: string | null;
+}
+
 const STATUS_TAG_COLOR: Record<ReconcileRecord['状态'], string> = {
   '正确': 'success',
   '疑似漏打标': 'warning',
@@ -88,14 +96,8 @@ const STATUS_ICON: Record<ReconcileRecord['状态'], React.ReactNode> = {
 const TOLERANCE_OPTIONS = [
   { label: '±0 天（严格匹配）', value: 0 },
   { label: '±1 天', value: 1 },
-  { label: '±3 天（推荐）', value: 3 },
-  { label: '±7 天（兼容节假日）', value: 7 },
-];
-
-const NORMALIZATION_OPTIONS = [
-  { label: '方案 A：剥 emoji + 零宽 + NFC（推荐）', value: 'A' },
-  { label: '方案 B：剥零宽 + NFC（不处理 emoji）', value: 'B' },
-  { label: '方案 C：原样 + 小写（基线对照）', value: 'C' },
+  { label: '±3 天', value: 3 },
+  { label: '±7 天（推荐，兼容节假日）', value: 7 },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -108,8 +110,7 @@ const STATUS_FILTER_OPTIONS = [
 
 const DouyinQingniaoReconciliationPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
-  const [toleranceDays, setToleranceDays] = useState<number>(3);
-  const [scheme, setScheme] = useState<'A' | 'B' | 'C'>('A');
+  const [toleranceDays, setToleranceDays] = useState<number>(7);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const [records, setRecords] = useState<ReconcileRecord[]>([]);
@@ -118,10 +119,19 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [dateRangeInfo, setDateRangeInfo] = useState<DateRangeResp | null>(null);
 
+  // v3.3.6：批次标注
+  const [batchList, setBatchList] = useState<BatchItem[]>([]);
+  const [selectedBatchTag, setSelectedBatchTag] = useState<string | undefined>(undefined);
+  // 导入弹窗：用户输入批次标注
+  const [batchInputOpen, setBatchInputOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [batchInputValue, setBatchInputValue] = useState<string>('');
+
   // 拉青鸟侧日期范围用于默认填充
-  const loadDateRange = async () => {
+  // v3.3.6：传入 batchTag 时只统计该批次；不传时统计全部
+  const loadDateRange = async (batchTag?: string) => {
     try {
-      const res: any = await dataService.getDouyinQingniaoDateRange();
+      const res: any = await dataService.getDouyinQingniaoDateRange(batchTag);
       const d = res?.data || res;
       if (d?.has_data && d.min_date && d.max_date) {
         setDateRangeInfo(d);
@@ -134,9 +144,36 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { loadDateRange(); }, []);
+  // v3.3.6：拉批次列表
+  const loadBatches = async (): Promise<BatchItem[]> => {
+    try {
+      const res: any = await dataService.getDouyinQingniaoBatches();
+      const d = res?.data || res;
+      const items: BatchItem[] = d?.items || [];
+      setBatchList(items);
+      return items;
+    } catch (e) {
+      return [];
+    }
+  };
 
-  // 导入青鸟数据：上传后轮询 status，完成后自动触发对账
+  useEffect(() => {
+    (async () => {
+      const items = await loadBatches();
+      // 默认选中最新批次（batches 端点按 first_id DESC 返回，第一条为最新）
+      const latest = items[0]?.batch_tag;
+      if (latest) {
+        setSelectedBatchTag(latest);
+        await loadDateRange(latest);
+      } else {
+        await loadDateRange();
+      }
+    })();
+  }, []);
+
+  // 导入青鸟数据：v3.3.6 改两步式
+  //   1) beforeUpload 拦截文件，弹 Modal 让用户输入批次标注（默认 YYYYMMDDHHmm）
+  //   2) 用户确认后开始真正上传，上传时把 batch_tag 一起带到 FormData
   const importProps: UploadProps = {
     accept: '.xlsx,.xls',
     showUploadList: false,
@@ -148,86 +185,96 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
         message.error('仅支持 .xlsx / .xls 格式');
         return Upload.LIST_IGNORE;
       }
-      return true;
+      // 弹窗让用户输入批次标注，默认填当前时间
+      setPendingFile(file as File);
+      setBatchInputValue(dayjs().format('YYYYMMDDHHmm'));
+      setBatchInputOpen(true);
+      // 返回 Upload.LIST_IGNORE 阻止 antd 自动上传，由 customRequest 手动触发
+      return Upload.LIST_IGNORE;
     },
-    customRequest: async (options) => {
-      const { file, onSuccess, onError } = options;
-      setUploading(true);
-      try {
-        // 1. 上传文件（异步接口，立即返回 task_id）
-        const upRes = await uploadService.uploadFile(file as File, 'qingniao_leads' as any, true);
-        if (!upRes?.success) {
-          message.error(upRes?.message || '上传请求失败');
-          onError?.(new Error(upRes?.message || '上传失败'));
-          return;
-        }
-        const taskId = (upRes.data as any)?.task_id;
-        if (!taskId) {
-          message.error('上传响应缺少 task_id');
-          onError?.(new Error('上传响应缺少 task_id'));
-          return;
-        }
+    // 实际不会被 antd 调用（beforeUpload 返回 LIST_IGNORE），customRequest 仅作为占位
+    customRequest: () => {},
+  };
 
-        // 2. 轮询 status 直到 completed / failed（最多等 60s）
-        const maxAttempts = 60;
-        const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-        let finalStatus: any = null;
-        for (let i = 0; i < maxAttempts; i++) {
-          await delay(1000);
-          const stRes: any = await dataService.getDouyinQingniaoImportStatus(taskId);
-          const d = stRes?.data || stRes;
-          if (!d) continue;
-          finalStatus = d;
-          if (d.status === 'completed' || d.status === 'failed') break;
-        }
-
-        if (!finalStatus || finalStatus.status !== 'completed') {
-          const errMsg = finalStatus?.message || '导入超时或失败';
-          message.error(`导入失败：${errMsg}`);
-          onError?.(new Error(errMsg));
-          return;
-        }
-
-        message.success(`导入成功，共 ${finalStatus.total_rows ?? 0} 行`);
-
-        // 3. 刷新日期范围（拿到刚导入数据的实际日期范围）
-        await loadDateRange();
-
-        // 4. 自动触发对账（用刚导入数据的日期范围）
-        //    此时 dateRange state 尚未更新，直接调用 handleMatch 会用旧值，
-        //    所以这里改为手动传入最新日期范围触发对账
-        const rangeRes: any = await dataService.getDouyinQingniaoDateRange();
-        const rd = rangeRes?.data || rangeRes;
-        if (rd?.has_data && rd.min_date && rd.max_date) {
-          const newRange: [Dayjs, Dayjs] = [dayjs(rd.min_date), dayjs(rd.max_date)];
-          setDateRange(newRange);
-          await runMatchWithRange(newRange, toleranceDays, scheme);
-        }
-
-        onSuccess?.({}, new XMLHttpRequest());
-      } catch (e: any) {
-        message.error(e?.message || '导入请求异常');
-        onError?.(e);
-      } finally {
-        setUploading(false);
+  // 真正执行上传的逻辑（弹窗确认后调用）
+  const doUpload = async () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    const batchTag = batchInputValue.trim() || dayjs().format('YYYYMMDDHHmm');
+    setBatchInputOpen(false);
+    setPendingFile(null);
+    setUploading(true);
+    try {
+      // 1. 上传文件（异步接口，立即返回 task_id）+ 带 batch_tag
+      const upRes = await uploadService.uploadFile(file, 'qingniao_leads' as any, true, batchTag);
+      if (!upRes?.success) {
+        message.error(upRes?.message || '上传请求失败');
+        return;
       }
-    },
+      const taskId = (upRes.data as any)?.task_id;
+      if (!taskId) {
+        message.error('上传响应缺少 task_id');
+        return;
+      }
+
+      // 2. 轮询 status 直到 completed / failed（最多等 60s）
+      const maxAttempts = 60;
+      const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+      let finalStatus: any = null;
+      for (let i = 0; i < maxAttempts; i++) {
+        await delay(1000);
+        const stRes: any = await dataService.getDouyinQingniaoImportStatus(taskId);
+        const d = stRes?.data || stRes;
+        if (!d) continue;
+        finalStatus = d;
+        if (d.status === 'completed' || d.status === 'failed') break;
+      }
+
+      if (!finalStatus || finalStatus.status !== 'completed') {
+        const errMsg = finalStatus?.message || '导入超时或失败';
+        message.error(`导入失败：${errMsg}`);
+        return;
+      }
+
+      message.success(`导入成功，共 ${finalStatus.total_rows ?? 0} 行（批次：${batchTag}）`);
+
+      // 3. 刷新批次列表 + 选中本次批次 + 拉该批次日期范围
+      await loadBatches();
+      setSelectedBatchTag(batchTag);
+      await loadDateRange(batchTag);
+
+      // 4. 自动触发对账（用刚导入批次的日期范围 + batch_tag 过滤）
+      const rangeRes: any = await dataService.getDouyinQingniaoDateRange(batchTag);
+      const rd = rangeRes?.data || rangeRes;
+      if (rd?.has_data && rd.min_date && rd.max_date) {
+        const newRange: [Dayjs, Dayjs] = [dayjs(rd.min_date), dayjs(rd.max_date)];
+        setDateRange(newRange);
+        await runMatchWithRange(newRange, toleranceDays, batchTag);
+      }
+    } catch (e: any) {
+      message.error(e?.message || '导入请求异常');
+    } finally {
+      setUploading(false);
+    }
   };
 
   // 共用的对账请求逻辑（手动传入日期范围，避免 state 更新延迟问题）
+  // v3.3.6：支持 batch_tag 过滤，不传时查全表
   const runMatchWithRange = async (
     range: [Dayjs, Dayjs],
     tolerance: number,
-    schemeVal: 'A' | 'B' | 'C',
+    batchTag?: string,
   ) => {
     setLoading(true);
     try {
-      const params = {
+      const params: any = {
         start_date: range[0].format('YYYY-MM-DD'),
         end_date: range[1].format('YYYY-MM-DD'),
         date_tolerance_days: tolerance,
-        normalization_scheme: schemeVal,
       };
+      if (batchTag) {
+        params.batch_tag = batchTag;
+      }
       const res: any = await dataService.getDouyinQingniaoMatch(params);
       const d = res?.data || res;
       if (d?.records && d?.summary) {
@@ -251,7 +298,30 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       message.warning('请选择日期范围');
       return;
     }
-    await runMatchWithRange(dateRange, toleranceDays, scheme);
+    await runMatchWithRange(dateRange, toleranceDays, selectedBatchTag);
+  };
+
+  // v3.3.6：切换批次时刷新日期范围 + 重新对账
+  // tag 为 undefined 时表示清空批次过滤（查全部）
+  const handleBatchChange = async (tag?: string) => {
+    setSelectedBatchTag(tag);
+    await loadDateRange(tag);
+    if (tag) {
+      const rangeRes: any = await dataService.getDouyinQingniaoDateRange(tag);
+      const rd = rangeRes?.data || rangeRes;
+      if (rd?.has_data && rd.min_date && rd.max_date) {
+        const newRange: [Dayjs, Dayjs] = [dayjs(rd.min_date), dayjs(rd.max_date)];
+        setDateRange(newRange);
+        await runMatchWithRange(newRange, toleranceDays, tag);
+      } else {
+        setRecords([]);
+        setSummary(null);
+      }
+    } else {
+      // 清空批次 → 清空对账结果，等用户点「开始对账」
+      setRecords([]);
+      setSummary(null);
+    }
   };
 
   const filteredRecords = useMemo(() => {
@@ -268,7 +338,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       '青鸟线索ID', '青鸟昵称', '青鸟日期', '企微昵称', '线索日期',
       '后台是否开口', '后台是否有效', '后台是否开户',
       '青鸟是否开口', '青鸟是否有效', '青鸟是否开户',
-      '状态', '差异详情', '客户来源', '添加员工姓名',
+      '状态', '差异详情', '客户来源', '添加员工姓名', '批次标注',
     ];
     const rows = filteredRecords.map(r => [
       r.青鸟线索ID, r.青鸟昵称 ?? '', r.青鸟日期 ?? '',
@@ -276,6 +346,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       r.后台是否开口 ?? '', r.后台是否有效 ?? '', r.后台是否开户 ?? '',
       r.青鸟是否开口, r.青鸟是否有效, r.青鸟是否开户,
       r.状态, r.差异详情 ?? '', r.客户来源 ?? '', r.添加员工姓名 ?? '',
+      selectedBatchTag ?? '',
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(cell => {
@@ -289,7 +360,9 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `抖音青鸟对账_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+    // v3.3.6：文件名含 batch_tag 便于多次对账区分
+    const tagSuffix = selectedBatchTag ? `_${selectedBatchTag}` : '';
+    a.download = `抖音青鸟对账${tagSuffix}_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -381,6 +454,17 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       <FadeInSection duration={1.0} delay={0}>
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space size="middle" wrap>
+            <Select
+              placeholder="选择导入批次"
+              value={selectedBatchTag}
+              onChange={handleBatchChange}
+              style={{ width: 220 }}
+              allowClear
+              options={batchList.map(b => ({
+                value: b.batch_tag,
+                label: `${b.batch_tag}（${b.total} 条${b.min_date ? ` · ${b.min_date}~${b.max_date}` : ''}）`,
+              }))}
+            />
             <RangePicker
               value={dateRange as any}
               onChange={(v) => setDateRange(v as [Dayjs, Dayjs] | null)}
@@ -392,12 +476,6 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
               onChange={setToleranceDays}
               options={TOLERANCE_OPTIONS}
               style={{ width: 220 }}
-            />
-            <Select
-              value={scheme}
-              onChange={(v) => setScheme(v as 'A' | 'B' | 'C')}
-              options={NORMALIZATION_OPTIONS}
-              style={{ width: 320 }}
             />
             <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={handleMatch}>
               开始对账
@@ -417,9 +495,12 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
           </Space>
           {dateRangeInfo && (
             <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-              青鸟数据日期范围：{dateRangeInfo.has_data
+              {selectedBatchTag
+                ? `批次「${selectedBatchTag}」日期范围：`
+                : '青鸟数据日期范围（全部批次）：'}
+              {dateRangeInfo.has_data
                 ? `${dateRangeInfo.min_date} ~ ${dateRangeInfo.max_date}（共 ${dateRangeInfo.total} 条）`
-                : '暂无青鸟数据，请先在「数据导入」中上传青鸟线索通导出 Excel'}
+                : '暂无数据，请先点击「导入青鸟数据」上传青鸟线索通导出 Excel'}
             </div>
           )}
         </Card>
@@ -534,6 +615,41 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
           ]}
         />
       </FadeInSection>
+
+      {/* v3.3.6：导入批次标注输入弹窗 */}
+      <Modal
+        title="导入青鸟数据 - 批次标注"
+        open={batchInputOpen}
+        onOk={doUpload}
+        onCancel={() => {
+          setBatchInputOpen(false);
+          setPendingFile(null);
+        }}
+        okText="确认导入"
+        cancelText="取消"
+        okButtonProps={{ disabled: uploading }}
+        confirmLoading={uploading}
+        maskClosable={false}
+      >
+        <div style={{ marginBottom: 8, color: 'var(--color-text-secondary)', fontSize: 13 }}>
+          请输入本次导入的批次标注（用于多次对账数据区分），不填则使用默认时间戳。
+          <br />
+          示例：<Text code>众联0720</Text> / <Text code>客户A-202607</Text>
+        </div>
+        <Input
+          value={batchInputValue}
+          onChange={(e) => setBatchInputValue(e.target.value)}
+          placeholder={dayjs().format('YYYYMMDDHHmm')}
+          maxLength={50}
+          onPressEnter={doUpload}
+          autoFocus
+        />
+        {pendingFile && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+            待上传文件：{pendingFile.name}（{(pendingFile.size / 1024).toFixed(1)} KB）
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

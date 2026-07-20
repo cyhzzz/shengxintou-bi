@@ -295,4 +295,5 @@ class FactQingniaoLeads(db.Model):
     微信用户首次消息 = Column(Text)                    # 「未打」/「已打」 → 对账「开口」标志
     微信用户确认意向 = Column(Text)                    # 「未打」/「已打」 → 对账「有效」标志
     开户 = Column(Text)                                # 「未打」/「已打」 → 对账「开户」标志
+    批次标注 = Column(Text, index=True)                 # v3.3.6：导入批次标注（用户输入或默认时间戳），用于多次对账数据区分
 

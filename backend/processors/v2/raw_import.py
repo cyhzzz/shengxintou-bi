@@ -273,8 +273,16 @@ HANDLERS["xhs_note"] = handle_xhs_note
 HANDLERS["channel_open"] = handle_channel_open
 
 
-def handle_qingniao_leads(path: str):
+def handle_qingniao_leads(path: str, batch_tag: str = None):
     """抖音青鸟线索通线索详情导出 -> fact_qingniao_leads（1 行=1 条青鸟回传线索）。
+
+    v3.3.6 关键改造：
+    1. 批次标注字段：每行追加 `批次标注` 列，值为 batch_tag 参数。
+       若未传 batch_tag，默认用当前时间 'YYYYMMDDHHmm'（如 '202607201430'）。
+    2. 仍走 to_sql replace（不再保留历史批次）—— 实际历史批次保留通过 upload.py 端的
+       handler 改写实现：write_to_db 对 qingniao_leads 特例使用 append + 显式 batch_tag 列。
+       这里 handler 返回的 DataFrame 已带 `批次标注` 列。
+    3. id 列从 1 自增改为不主动设置，让数据库 AUTOINCREMENT 处理（避免 append 模式下主键冲突）。
 
     原样导入，仅做格式层规范（nan->NULL、超长 ID 转字符串、日期规范化）。
     3 个标志位列保持「未打」/「已打」字符串原样入库，对账端点再做映射。
@@ -293,17 +301,21 @@ def handle_qingniao_leads(path: str):
             except Exception:
                 pass
     # 标志位列保留原样字符串「未打」/「已打」，不做转换
-    # 保留 id 列（SQLAlchemy ORM 需要 id 主键）
-    if "id" not in df.columns:
-        df = df.copy()
-        df.insert(0, "id", range(1, len(df) + 1))
-    return {"fact_qingniao_leads": df}, {"row_counts": {"fact_qingniao_leads": len(df)}}
+    # 不主动设置 id 列，让数据库 AUTOINCREMENT 处理（v3.3.6 改 append 模式后避免主键冲突）
+    if "id" in df.columns:
+        df = df.drop(columns=["id"])
+    # v3.3.6：批次标注列
+    if not batch_tag:
+        batch_tag = datetime.now().strftime('%Y%m%d%H%M')
+    df = df.copy()
+    df["批次标注"] = batch_tag
+    return {"fact_qingniao_leads": df}, {"row_counts": {"fact_qingniao_leads": len(df)}, "batch_tag": batch_tag}
 
 
 HANDLERS["qingniao_leads"] = handle_qingniao_leads
 
 
-def process(data_type: str, file_path: str) -> dict:
+def process(data_type: str, file_path: str, **kwargs) -> dict:
     """
     处理入口：data_type -> {table_name: DataFrame, ...}, meta。
 
@@ -315,14 +327,23 @@ def process(data_type: str, file_path: str) -> dict:
     """
     if data_type not in HANDLERS:
         raise ValueError(f"Unknown data_type: {data_type}. Supported: {list(HANDLERS.keys())}")
-    tables, meta = HANDLERS[data_type](file_path)
+    # v3.3.6：qingniao_leads 支持 batch_tag 参数透传
+    if data_type == "qingniao_leads":
+        tables, meta = HANDLERS[data_type](file_path, **kwargs)
+    else:
+        tables, meta = HANDLERS[data_type](file_path)
     meta["data_type"] = data_type
     return {"tables": tables, "meta": meta}
 
+def write_to_db(data_type: str, file_path: str, db_url: str = DB_URL, **kwargs) -> dict:
+    """处理并写入新表。
 
-def write_to_db(data_type: str, file_path: str, db_url: str = DB_URL) -> dict:
-    """处理并写入新表（pandas to_sql replace，新表不存在则创建）。"""
-    result = process(data_type, file_path)
+    v3.3.6 关键改造：
+    - qingniao_leads 使用 append 模式（保留历史批次数据）
+    - 其他类型继续使用 replace 模式（每次导入覆盖旧数据）
+    - qingniao_leads 支持 batch_tag 参数，附加到每行的 `批次标注` 列
+    """
+    result = process(data_type, file_path, **kwargs)
     tables = result["tables"]
     meta = result["meta"]
 
@@ -330,12 +351,17 @@ def write_to_db(data_type: str, file_path: str, db_url: str = DB_URL) -> dict:
     written = {}
     with engine.begin() as conn:
         for table_name, df in tables.items():
-            df.to_sql(table_name, con=conn, if_exists="replace", index=False)
-            # SQLite 自增主键保留
-            try:
-                conn.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"))
-            except Exception:
-                pass  # sqlite_sequence 不存在时跳过（新表无 AUTOINCREMENT）
+            # v3.3.6：qingniao_leads 用 append（保留历史批次），其他类型仍 replace
+            if data_type == "qingniao_leads":
+                # append 模式：不主动设置 id 列，让数据库 AUTOINCREMENT 处理
+                df.to_sql(table_name, con=conn, if_exists="append", index=False)
+            else:
+                df.to_sql(table_name, con=conn, if_exists="replace", index=False)
+                # SQLite 自增主键保留
+                try:
+                    conn.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"))
+                except Exception:
+                    pass  # sqlite_sequence 不存在时跳过（新表无 AUTOINCREMENT）
             cur = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
             n = cur.fetchone()[0]
             written[table_name] = n
