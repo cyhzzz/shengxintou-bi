@@ -164,7 +164,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 ├── requirements.txt
 ├── .env.example                    # 环境变量示例
 ├── version.json                    # 当前版本与变更记录
-├── AGENTS.md / CLAUDE.md           # 项目工作说明（规则 + 守则 + 架构）
+├── AGENTS.md / CLAUDE.md           # 精简 AI 规则入口（两份字节一致）
 ├── backend/
 │   ├── models.py / models_v2.py    # ORM（2 张系统表 + 8 张业务表，列名 1:1 含中文）
 │   ├── database.py                 # 单例 SQLAlchemy
@@ -187,7 +187,10 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 │   │   ├── styles/                 # tokens.css / mixins.scss / variables.scss
 │   │   └── types/                  # orval 生成的 api.ts
 │   └── public/documents/           # 7 个 v2 数据导入指南 .md
-└── docs/                           # 设计文档与部署指南
+└── docs/
+    ├── rules/                      # 当前业务/前后端/测试规则、工作流与 TECH_SPEC 模板
+    ├── design/                     # 当前视觉设计资料
+    └── _archive/                   # 历史规划与过期架构
 ```
 
 ## 开发验证与文档
@@ -213,6 +216,8 @@ npm run test:report
 
 ### 文档索引
 
+- [docs/rules/README.md](docs/rules/README.md)：AI 与开发者规则导航、权威源和按任务阅读地图。
+- [docs/6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md](docs/6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md)：跨平台、跨 Agent、非破坏式项目建规指令。
 - [docs/部署指南.md](docs/部署指南.md)：开发、生产、性能优化、监控与故障排查。
 - [docs/design/weekly-poster-philosophy.md](docs/design/weekly-poster-philosophy.md)：周报海报设计哲学。
 - [docs/design/monochrome-data-canvas.pdf](docs/design/monochrome-data-canvas.pdf)：单色数据画布设计稿。

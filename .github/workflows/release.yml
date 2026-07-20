@@ -86,15 +86,16 @@ jobs:
           # 运行时必需文件
           Copy-Item -Path app.py, config.py, launcher.py, requirements.txt, version.json, AGENTS.md, CLAUDE.md, LICENSE, README.md, .env.example, 省心投启动器.spec, 省心投-开发版.spec, build.bat -Destination $stage -Force
           Copy-Item -Path backend -Destination $stage -Recurse -Force
+          New-Item -ItemType Directory -Force -Path $stage/docs | Out-Null
+          Copy-Item -Path docs/rules -Destination $stage/docs/rules -Recurse -Force
           Copy-Item -Path frontend-react/dist -Destination $stage/frontend-react/dist -Recurse -Force
           if (Test-Path icon) { Copy-Item -Path icon -Destination $stage -Recurse -Force }
           if (Test-Path frontend-react/public) { Copy-Item -Path frontend-react/public -Destination $stage/frontend-react/public -Recurse -Force }
           # PyInstaller 产物
           Copy-Item -Path "dist/省心投启动器.exe" -Destination $stage -Force
           # 一键安装脚本（让最终用户也能 `npm run setup` 装运行时依赖）
-          Copy-Item -Path scripts/setup.bat, scripts/setup.sh, scripts/setup.py, scripts/setup.mjs -Destination $stage/scripts -Force
           New-Item -ItemType Directory -Force -Path $stage/scripts | Out-Null
-          Copy-Item -Path scripts/setup.bat, scripts/setup.sh, scripts/setup.py, scripts/setup.mjs -Destination $stage/scripts -Force
+          Copy-Item -Path scripts/setup.bat, scripts/setup.sh, scripts/setup.py, scripts/setup.mjs, scripts/check_rule_architecture.py -Destination $stage/scripts -Force
           # 打包
           $zipPath = "shengxintou-bi-$v-windows.zip"
           Compress-Archive -Path "$stage/*" -DestinationPath $zipPath -CompressionLevel Optimal

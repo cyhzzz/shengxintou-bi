@@ -279,9 +279,9 @@ def handle_qingniao_leads(path: str, batch_tag: str = None):
     v3.3.6 关键改造：
     1. 批次标注字段：每行追加 `批次标注` 列，值为 batch_tag 参数。
        若未传 batch_tag，默认用当前时间 'YYYYMMDDHHmm'（如 '202607201430'）。
-    2. 仍走 to_sql replace（不再保留历史批次）—— 实际历史批次保留通过 upload.py 端的
-       handler 改写实现：write_to_db 对 qingniao_leads 特例使用 append + 显式 batch_tag 列。
-       这里 handler 返回的 DataFrame 已带 `批次标注` 列。
+    2. 历史批次保留：write_to_db 对 qingniao_leads 特例使用 to_sql(if_exists='append')
+       保留历史批次；其他 6 类 v2 类型默认 to_sql(if_exists='replace')。
+       本 handler 返回的 DataFrame 已带 `批次标注` 列。
     3. id 列从 1 自增改为不主动设置，让数据库 AUTOINCREMENT 处理（避免 append 模式下主键冲突）。
 
     原样导入，仅做格式层规范（nan->NULL、超长 ID 转字符串、日期规范化）。
