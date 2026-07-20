@@ -1,10 +1,12 @@
-# Dependabot 配置：每周一自动扫描三类生态的过期依赖，自动开 PR。
+# Dependabot 配置：已禁用自动 PR（open-pull-requests-limit: 0）。
+# 历史背景：项目维护者非程序员，Dependabot 自动开的 PR 无人 review 会堆积。
+# 保留配置文件 + ignore 规则，未来需要重启自动 PR 时把 limit 改回 5 即可。
 # 配合 .github/workflows/ci.yml，PR 触发后会自动跑后端 smoke + 前端 typecheck/lint/build。
 
 version: 2
 
 updates:
-  # Python 后端依赖
+  # Python 后端依赖（已禁用自动 PR）
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -12,7 +14,7 @@ updates:
       day: "monday"
       time: "08:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "python"
@@ -28,7 +30,7 @@ updates:
       - dependency-name: "Flask"
         update-types: ["version-update:semver-major"]
 
-  # 前端 npm 依赖
+  # 前端 npm 依赖（已禁用自动 PR）
   - package-ecosystem: "npm"
     directory: "/frontend-react"
     schedule:
@@ -36,7 +38,7 @@ updates:
       day: "monday"
       time: "08:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "frontend"
@@ -70,7 +72,7 @@ updates:
           - "@types/*"
           - "eslint*"
 
-  # GitHub Actions 版本
+  # GitHub Actions 版本（已禁用自动 PR）
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -78,7 +80,7 @@ updates:
       day: "monday"
       time: "08:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "ci"
