@@ -28,6 +28,7 @@ import {
   BulbOutlined,
   SunOutlined,
   MoonOutlined,
+  AuditOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
@@ -38,6 +39,7 @@ import styles from './MainLayout.module.scss';
 const { Sider, Header, Content } = Layout;
 
 const menuItems: MenuProps['items'] = [
+  // ===== 第一段：业务总览 =====
   // v3.1 §二.5: 全渠道获客放最上面（顶级 1）
   {
     key: '/omni-channel',
@@ -56,22 +58,20 @@ const menuItems: MenuProps['items'] = [
     label: '转化漏斗',
   },
   {
-    key: '/leads-detail',
-    icon: <UnorderedListOutlined />,
-    label: '线索明细',
-  },
-  {
     key: '/agency-analysis',
     icon: <BarChartOutlined />,
     label: '厂商分析',
   },
+  { type: 'divider' },
+  // ===== 第二段：业务专题 =====
+  // 内容平台（v3.3.6 新增一级菜单：线索明细 + 抖音青鸟对账）
   {
-    key: 'xhs-notes',
-    icon: <BookOutlined />,
-    label: '小红书',
+    key: 'content-platform',
+    icon: <FileTextOutlined />,
+    label: '内容平台',
     children: [
-      { key: '/xhs-notes/list', label: '笔记列表', icon: <FileTextOutlined /> },
-      { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
+      { key: '/leads-detail', label: '线索明细', icon: <UnorderedListOutlined /> },
+      { key: '/data-reconciliation/douyin-qingniao', label: '抖音青鸟对账', icon: <AuditOutlined /> },
     ],
   },
   // v3.1 §六: 应用市场升顶级
@@ -87,12 +87,12 @@ const menuItems: MenuProps['items'] = [
     ],
   },
   {
-    key: 'employee-conversion',
-    icon: <TeamOutlined />,
-    label: '员工转化',
+    key: 'xhs-notes',
+    icon: <BookOutlined />,
+    label: '小红书',
     children: [
-      { key: '/employee-conversion/analysis', label: '转化分析', icon: <UserSwitchOutlined /> },
-      { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
+      { key: '/xhs-notes/list', label: '笔记列表', icon: <FileTextOutlined /> },
+      { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
     ],
   },
   // 直播获客（含主播聚类二级菜单）
@@ -108,7 +108,17 @@ const menuItems: MenuProps['items'] = [
       { key: '/anchor-clusters', label: '主播分析', icon: <UserOutlined /> },
     ],
   },
+  {
+    key: 'employee-conversion',
+    icon: <TeamOutlined />,
+    label: '员工转化',
+    children: [
+      { key: '/employee-conversion/analysis', label: '转化分析', icon: <UserSwitchOutlined /> },
+      { key: '/employee-conversion/weekly', label: '转化周报', icon: <FileAddOutlined /> },
+    ],
+  },
   { type: 'divider' },
+  // ===== 第三段：系统功能 =====
   {
     key: '/report-generation',
     icon: <FilePdfOutlined />,
@@ -156,11 +166,15 @@ export default function MainLayout() {
   };
 
   const getOpenKeys = () => {
-    const pathParts = location.pathname.split('/').filter(Boolean);
-    if (pathParts.length > 1) {
-      return [`/${pathParts[0]}`];
+    // 遍历 menuItems 反查当前路径所在父级菜单的 key
+    const openKeys: string[] = [];
+    for (const item of menuItems || []) {
+      if (!item || !('children' in item) || !item.children) continue;
+      if ('key' in item && item.key && item.children.some(c => c && 'key' in c && c.key === location.pathname)) {
+        openKeys.push(item.key as string);
+      }
     }
-    return [];
+    return openKeys;
   };
 
   return (

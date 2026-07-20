@@ -273,6 +273,36 @@ HANDLERS["xhs_note"] = handle_xhs_note
 HANDLERS["channel_open"] = handle_channel_open
 
 
+def handle_qingniao_leads(path: str):
+    """抖音青鸟线索通线索详情导出 -> fact_qingniao_leads（1 行=1 条青鸟回传线索）。
+
+    原样导入，仅做格式层规范（nan->NULL、超长 ID 转字符串、日期规范化）。
+    3 个标志位列保持「未打」/「已打」字符串原样入库，对账端点再做映射。
+    """
+    df = _read_excel(path)
+    df = _clean_nan(df)
+    # 超长 ID 安全转换（计划ID/创意ID/素材ID/广告ID/广告账户ID 均可能超 64 位）
+    for c in df.columns:
+        if any(k in c for k in ["ID", "id", "Id"]):
+            df[c] = _safe_overlong_id(df[c])
+    # 日期列：青鸟侧「日期」字段格式为 'YYYY-MM-DD'
+    for c in df.columns:
+        if c == "日期" or "日期" in c:
+            try:
+                df[c] = _to_date_str(df[c])
+            except Exception:
+                pass
+    # 标志位列保留原样字符串「未打」/「已打」，不做转换
+    # 保留 id 列（SQLAlchemy ORM 需要 id 主键）
+    if "id" not in df.columns:
+        df = df.copy()
+        df.insert(0, "id", range(1, len(df) + 1))
+    return {"fact_qingniao_leads": df}, {"row_counts": {"fact_qingniao_leads": len(df)}}
+
+
+HANDLERS["qingniao_leads"] = handle_qingniao_leads
+
+
 def process(data_type: str, file_path: str) -> dict:
     """
     处理入口：data_type -> {table_name: DataFrame, ...}, meta。

@@ -43,7 +43,7 @@ const ConversionFunnelPage: React.FC = () => {
   // 筛选器可选平台：内容平台 + 应用市场
   const PLATFORM_OPTIONS = [
     { label: '小红书', value: '小红书' },
-    { label: '腾讯高类平台', value: '腾讯高类平台' },
+    { label: '腾讯', value: '腾讯' },
     { label: '抖音', value: '抖音' },
     { label: '快手', value: '快手' },
     { label: '小米', value: '小米' },
