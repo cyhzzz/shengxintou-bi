@@ -4,6 +4,9 @@
   "version": "0.9.4",
   "type": "module",
   "scripts": {
+    "setup": "node ../scripts/setup.mjs",
+    "setup:win": "..\\scripts\\setup.bat",
+    "setup:unix": "bash ../scripts/setup.sh",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",

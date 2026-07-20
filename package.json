@@ -1,0 +1,19 @@
+{
+  "name": "shengxintou-bi",
+  "version": "3.3.5",
+  "private": true,
+  "description": "省心投 BI - 券商财富管理场景下的互联网广告投放 + 开户转化数据分析平台。一行命令搞定所有依赖。",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "setup:win": "scripts\\setup.bat",
+    "setup:unix": "bash scripts/setup.sh",
+    "setup:py": "python scripts/setup.py",
+    "dev:backend": "python app.py",
+    "dev:backend:win": ".venv\\Scripts\\python.exe app.py",
+    "dev:frontend": "cd frontend-react && npm run dev",
+    "build": "cd frontend-react && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
