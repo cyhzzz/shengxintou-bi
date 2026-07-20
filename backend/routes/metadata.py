@@ -57,10 +57,10 @@ def get_metadata():
     return jsonify({
         'success': True,
         'data': {
-            'platforms': [{'value': p, 'label': p} for p in platforms],
+            'platforms': platforms,
             'agencies': [{'value': a, 'label': a, 'full_names': expand_short_to_fulls([a])} for a in agencies],
             'agency_full_map': {s: expand_short_to_fulls([s]) for s in agencies},
-            'business_models': [{'value': b, 'label': b} for b in business_models],
+            'business_models': business_models,
             'date_range': date_range,
             'xhs_notes_date_range': xhs_notes_date_range,
         }
