@@ -24,10 +24,10 @@
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
-    "@ant-design/icons": "^6.1.0",
+    "@ant-design/icons": "^6.3.2",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "antd": "^6.3.2",
+    "antd": "^6.5.1",
     "dayjs": "^1.11.19",
     "echarts": "^6.0.0",
     "framer-motion": "^12.42.2",
