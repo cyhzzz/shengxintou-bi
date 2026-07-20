@@ -139,7 +139,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       } else {
         setDateRangeInfo({ has_data: false, min_date: null, max_date: null, total: 0 });
       }
-    } catch (e) {
+    } catch {
       // 静默
     }
   };
@@ -152,7 +152,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       const items: BatchItem[] = d?.items || [];
       setBatchList(items);
       return items;
-    } catch (e) {
+    } catch {
       return [];
     }
   };

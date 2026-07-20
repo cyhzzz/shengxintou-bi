@@ -10,7 +10,6 @@ import {
   expectSidebarVisible,
   expectMainContentVisible,
   expectFilterBarVisible,
-  expectDataTableVisible,
   clickSearchButton,
   getTableRowCount,
   hasDataInTable,

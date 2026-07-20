@@ -55,7 +55,7 @@ const RouteErrorBoundary: React.FC = () => {
         // 保留当前 URL，整页刷新拉取最新资源
         window.location.reload();
       }
-    } catch (e) {
+    } catch {
       // sessionStorage 不可用时静默降级到手动刷新
     }
   }, [isChunkLoadError]);

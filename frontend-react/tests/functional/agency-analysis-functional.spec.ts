@@ -6,7 +6,6 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   waitForChartRender,
   expectSidebarVisible,
@@ -17,10 +16,7 @@ import {
   clickSearchButton,
   getTableRowCount,
   hasDataInTable,
-  takeScreenshot,
-  checkElementExists,
   waitForLoadingComplete,
-  expandSubMenu,
 } from './utils';
 
 test.describe('厂商分析页面功能测试', () => {

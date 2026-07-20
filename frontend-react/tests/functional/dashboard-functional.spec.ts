@@ -6,7 +6,6 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   waitForChartRender,
   expectSidebarVisible,
@@ -14,14 +13,9 @@ import {
   expectMetricCardsVisible,
   expectChartVisible,
   clickSearchButton,
-  getTableRowCount,
   hasDataInTable,
-  takeScreenshot,
-  checkElementExists,
-  getTextContent,
   waitForLoadingComplete,
 } from './utils';
-import { PAGE_ROUTES } from './utils';
 
 test.describe('数据概览页面功能测试', () => {
   test.beforeEach(async ({ page }) => {

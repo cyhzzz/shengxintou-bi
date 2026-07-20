@@ -6,7 +6,6 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   waitForChartRender,
   expectSidebarVisible,
@@ -17,7 +16,6 @@ import {
   getTableRowCount,
   hasDataInTable,
   checkElementExists,
-  getTextContent,
   waitForLoadingComplete,
 } from './utils';
 

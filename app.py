@@ -388,10 +388,6 @@ def ensure_database_exists():
         logger.error(f"数据库初始化失败: {e}")
         raise
 
-# 应用启动前确保数据库存在
-with app.app_context():
-    ensure_database_exists()
-
 # 确保必要的文件夹存在
 for folder in [UPLOAD_FOLDER, LOG_FOLDER]:
     if not os.path.exists(folder):
@@ -511,6 +507,13 @@ app.register_blueprint(system.bp)
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 app.register_blueprint(app_market_report_blueprint.bp)
 app.register_blueprint(omni_channel_report_blueprint.bp)
+
+# ============================================================================
+# 数据库初始化（必须在所有 ORM 模型被 import 之后调用，否则 db.create_all()
+# 看不到完整 metadata，会导致部分表（如 data_import_log）在全新数据库上不被创建）
+# ============================================================================
+with app.app_context():
+    ensure_database_exists()
 
 # ============================================================================
 # Swagger/OpenAPI 文档初始化

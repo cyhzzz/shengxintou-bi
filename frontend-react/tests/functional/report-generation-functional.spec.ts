@@ -9,7 +9,6 @@ import {
   waitForDataLoad,
   expectSidebarVisible,
   expectMainContentVisible,
-  clickSearchButton,
   checkElementExists,
   waitForLoadingComplete,
 } from './utils';

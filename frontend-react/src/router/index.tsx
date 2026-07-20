@@ -49,7 +49,7 @@ const AnchorClusterPage = lazy(() => import('@/pages/AnchorCluster'));
 const ReportGenerationPage = lazy(() => import('@/pages/ReportGeneration'));
 const DouyinQingniaoReconciliationPage = lazy(() => import('@/pages/DataReconciliation/DouyinQingniao'));
 
-export const router = createBrowserRouter([
+const router = createBrowserRouter([
   {
     path: '/',
     element: <MainLayout />,

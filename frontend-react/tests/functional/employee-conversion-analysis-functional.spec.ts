@@ -6,14 +6,12 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   waitForChartRender,
   expectSidebarVisible,
   expectMainContentVisible,
   expectFilterBarVisible,
   expectChartVisible,
-  expectDataTableVisible,
   clickSearchButton,
   getTableRowCount,
   hasDataInTable,

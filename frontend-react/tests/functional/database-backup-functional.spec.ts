@@ -6,7 +6,6 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   expectSidebarVisible,
   expectMainContentVisible,

@@ -8,7 +8,7 @@
 
 原始数据的 mapping / 清洗 / 归一化 / 漏斗预计算由上游 ETL 完成，本项目仅做原样入库（`pandas.to_sql(if_exists='replace')`）+ SELECT 聚合 + 报表展示，不在下游引入业务口径修补逻辑。
 
-![省心投 BI 报表概览](frontend-react/src/assets/项目截图.png)
+![省心投 BI 报表概览](frontend-react/src/assets/dashboard-preview.png)
 
 ### 业务价值
 

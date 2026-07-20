@@ -77,7 +77,7 @@ const ConversionFunnelPage: React.FC = () => {
       } else {
         message.error(response.message || '加载转化漏斗失败');
       }
-    } catch (error) {
+    } catch {
       message.error('加载转化漏斗异常');
     } finally {
       setLoading(false);

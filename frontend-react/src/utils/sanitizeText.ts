@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 文本清洗工具 (v3.1.2)
  *
  * 解决上游 Excel 导入 fact_conv_content / fact_conv_appmarket 时混入的脏字符：
@@ -13,6 +13,19 @@
  * - 服务端清洗会破坏 v2 原样入库的语义，且清洗逻辑要全链路同步
  */
 
+// 控制字符正则：用 String.fromCharCode 构造，避免正则字面量中出现控制字符触发 no-control-regex
+// 范围：0x00-0x08、0x0B、0x0C、0x0E-0x1F、0x7F（保留 \t=0x09、\n=0x0A、\r=0x0D）
+const CONTROL_CHARS_RE = new RegExp(
+  '[' +
+    String.fromCharCode(0x00) + '-' + String.fromCharCode(0x08) +
+    String.fromCharCode(0x0b) +
+    String.fromCharCode(0x0c) +
+    String.fromCharCode(0x0e) + '-' + String.fromCharCode(0x1f) +
+    String.fromCharCode(0x7f) +
+  ']',
+  'g'
+);
+
 /**
  * 清洗单个字符串。返回安全可渲染的字符串；传入 null/undefined 返回 ''。
  */
@@ -26,7 +39,7 @@ export function sanitizeText(value: unknown): string {
 
   // 2. NUL / ASCII 控制字符：保留 \t(0x09)、\n(0x0A)、\r(0x0D)
   //    其余 0x00-0x1F 与 0x7F 全部删
-  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  s = s.replace(CONTROL_CHARS_RE, '');
 
   // 3. UTF-8 替换字符（数据库里的 GBK 残留）
   s = s.replace(/\uFFFD/g, '');

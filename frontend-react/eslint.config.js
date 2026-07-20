@@ -19,5 +19,27 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // 项目历史遗留：大量使用 any，降为 warn 不阻断 CI，后续逐步收紧
+      '@typescript-eslint/no-explicit-any': 'warn',
+      // 测试文件允许 any 和非空断言
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // 约定俗成的"故意不用"变量以 _ 前缀声明，允许通过
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+    },
   },
 ])

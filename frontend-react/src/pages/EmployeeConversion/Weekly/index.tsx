@@ -114,7 +114,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     try {
       await navigator.clipboard.writeText(reportContent);
       message.success('周报已复制到剪贴板');
-    } catch (error) {
+    } catch {
       message.error('复制失败，请手动选择内容复制');
     }
   }, [reportContent]);

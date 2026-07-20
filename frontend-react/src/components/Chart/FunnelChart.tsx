@@ -115,16 +115,16 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
 }) => {
   // v3.2.5：漏斗图容器级动效 — IntersectionObserver 触发后给 chartWrap 加 visible 类
   // 用 CSS 动画让漏斗图整体淡入 + 上浮，不依赖 @ant-design/plots 内置 animate（v5 API 与 plots 透传链路不稳定）
+  // prefers-reduced-motion 用户在 lazy initializer 中直接设为 visible，避免 effect 中同步 setState
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible(true);
-      return;
-    }
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {

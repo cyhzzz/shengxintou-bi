@@ -6,14 +6,12 @@
 import { test, expect } from '@playwright/test';
 import {
   navigateToPage,
-  waitForPageReady,
   waitForDataLoad,
   expectSidebarVisible,
   expectMainContentVisible,
   checkElementExists,
   waitForLoadingComplete,
   getTextContent,
-  takeScreenshot,
 } from './utils';
 
 test.describe('数据导入页面功能测试', () => {

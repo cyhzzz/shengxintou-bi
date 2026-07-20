@@ -25,15 +25,19 @@ export function useCountUp(
 ): number {
   const { duration = 1500, disabled = false, decimals = 0 } = options;
   const [displayValue, setDisplayValue] = useState(0);
+  // prefers-reduced-motion 在 lazy initializer 中读取一次，避免在 effect 中同步 setState
+  const [prefersReduced] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
   const startTimeRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const fromRef = useRef(0);
   const targetRef = useRef(target ?? 0);
 
   useEffect(() => {
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 跳过动画的情况在 render 阶段处理（见下方 skipAnimation），effect 直接返回
     if (disabled || prefersReduced || target === undefined || target === null || Number.isNaN(target)) {
-      setDisplayValue(target ?? 0);
       return;
     }
 
@@ -64,9 +68,13 @@ export function useCountUp(
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [target, duration, disabled]);
+  }, [target, duration, disabled, prefersReduced]);
 
-  return Number(displayValue.toFixed(decimals));
+  // 跳过动画时直接返回目标值（derived value），避免在 effect 中同步 setState
+  const skipAnimation = disabled || prefersReduced ||
+    target === undefined || target === null || Number.isNaN(target);
+  const value = skipAnimation ? (target ?? 0) : displayValue;
+  return Number(value.toFixed(decimals));
 }
 
 export default useCountUp;
