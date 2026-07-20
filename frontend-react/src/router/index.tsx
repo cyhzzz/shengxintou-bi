@@ -46,6 +46,7 @@ const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
 const LiveDirectSalesPage = lazy(() => import('@/pages/Live/DirectSales'));
 const AnchorClusterPage = lazy(() => import('@/pages/AnchorCluster'));
 const ReportGenerationPage = lazy(() => import('@/pages/ReportGeneration'));
+const DouyinQingniaoReconciliationPage = lazy(() => import('@/pages/DataReconciliation/DouyinQingniao'));
 
 export const router = createBrowserRouter([
   {
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
     ],
   },
       { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
+      { path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) },
 
       // v3.1 老路由重定向 (兼容旧链接)
       { path: 'reports/app-market', element: <Navigate to="/app-market/funnel" replace /> },

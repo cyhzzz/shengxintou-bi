@@ -253,3 +253,46 @@ class AggDailyChannelOpen(db.Model):
     入金率 = Column(Float)
     有效户数 = Column(BigInteger)
     有效户率 = Column(Float)
+
+
+# ============================================================================
+# 外部对账数据层（v3.3.6 新增）
+# ============================================================================
+
+class FactQingniaoLeads(db.Model):
+    """青鸟线索通回传明细（v3.3.6 新增，1 行=1 条青鸟回传线索）
+
+    用于与 fact_conv_content 抖音引流线索做标志位对账：
+    - 青鸟侧 3 个标志位（微信用户首次消息 / 微信用户确认意向 / 开户）
+      取值「未打」/「已打」字符串
+    - 系统侧对应 3 个标志位（是否客户开口 / 是否有效线索 / 是否开户）
+      取值 0/1 整数
+
+    对账匹配字段：微信线索昵称 + 日期（与系统侧 微信昵称 + 线索日期 联合匹配）。
+
+    注：列名 1:1 对齐青鸟 Excel 原始表头（含空格的列名「计划 ID」「创意 ID」「素材 ID」「广告 ID」
+    保留空格，符合 v2 原样入库原则）。
+    """
+    __tablename__ = 'fact_qingniao_leads'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+
+    微信线索昵称 = Column(Text, index=True)             # 客户微信昵称（对应系统 fact_conv_content.微信昵称）
+    日期 = Column(Text, index=True)                    # 青鸟侧记录日期 'YYYY-MM-DD'
+    广告账户ID = Column(Text)
+    计划ID = Column('计划 ID', Text)                    # 列名带空格，与 Excel 表头一致
+    计划名称 = Column(Text)
+    创意ID = Column('创意 ID', Text)
+    素材ID = Column('素材 ID', Text)
+    微信号码包ID = Column(Text)
+    微信号码包名称 = Column(Text)
+    客服微信昵称 = Column(Text)
+    广告ID = Column('广告 ID', Text)
+    广告名称 = Column(Text)
+    用户抖音号 = Column(Text)
+    用户抖音昵称 = Column(Text)
+    接待抖音号 = Column(Text)
+    微信用户首次消息 = Column(Text)                    # 「未打」/「已打」 → 对账「开口」标志
+    微信用户确认意向 = Column(Text)                    # 「未打」/「已打」 → 对账「有效」标志
+    开户 = Column(Text)                                # 「未打」/「已打」 → 对账「开户」标志
+

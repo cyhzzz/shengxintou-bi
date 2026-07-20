@@ -13,6 +13,16 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  // v3.3.6：antd v6 Sider 包了一层 .ant-layout-sider-children，
+  // 默认非 flex 布局会导致 .menu 的 flex:1 不生效 → 菜单撑不开 → 滚动条不出现
+  :global(.ant-layout-sider-children) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 .sidebarHeader {
@@ -22,6 +32,7 @@
   align-items: center;
   border-bottom: 1px solid var(--border-default);
   background: var(--bg-content);
+  flex-shrink: 0;
 }
 
 .logoContainer {
@@ -55,26 +66,26 @@
   border-right: none;
   flex: 1 1 0;
   min-height: 0;
-  height: 100%;
+  // v3.3.6：菜单自身滚动（之前 :global(.ant-menu) overflow 选择器未作用到正确容器）
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: var(--spacer-16);
 
-  :global(.ant-menu) {
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  :global(.ant-menu::-webkit-scrollbar) {
+  &::-webkit-scrollbar {
     width: 8px;
   }
 
-  :global(.ant-menu::-webkit-scrollbar-track) {
+  &::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  :global(.ant-menu::-webkit-scrollbar-thumb) {
+  &::-webkit-scrollbar-thumb {
     background: var(--border-strong);
     border-radius: var(--radius-sm);
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--color-text-tertiary);
   }
 }
 
@@ -166,9 +177,6 @@
   overflow-x: hidden;
   // v3.2.5：预留滚动条空间，避免动画过程中滚动条出现/消失导致内容区宽度跳变
   scrollbar-gutter: stable;
-  // v3.2.5：极淡的顶部光照渐变，让页面更有层次
-  background-image:
-    radial-gradient(ellipse at 50% 0%, var(--color-brand-bg) 0%, transparent 60%);
 
   &::-webkit-scrollbar {
     width: var(--spacer-8);

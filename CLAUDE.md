@@ -542,6 +542,43 @@ git push origin main --tags
 
 ## 13. 版本历史
 
+### v3.3.6 已落地（2026-07-20） 抖音青鸟线索通数据对账 + 菜单结构重构 + UI 修复
+
+**主线功能：抖音青鸟线索通数据对账**——核对青鸟回传数据的 3 个标志位（开口/有效/开户）与系统 fact_conv_content 中抖音引流线索明细的 3 个标志位（是否客户开口/是否有效线索/是否开户），输出 4 类对账状态。每行 = 青鸟侧一条记录。
+
+- **后端**：
+  - 新增 `FactQingniaoLeads` ORM 模型（`backend/models_v2.py`），列名带空格的「计划 ID」/「创意 ID」/「素材 ID」/「广告 ID」用 `Column('计划 ID', Text)` 显式映射。
+  - 新增 `handle_qingniao_leads` v2 原样导入处理器（`backend/processors/v2/raw_import.py`）：3 个标志位「未打」/「已打」保持字符串入库，不转 int。
+  - `upload.py` DATA_TYPES 字典注册 `qingniao_leads`（前端不暴露到数据导入页，仅对账页内部调用）。
+  - 新增对账蓝图 `backend/routes/data/data_reconciliation.py`，含 2 个端点：
+    - `POST /api/v1/data-reconciliation/douyin-qingniao/match` — 主对账。匹配逻辑：青鸟侧「微信线索昵称 + 日期」vs 系统侧「微信昵称 + 线索日期」；昵称归一化精确匹配 + 日期容差 ±N 天（0/1/3/7，默认 3）；3 种归一化方案 A/B/C（A=剥 emoji+零宽+NFC+lower 推荐）。
+    - `GET /api/v1/data-reconciliation/douyin-qingniao/date-range` — 获取青鸟数据日期范围（供前端默认填充筛选器）。
+  - 4 类对账状态：未匹到（无候选）/ 疑似漏打标（系统=1 青鸟=未打）/ 疑似误打标（系统=0 青鸟=已打）/ 正确（3 标志一致）；混合时优先报漏打标。
+  - 输出 14 列字段：状态/青鸟昵称/青鸟日期/企微昵称/线索日期/后台3标志/青鸟3标志/差异详情/客户来源/添加员工。
+- **前端 `pages/DataReconciliation/DouyinQingniao.tsx`**：
+  - 筛选卡：日期范围 + 容差 + 归一化方案 + 开始对账/导入青鸟数据/重置按钮。
+  - 6 张指标卡：青鸟总数 / 已匹到 / 未匹到 / 正确 / 疑似漏打标 / 疑似误打标。
+  - 主表：14 列，状态 Tag（颜色+图标） + BoolCell（是=绿/否=灰）+ 分页 + 状态筛选 Segmented。
+  - 表卡片右上角放「导出 CSV」按钮（`type="text"` 弱化样式），CSV 带 UTF-8 BOM。
+  - 「导入青鸟数据」按钮：Upload 组件调 `/api/v1/upload`（data_type=qingniao_leads），上传后轮询 `/status/<task_id>` 直到 completed/failed（最多 60s 每秒一次），完成后自动用导入数据的日期范围触发对账。该功能相对独立，未放入系统配置→数据导入。
+- **菜单结构重构**（`MainLayout.tsx`）：三段式布局
+  - 业务总览：全渠道获客 / 互联网渠道数据概览 / 转化漏斗 / 厂商分析
+  - 分割线
+  - 业务专题：内容平台（新增一级菜单，下含「线索明细」+「抖音青鸟对账」）/ 应用市场 / 小红书 / 直播获客 / 员工转化
+  - 分割线
+  - 系统功能：报告生成 / 系统配置
+  - `getOpenKeys` 改为遍历 menuItems 反查父级 key（因为 `/leads-detail` 和 `/data-reconciliation/*` 现在是二级菜单了）。
+- **UI 修复**：
+  - **RouteErrorBoundary**（`components/RouteErrorBoundary/index.tsx`）：检测到 chunk load error（`Failed to fetch dynamically imported module` 等）时自动整页刷新，带 sessionStorage 防抖（5 秒窗口内只自动重载一次，避免死循环）；非 chunk load error（404、渲染崩溃）不触发自动重载。
+  - **侧边栏菜单滚动**（`MainLayout.module.scss`）：根因是 antd v6 `Sider` 包了一层 `.ant-layout-sider-children`，默认非 flex 布局导致 `.menu` 的 `flex:1` 不生效 → 菜单撑不开 → 滚动条不出现。修复：`.sider :global(.ant-layout-sider-children) { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden }`；`.menu` 直接加 `overflow-y:auto` + 滚动条样式（之前 `:global(.ant-menu) overflow` 选择器没作用到正确容器）。
+  - **内容区蓝色渐变**（`MainLayout.module.scss`）：删除 `.content` 的 `background-image: radial-gradient(ellipse at 50% 0%, var(--color-brand-bg) 0%, transparent 60%)`（v3.2.5 加的「极淡顶部光照渐变」实际渲染出来是「中间蓝色渐变」）。
+  - **FadeInSection 改为 passthrough**（`components/FadeInSection/index.tsx`）：直接渲染 children，无 IntersectionObserver、无动画、无 transform。保留组件和所有 props 签名（22 个调用方零改动）。取消原因：实际使用反馈存在视觉问题（中间蓝色渐变残留、节奏过慢）。
+- **其他修复**：
+  - `leads.py` `anchor-clusters` 端点平台归一化：把「视频号」/「视频号直播」/「微信」归一化到「腾讯」（fact_conv_content.平台来源 只有「腾讯/抖音/小红书/财联社/yj/快手/高德」，没有「视频号」），避免前端筛选项「视频号」过滤命中 0 行。
+  - `ConversionFunnel/index.tsx` 平台筛选项：「腾讯高类平台」改为「腾讯」。
+  - `dataService.ts` `getDouyinQingniaoImportStatus` 等方法误加到 `dataServiceOmniChannel` 对象的 bug 修复（移到 `dataService` 对象末尾）。
+- **校验**：tsc 0 错；npm run build 0 错；后端导入 + 对账端点真实数据验证通过（1115 行青鸟数据 → 523 matched / 592 missed / 424 correct / 54 漏打标 / 45 误打标）。
+
 ### v3.3.5 已落地（2026-07-19） 应用市场 · 计划分析（按平台单选 + 周度走势 + 拿量能力/精准性双视角）
 
 将原「创意效果」列表页（`pages/Reports/AppMarket/Creative.tsx`）改造为「计划分析」周度走势页，回答两个核心业务问题：计划拿量能力（激活/开户/新开户量是否衰减）+ 精准性变化（各转化节点转化率是否稳定）。路由 `/app-market/creative` 保持不变（不破坏书签），菜单文案「创意效果」改为「计划分析」。
