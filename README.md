@@ -17,6 +17,38 @@
 - 互联网渠道开户日历热力图 + 年度 KPI 完成率时间折算，辅助进度管理。
 - 数据新鲜度监控 + 坚果云 WebDAV 自动备份，降低运维风险。
 
+
+## 🚀 一键安装（AI / 用户通用）
+
+> 适合 **AI 助手自动识别** 和 **新用户 clone 后第一件事**。脚本会自检 Python / Node 版本，创建 `.venv`、安装后端依赖、`npm install` + `npm run build`、复制 `.env`，全程自动。
+
+| 平台 | 命令 |
+| --- | --- |
+| **Windows** | `scripts\setup.bat` |
+| **macOS / Linux / WSL / Git Bash** | `bash scripts/setup.sh` |
+| **任何平台（兜底）** | `python scripts/setup.py` |
+| **通过 npm** | `npm run setup`（仓库根目录或 `frontend-react/`） |
+
+完成后双击 `省心投启动器.exe` 即可启动桌面应用；或开发模式运行：
+
+```powershell
+# Windows
+$env:DEV_MODE='1'; .venv\Scripts\python.exe app.py
+# 然后另开一个终端：
+cd frontend-react; npm run dev
+```
+
+```bash
+# macOS / Linux
+DEV_MODE=1 .venv/bin/python app.py
+# 然后另开一个终端：
+cd frontend-react && npm run dev
+```
+
+**前置**：Python 3.9+、Node.js 20+、`python` 与 `node` 需在 PATH 中可见。
+
+> 🤖 **AI 助手请注意**：clone 仓库后**第一步**就运行 `npm run setup`（或对应平台的脚本），它会一次性装好所有依赖。**不要**逐条询问用户要不要装。
+
 ## 目录
 
 - [核心能力](#核心能力)
@@ -183,6 +215,40 @@ npm run test:report
 - [docs/前端UI优化规划PRD.md](docs/前端UI优化规划PRD.md)：设计 token / 日夜模式 / 样式治理规划。
 - [docs/数据库架构文档.md](docs/数据库架构文档.md)：旧 13 表说明（新代码以 v2 / v3 重构文档为准）。
 - [docs/部署指南.md](docs/部署指南.md)：开发、生产、性能优化、监控与故障排查。
+
+
+## 📦 发布流程
+
+> 开发者只需更新版本号 + push tag，CI 自动构建 + 上传 GitHub Release。
+
+```powershell
+# 本地
+scripts\release.bat 3.3.6          # 交互：先确认版本号 → 自动改 version.json → commit → tag → push
+```
+
+```bash
+bash scripts/release.sh 3.3.6
+```
+
+push tag `v3.3.6` 后，`.github/workflows/release.yml` 自动：
+
+1. 安装 Python 3.13 + Node 20
+2. `pip install -r requirements.txt` + PyInstaller
+3. `npm ci && npm run build` 生成 `frontend-react/dist/`
+4. `pyinstaller 省心投启动器.spec` 产出 `省心投启动器.exe`
+5. 把 `exe` + `app.py` + `backend/` + `dist/` + 启动脚本 + `.env.example` 打成 `shengxintou-bi-3.3.6-windows.zip`
+6. 从 `version.json` 提取 changelog 作为 Release notes
+7. 创建 GitHub Release，上传 exe + zip
+
+**最终用户的使用方式**：
+
+1. 打开 GitHub Releases 页面，下载最新版本的 `shengxintou-bi-X.Y.Z-windows.zip`
+2. 解压到任意目录
+3. 双击 `省心投启动器.exe` → 启动器自动检测依赖（如缺 Python，会引导运行 `npm run setup`）→ 浏览器自动打开报表
+4. 普通用户**完全不需要安装 Python 或 Node**（启动器内嵌 PyInstaller bootloader，或引导 setup）
+
+每次 push / PR 还会自动跑 `.github/workflows/ci.yml`：后端 API smoke + 前端 typecheck/lint/build + 4 个 setup 脚本语法检查。
+
 
 ## 项目边界与维护
 

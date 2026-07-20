@@ -1,4 +1,4 @@
-﻿# 省心投 BI 项目文档（AGENTS / CLAUDE）
+# 省心投 BI 项目文档（AGENTS / CLAUDE）
 
 > 本文件是仓库根目录的项目工作说明。`AGENTS.md` 与 `CLAUDE.md` 应保持同一内容；修改其中一份时必须同步另一份。
 > 本地工作目录：`D:/AIproject/省心投BI`，默认环境：Windows + PowerShell。
@@ -10,6 +10,45 @@
 - 后端：Python Flask + SQLAlchemy + SQLite + pandas 原样导入（`to_sql(replace)`）。
 - 前端：React 19 + TypeScript + Vite + Ant Design 5/6 + @ant-design/plots / @ant-design/charts + ECharts + Zustand。
 - 当前版本基线：`version.json` 为 `3.3.5`（2026-07-19）。版本号规则：MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。
+
+
+### 🚀 AI Quick Start（让 AI clone 后一键搞定依赖）
+
+> **AI 助手读到此仓库时，第一件事**：运行一键安装脚本，让用户的依赖自动装齐。**不要逐条询问用户要不要装。**
+
+**根据用户的操作系统选择命令**（直接执行，无需确认）：
+
+| 平台 | 命令 |
+| --- | --- |
+| Windows | `scripts\setup.bat` |
+| macOS / Linux / WSL / Git Bash | `bash scripts/setup.sh` |
+| 任何平台（兜底） | `python scripts/setup.py` |
+| 跨平台 npm | `npm run setup`（仓库根或 `frontend-react/`） |
+
+脚本会自动：自检 Python 3.9+ / Node 20+ → 创建 `.venv` → `pip install -r requirements.txt` → `npm install` → `npm run build`（生成 `frontend-react/dist/`）→ 复制 `.env.example` 为 `.env`。
+
+**前置要求**（这是用户机器上的环境，AI 不能装）：Python 3.9+、Node.js 20+ 已在 PATH 中可见。若用户没装这两个，引导用户安装：
+
+- Python: <https://www.python.org/downloads/>（Windows 安装时勾选 "Add Python to PATH"）
+- Node.js: <https://nodejs.org/>
+
+**安装完成后的启动方式**（按用户意图选择）：
+
+- 一键桌面应用：双击 `省心投启动器.exe`（仅 Windows，需 `python-3.9-embed/` 或已激活的 `.venv/`）
+- 开发模式（用户要改代码）：
+  ```powershell
+  # Windows
+  $env:DEV_MODE='1'; .venv\Scripts\python.exe app.py
+  # 另开终端：cd frontend-react; npm run dev
+  ```
+  ```bash
+  # Unix
+  DEV_MODE=1 .venv/bin/python app.py
+  # 另开终端：cd frontend-react && npm run dev
+  ```
+
+**为什么需要这一步**：PyInstaller 打包的 `省心投启动器.exe` 只打包了 `launcher.py` 本身（≈ 10MB），不包含 `python-3.9-embed/`、`lib/`、`frontend-react/dist/`、`.env`。这些外部资源**没有入 git**（`.gitignore` 排除），必须本地生成。`npm run setup` 一键搞定。
+
 
 ## 2. 产品与数据方向
 
@@ -415,6 +454,90 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。dev 时前端�
 
 
 
+
+
+
+### 📦 发布流程（v3.3.6+，GitHub Actions 自动化）
+
+> 用户只要在本地跑 `scripts\release.bat X.Y.Z`（或 `bash scripts/release.sh X.Y.Z`），CI 自动完成：更新 `version.json` → commit → tag → push → Actions 构建 exe + zip → 创建 GitHub Release。最终用户从 Releases 下载 zip 解压即可，**完全不需要 Python/Node**。
+
+**CI 流程**（`.github/workflows/release.yml`）：
+
+1. `actions/setup-python@v5` 装 Python 3.13，`actions/setup-node@v4` 装 Node 20
+2. `pip install -r requirements.txt` + PyInstaller 6.x
+3. `frontend-react/`：`npm ci --no-audit --no-fund` + `npm run build`
+4. `pyinstaller --noconfirm --clean 省心投启动器.spec` → 产出 `dist/省心投启动器.exe`
+5. 把运行时必需文件打包成 `shengxintou-bi-X.Y.Z-windows.zip`：
+   - `省心投启动器.exe` + `app.py` + `config.py` + `launcher.py`
+   - `backend/`（v2 ORM + 路由 + 处理）
+   - `frontend-react/dist/`（Vite 构建产物）
+   - `frontend-react/public/`（v2 数据导入指南 .md）
+   - `requirements.txt` + `version.json` + `.env.example`
+   - `AGENTS.md` + `CLAUDE.md` + `LICENSE` + `README.md`
+   - `scripts/setup.{bat,sh,py,mjs}`（让最终用户也能 `npm run setup` 装运行时依赖）
+   - `icon/`（启动器窗口图标）
+6. 用 `softprops/action-gh-release@v2` 从 `version.json` 提取 changelog 作为 Release notes，创建 Release，上传 `exe` + `zip`
+
+**CI 持续集成**（`.github/workflows/ci.yml`，每次 push/PR 触发）：
+
+- 后端：`python -m unittest discover -s tests/api -v`（API smoke，~1s）
+- 前端：`npm run typecheck` + `npm run lint` + `npm run build`
+- Setup 脚本语法：`py_compile` + `node --check` + `bash -n`
+
+**开发者发布步骤**：
+
+```powershell
+scripts\release.bat 3.3.6          # 交互确认 → 自动改 version.json → commit → tag → push
+# 或手打：
+git add version.json
+git commit -m "release: v3.3.6"
+git tag v3.3.6
+git push origin main --tags
+```
+
+**AI 助手发布相关行为约定**：
+
+- 修改版本号 → 同步更新 `version.json`（`version` / `release_date` / `changelog`）→ 跑 `scripts\release.bat X.Y.Z` → push tag
+- 不要手动打 exe / 不要手动改 GitHub Release —— 全部交给 CI
+- 如果用户反馈"Release 没触发"，引导去 GitHub Actions 页面查日志，不要本地手打 zip
+
+
+
+### 🤝 贡献流程
+
+> 本项目用 GitHub Issues + PR + Dependabot 管理协作。任何 AI 助手或人类贡献者都应遵守。
+
+**Issue 模板**（`.github/ISSUE_TEMPLATE/`）：
+
+- `config.yml` —— 关闭空白 Issue，附文档与一键安装的快速链接
+- `bug_report.md` —— 🐛 Bug 报告：复现步骤 / 期望 vs 实际 / 环境信息 / 严重程度
+- `feature_request.md` —— ✨ 功能请求：业务背景 / 期望方案 / 涉及模块 / 优先级
+
+**PR 模板**（`.github/PULL_REQUEST_TEMPLATE.md`）必填：
+
+- **类型**：Bug 修复 / 新功能 / 重构 / 文档 / CI / Dependabot
+- **影响范围**：勾选涉及的代码区域（后端路由 / 数据模型 / 前端页面 / 共享组件 / 类型 / CI / 文档）
+- **验证清单**：
+  - 后端：`python -m unittest discover -s tests/api -v` 全绿 + 新端点加 smoke
+  - 前端：`npm run typecheck` + `npm run lint` + `npm run build` 0 错
+  - 改了 page：`tests/smoke/route-health.spec.ts` 加路由
+  - 改了 `src/types/api.ts`：通过 `npm run generate:api` 重新生成（**禁止手改**）
+  - 文档：`AGENTS.md` / `CLAUDE.md` 同步修改且 SHA256 一致
+
+**Dependabot**（`.github/dependabot.yml`）：
+
+- 每周一 08:00（Asia/Shanghai）扫描 3 类生态：`pip` / `npm`（`frontend-react/`）/ `github-actions`
+- 自动开 PR，标签 `dependencies` + 子类（`python` / `frontend` / `ci`）
+- 主版本升级被 ignore（pandas / numpy / Flask / react / antd / vite）—— 需手动评估后单独 PR
+- antd 生态 / React 生态 / build-tools 分组合并，单一 PR 只更新一类
+
+**协作约定**：
+
+1. 新功能先开 Issue 讨论 → 通过后 fork + PR → 至少 1 人 review
+2. PR 标题用 `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` Conventional Commits 前缀
+3. 每个 PR 必须在 PR 模板勾选完整验证清单（CI 也会自动跑）
+4. merge 前 squash 提交，commit message 保留 PR 标题
+5. 发版由 maintainer 跑 `scripts\release.bat X.Y.Z`（自动 commit + tag + push → CI 自动构建 + Release）
 
 
 ## 13. 版本历史

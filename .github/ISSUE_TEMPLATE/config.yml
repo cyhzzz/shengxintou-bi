@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📖 项目文档 AGENTS.md / CLAUDE.md"
+    url: https://github.com/<owner>/<repo>/blob/main/AGENTS.md
+    about: 仓库根目录的 AGENTS.md 与 CLAUDE.md 包含项目架构、共享组件、修改守则、踩坑记录、测试体系、AI 行为约定 —— 查问题前先看这里。
+  - name: "🚀 一键安装"
+    url: https://github.com/<owner>/<repo>/blob/main/README.md#-一键安装ai--用户通用
+    about: clone 仓库后第一件事：跑 npm run setup（自动装 Python/Node 依赖 + npm run build + 复制 .env）。
