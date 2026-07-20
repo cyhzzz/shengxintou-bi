@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM ============================================================
 REM 省心投 BI - 一键依赖安装（Windows）
 REM
@@ -48,7 +48,10 @@ for /f "tokens=2" %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
 echo   [OK] Python !PY_VER!
 
 REM 解析主版本号
-for /f "tokens=1,2 delims=." %%a in ("!PY_VER!") do set "PY_MAJOR=%%a" ^& set "PY_MINOR=%%b"
+for /f "tokens=1,2 delims=." %%a in ("!PY_VER!") do (
+    set "PY_MAJOR=%%a"
+    set "PY_MINOR=%%b"
+)
 if !PY_MAJOR! LSS 3 (
     echo   [X] Python 版本过低（!PY_VER!），需要 3.9+
     popd
