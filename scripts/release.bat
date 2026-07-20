@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM ============================================================
 REM 省心投 BI - 一键发布（本地打 tag + push，触发 GitHub Actions Release）
 REM
