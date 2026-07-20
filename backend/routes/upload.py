@@ -3,13 +3,15 @@
 省心投 BI - 文件上传API接口（v2 - 新表原样导入）
 
 v2 改造要点：
-- 6 个新数据类型（原样导入，无中间计算）：
-    account_mapping       → dim_account + dim_vendor
+- 7 个新数据类型（原样导入，导入层仅做格式层安全处理）：
+    account_mapping       → dim_account
     conversion_content    → fact_conv_content
     conversion_appmarket  → fact_conv_appmarket
     vendor_daily          → agg_vendor_daily
     xhs_note              → agg_xhs_note
     channel_open          → agg_daily_channel_open
+    qingniao_leads        → fact_qingniao_leads（例外：按批次 append 保留历史）
+  其中 qingniao_leads 是明确例外，走 append + 批次标注；其他 6 类走 to_sql(replace)。
 - 7 个旧数据类型（tencent_ads/douyin_ads/xiaohongshu_ads/backend_conversion/
   xhs_notes_list/xhs_notes_daily/xhs_notes_content_daily）已退役，返回 410 Gone。
 - 保留 DataImportLog 记录（用于上传历史与进度跟踪）。
@@ -32,7 +34,7 @@ from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('upload', __name__)
 
-# v2 数据类型（6 个）—— 原样导入
+# v2 数据类型（7 个）—— 原样导入；qingniao_leads 例外走 append + 批次标注
 DATA_TYPES = {
     'account_mapping':      '投放账号映射',
     'conversion_content':   '内容平台加微链路',

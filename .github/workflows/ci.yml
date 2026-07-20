@@ -1,7 +1,7 @@
 name: CI
 
-# 每次 push / PR 触发：跑后端 smoke + 前端 typecheck/lint/build，
-# 保证 merge 到 main 的代码至少能编译通过、核心 API 正常返回。
+# 每次 push / PR 触发：检查规则架构、后端 smoke、前端 typecheck/lint/build，
+# 保证规则不漂移、核心 API 正常返回且前端可构建。
 
 on:
   push:
@@ -10,6 +10,18 @@ on:
     branches: [main, master]
 
 jobs:
+  rule-architecture:
+    name: Rule architecture
+    runs-on: windows-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+      - name: Validate AI rule architecture
+        run: python scripts/check_rule_architecture.py
+
   backend-smoke:
     name: Backend API smoke
     runs-on: windows-latest
