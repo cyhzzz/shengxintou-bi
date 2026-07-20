@@ -174,12 +174,18 @@ export const dataService = {
     start_date?: string;
     end_date?: string;
     date_tolerance_days?: number;
-    normalization_scheme?: 'A' | 'B' | 'C';
+    batch_tag?: string;
   }) => {
     return http.post('/data-reconciliation/douyin-qingniao/match', params);
   },
-  getDouyinQingniaoDateRange: async () => {
-    return http.get('/data-reconciliation/douyin-qingniao/date-range');
+  // v3.3.6：date-range 支持 batch_tag 查询参数（仅统计该批次）
+  getDouyinQingniaoDateRange: async (batchTag?: string) => {
+    const qs = batchTag ? `?batch_tag=${encodeURIComponent(batchTag)}` : '';
+    return http.get(`/data-reconciliation/douyin-qingniao/date-range${qs}`);
+  },
+  // v3.3.6：获取所有导入批次列表
+  getDouyinQingniaoBatches: async () => {
+    return http.get('/data-reconciliation/douyin-qingniao/batches');
   },
   // 查询导入任务状态（用于「导入青鸟数据」按钮轮询）
   getDouyinQingniaoImportStatus: async (taskId: string) => {

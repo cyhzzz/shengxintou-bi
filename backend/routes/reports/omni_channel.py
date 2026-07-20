@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """全渠道获客情况报表 v3.1（v3.1 §二.5 重构）
 
 数据源（按用户口径，**单一独立数据源**）:
@@ -18,7 +18,7 @@ v3.1 重构:
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
-from backend.models_v2 import AggDailyChannelOpen
+from backend.models_v2 import AggDailyChannelOpen, AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 
@@ -198,17 +198,37 @@ def omni_channel_summary():
 @bp.route('/daily-calendar', methods=['POST'])
 @handle_exceptions
 def omni_channel_daily_calendar():
+    u"""互联网渠道开户日历热力图
+
+    v3.3.6 改造：
+    - 数据源从 agg_daily_channel_open（仅有渠道类别）切换为 agg_vendor_daily
+      （agg_vendor_daily 有 平台/厂商/业务模式 字段，能跟随 Dashboard 筛选器联动）
+    - 支持 filters.platforms / filters.agencies / filters.business_models 筛选
+    - 业务口径：按日期 SUM(开户人数)，过去 N 天（默认 365）
+    """
     data = request.get_json() or {}
     days = max(7, min(366, int(data.get('days') or 365)))
+    filters = data.get('filters') or {}
     today = datetime.now().date()
-    start = today - timedelta(days=days - 1)
-    cond = AggDailyChannelOpen.时间区间 >= start.isoformat()
-    end_cond = AggDailyChannelOpen.时间区间 <= today.isoformat()
-    cat_clause = (AggDailyChannelOpen.渠道类别 == '互联网引流')
-    rows = db.session.query(
-        AggDailyChannelOpen.时间区间.label('date'),
-        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-    ).filter(cond).filter(end_cond).filter(cat_clause).group_by(AggDailyChannelOpen.时间区间).order_by(AggDailyChannelOpen.时间区间).all()
+    start = (today - timedelta(days=days - 1)).isoformat()
+    end = today.isoformat()
+
+    q = db.session.query(
+        AggVendorDaily.日期.label('date'),
+        func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opens'),
+    ).filter(
+        AggVendorDaily.日期 >= start,
+        AggVendorDaily.日期 <= end,
+    )
+    # 筛选器：平台 / 代理商（厂商）/ 业务模式
+    if filters.get('platforms'):
+        q = q.filter(AggVendorDaily.平台.in_([str(p) for p in filters['platforms']]))
+    if filters.get('agencies'):
+        q = q.filter(AggVendorDaily.厂商.in_([str(a) for a in filters['agencies']]))
+    if filters.get('business_models'):
+        q = q.filter(AggVendorDaily.业务模式.in_([str(b) for b in filters['business_models']]))
+    q = q.group_by(AggVendorDaily.日期).order_by(AggVendorDaily.日期)
+    rows = q.all()
     calendar = [{'date': r.date, 'opens': int(r.opens or 0)} for r in rows]
     return jsonify({'success': True, 'data': calendar})
 

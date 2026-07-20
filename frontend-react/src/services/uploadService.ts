@@ -36,15 +36,20 @@ export interface VersionInfo {
 // 上传服务
 export const uploadService = {
   // 上传文件
+  // v3.3.6：qingniao_leads 支持 batchTag（批次标注），不传时后端用 'YYYYMMDDHHmm'
   uploadFile: async (
     file: File,
     dataType: DataType,
-    overwrite: boolean = false
+    overwrite: boolean = false,
+    batchTag?: string
   ): Promise<ApiResponse<UploadResult>> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('data_type', dataType);
     formData.append('overwrite', String(overwrite));
+    if (batchTag && batchTag.trim()) {
+      formData.append('batch_tag', batchTag.trim());
+    }
 
     return http.upload('/upload', formData);
   },

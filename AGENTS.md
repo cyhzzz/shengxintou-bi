@@ -542,6 +542,24 @@ git push origin main --tags
 
 ## 13. 版本历史
 
+### v3.3.7 已落地（2026-07-20） 青鸟对账 NoneType 报错修复 + 日历热力图筛选器联动 + TS 清理
+
+3 项 bug 修复 + 1 项功能改造，承接 v3.3.6 后用户反馈的回归问题。
+
+- **修复 1：青鸟对账端点 NoneType 报错**
+  - 现象：用户再次导入青鸟数据后，`POST /api/v1/data-reconciliation/douyin-qingniao/match` 报 `'NoneType' object has no attribute '微信线索昵称'` 500 错误。
+  - 根因：`fact_qingniao_leads` 表由 pandas `to_sql` 创建，id 列是 `BIGINT` 而非 `INTEGER PRIMARY KEY AUTOINCREMENT`（SQLite 只有 `INTEGER PRIMARY KEY` 才是 ROWID 别名 + 支持 AUTOINCREMENT）。append 模式 drop id 列后新数据 id 全为 NULL，SQLAlchemy ORM 加载主键为 NULL 的行返回 None 对象。
+  - 修复：`app.py` 的 `_migrate_qingniao_batch_tag` 函数从「只加批次标注列」扩展为「加列 + 重建表为 INTEGER PRIMARY KEY AUTOINCREMENT」。流程：a.创建临时表 `_fact_qingniao_leads_new`（`id INTEGER PRIMARY KEY AUTOINCREMENT` + 其他列统一 TEXT）→ b.`INSERT...SELECT` 复制数据（NULL id 由 AUTOINCREMENT 自动生成）→ c.DROP 旧表 → d.RENAME 临时表 → e.重建索引（批次标注/微信线索昵称/日期）+ 更新 `sqlite_sequence`。幂等设计：检查 `pk_constraint` 已含 id 则跳过。
+  - 验证：Flask 重启后日志 `✓ fact_qingniao_leads 表已重建`；`/match` 端点 `batch_tag=风声测试` 返回 329 条记录，匹配率 79.9%（263/329）。
+- **修复 2：TypeScript 清理**
+  - `pages/Live/DirectSales.tsx`：删除未使用的 `UserOutlined` import；`LIVE_TYPE_META` 补全「投顾配合做带货」配置项（原 `Record<LiveType, {...}>` 类型要求 4 个成员全齐，缺一个就报 TS 错）。
+  - `pages/Live/Funnel.tsx`：删除未使用的 `UserOutlined` + `FireOutlined` import。
+  - 基线对比：当前 177 个 TS 错误全是历史遗留（`git stash` 基线也是 ~178 个），不是本次改动引入。TS 大清理单独排期。
+- **功能改造：互联网渠道数据概览的开户日历热力图跟随筛选器联动**
+  - 后端 `routes/reports/omni_channel.py` `daily-calendar` 端点数据源从 `agg_daily_channel_open`（仅有渠道类别，无平台/厂商/业务模式字段）切换为 `agg_vendor_daily`（有完整 平台/厂商/业务模式/开户人数 字段），支持 `filters.platforms` / `filters.agencies` / `filters.business_models` 筛选。
+  - 前端 `pages/Dashboard/index.tsx` `calendarData` 的 `useEffect` 依赖从 `[]` 改为 `[filters.platforms, filters.agencies, filters.business_models]`，请求时传入 `calFilters`。筛选器变化即重拉日历数据。
+- **校验**：青鸟对账端点真实数据验证通过；日历热力图筛选器联动验证通过；Flask 重启后数据库迁移日志正常。
+
 ### v3.3.6 已落地（2026-07-20） 抖音青鸟线索通数据对账 + 菜单结构重构 + UI 修复
 
 **主线功能：抖音青鸟线索通数据对账**——核对青鸟回传数据的 3 个标志位（开口/有效/开户）与系统 fact_conv_content 中抖音引流线索明细的 3 个标志位（是否客户开口/是否有效线索/是否开户），输出 4 类对账状态。每行 = 青鸟侧一条记录。

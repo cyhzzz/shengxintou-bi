@@ -26,7 +26,6 @@ import {
   ReloadOutlined,
   SearchOutlined,
   VideoCameraOutlined,
-  UserOutlined,
   RiseOutlined,
   DollarOutlined,
   InfoCircleOutlined,
@@ -92,6 +91,14 @@ const LIVE_TYPE_META: Record<LiveType, {
     anchorLabel: '分析师主播',
     funnelTitle: '6 阶段分析师业务漏斗',
     descTag: '直播类型：分析师（固定）',
+  },
+  '投顾配合做带货': {
+    color: 'gold',
+    icon: <ShoppingCartOutlined />,
+    pageTitle: '投顾配合做带货 · 业务分析报表',
+    anchorLabel: '投顾主播',
+    funnelTitle: '6 阶段投顾配合做货业务漏斗',
+    descTag: '直播类型：投顾配合做带货（固定）',
   },
 };
 
@@ -910,7 +917,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     ) },
     { title: '平台数', width: 80, align: 'center' as const, render: (_: any, r: AnchorAggRow) => <Tag color="blue">{r.platforms.length}</Tag> },
     { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
-    { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+    { title: '线索数', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '有效(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
@@ -963,7 +970,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
         <FadeInSection delay={0.4} duration={0.8}>
           <MetricSection title={`${liveType}核心产出`} description={`${meta.anchorLabel}的新客户获客主指标（仅统计非存量客户）`}>
             <MetricCard title={`${meta.anchorLabel}数`} value={totals.anchors} valueColor="var(--color-brand)" icon={React.cloneElement(meta.icon as React.ReactElement, { style: { color: 'var(--color-brand)' } })} description={`直播类型=${liveType}的主播数`} showWowChange={false} />
-            <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
+            <MetricCard title="线索数" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
             <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
             <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />
             <MetricCard title="新开户资产" value={totals.new_assets} prefix="¥" formatter="currency" valueColor="var(--color-warning)" icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />} description={`非存量且开户成功客户总资产·主指标`} showWowChange={false} />

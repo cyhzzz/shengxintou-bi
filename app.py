@@ -252,6 +252,97 @@ def _sync_anchor_live_types_from_json():
     return changes
 
 
+def _migrate_qingniao_batch_tag():
+    """v3.3.6: fact_qingniao_leads 表加 `批次标注` 列 + 修复 id 列为 PRIMARY KEY AUTOINCREMENT。
+
+    背景：
+    - 历史表由 pandas to_sql 创建，id 列没有 PRIMARY KEY AUTOINCREMENT 约束。
+    - append 模式下 drop id 列后，新数据 id 全为 NULL，导致 SQLAlchemy ORM 无法加载对象
+      （主键为 NULL → 返回 None 对象，访问属性报错 'NoneType' has no attribute ...）。
+    - 修复方案：重建表为 `id INTEGER PRIMARY KEY AUTOINCREMENT`，历史数据自动生成 id。
+
+    幂等：列已存在且 id 已是 PRIMARY KEY 时跳过。
+    """
+    from sqlalchemy import text, inspect
+    inspector = inspect(db.engine)
+    if not inspector.has_table('fact_qingniao_leads'):
+        return  # 表本身不存在，create_all 之后会带新列创建
+
+    # 1. 加批次标注列（幂等）
+    cols = [c['name'] for c in inspector.get_columns('fact_qingniao_leads')]
+    if '批次标注' not in cols:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE fact_qingniao_leads ADD COLUMN \"批次标注\" TEXT"))
+            conn.execute(text("UPDATE fact_qingniao_leads SET \"批次标注\" = 'legacy' WHERE \"批次标注\" IS NULL"))
+        logger.info("✓ fact_qingniao_leads 已新增 `批次标注` 列（旧数据补默认值 'legacy'）")
+        # 重新检查列定义
+        inspector = inspect(db.engine)
+        cols = [c['name'] for c in inspector.get_columns('fact_qingniao_leads')]
+
+    # 2. 加索引（幂等）
+    with db.engine.begin() as conn:
+        try:
+            conn.execute(text('CREATE INDEX IF NOT EXISTS ix_fact_qingniao_leads_batch ON fact_qingniao_leads("批次标注")'))
+        except Exception:
+            pass
+
+    # 3. 修复 id 列为 PRIMARY KEY AUTOINCREMENT（幂等）
+    #    SQLite 不支持 ALTER 列属性，需要重建表
+    pk_cols = inspector.get_pk_constraint('fact_qingniao_leads')['constrained_columns'] or []
+    if 'id' in pk_cols:
+        return  # id 已是主键，无需重建
+
+    logger.warning("fact_qingniao_leads.id 列不是 PRIMARY KEY，开始重建表结构...")
+
+    # 步骤：
+    # a. 临时表（带正确主键）→ b. 复制数据（NULL id 自动生成）→ c. drop 旧表 → d. rename
+    # 注意：SQLite 中只有 `INTEGER PRIMARY KEY` 才是 ROWID 别名 + AUTOINCREMENT，
+    #       `BIGINT PRIMARY KEY` 不是，所以必须用 INTEGER 而非 BIGINT。
+    from backend.models_v2 import FactQingniaoLeads
+    orm_cols = [c.name for c in FactQingniaoLeads.__table__.columns]
+    # 去掉 id（让新表 AUTOINCREMENT 处理）
+    data_cols = [c for c in orm_cols if c != 'id']
+    # 用双引号包裹中文列名 + 含空格的列名
+    def q(name):
+        return f'"{name}"'
+    data_cols_sql = ', '.join(q(c) for c in data_cols)
+
+    with db.engine.begin() as conn:
+        # a. 创建临时表（id 用 INTEGER PRIMARY KEY AUTOINCREMENT，其他列保持原类型）
+        #    先 drop 临时表（如果上次迁移失败留下的残留）
+        conn.execute(text('DROP TABLE IF EXISTS _fact_qingniao_leads_new'))
+        # 用 ORM 列定义拼出 CREATE TABLE 语句
+        # 列类型映射：BigInteger/BIGINT → TEXT/REAL/INTEGER 由原表决定，
+        #   为简化直接用 TEXT 容纳所有字符串/数字（SQLite 是动态类型）
+        col_defs = ['id INTEGER PRIMARY KEY AUTOINCREMENT']
+        for c in FactQingniaoLeads.__table__.columns:
+            if c.name == 'id':
+                continue
+            col_defs.append(f'{q(c.name)} TEXT')
+        create_sql = f'CREATE TABLE _fact_qingniao_leads_new ({", ".join(col_defs)})'
+        conn.execute(text(create_sql))
+        # b. 复制数据（旧表的 NULL id 会被忽略，新表用 AUTOINCREMENT 生成）
+        conn.execute(text(
+            f'INSERT INTO _fact_qingniao_leads_new ({data_cols_sql}) '
+            f'SELECT {data_cols_sql} FROM fact_qingniao_leads'
+        ))
+        # 统计行数
+        n_old = conn.execute(text('SELECT COUNT(*) FROM fact_qingniao_leads')).scalar()
+        # c. drop 旧表
+        conn.execute(text('DROP TABLE fact_qingniao_leads'))
+        # d. rename 临时表
+        conn.execute(text('ALTER TABLE _fact_qingniao_leads_new RENAME TO fact_qingniao_leads'))
+        # 重建索引
+        conn.execute(text('CREATE INDEX IF NOT EXISTS ix_fact_qingniao_leads_batch ON fact_qingniao_leads("批次标注")'))
+        conn.execute(text('CREATE INDEX IF NOT EXISTS ix_fact_qingniao_leads_nickname ON fact_qingniao_leads("微信线索昵称")'))
+        conn.execute(text('CREATE INDEX IF NOT EXISTS ix_fact_qingniao_leads_date ON fact_qingniao_leads("日期")'))
+        # 更新 sqlite_sequence 让后续 AUTOINCREMENT 接着最大 id 递增
+        max_id = conn.execute(text('SELECT MAX(id) FROM fact_qingniao_leads')).scalar() or 0
+        conn.execute(text("DELETE FROM sqlite_sequence WHERE name='fact_qingniao_leads'"))
+        conn.execute(text(f"INSERT INTO sqlite_sequence(name, seq) VALUES('fact_qingniao_leads', {max_id})"))
+        logger.info(f"✓ fact_qingniao_leads 表已重建（id 改为 INTEGER PRIMARY KEY AUTOINCREMENT，{n_old} 行数据已迁移）")
+
+
 def ensure_database_exists():
     """确保数据库和所有表存在"""
     try:
@@ -281,6 +372,14 @@ def ensure_database_exists():
                     logger.info(f"✓ 主播直播类型映射已同步: {synced} 条")
             except Exception as e:
                 logger.warning(f"主播直播类型映射同步失败（不影响启动）: {e}")
+
+            # v3.3.6: fact_qingniao_leads 批次标注列迁移
+            #   create_all 不会给已存在的表加列，需要手动 ALTER TABLE
+            #   旧数据补默认值 'legacy'，便于后续按批次筛选（与新版区分开）
+            try:
+                _migrate_qingniao_batch_tag()
+            except Exception as e:
+                logger.warning(f"fact_qingniao_leads 批次标注列迁移失败（不影响启动）: {e}")
 
             # 记录数据库文件位置
             logger.info(f"✓ 数据库位置: {database_path}")
