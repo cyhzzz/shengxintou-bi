@@ -33,12 +33,6 @@ import { FadeInSection } from '@/components';
 const { Link } = Typography;
 const { RangePicker } = DatePicker;
 
-// 内容类型选项
-const CONTENT_TYPE_OPTIONS = [
-  { label: '图文', value: '图文' },
-  { label: '视频', value: '视频' },
-];
-
 // 快速选择日期选项
 const QUICK_DATE_OPTIONS = [
   { label: '近7天', value: 7 },
@@ -823,7 +817,7 @@ const XhsNotesListPage: React.FC = () => {
         <Table
           columns={columns}
           dataSource={sortedData}
-          rowKey={(record) => record?.id ?? record?.note_id ?? Math.random().toString(36).slice(2)}
+          rowKey={(record) => record?.note_id ?? Math.random().toString(36).slice(2)}
           loading={loading}
           scroll={{ x: 2500 }}
           pagination={{

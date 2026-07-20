@@ -27,6 +27,7 @@ interface FunnelStage {
   step: string;
   value: number;
   rate: number;
+  step_rate?: number;
 }
 
 const ConversionFunnelPage: React.FC = () => {
@@ -176,7 +177,7 @@ const ConversionFunnelPage: React.FC = () => {
                 options={PLATFORM_OPTIONS}
                 allowClear
               />
-              <Button type="primary" icon={<SearchOutlined />} onClick={loadData}>查询</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => loadData()}>查询</Button>
               <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
             </Space>
           </Card>
@@ -268,8 +269,8 @@ const ConversionFunnelPage: React.FC = () => {
                                         </Tag>
                                       </td>
                                       <td className={styles.colNum}>
-                                        <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
-                                          {s.step_rate.toFixed(2)}%
+                                        <Tag color={(s.step_rate || 0) > 30 ? 'green' : (s.step_rate || 0) > 5 ? 'gold' : 'default'}>
+                                          {(s.step_rate || 0).toFixed(2)}%
                                         </Tag>
                                       </td>
                                     </tr>
@@ -363,8 +364,8 @@ const ConversionFunnelPage: React.FC = () => {
                                         </Tag>
                                       </td>
                                       <td className={styles.colNum}>
-                                        <Tag color={s.step_rate > 30 ? 'green' : s.step_rate > 5 ? 'gold' : 'default'}>
-                                          {s.step_rate.toFixed(2)}%
+                                        <Tag color={(s.step_rate || 0) > 30 ? 'green' : (s.step_rate || 0) > 5 ? 'gold' : 'default'}>
+                                          {(s.step_rate || 0).toFixed(2)}%
                                         </Tag>
                                       </td>
                                     </tr>

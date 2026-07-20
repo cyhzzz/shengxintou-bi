@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 平台筛选器组件
  * 多选平台筛选
  */
@@ -28,7 +28,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
     const loadPlatforms = async () => {
       const response = await metadataService.getMetadata();
       if (response.success && response.data) {
-        setPlatformOptions(response.data.platforms);
+        setPlatformOptions((response.data.platforms || []).map((p: string) => ({ value: p, label: p })));
       }
     };
     loadPlatforms();

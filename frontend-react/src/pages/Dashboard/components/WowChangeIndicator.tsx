@@ -23,7 +23,6 @@ const WowChangeIndicator: React.FC<WowChangeIndicatorProps> = ({
   trend,
   color,
   showTooltip = true,
-  inverseTrend = false,
 }) => {
   if (value === undefined) return null;
 

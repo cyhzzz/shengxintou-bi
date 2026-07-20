@@ -56,7 +56,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   prefix,
   suffix,
   formatter = 'number',
-  inverseTrend = false,
   variant = 'default',
   icon,
   tooltip,
@@ -65,7 +64,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   description,
   className,
   loading = false,
-  index = 0,
 }) => {
   const formatValue = (val?: number): string => {
     if (val === undefined || val === null) return '-';

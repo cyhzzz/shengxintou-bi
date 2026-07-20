@@ -8,7 +8,6 @@ import {
   Table,
   Row,
   Col,
-  Select,
   Button,
   Space,
   message,
@@ -208,9 +207,6 @@ const XhsNotesOperationPage: React.FC = () => {
   // 独立模块加载状态 - 用于优秀笔记排行榜
   const [topNotesLoading, setTopNotesLoading] = useState(false);
 
-  // 当前选中的图表Tab
-  const [creationChartType, setCreationChartType] = useState<string>('impressions');
-
   // v3.2.3：视图模式 - Web 桌面布局 / H5 手机布局（480px poster）
   // H5 模式参考报告生成页 poster 容器，所有双列改单列，导出截图即手机友好长图
   const [viewMode, setViewMode] = useState<'web' | 'h5'>('web');
@@ -271,7 +267,8 @@ const XhsNotesOperationPage: React.FC = () => {
       // 后端返回格式: { success: true, data: { core_metrics, creator_content_data, ... } }
       // response.data 已经是 XhsOperationAnalysisData 类型
       if (response.success && response.data) {
-        setData(response.data);
+        // response.data 运行时已是 XhsOperationAnalysisData，类型签名存在双重包装，需断言
+        setData(response.data as unknown as XhsOperationAnalysisData);
       } else {
         message.error(response.message || '获取数据失败');
       }
@@ -297,7 +294,8 @@ const XhsNotesOperationPage: React.FC = () => {
       };
       const response = await postXhsOperationAnalysis({ filters });
       if (response.success && response.data) {
-        setData(prev => prev ? { ...prev, top_notes: response.data.top_notes } : response.data);
+        const innerData = response.data as unknown as XhsOperationAnalysisData;
+        setData(prev => prev ? { ...prev, top_notes: innerData.top_notes } : innerData);
       }
     } catch (error) {
       console.error('获取笔记排行榜数据失败:', error);
@@ -314,7 +312,7 @@ const XhsNotesOperationPage: React.FC = () => {
   }, [metadataLoaded, fetchData]);
 
   // 检查日期范围是否匹配（用于高亮快速日期按钮）
-  const isDateRangeActive = (range: [string, string] | null, type: 'days30' | 'ytd'): boolean => {
+  const isDateRangeActive = (range: [string, string] | null, type: 'days7' | 'days30' | 'ytd' | 'all'): boolean => {
     // 防止 null 值导致崩溃
     if (!range || !range[0] || !range[1]) {
       return false;
@@ -348,7 +346,7 @@ const XhsNotesOperationPage: React.FC = () => {
   };
 
   // 快速选择日期 - 笔记排行榜独立筛选器
-  const handleQuickDateSelect = async (type: 'topNotes', option: 'days30' | 'ytd') => {
+  const handleQuickDateSelect = async (type: 'topNotes', option: 'days7' | 'days30' | 'ytd' | 'all') => {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
@@ -579,8 +577,8 @@ const XhsNotesOperationPage: React.FC = () => {
       item.valid_lead_users,
       item.opened_account_users,
       item.valid_customer_users,
-      `${item.opening_rate.toFixed(2)}%`,
-      `${item.valid_customer_rate.toFixed(2)}%`,
+      `${(item.opening_rate || 0).toFixed(2)}%`,
+      `${(item.valid_customer_rate || 0).toFixed(2)}%`,
       item.total_assets || 0,
     ]);
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -602,60 +600,6 @@ const XhsNotesOperationPage: React.FC = () => {
     ]);
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   };
-
-  // 创作趋势图表配置 - ECharts
-  const creationTrendOption = useMemo((): EChartsOption => {
-    if (!data?.creation_trend?.dates?.length) return {};
-
-    const yField = creationChartType === 'impressions' ? '曝光量' :
-                   creationChartType === 'interactions' ? '互动量' :
-                   creationChartType === 'cost' ? '消耗' : '笔记数';
-
-    const seriesData = data.creation_trend.dates.map((date, index) => {
-      const value = creationChartType === 'impressions' ? data.creation_trend?.impression_series[index] || 0 :
-                   creationChartType === 'interactions' ? data.creation_trend?.interaction_series[index] || 0 :
-                   creationChartType === 'cost' ? data.creation_trend?.cost_series[index] || 0 :
-                   data.creation_trend?.note_counts[index] || 0;
-      return [date, value];
-    });
-
-    return {
-      tooltip: {
-        trigger: 'axis',
-        showContent: true,
-      },
-      legend: {
-        show: false,
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true,
-      },
-      xAxis: {
-        type: 'category',
-        data: data.creation_trend.dates,
-        axisLabel: {
-          rotate: data.creation_trend.dates.length > 30 ? 45 : 0,
-        },
-      },
-      yAxis: {
-        type: 'value',
-        name: yField,
-      },
-      series: [{
-        name: yField,
-        type: 'line',
-        smooth: true,
-        data: seriesData.map(d => d[1]),
-        symbol: 'circle',
-        symbolSize: 4,
-        itemStyle: { color: '#1890ff' },
-        lineStyle: { color: '#1890ff' },
-      }],
-    };
-  }, [data?.creation_trend, creationChartType]);
 
   // 转化趋势图表配置 - ECharts 分组柱状图（原样复制旧版）
   const conversionTrendOption = useMemo((): EChartsOption => {
@@ -862,7 +806,7 @@ const XhsNotesOperationPage: React.FC = () => {
         name: producer,
         type: 'bar' as const,
         stack: 'total',
-        data: matrix.matrix[producer] || [],
+        data: matrix.matrix?.[producer] || [],
         itemStyle: { color: palette[idx % palette.length] },
         emphasis: { focus: 'series' as const },
         barMaxWidth: 40,
@@ -993,10 +937,11 @@ const XhsNotesOperationPage: React.FC = () => {
     // 以 content 为主，转化数据合并进来；转化有但 content 没有的也补上
     const seenProducers = new Set<string>();
     contentList.forEach(c => {
-      const cv = conversionMap.get(c.producer);
-      seenProducers.add(c.producer);
+      const producer = c.producer || '';
+      const cv = conversionMap.get(producer);
+      seenProducers.add(producer);
       merged.push({
-        producer: c.producer,
+        producer,
         note_count: c.note_count || 0,
         total_impressions: c.total_impressions || 0,
         total_clicks: c.total_clicks || 0,
@@ -1011,9 +956,10 @@ const XhsNotesOperationPage: React.FC = () => {
       });
     });
     conversionList.forEach(cv => {
-      if (!seenProducers.has(cv.producer)) {
+      const producer = cv.producer || '';
+      if (!seenProducers.has(producer)) {
         merged.push({
-          producer: cv.producer,
+          producer,
           note_count: 0,
           total_impressions: 0,
           total_clicks: 0,
@@ -1212,7 +1158,7 @@ const XhsNotesOperationPage: React.FC = () => {
       key: 'total_cost',
       width: 90,
       align: 'right' as const,
-      sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => a.total_cost - b.total_cost,
+      sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => (a.total_cost || 0) - (b.total_cost || 0),
       render: (value: number) => value ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` : '-',
     },
     {
@@ -1221,7 +1167,7 @@ const XhsNotesOperationPage: React.FC = () => {
       key: 'total_impressions',
       width: 90,
       align: 'right' as const,
-      sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => a.total_impressions - b.total_impressions,
+      sorter: (a: XhsTopNoteItem, b: XhsTopNoteItem) => (a.total_impressions || 0) - (b.total_impressions || 0),
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -1377,7 +1323,7 @@ const XhsNotesOperationPage: React.FC = () => {
       key: 'lead_users',
       width: 70,
       align: 'right' as const,
-      sorter: (a: XhsEmployeeConversionItem, b: XhsEmployeeConversionItem) => a.lead_users - b.lead_users,
+      sorter: (a: XhsEmployeeConversionItem, b: XhsEmployeeConversionItem) => (a.lead_users || 0) - (b.lead_users || 0),
       render: (value: number) => value?.toLocaleString() || '-',
     },
     {
@@ -1583,7 +1529,7 @@ const XhsNotesOperationPage: React.FC = () => {
             <div style={{ background: 'rgba(99, 102, 241, 0.08)', borderLeft: '3px solid var(--chart-color-5)', padding: '14px 16px', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--chart-color-5)', fontWeight: 600, marginBottom: 6 }}>新增笔记数</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {formatNumber(data?.core_metrics?.new_notes_count || 0)}
+                {formatNumber(Number(data?.core_metrics?.new_notes_count) || 0)}
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>篇</div>
             </div>
@@ -1592,7 +1538,7 @@ const XhsNotesOperationPage: React.FC = () => {
             <div style={{ background: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid var(--color-warning)', padding: '14px 16px', borderRadius: 6 }}>
               <div style={{ fontSize: 11, color: 'var(--color-warning)', fontWeight: 600, marginBottom: 6 }}>投放金额</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                ¥{formatNumber(data?.core_metrics?.total_cost || 0, 2)}
+                ¥{formatNumber(Number(data?.core_metrics?.total_cost) || 0, 2)}
               </div>
               <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>元</div>
             </div>
@@ -1610,35 +1556,35 @@ const XhsNotesOperationPage: React.FC = () => {
               <div style={{ background: 'var(--color-brand-bg)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--color-text-brand)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
                 <div style={{ fontSize: 10, color: 'var(--color-text-brand)', fontWeight: 600, marginBottom: 4 }}>曝光量</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_impressions || 0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(Number(data?.core_metrics?.total_impressions) || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
               <div style={{ background: 'rgba(226, 121, 0, 0.1)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-7)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</div>
                 <div style={{ fontSize: 10, color: 'var(--chart-color-7)', fontWeight: 600, marginBottom: 4 }}>点击量</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_clicks || 0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(Number(data?.core_metrics?.total_clicks) || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
               <div style={{ background: 'rgba(235, 47, 199, 0.08)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-8)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</div>
                 <div style={{ fontSize: 10, color: 'var(--chart-color-8)', fontWeight: 600, marginBottom: 4 }}>私信进线</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_private_messages || 0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(Number(data?.core_metrics?.total_private_messages) || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
               <div style={{ background: 'rgba(21, 168, 119, 0.1)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--color-success)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>4</div>
                 <div style={{ fontSize: 10, color: 'var(--color-success)', fontWeight: 600, marginBottom: 4 }}>加企微</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_lead_users || 0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(Number(data?.core_metrics?.total_lead_users) || 0)}</div>
               </div>
             </Col>
             <Col span={4.8} style={{ width: '20%' }}>
               <div style={{ background: 'rgba(114, 46, 209, 0.08)', borderRadius: 6, padding: 12, textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: 8, left: 8, width: 18, height: 18, background: 'var(--chart-color-5)', color: 'var(--bg-content)', borderRadius: '50%', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>5</div>
                 <div style={{ fontSize: 10, color: 'var(--chart-color-5)', fontWeight: 600, marginBottom: 4 }}>开户数</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(data?.core_metrics?.total_opened_accounts || 0)}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>{formatNumber(Number(data?.core_metrics?.total_opened_accounts) || 0)}</div>
               </div>
             </Col>
           </Row>
@@ -1652,16 +1598,16 @@ const XhsNotesOperationPage: React.FC = () => {
           </div>
           <Row gutter={10}>
             <Col span={6}>
-              {renderRateCard('曝光点击率', data?.core_metrics?.impression_click_rate || 0, '曝光 → 点击')}
+              {renderRateCard('曝光点击率', Number(data?.core_metrics?.impression_click_rate) || 0, '曝光 → 点击')}
             </Col>
             <Col span={6}>
-              {renderRateCard('点击进线率', data?.core_metrics?.click_lead_rate || 0, '点击 → 私信')}
+              {renderRateCard('点击进线率', Number(data?.core_metrics?.click_lead_rate) || 0, '点击 → 私信')}
             </Col>
             <Col span={6}>
-              {renderRateCard('进线加微率', data?.core_metrics?.lead_to_wechat_rate || 0, '私信 → 加微')}
+              {renderRateCard('进线加微率', Number(data?.core_metrics?.lead_to_wechat_rate) || 0, '私信 → 加微')}
             </Col>
             <Col span={6}>
-              {renderRateCard('线索开户率', data?.core_metrics?.wechat_to_account_rate || 0, '加微 → 开户')}
+              {renderRateCard('线索开户率', Number(data?.core_metrics?.wechat_to_account_rate) || 0, '加微 → 开户')}
             </Col>
           </Row>
         </div>
@@ -1674,16 +1620,16 @@ const XhsNotesOperationPage: React.FC = () => {
           </div>
           <Row gutter={10}>
             <Col span={6}>
-              {renderCostCard('千次曝光成本', data?.core_metrics?.cost_per_mille || 0, '元/千次')}
+              {renderCostCard('千次曝光成本', Number(data?.core_metrics?.cost_per_mille) || 0, '元/千次')}
             </Col>
             <Col span={6}>
-              {renderCostCard('点击成本', data?.core_metrics?.cost_per_click || 0, '元/次')}
+              {renderCostCard('点击成本', Number(data?.core_metrics?.cost_per_click) || 0, '元/次')}
             </Col>
             <Col span={6}>
-              {renderCostCard('单企微成本', data?.core_metrics?.cost_per_lead_user || 0, '元/人')}
+              {renderCostCard('单企微成本', Number(data?.core_metrics?.cost_per_lead_user) || 0, '元/人')}
             </Col>
             <Col span={6}>
-              {renderCostCard('单开户成本', data?.core_metrics?.cost_per_opened_account || 0, '元/户')}
+              {renderCostCard('单开户成本', Number(data?.core_metrics?.cost_per_opened_account) || 0, '元/户')}
             </Col>
           </Row>
         </div>

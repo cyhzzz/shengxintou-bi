@@ -11,7 +11,8 @@
  */
 import React, { useRef, useEffect, useCallback } from 'react';
 import * as echarts from 'echarts/core';
-import type { ECharts, EChartsOption } from 'echarts';
+import type { EChartsType } from 'echarts/core';
+import type { EChartsOption } from 'echarts';
 import { LineChart, BarChart, PieChart, RadarChart } from 'echarts/charts';
 import {
   TitleComponent,
@@ -58,7 +59,7 @@ export interface EChartsProps {
   /** 主题：light/dark，不传则跟随 data-theme 属性 */
   theme?: 'light' | 'dark';
   /** 图表初始化完成回调 */
-  onChartReady?: (chart: ECharts) => void;
+  onChartReady?: (chart: EChartsType) => void;
   /** 容器样式 */
   style?: React.CSSProperties;
   /** 容器类名 */
@@ -79,7 +80,7 @@ const EChartsComponent: React.FC<EChartsProps> = ({
   disableAnimation = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ECharts | null>(null);
+  const chartRef = useRef<EChartsType | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   // 获取当前主题

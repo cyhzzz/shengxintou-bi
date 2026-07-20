@@ -39,7 +39,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
   prefix,
   suffix,
   formatter = 'number',
-  inverseTrend = false,
   variant = 'default',
   icon,
   tooltip,

@@ -2,7 +2,6 @@
  * 带 shimmer 骨架屏的表格包装组件
  * loading 时展示 SkeletonTable，否则展示 antd Table
  */
-import React from 'react';
 import { Table } from 'antd';
 import type { TableProps } from 'antd';
 import SkeletonTable from '@/components/SkeletonTable';
