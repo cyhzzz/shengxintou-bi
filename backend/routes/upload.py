@@ -66,8 +66,11 @@ def allowed_file(filename):
 # 后台处理线程
 # -----------------------------------------------------------------------------
 def _process_file(task_id: str, filepath: str, data_type: str,
-                  overwrite: bool, log_id: int):
-    """异步处理文件（v2 原样导入）。"""
+                  overwrite: bool, log_id: int, batch_tag: str = None):
+    """异步处理文件（v2 原样导入）。
+
+    v3.3.6：qingniao_leads 支持 batch_tag 参数（批次标注），其他类型忽略此参数。
+    """
     try:
         from app import app
         with app.app_context():
@@ -81,9 +84,13 @@ def _process_file(task_id: str, filepath: str, data_type: str,
             import_log.message = '正在读取 Excel 文件...'
             db.session.commit()
 
-            # v2 原样导入（pandas to_sql replace）
+            # v2 原样导入
             started = time.time()
-            meta = raw_import.write_to_db(data_type, filepath)
+            # v3.3.6：qingniao_leads 传 batch_tag 给 write_to_db → handle_qingniao_leads
+            if data_type == 'qingniao_leads':
+                meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
+            else:
+                meta = raw_import.write_to_db(data_type, filepath)
             elapsed = time.time() - started
 
             written = meta.get('written', {})
@@ -196,6 +203,10 @@ def upload_file():
 
     overwrite = request.form.get('overwrite', 'false').lower() == 'true'
 
+    # v3.3.6：批次标注（仅 qingniao_leads 使用，其他类型忽略）
+    # 不传时由 raw_import.handle_qingniao_leads 默认用 'YYYYMMDDHHmm'
+    batch_tag = request.form.get('batch_tag', '').strip() or None
+
     task_id = str(uuid.uuid4())
     original_filename = file.filename
 
@@ -233,7 +244,7 @@ def upload_file():
     # 启动异步线程
     thread = threading.Thread(
         target=_process_file,
-        args=(task_id, filepath, data_type, overwrite, log_id),
+        args=(task_id, filepath, data_type, overwrite, log_id, batch_tag),
         daemon=True,
     )
     thread.start()
@@ -245,6 +256,8 @@ def upload_file():
             'status': 'pending',
             'message': f'文件已接收，使用 {DATA_TYPES[data_type]} 原样导入（v2，无中间计算）',
             'data_type': data_type,
+            # v3.3.6：回传 batch_tag 便于前端自动选中本次批次
+            'batch_tag': batch_tag,
         }
     })
 

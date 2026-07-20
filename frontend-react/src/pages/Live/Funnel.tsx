@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
-import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined, RiseOutlined, DollarOutlined, FireOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, RiseOutlined, DollarOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -385,7 +385,7 @@ const LiveFunnelPage: React.FC = () => {
     { title: '主播数', dataIndex: 'anchors', align: 'right' as const, width: 100, sorter: (a: PlatformRow, b: PlatformRow) => a.anchors - b.anchors, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
     { title: '线索', dataIndex: 'leads', align: 'right' as const, width: 110, sorter: (a: PlatformRow, b: PlatformRow) => a.leads - b.leads, render: (v: number) => v.toLocaleString() },
     { title: '存量客户', dataIndex: 'existing_leads', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
-    { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+    { title: '线索数', dataIndex: 'new_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '开口', dataIndex: 'mouth', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
     { title: '有效线索(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 130, render: (v: number) => v.toLocaleString() },
@@ -427,7 +427,7 @@ const LiveFunnelPage: React.FC = () => {
     { title: '平台数', width: 80, align: 'center' as const, render: (_: any, r: AnchorAggRow) => <Tag color="blue">{r.platforms.length}</Tag> },
     { title: '线索量', dataIndex: 'leads', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.leads - b.leads, defaultSortOrder: 'descend' as const, render: (v: number) => v.toLocaleString() },
     { title: '存量客户', dataIndex: 'existing_leads', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
-    { title: '新客户', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+    { title: '线索数', dataIndex: 'new_leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
     { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
     { title: '有效(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
@@ -478,7 +478,7 @@ const LiveFunnelPage: React.FC = () => {
         <FadeInSection delay={0.4} duration={0.8}>
           <MetricSection title="直播获客核心产出" description="同名主播跨平台去重后的新客户获客主指标（仅统计非存量客户，v3.1.25 起坚持这一口径）">
           <MetricCard title="主播数" value={totals.anchors} valueColor="var(--color-brand)" icon={<VideoCameraOutlined style={{ color: 'var(--color-brand)' }} />} description={`同名主播跨平台去重后的活跃主播数量`} showWowChange={false} />
-          <MetricCard title="新客户" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
+          <MetricCard title="线索数" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
           <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
           <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />
           <MetricCard title="新开户资产" value={totals.new_assets} prefix="¥" formatter="currency" valueColor="var(--color-warning)" icon={<DollarOutlined style={{ color: 'var(--color-warning)' }} />} description={`非存量且开户成功客户总资产·主指标`} showWowChange={false} />

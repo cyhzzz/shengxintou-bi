@@ -80,14 +80,19 @@ const DashboardPage: React.FC = () => {
     fetchTrendData,
   } = useTrendData();
 
-  // 开户日历热力图：过去 365 天 互联网渠道每日开户数
+  // 开户日历热力图：过去 365 天 每日开户数（v3.3.6：跟随筛选器 平台/代理商/业务模式）
   const [calendarData, setCalendarData] = useState<{ date: string; value: number }[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   useEffect(() => {
     let alive = true;
     setCalendarLoading(true);
+    // v3.3.6：把筛选器条件带到日历端点（与核心指标/趋势图保持口径一致）
+    const calFilters: Record<string, unknown> = {};
+    if (filters.platforms.length > 0) calFilters.platforms = filters.platforms;
+    if (filters.agencies.length > 0) calFilters.agencies = filters.agencies;
+    if (filters.business_models.length > 0) calFilters.business_models = filters.business_models;
     dataServiceOmniChannel
-      .getOmniChannelDailyCalendar({ days: 365 })
+      .getOmniChannelDailyCalendar({ days: 365, filters: calFilters })
       .then((resp: any) => {
         if (!alive) return;
         const rows = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
@@ -96,7 +101,8 @@ const DashboardPage: React.FC = () => {
       .catch((err) => { if (alive) { setCalendarData([]); message.warning('开户日历热力图加载失败，已使用空数据兜底'); console.error('[Dashboard] daily-calendar load failed:', err); } })
       .finally(() => { if (alive) setCalendarLoading(false); });
     return () => { alive = false; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.platforms, filters.agencies, filters.business_models]);
 
   // 合并加载状态
   const loading = coreMetricsLoading || trendLoading;
