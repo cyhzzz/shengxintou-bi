@@ -27,7 +27,6 @@ export interface FadeInSectionProps {
  */
 export const FadeInSection: React.FC<FadeInSectionProps> = ({
   children,
-  fullWidth = true,
   className = '',
   style,
 }) => {

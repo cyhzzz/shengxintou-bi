@@ -53,8 +53,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   '互联网引流': ECHARTS_COLORS[3],
 };
 const CATEGORY_ORDER = ['合作机构', '自然流入', '员工开户', '互联网引流'];
-// 二级渠道（渠道名称）调色板，按出现顺序循环取色
-const SUBCHANNEL_PALETTE = ECHARTS_COLORS;
 
 interface SubRow {
   channel_category: string;
@@ -140,7 +138,7 @@ const OmniChannelPage: React.FC = () => {
   );
 
   // 兼容旧 by-channel 路径：filters 里已有 sub_channels 时 by-channel 也透传
-  const byChannelFilters = filters;;
+  const byChannelFilters = filters;
 
   const load = async () => {
     setLoading(true);
@@ -157,12 +155,15 @@ const OmniChannelPage: React.FC = () => {
           )
         ),
       ]);
-      if (sumRes?.success) setSummary(sumRes.data);
-      if (trendRes?.success) setTrend(trendRes.data.daily_trend || trendRes.data.trend || []);
+      if (sumRes?.success) setSummary(sumRes.data as any);
+      if (trendRes?.success) {
+        const td = trendRes.data as any;
+        setTrend(td?.daily_trend || td?.trend || []);
+      }
       const map: Record<string, SubRow[]> = {};
       activeCategories.forEach((catName, idx) => {
         const res = channelResponses[idx];
-        if (res?.success) map[catName] = res.data.items || [];
+        if (res?.success) map[catName] = (res.data as any)?.items || [];
       });
       setByChannel(map);
     } finally {
@@ -180,10 +181,6 @@ const OmniChannelPage: React.FC = () => {
     setSelectedCategories([]);
     setSelectedSubChannels([]);
   };
-
-  const topCategory = summary?.top_category;
-  // 前端 summary state 类型补 top_category 字段（TS 宽类型 any 等价兼容）
-
 
   // 趋势图：按 一级/二级渠道 + 开户/有效户 维度运行时聚合（长格式 -> 宽格式 + series）
   const chartData = useMemo(() => {

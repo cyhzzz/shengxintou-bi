@@ -16,7 +16,6 @@ import {
   SettingOutlined,
   UploadOutlined,
   UserOutlined,
-  TagOutlined,
   SyncOutlined,
   FilePdfOutlined,
   MobileOutlined,

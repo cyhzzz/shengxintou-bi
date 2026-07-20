@@ -163,12 +163,12 @@ function buildTrendChartOption(dates: string[], series: any[], metric: MetricTyp
       },
       splitLine: { lineStyle: { type: 'dashed', color: '#f0f1f3' } },
     },
-    series: seriesData,
+    series: seriesData as any,
     dataZoom: dates.length > 30 ? [
       { type: 'inside', start: 0, end: 100 },
       { type: 'slider', start: 0, end: 100, height: 20, bottom: 0 },
     ] : [],
-  };
+  } as EChartsOption;
 }
 
 const AgencyAnalysisLegacyPage: React.FC = () => {
@@ -200,7 +200,7 @@ const AgencyAnalysisLegacyPage: React.FC = () => {
         params.business_models = selectedBusinessModels.join(',');
       }
 
-      const response: AgencyAnalysisResponse = await getAgencyAnalysis(params);
+      const response = await getAgencyAnalysis(params) as unknown as AgencyAnalysisResponse;
 
       if (response.success && response.data) {
         // 展平数据 - 与旧版逻辑一致
@@ -259,7 +259,7 @@ const AgencyAnalysisLegacyPage: React.FC = () => {
         params.end_date = dateRange.endDate;
       }
 
-      const response: AgencyAnalysisResponse = await getAgencyAnalysis(params);
+      const response = await getAgencyAnalysis(params) as unknown as AgencyAnalysisResponse;
 
       if (response.success && response.data) {
         const flattenedSummary = (response.data.summary || []).map((item: any) => {
@@ -461,7 +461,7 @@ const AgencyAnalysisLegacyPage: React.FC = () => {
       dataIndex: 'agency',
       key: 'agency',
       width: 120,
-      render: (value: string, record: FlattenedSummaryItem) => {
+      render: (value: string) => {
         const display = value || '未归因';
         return <strong>{display}</strong>;
       },

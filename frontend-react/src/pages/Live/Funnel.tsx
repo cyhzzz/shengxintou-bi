@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
-import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, RiseOutlined, DollarOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, RiseOutlined, DollarOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -260,8 +260,8 @@ const LiveFunnelPage: React.FC = () => {
       grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
       xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },
       yAxis: [{ type: 'value', name: '新开户(人)' }],
-      series: [...series, totalSeries],
-    };
+      series: [...series, totalSeries] as any,
+    } as EChartsOption;
   }, [trendData, trendGranularity]);
 
   const totals = useMemo(() => {

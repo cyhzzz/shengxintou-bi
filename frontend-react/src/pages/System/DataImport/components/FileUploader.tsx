@@ -3,6 +3,7 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import { Upload, message, Progress, Switch, Space, Spin } from 'antd';
+import type { UploadProps } from 'antd/es/upload/interface';
 import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { UploadResponse } from '@/types/api.schemas';
 import ImportResult from './ImportResult';
@@ -145,7 +146,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
     multiple: false,
     accept: '.xlsx,.xls,.csv',
     showUploadList: false,
-    customRequest: async (options) => {
+    customRequest: async (options: any) => {
       const { file } = options;
       setUploading(true);
       setProgress(0);

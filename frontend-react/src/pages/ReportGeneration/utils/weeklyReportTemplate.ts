@@ -8,7 +8,20 @@
  * - 支持重点工作增删改
  */
 
-import type { ReportData, WorkItem } from '../index';
+// 周报数据结构（局部定义，与上层调用方对齐；保留 any 以兼容模板内动态字段访问）
+interface WorkItem {
+  work_id?: string | number;
+  work_num?: string | number;
+  work_category?: string;
+  work_description?: string;
+}
+
+interface ReportData {
+  report_week?: number;
+  key_works?: WorkItem[];
+  branch_new_accounts_cumulative?: number;
+  [key: string]: any;
+}
 
 /**
  * 格式化数字（添加千分位）
@@ -680,7 +693,7 @@ export function generateWeeklyReportHTML(data: ReportData): string {
             <div class="section-title" contenteditable="true">重点工作进展</div>
 
             <div class="work-list">
-                ${keyWorks.map((work, index) => `
+                ${keyWorks.map((work: WorkItem, index: number) => `
                     <div class="work-item" data-work-id="${work.work_id || ''}" data-index="${index}">
                         <div class="work-num" contenteditable="true">${work.work_num || ''}</div>
                         <div class="work-cat" contenteditable="true">${work.work_category || ''}</div>

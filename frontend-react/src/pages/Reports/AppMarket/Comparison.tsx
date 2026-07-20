@@ -97,9 +97,9 @@ const AppMarketComparisonPage: React.FC = () => {
   }, [data]);
 
   // 月度堆叠柱状图：横轴月份，分段应用市场
-  const monthlyOption: EChartsOption = useMemo(() => {
-    const months = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.month))).sort();
-    const markets = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.app_market))).sort();
+  const monthlyOption = useMemo((): EChartsOption => {
+    const months: string[] = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.month))).sort() as string[];
+    const markets: string[] = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.app_market))).sort() as string[];
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { top: 0, type: 'scroll' },
@@ -115,7 +115,7 @@ const AppMarketComparisonPage: React.FC = () => {
           return row ? row.counts['新开户'] || 0 : 0;
         }),
         emphasis: { focus: 'series' },
-      })),
+      })) as any,
     };
   }, [data]);
 

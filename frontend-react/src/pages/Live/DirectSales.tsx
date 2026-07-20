@@ -394,8 +394,8 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
       grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
       xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },
       yAxis: [{ type: 'value', name: '新开户(人)' }],
-      series: [...series, totalSeries],
-    };
+      series: [...series, totalSeries] as any,
+    } as EChartsOption;
   }, [trendData, trendGranularity]);
 
   // v3.3.3 P0-1: 新开户率走势图 option
@@ -450,8 +450,8 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
           axisLabel: { formatter: '{value}%' },
         },
       ],
-      series: [...series, totalRateSeries],
-    };
+      series: [...series, totalRateSeries] as any,
+    } as EChartsOption;
   }, [trendData, trendGranularity]);
 
   // 汇总指标
@@ -828,8 +828,8 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
           type: 'radar',
           data: series,
         },
-      ],
-    };
+      ] as any,
+    } as EChartsOption;
   }, [anchorAggRows]);
 
   // v3.3.3 P3-11: 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱图）
@@ -867,8 +867,8 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
         axisLabel: { fontSize: 11, interval: 0, rotate: 0 },
       },
       yAxis: { type: 'value', name: '人数' },
-      series,
-    };
+      series: series as any,
+    } as EChartsOption;
   }, [anchorAggRows]);
 
   const anchorAggColumns = [
@@ -969,7 +969,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>
           <MetricSection title={`${liveType}核心产出`} description={`${meta.anchorLabel}的新客户获客主指标（仅统计非存量客户）`}>
-            <MetricCard title={`${meta.anchorLabel}数`} value={totals.anchors} valueColor="var(--color-brand)" icon={React.cloneElement(meta.icon as React.ReactElement, { style: { color: 'var(--color-brand)' } })} description={`直播类型=${liveType}的主播数`} showWowChange={false} />
+            <MetricCard title={`${meta.anchorLabel}数`} value={totals.anchors} valueColor="var(--color-brand)" icon={React.cloneElement(meta.icon as React.ReactElement<any>, { style: { color: 'var(--color-brand)' } } as any)} description={`直播类型=${liveType}的主播数`} showWowChange={false} />
             <MetricCard title="线索数" value={totals.new_leads} valueColor="var(--color-brand)" icon={<UserAddOutlined style={{ color: 'var(--color-brand)' }} />} description={`非存量线索·核心获客容量`} showWowChange={false} />
             <MetricCard title="新开户" value={totals.new_opened} valueColor="var(--color-error)" icon={<AimOutlined style={{ color: 'var(--color-error)' }} />} description={`非存量且成功开户人数·主指标`} showWowChange={false} />
             <MetricCard title="新有效户" value={totals.new_valid} valueColor="var(--color-success)" icon={<CheckCircleOutlined style={{ color: 'var(--color-success)' }} />} description={`非存量且有效户人数·主指标`} showWowChange={false} />

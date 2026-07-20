@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 账号管理页面
  * 管理各平台账号与代理商的映射关系
  */
@@ -11,13 +11,13 @@ import styles from './AccountManagement.module.scss';
 
 const { Title } = Typography;
 
-interface AccountMappingForm extends Omit<AccountMapping, 'created_at' | 'updated_at'> {
-  agency_short?: string;
+interface AccountMappingForm {
   platform: string;
   account_id?: string;
   account_name: string;
   main_account_id?: string;
   agency: string;
+  agency_short?: string;
   business_model: string;
 }
 
@@ -27,26 +27,16 @@ const AccountManagementPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AccountMapping | null>(null);
-  const [agencyOptions, setAgencyOptions] = useState<{value: string; label: string}[]>([]);
   const [currentPlatform, setCurrentPlatform] = useState<string>('腾讯');
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-
-  const loadAgencyOptions = useCallback(async () => {
-    try {
-      const response = await metadataService.getMetadata();
-      if (response.success && response.data) {
-        setAgencyOptions(response.data.agencies || []);
-      }
-    } catch { /* ignore */ }
-  }, []);
 
 const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await metadataService.getAccountMappings();
       if (response.success && response.data) {
-        setData(response.data);
+        setData(response.data as AccountMapping[]);
       } else {
         message.error('获取数据失败');
       }
@@ -70,7 +60,7 @@ const fetchData = useCallback(async () => {
   };
 
   const handleEdit = (record: AccountMapping) => {
-    setCurrentPlatform(record.platform);
+    setCurrentPlatform(record.platform || '');
     setEditingRecord(record);
     form.setFieldsValue({
       platform: record.platform,
@@ -115,7 +105,7 @@ const fetchData = useCallback(async () => {
           message.error('更新失败');
         }
       } else {
-        const response = await metadataService.createAccountMapping(values);
+        const response = await metadataService.createAccountMapping(values as any);
         if (response.success) {
           message.success('添加成功');
           setModalVisible(false);
@@ -139,8 +129,9 @@ const fetchData = useCallback(async () => {
       '小红书': [],
     };
     data.forEach((item) => {
-      if (groups[item.platform]) {
-        groups[item.platform].push(item);
+      const plat = item.platform || '';
+      if (groups[plat]) {
+        groups[plat].push(item);
       }
     });
     return groups;
@@ -189,7 +180,7 @@ const fetchData = useCallback(async () => {
             </Button>
             <Popconfirm
               title="确定删除此映射？"
-              onConfirm={() => handleDelete(record.platform, record.account_id || '')}
+              onConfirm={() => handleDelete(record.platform || '', record.account_id || '')}
             >
               <Button type="link" size="small" danger icon={<DeleteOutlined />}>
                 删除

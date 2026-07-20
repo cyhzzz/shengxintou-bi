@@ -18,9 +18,9 @@ import {
 // v3.2.5：按需 import（echarts/core），图表/组件/渲染器由 EChartsComponent 模块副作用注册
 // 这里只触发副作用 + 拿到 echarts core API（init / EChartsOption type）
 import * as echarts from 'echarts/core';
-import type { ECharts, EChartsOption } from 'echarts';
+import type { EChartsType } from 'echarts/core';
+import type { EChartsOption } from 'echarts';
 import '@/components/Chart/ECharts'; // 触发 echarts.use 副作用（幂等）
-import { pickEChartsColor } from '@/utils/echartsColors';
 import { FadeInSection } from '@/components';
 import styles from './index.module.scss';
 
@@ -242,8 +242,8 @@ const ReportGeneration: React.FC = () => {
   const posterRef = useRef<HTMLDivElement>(null);
   const opensChartRef = useRef<HTMLDivElement>(null);
   const yearlyChartRef = useRef<HTMLDivElement>(null);
-  const opensChartInstanceRef = useRef<ECharts | null>(null);
-  const yearlyChartInstanceRef = useRef<ECharts | null>(null);
+  const opensChartInstanceRef = useRef<EChartsType | null>(null);
+  const yearlyChartInstanceRef = useRef<EChartsType | null>(null);
 
   // 加载报告期选项
   const loadWeekOptions = useCallback(async () => {

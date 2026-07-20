@@ -24,13 +24,11 @@ const quickOptions = [
 interface DateRangeFilterProps {
   onChange?: (startDate: string, endDate: string) => void;
   showQuickSelect?: boolean;
-  defaultDays?: number;
 }
 
 const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   onChange,
   showQuickSelect = true,
-  defaultDays = 0,  // 默认选中"全部"
 }) => {
   const { dateRange, setDateRange, setQuickDateRange } = useFilterStore();
   // 从持久化的 store 状态派生初始高亮按钮，避免跨页面导航后高亮与实际范围不一致

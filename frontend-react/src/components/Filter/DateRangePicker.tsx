@@ -13,12 +13,14 @@ interface DateRangePickerProps {
   value: [string, string] | null;
   onChange: (dates: [string, string]) => void;
   placeholder?: [string, string];
+  style?: React.CSSProperties;
 }
 
 const DateRangePicker: React.FC<DateRangePickerProps> = ({
   value,
   onChange,
   placeholder = ['开始日期', '结束日期'],
+  style,
 }) => {
   // 将字符串日期转换为 Dayjs 对象，处理 null 值
   const dayjsValue: [Dayjs | null, Dayjs | null] = value
@@ -40,7 +42,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
       onChange={handleChange}
       placeholder={placeholder}
       allowClear
-      style={{ width: 260 }}
+      style={{ width: 260, ...style }}
       suffixIcon={<CalendarOutlined />}
     />
   );

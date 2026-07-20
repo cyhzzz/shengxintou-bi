@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 业务模式筛选器组件
  * 多选业务模式筛选
  */
@@ -28,7 +28,7 @@ const BusinessModelFilter: React.FC<BusinessModelFilterProps> = ({
     const loadBusinessModels = async () => {
       const response = await metadataService.getMetadata();
       if (response.success && response.data) {
-        setBusinessModelOptions(response.data.business_models);
+        setBusinessModelOptions((response.data.business_models || []).map((m: string) => ({ value: m, label: m })));
       }
     };
     loadBusinessModels();
