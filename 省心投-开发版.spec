@@ -5,7 +5,7 @@ Developer 打包配置（带 console 便于开发调试）。
 用法:
   pip install pyinstaller
   cd 项目根目录
-  pyinstaller 省心投-开发版_new.spec
+  pyinstaller 省心投-开发版.spec
 
 产物: dist/省心投启动器.exe（带窗口 + 控制台日志）
 \"\"\"

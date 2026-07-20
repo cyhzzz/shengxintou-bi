@@ -28,11 +28,17 @@ export interface PaginationParams {
 
 // 数据服务
 export const dataService = {
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取汇总数据
   getSummary: async (filters?: FilterParams): Promise<ApiResponse<SummaryData>> => {
     return http.post('/summary', { filters });
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取趋势数据
   getTrend: async (
     filters?: FilterParams,
@@ -42,6 +48,9 @@ export const dataService = {
     return http.post('/trend', { filters, metrics, granularity });
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取数据概览核心指标（与原始前端一致）
   getDashboardCoreMetrics: async (params?: {
     platforms?: string[];
@@ -53,6 +62,9 @@ export const dataService = {
     return http.post('/dashboard/core-metrics', params || {});
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取数据概览趋势数据（与原始前端一致）
   getDashboardTrendData: async (params: {
     start_date: string;
@@ -65,6 +77,9 @@ export const dataService = {
     return http.post('/dashboard/trend-data', params);
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，前端改走 @/types/api 的同名函数
+   */
   // 获取代理商分析数据
   getAgencyAnalysis: async (filters?: FilterParams): Promise<ApiResponse<AgencyAnalysisData>> => {
     // 后端使用 GET 请求，需要将 filters 转换为查询参数
@@ -82,6 +97,9 @@ export const dataService = {
     return http.get('/agency-analysis', params);
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，前端改走 @/types/api 的同名函数
+   */
   // 获取转化漏斗数据（v2.1 单端点，保留兼容）
   getConversionFunnel: async (filters?: FilterParams): Promise<ApiResponse<ConversionFunnelData>> => {
     return http.post('/conversion-funnel', { filters });
@@ -91,6 +109,9 @@ export const dataService = {
     return http.post('/conversion-funnel/split', { filters });
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，前端改走 @/types/api 的同名函数
+   */
   // 获取线索明细
   getLeadsDetail: async (
     params?: FilterParams & PaginationParams
@@ -119,16 +140,25 @@ export const dataService = {
     return http.get('/xhs-notes/filter-options');
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取小红书运营分析
   getXhsNotesOperation: async (filters?: FilterParams): Promise<ApiResponse<unknown>> => {
     return http.post('/xhs-notes-operation-analysis', { filters });
   },
 
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 获取员工转化分析
   getEmployeeConversionAnalysis: async (filters?: FilterParams): Promise<ApiResponse<unknown>> => {
     return http.post('/employee-conversion/analysis', { filters });
   },
 
+  /**
+   * @deprecated v3.3.9 起自更新前端入口已移除，3 个方法全部闲置
+   */
   // 获取版本信息
   // Git 更新状态（git head / dirty / 远端 sha）
   getGitStatus: async (): Promise<ApiResponse<{
@@ -143,10 +173,16 @@ export const dataService = {
   }>> => {
     return http.get('/system/self-update/git-status');
   },
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 启动一次自更新（git pull origin main）
   selfUpdateStart: async (force = false): Promise<ApiResponse<{ task_id: string; message: string }>> => {
     return http.post('/system/self-update/start', { force });
   },
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // 查询自更新任务状态（前端 1s 轮询）
   selfUpdateStatus: async (taskId: string): Promise<ApiResponse<{
     task_id: string;
@@ -212,6 +248,9 @@ export const dataServiceReports = {
   getAppMarketSummary: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
     return http.post('/reports/app-market/summary', { filters });
   },
+  /**
+   * @deprecated v3.3.9 起未使用，Funnel 页改用 getAppMarketSummary
+   */
   getAppMarketFunnel: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
     return http.post('/reports/app-market/funnel', { filters });
   },
@@ -221,6 +260,9 @@ export const dataServiceReports = {
   getAppMarketFilterOptions: async () => {
     return http.get('/reports/app-market/filter-options');
   },
+  /**
+   * @deprecated v3.3.9 起未使用，Creative 页改用 getAppMarketPlanAnalysis
+   */
   getAppMarketCreative: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
     return http.post('/reports/app-market/creative', params);
   },
@@ -277,6 +319,9 @@ export const dataServiceLeadsAnchor = {
   getAnchorClusters: async (params: { filters?: Record<string, unknown>; top_n?: number } = {}) => {
     return http.post('/leads-detail/anchor-clusters', params);
   },
+  /**
+   * @deprecated v3.3.9 起未使用，保留接口待后续清理
+   */
   // v3.1.27: 主播引流走势 (daily/weekly/monthly, 按平台 series)
   getAnchorClustersTrend: async (params: { filters?: Record<string, unknown>; granularity?: 'daily' | 'weekly' | 'monthly' } = {}) => {
     return http.post('/leads-detail/anchor-clusters-trend', params);

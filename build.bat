@@ -7,7 +7,7 @@ REM        build.bat dev       — 打包开发版（带 console，便于调试�
 setlocal
 
 if \"%1\"==\"dev\" (
-    set SPEC=省心投-开发版_new.spec
+    set SPEC=省心投-开发版.spec
     set LABEL=开发版（带 console）
 ) else (
     set SPEC=省心投启动器.spec

@@ -84,7 +84,7 @@ jobs:
           $stage = "release-stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           # 运行时必需文件
-          Copy-Item -Path app.py, config.py, launcher.py, requirements.txt, version.json, AGENTS.md, CLAUDE.md, LICENSE, README.md, .env.example, 省心投启动器.spec, 省心投-开发版_new.spec, build.bat -Destination $stage -Force
+          Copy-Item -Path app.py, config.py, launcher.py, requirements.txt, version.json, AGENTS.md, CLAUDE.md, LICENSE, README.md, .env.example, 省心投启动器.spec, 省心投-开发版.spec, build.bat -Destination $stage -Force
           Copy-Item -Path backend -Destination $stage -Recurse -Force
           Copy-Item -Path frontend-react/dist -Destination $stage/frontend-react/dist -Recurse -Force
           if (Test-Path icon) { Copy-Item -Path icon -Destination $stage -Recurse -Force }
