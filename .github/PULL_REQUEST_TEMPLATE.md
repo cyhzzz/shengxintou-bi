@@ -45,9 +45,10 @@
 - [ ] 改 `src/types/api.ts`：通过 `npm run generate:api` 重新生成（不手改）
 
 ### 文档
-- [ ] `AGENTS.md` / `CLAUDE.md` 同步修改且 SHA256 一致
+- [ ] `python scripts/check_rule_architecture.py` 通过（自动校验双入口 SHA256、规则链接与版本漂移）
+- [ ] 稳定规则写入 `docs/rules/`；版本历史只写入 `version.json`
 - [ ] changelog 写入 `version.json`（如发版）
-- [ ] 新增组件 / 端点 / 路由在 AGENTS.md 索引里登记
+- [ ] 架构/公共入口变化已更新 `docs/rules/overview.md` 或对应专题规则
 
 ## 关联 Issue
 
@@ -59,7 +60,7 @@
 
 ## 自检
 
-- [ ] 我已读 `AGENTS.md` 修改守则
+- [ ] 我已读 `AGENTS.md` 及本次改动涉及的 `docs/rules/` 专题规则
 - [ ] 我没有把本地数据库 / 上传文件 / `prototype/` / `tmp_*` / `logs/bug-fix-shots/` 加入索引
 - [ ] `.env` 与 `database/*.db` 未被提交
 - [ ] 我没有复活旧 v1 上传类型 / 旧原生前端目录 / 旧周报系统
