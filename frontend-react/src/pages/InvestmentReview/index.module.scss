@@ -1,0 +1,96 @@
+@use '../../styles/mixins' as *;
+
+.investmentReviewPage {
+  padding: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacer-12);
+  padding: var(--spacer-16) var(--spacer-20);
+  margin-bottom: var(--spacer-16);
+  background: var(--bg-content);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-12);
+}
+
+.toolbarIcon {
+  font-size: 18px;
+  color: var(--color-brand);
+}
+
+.toolbarTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.toolbarMeta {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  padding: 2px 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-12);
+}
+
+.agencyCard {
+  margin-bottom: var(--spacer-20);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+
+  :global(.ant-card-head-title) {
+    padding: 12px 0;
+  }
+}
+
+.cardTitleRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacer-12);
+}
+
+.cardTitleMain {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.cardTitleSub {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.chartContainer {
+  width: 100%;
+  margin-bottom: var(--spacer-16);
+}
+
+.monthTable {
+  :global(.ant-table-thead > tr > th) {
+    background: var(--bg-secondary);
+    font-weight: var(--font-weight-medium);
+  }
+}
+
+.totalRow {
+  td {
+    background: var(--bg-hover) !important;
+    font-weight: var(--font-weight-semibold);
+    border-top: 1.5px solid var(--color-text-primary) !important;
+  }
+}

@@ -20,6 +20,7 @@ from . import xhs_operation
 from . import employee_conversion
 from . import weekly_report_poster
 from . import data_reconciliation
+from . import investment_review
 
 # 汇总Blueprint（为了兼容性，创建一个主Blueprint）
 # 实际使用时需要分别注册各个Blueprint
@@ -37,4 +38,5 @@ __all__ = [
     'employee_conversion',
     'weekly_report_poster',
     'data_reconciliation',
+    'investment_review',
 ]

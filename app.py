@@ -498,6 +498,7 @@ from backend.routes.data import (
     employee_conversion,
     weekly_report_poster,
     data_reconciliation,
+    investment_review,
 )
 
 # 注意：已移除模块缓存清除和reload逻辑，避免"module not in sys.modules"错误
@@ -519,6 +520,7 @@ app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
 app.register_blueprint(employee_conversion.bp, url_prefix=API_PREFIX)
 app.register_blueprint(weekly_report_poster.bp, url_prefix=API_PREFIX)
 app.register_blueprint(data_reconciliation.bp, url_prefix=API_PREFIX)
+app.register_blueprint(investment_review.bp, url_prefix=API_PREFIX)
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')

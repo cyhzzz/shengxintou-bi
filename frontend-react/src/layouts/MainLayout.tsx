@@ -63,13 +63,14 @@ const menuItems: MenuProps['items'] = [
   },
   { type: 'divider' },
   // ===== 第二段：业务专题 =====
-  // 内容平台（v3.3.6 新增一级菜单：线索明细 + 抖音青鸟对账）
+  // 内容平台（v3.3.6 新增一级菜单：线索明细 + 抖音青鸟对账；v3.3.10 增加投放评审）
   {
     key: 'content-platform',
     icon: <FileTextOutlined />,
     label: '内容平台',
     children: [
       { key: '/leads-detail', label: '线索明细', icon: <UnorderedListOutlined /> },
+      { key: '/investment-review', label: '投放评审', icon: <AuditOutlined /> },
       { key: '/data-reconciliation/douyin-qingniao', label: '抖音青鸟对账', icon: <AuditOutlined /> },
     ],
   },
