@@ -40,7 +40,8 @@ const OmniChannelReportPage = lazy(() => import('@/pages/Reports/OmniChannel'));
 const AppMarketFunnelPage = lazy(() => import('@/pages/Reports/AppMarket/Funnel'));
 const AppMarketComparisonPage = lazy(() => import('@/pages/Reports/AppMarket/Comparison'));
 const AppMarketDetailPage = lazy(() => import('@/pages/Reports/AppMarket/Detail'));
-const AppMarketCreativePage = lazy(() => import('@/pages/Reports/AppMarket/Creative'));
+// v3.3.10: Creative.tsx → PlanAnalysis.tsx（统一为"计划分析"命名）
+const AppMarketPlanAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/PlanAnalysis'));
 
 // 直播 v3.1
 const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
@@ -50,6 +51,8 @@ const ReportGenerationPage = lazy(() => import('@/pages/ReportGeneration'));
 const DouyinQingniaoReconciliationPage = lazy(() => import('@/pages/DataReconciliation/DouyinQingniao'));
 // v3.3.10: 投放评审（内容平台二级菜单）
 const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
+// v3.3.10: 小红书计划分析（小红书二级菜单）
+const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
 
 const router = createBrowserRouter([
   {
@@ -72,6 +75,8 @@ const router = createBrowserRouter([
         children: [
           { path: 'list', element: withSuspense(XhsNotesListPage) },
           { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
+          // v3.3.10: 小红书计划分析
+          { path: 'plan-analysis', element: withSuspense(XhsPlanAnalysisPage) },
         ],
       },
       {
@@ -89,7 +94,10 @@ const router = createBrowserRouter([
           { path: 'funnel', element: withSuspense(AppMarketFunnelPage) },
           { path: 'comparison', element: withSuspense(AppMarketComparisonPage) },
           { path: 'detail', element: withSuspense(AppMarketDetailPage) },
-          { path: 'creative', element: withSuspense(AppMarketCreativePage) },
+          // v3.3.10: 计划分析（应用市场）
+          { path: 'plan-analysis', element: withSuspense(AppMarketPlanAnalysisPage) },
+          // v3.3.10: 旧路径 creative 重定向到 plan-analysis
+          { path: 'creative', element: <Navigate to="/app-market/plan-analysis" replace /> },
         ],
       },
       // 直播 v3.1 占位

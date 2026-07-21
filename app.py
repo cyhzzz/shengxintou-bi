@@ -482,6 +482,8 @@ from backend.routes.system import self_update as system
 from backend.routes import weekly_reports
 from backend.routes.reports import app_market as app_market_report_blueprint
 from backend.routes.reports import omni_channel as omni_channel_report_blueprint
+# v3.3.10: 小红书计划分析（仿应用市场 /plan-analysis，数据源 fact_conv_content）
+from backend.routes.reports import xhs_plan_analysis as xhs_plan_analysis_report_blueprint
 
 # 导入拆分后的数据模块
 from backend.routes.data import (
@@ -528,6 +530,8 @@ app.register_blueprint(system.bp)
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 app.register_blueprint(app_market_report_blueprint.bp)
 app.register_blueprint(omni_channel_report_blueprint.bp)
+# v3.3.10: 小红书计划分析（URL prefix 已在蓝图定义: /api/v1/reports/xhs）
+app.register_blueprint(xhs_plan_analysis_report_blueprint.bp)
 
 # ============================================================================
 # 数据库初始化（必须在所有 ORM 模型被 import 之后调用，否则 db.create_all()

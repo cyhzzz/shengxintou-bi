@@ -83,7 +83,8 @@ const menuItems: MenuProps['items'] = [
       { key: '/app-market/funnel', label: '获客漏斗', icon: <FunnelPlotOutlined /> },
       { key: '/app-market/comparison', label: '市场对比', icon: <AppstoreOutlined /> },
       { key: '/app-market/detail', label: '明细查询', icon: <UnorderedListOutlined /> },
-      { key: '/app-market/creative', label: '计划分析', icon: <FileTextOutlined /> },
+      // v3.3.10: 路由 key 由 /app-market/creative 改为 /app-market/plan-analysis（命名统一）
+      { key: '/app-market/plan-analysis', label: '计划分析', icon: <FileTextOutlined /> },
     ],
   },
   {
@@ -93,6 +94,8 @@ const menuItems: MenuProps['items'] = [
     children: [
       { key: '/xhs-notes/list', label: '笔记列表', icon: <FileTextOutlined /> },
       { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
+      // v3.3.10: 小红书计划分析（仿应用市场 plan-analysis 报表）
+      { key: '/xhs-notes/plan-analysis', label: '计划分析', icon: <FileTextOutlined /> },
     ],
   },
   // 直播获客（含主播聚类二级菜单）

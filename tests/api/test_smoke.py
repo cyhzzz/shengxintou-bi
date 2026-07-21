@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """省心投 BI - 后端 API 冒烟测试
 
 目标：快速验证核心接口返回 200 + 响应结构合法。
@@ -276,6 +276,51 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIsInstance(data, dict)
         # 若返回了 selected_platform，应等于请求的平台
         self.assertEqual(data.get('selected_platform'), '华为')
+
+    def test_48_xhs_plan_analysis(self):
+        # v3.3.10 小红书 · 计划分析（仿应用市场 plan-analysis）
+        # 数据源：fact_conv_content（平台来源=小红书）
+        # 漏斗：企微 → 开口 → 有效线索 → 有效线索(不含存量) → 新开户 → 有效户（6 阶段）
+        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END}, 'top_n': 10}
+        data = self._ok(
+            self._post('/api/v1/reports/xhs/plan-analysis', payload),
+            '/reports/xhs/plan-analysis')
+        self.assertIsInstance(data, dict)
+        self.assertIn('agencies', data)
+        self.assertIn('target_agencies', data)
+        self.assertIn('weekly_totals', data)
+        self.assertIn('plan_items', data)
+        self.assertIn('totals', data)
+        # 验证 6 阶段漏斗结构（key 与 funnel_stages 顺序对齐）
+        expected_keys = {'企微', '开口', '有效线索', '有效线索_不含存量', '新开户', '有效户'}
+        if data['weekly_totals']:
+            w = data['weekly_totals'][0]
+            for k in expected_keys:
+                self.assertIn(k, w, f'weekly_totals[0] 缺少阶段 {k}')
+            # 验证至少一个转化率字段
+            self.assertIn('企微_新开户率', w)
+        # 验证计划项结构
+        if data['plan_items']:
+            p = data['plan_items'][0]
+            self.assertIn('plan_id', p)
+            self.assertIn('广告账号', p)
+            self.assertIn('广告代理商', p)
+            self.assertIn('totals', p)
+            self.assertIn('weekly', p)
+            for k in expected_keys:
+                self.assertIn(k, p['totals'], f'plan.totals 缺少阶段 {k}')
+
+    def test_49_xhs_plan_analysis_with_agency(self):
+        # v3.3.10 小红书 · 计划分析（指定代理商筛选）
+        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END, 'agency': '量子'}, 'top_n': 5}
+        data = self._ok(
+            self._post('/api/v1/reports/xhs/plan-analysis', payload),
+            '/reports/xhs/plan-analysis?agency=量子')
+        self.assertIsInstance(data, dict)
+        # 若返回了 selected_agency，应等于请求的代理商
+        self.assertEqual(data.get('selected_agency'), '量子')
+        # 业务期望代理商名单固定 4 家
+        self.assertEqual(set(data.get('target_agencies', [])), {'直投', '量子', '绩牛', '美洋'})
 
     # ============================================================
     #  员工转化 / 线索明细 / 小红书

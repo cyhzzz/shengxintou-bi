@@ -270,6 +270,13 @@ export const dataServiceReports = {
   getAppMarketPlanAnalysis: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
     return http.post('/reports/app-market/plan-analysis', params);
   },
+  // v3.3.10 小红书 · 计划分析（按周度走势 + 按代理商单选）
+  //   filters.agency: 单值字符串，可为 None=全部（仅 TARGET_AGENCIES 内代理商）
+  //   filters.start_date / end_date: 日期区间
+  //   top_n: Top N 计划（默认 30）
+  getXhsPlanAnalysis: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
+    return http.post('/reports/xhs/plan-analysis', params);
+  },
 };
 
 
