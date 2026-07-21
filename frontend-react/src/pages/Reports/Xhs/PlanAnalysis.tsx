@@ -77,6 +77,8 @@ const XhsPlanAnalysisPage: React.FC = () => {
   const [totals, setTotals] = useState<any>({ total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0 });
   const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
+  // v3.3.10: 计划详情表 - 按广告账号多选筛选（仅影响详情表，不影响走势/指标卡）
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
@@ -88,7 +90,30 @@ const XhsPlanAnalysisPage: React.FC = () => {
     setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
     setAgency(undefined);
     setTopN(30);
+    setSelectedAccounts([]);
   };
+
+  // v3.3.10: 计划详情表 - 按所选账号多选过滤
+  //  - 未选（空数组）= 全部展示
+  //  - 选中 N 个 = 只展示这些账号下的广告 ID 行
+  //  - 走势图（weekly_totals / 5 张指标卡）不受账号筛选影响，保持代理商层级总览
+  const filteredPlanItems = useMemo(() => {
+    if (!selectedAccounts.length) return planItems;
+    const set = new Set(selectedAccounts);
+    return planItems.filter((p) => set.has(p['广告账号']));
+  }, [planItems, selectedAccounts]);
+
+  // 当前 plan_items 中所有出现过的广告账号（去重 + 排序，供多选下拉）
+  const accountOptions = useMemo(() => {
+    const set = new Set<string>();
+    planItems.forEach((p) => {
+      if (p['广告账号'] && p['广告账号'] !== '-') set.add(p['广告账号']);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+  }, [planItems]);
+
+  // 切换代理商/重置时清空账号选择（账号是代理商下的子集，避免孤儿选项）
+  useEffect(() => { setSelectedAccounts([]); }, [agency, planItems]);
 
   const load = async () => {
     setLoading(true);
@@ -245,13 +270,13 @@ const XhsPlanAnalysisPage: React.FC = () => {
     };
   }, [weeklyTotals]);
 
-  const exportCsv = () => {
-    if (!planItems.length) return;
+  const exportCsv = (rowsSource: PlanItem[] = planItems) => {
+    if (!rowsSource.length) return;
     const headers = ['广告ID', '广告账号', '广告代理商', '周起始日',
       '企微', '开口', '有效线索', '有效线索(不含存量)', '新开户', '有效户',
       '企微→开口%', '企微→有效线索%', '企微→不含存量%', '企微→新开户%', '企微→有效户%', '开口→新开户%', '不含存量→有效户%'];
     const rows: string[] = [];
-    planItems.forEach((p) => {
+    rowsSource.forEach((p) => {
       p.weekly.forEach((w) => {
         rows.push([
           p.plan_id, p['广告账号'], p['广告代理商'] || '', w.week_start,
@@ -266,7 +291,8 @@ const XhsPlanAnalysisPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `小红书计划分析_${agency || '全部'}_${new Date().toISOString().slice(0, 10)}.csv`;
+    const accountsTag = selectedAccounts.length > 0 ? `_账号x${selectedAccounts.length}` : '';
+    link.download = `小红书计划分析_${agency || '全部'}${accountsTag}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -437,18 +463,49 @@ const XhsPlanAnalysisPage: React.FC = () => {
 
         <FadeInSection delay={1.2} duration={0.8}>
           <Card
-            title={`计划详情（${planItems.length} 个计划 · 按新开户降序 · 展开查看周度明细）`}
+            title={
+              <Space size={8} align="center" wrap>
+                <span>计划详情</span>
+                <Tag color="blue">
+                  {selectedAccounts.length > 0
+                    ? `已选 ${selectedAccounts.length} 个账号 / 显示 ${filteredPlanItems.length} 个计划`
+                    : `共 ${planItems.length} 个计划`}
+                </Tag>
+                <span className={styles.label}>按广告账号筛选</span>
+                <Select
+                  mode="multiple"
+                  allowClear
+                  placeholder="全部账号（不选 = 全部）"
+                  value={selectedAccounts}
+                  onChange={(v) => setSelectedAccounts(v || [])}
+                  options={accountOptions.map((a) => ({ label: a, value: a }))}
+                  style={{ minWidth: 260, maxWidth: 480 }}
+                  showSearch
+                  optionFilterProp="label"
+                  maxTagCount="responsive"
+                />
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  按新开户降序 · 展开查看周度明细
+                </span>
+              </Space>
+            }
             size="small"
             extra={
-              <Tooltip title="导出为 CSV（按计划 × 周长表）">
-                <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!planItems.length}>导出 CSV</Button>
+              <Tooltip title="导出为 CSV（按当前筛选后的计划 × 周长表）">
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={() => exportCsv(filteredPlanItems)}
+                  disabled={!filteredPlanItems.length}
+                >
+                  导出 CSV
+                </Button>
               </Tooltip>
             }
           >
             <Table
               size="small"
               rowKey={(r: any) => r.row_id}
-              dataSource={planItems}
+              dataSource={filteredPlanItems}
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
               scroll={{ x: 'max-content' }}
               expandable={{
