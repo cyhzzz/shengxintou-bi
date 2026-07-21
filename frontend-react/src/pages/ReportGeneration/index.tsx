@@ -41,7 +41,9 @@ interface MetricSet {
   impressions: number;   // 品牌曝光
   leads_wx: number;      // 企微数（内容平台）
   leads_app: number;     // APP激活数（应用市场）
-  opens: number;         // 开户数
+  opens_app: number;     // 应用市场开户数（互联网引流里属于应用市场大类）
+  opens_other: number;  // 其他渠道开户数（互联网引流里非应用市场部分）
+  opens: number;         // 合计新开户数（互联网引流合计 = opens_app + opens_other）
   valid: number;         // 新增有效户数
   assets: number;        // 新增客户资产
 }
@@ -78,15 +80,19 @@ interface WeeklyData {
   };
 }
 
-// 7 个核心指标定义（v3.1.32：线索数拆分为企微数 + APP激活数）
-const METRICS: Array<{ key: keyof MetricSet; label: string; fmt: (n: number) => string }> = [
-  { key: 'cost', label: '消耗金额', fmt: fmtMoney },
-  { key: 'impressions', label: '品牌曝光', fmt: fmtLarge },
-  { key: 'leads_wx', label: '企微数', fmt: fmtNum },
-  { key: 'leads_app', label: 'APP激活数', fmt: fmtNum },
-  { key: 'opens', label: '开户数', fmt: fmtNum },
-  { key: 'valid', label: '新增有效户数', fmt: fmtNum },
-  { key: 'assets', label: '新增客户资产', fmt: fmtMoney },
+// 核心指标定义（v3.3.10：开户数拆 3 行 — 应用市场 / 其他渠道 / 合计）
+// rowType: normal=普通指标；sub=开户数分项行（淡背景+不加粗）；total=合计行（加粗+顶部分隔线）
+type RowType = 'normal' | 'sub' | 'total';
+const METRICS: Array<{ key: keyof MetricSet; label: string; fmt: (n: number) => string; rowType: RowType }> = [
+  { key: 'cost', label: '消耗金额', fmt: fmtMoney, rowType: 'normal' },
+  { key: 'impressions', label: '品牌曝光', fmt: fmtLarge, rowType: 'normal' },
+  { key: 'leads_wx', label: '企微数', fmt: fmtNum, rowType: 'normal' },
+  { key: 'leads_app', label: 'APP激活数', fmt: fmtNum, rowType: 'normal' },
+  { key: 'opens_app', label: '应用市场开户数', fmt: fmtNum, rowType: 'sub' },
+  { key: 'opens_other', label: '其他渠道开户数', fmt: fmtNum, rowType: 'sub' },
+  { key: 'opens', label: '合计新开户数', fmt: fmtNum, rowType: 'total' },
+  { key: 'valid', label: '新增有效户数', fmt: fmtNum, rowType: 'normal' },
+  { key: 'assets', label: '新增客户资产', fmt: fmtMoney, rowType: 'normal' },
 ];
 
 // 格式化数字（千分位）
@@ -586,7 +592,7 @@ const ReportGeneration: React.FC = () => {
                   </div>
                 </header>
 
-                {/* 1. 核心指标：7 指标 × 3 列（本周/全年/环比） */}
+                {/* 1. 核心指标：本周 + 全年累计（环比作为本周数字旁的小字角标，弱化视觉） */}
                 <section className={styles.layerCard}>
                   <div className={styles.layerHeader}>
                     <span className={styles.layerTitle}>核心指标</span>
@@ -601,14 +607,12 @@ const ReportGeneration: React.FC = () => {
                       <col />
                       <col />
                       <col />
-                      <col />
                     </colgroup>
                     <thead>
                       <tr>
                         <th>指标</th>
                         <th>本周</th>
                         <th>全年累计</th>
-                        <th>环比</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -618,16 +622,20 @@ const ReportGeneration: React.FC = () => {
                         const wow = weeklyData.week_over_week[m.key];
                         const wowFmt = fmtWow(wow);
                         return (
-                          <tr key={m.key}>
+                          <tr key={m.key} data-row-type={m.rowType}>
                             <td className={styles.cellName}>{m.label}</td>
-                            <td className={styles.cellNum}>{m.fmt(cw)}</td>
-                            <td className={styles.cellNum}>{m.fmt(ytd)}</td>
-                            <td
-                              className={`${styles.cellNum} ${styles.wowCell}`}
-                              data-positive={wowFmt.positive === null ? 'na' : wowFmt.positive ? 'up' : 'down'}
-                            >
-                              {wowFmt.text}
+                            <td className={styles.cellNum}>
+                              <span className={styles.cellWithWow}>
+                                <span className={styles.cellMain}>{m.fmt(cw)}</span>
+                                <span
+                                  className={styles.wowSup}
+                                  data-positive={wowFmt.positive === null ? 'na' : wowFmt.positive ? 'up' : 'down'}
+                                >
+                                  {wowFmt.text}
+                                </span>
+                              </span>
                             </td>
+                            <td className={styles.cellNum}>{m.fmt(ytd)}</td>
                           </tr>
                         );
                       })}
@@ -714,7 +722,7 @@ const ReportGeneration: React.FC = () => {
                 <ul>
                   <li>消耗金额 / 品牌曝光 / APP激活数：来自 agg_vendor_daily（广告投放日聚合）</li>
                   <li>企微数：来自 fact_conv_content COUNT（内容平台线索明细，1 行=1 企微）</li>
-                  <li>开户数 / 新增有效户数：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流</li>
+                  <li>开户数（应用市场 / 其他渠道 / 合计）：来自 agg_daily_channel_open，仅统计渠道类别=互联网引流；按渠道名称拆分（应用市场大类：华为/荣耀/小米/oppo/vivo/苹果/鸿蒙，其余为其他渠道），与堆叠图口径一致</li>
                   <li>新增客户资产：内容平台 fact_conv_content（是否开户=1 AND 非存量）+ 应用市场 fact_conv_appmarket（是否新开户=1 AND 渠道类型=互联网引流）</li>
                   <li>全年累计：年初至周末；环比：与上一周对比</li>
                   <li>互联网渠道占公司开户占比：互联网引流 / 全渠道类别（互联网引流+合作机构+员工开户+自然流入），分本周与全年累计两个口径</li>

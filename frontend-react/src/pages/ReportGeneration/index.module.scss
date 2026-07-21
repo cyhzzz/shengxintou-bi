@@ -505,18 +505,17 @@
   }
 }
 
-/* v3.1.31 核心指标表（6 指标 × 3 列：本周/全年/环比） */
+/* v3.3.10 核心指标表（3 列：指标/本周/全年累计；环比作为本周数字旁的小字角标） */
 .metricTable {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 12px;
 
-  /* 第一列固定 130px，其余 3 列均分 */
-  colgroup col:nth-child(1) { width: 130px; }
+  /* 第一列固定 140px（容纳"应用市场开户数"等长 label），其余 2 列均分 */
+  colgroup col:nth-child(1) { width: 140px; }
   colgroup col:nth-child(2),
-  colgroup col:nth-child(3),
-  colgroup col:nth-child(4) { width: calc((100% - 130px) / 3); }
+  colgroup col:nth-child(3) { width: calc((100% - 140px) / 2); }
 
   th {
     text-align: right;
@@ -558,22 +557,90 @@
   tbody tr:hover {
     background: #f7f7f7;
   }
+
+  /* v3.3.10 开户数分项行：淡背景 + 不加粗，与合计行形成视觉层级 */
+  tbody tr[data-row-type='sub'] {
+    background: #fafaf8;
+    font-weight: 400;
+
+    td {
+      font-weight: 400;
+      color: #595959;
+      border-bottom-color: #f5f5f3;
+    }
+
+    .cellMain {
+      font-weight: 400;
+    }
+
+    &:hover {
+      background: #f5f5f0;
+    }
+  }
+
+  /* 分项组起始：普通行 → 第一个分项行之间加粗黑线（分组起始边界） */
+  tbody tr[data-row-type='normal'] + tr[data-row-type='sub'] {
+    td {
+      border-top: 1.5px solid #1a1a1a;
+    }
+  }
+
+  /* 合计行：加粗，突出汇总地位 */
+  tbody tr[data-row-type='total'] {
+    td {
+      border-bottom: 1px solid #f0f0f0;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .cellName {
+      font-weight: 600;
+    }
+
+    .cellMain {
+      font-weight: 600;
+    }
+  }
+
+  /* 合计组结束：合计行 → 下一普通行之间加粗灰线（分组收尾边界） */
+  tbody tr[data-row-type='total'] + tr[data-row-type='normal'] {
+    td {
+      border-top: 1.5px solid #bfbfbf;
+    }
+  }
 }
 
-/* 环比单元格颜色（中国股市惯例：上升红、下降绿） */
-.wowCell {
+/* 本周单元格容器：主数字 + 环比角标 */
+.cellWithWow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.cellMain {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 环比角标：小字 + 淡色，弱化视觉（中国股市惯例：上升红、下降绿） */
+.wowSup {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+
   &[data-positive='up'] {
     color: #c0392b;
-    font-weight: 600;
   }
 
   &[data-positive='down'] {
     color: #27ae60;
-    font-weight: 600;
   }
 
   &[data-positive='na'] {
-    color: #a3a3a3;
+    color: #bfbfbf;
   }
 }
 

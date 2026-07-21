@@ -14,6 +14,9 @@ from flask import Flask, render_template, jsonify
 from flask_cors import CORS
 from config import *
 from backend.database import db
+# v3.3.10: 把 DimAnchorLiveType 提到顶层 import，避免 _sync_anchor_live_types_from_json
+# 异常时 except 分支访问不到该名字，同时让 db.create_all() 能在更早时机注册到 metadata
+from backend.models_v2 import DimAnchorLiveType
 
 # 修复：在便携Python环境中，将lib目录添加到sys.path
 # 这样即使PYTHONPATH环境变量不生效，也能正常导入第三方库
@@ -191,8 +194,7 @@ def _sync_anchor_live_types_from_json():
     """
     import json
     from datetime import datetime
-    from backend.models_v2 import DimAnchorLiveType
-    from backend.database import db
+    # DimAnchorLiveType / db 已在 app.py 顶层 import，这里无需重复
 
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                'backend', 'config', 'anchor_live_types.json')
@@ -366,12 +368,29 @@ def ensure_database_exists():
             logger.info("✓ 数据库表结构已就绪")
 
             # v3.3.0: 主播直播类型映射同步（JSON 权威源 → DB 缓存，每次启动都 upsert）
+            # v3.3.10: 同步失败时记录 ERROR 级别日志 + 二次校验表是否为空，避免静默失败导致
+            #          直播获客报表全 0 而用户毫无察觉
             try:
                 synced = _sync_anchor_live_types_from_json()
                 if synced > 0:
                     logger.info(f"✓ 主播直播类型映射已同步: {synced} 条")
+                else:
+                    # 二次校验：表里必须有 active 数据，否则直播获客报表会全 0
+                    from sqlalchemy import func as _func
+                    active_count = db.session.query(_func.count(DimAnchorLiveType.id)).filter(
+                        DimAnchorLiveType.is_active == 1
+                    ).scalar() or 0
+                    if active_count == 0:
+                        logger.error(
+                            "⚠ 主播直播类型映射表为空！直播获客报表将全 0。"
+                            "请检查 backend/config/anchor_live_types.json 是否存在且格式正确。"
+                        )
+                    else:
+                        logger.info(f"✓ 主播直播类型映射已就绪（{active_count} 条 active，本次无变化）")
             except Exception as e:
-                logger.warning(f"主播直播类型映射同步失败（不影响启动）: {e}")
+                import traceback
+                logger.error(f"主播直播类型映射同步失败（直播获客报表将全 0）: {e}")
+                logger.error(traceback.format_exc())
 
             # v3.3.6: fact_qingniao_leads 批次标注列迁移
             #   create_all 不会给已存在的表加列，需要手动 ALTER TABLE

@@ -46,14 +46,22 @@ def _safe_div(num, den, pct=False):
         return 0.0
 
 
+# 应用市场渠道名称集合（与前端 CHANNEL_CATEGORY_MAP 一致；用于开户数按渠道大类拆分）
+APP_MARKET_CHANNELS = ('华为', '荣耀', '小米', 'oppo', 'vivo', '苹果', '鸿蒙')
+
+
 def _query_metrics(sd, ed):
-    """查询某时间区间的 7 个核心指标
+    """查询某时间区间的核心指标
 
     1. 消耗金额 (agg_vendor_daily.花费)
     2. 品牌曝光 (agg_vendor_daily.展示量)
     3. 企微数   (fact_conv_content COUNT(*), 内容平台线索)
     4. APP激活数 (agg_vendor_daily.APP激活人数, 应用市场线索)
     5. 开户数   (agg_daily_channel_open.开户成功人数, 仅互联网引流)
+       v3.3.10 起按渠道名称拆 3 行：
+         - opens_app   应用市场开户数（华为/荣耀/小米/oppo/vivo/苹果/鸿蒙）
+         - opens_other 其他渠道开户数（互联网引流 - 应用市场）
+         - opens       合计新开户数（互联网引流合计）
     6. 新增有效户数 (agg_daily_channel_open.有效户数, 仅互联网引流)
     7. 新增客户资产 (agg_vendor_daily.客户资产 SUM)
        v3.2.3 起改走 DWS 预聚合字段，与 Dashboard /core-metrics 口径对齐
@@ -82,12 +90,28 @@ def _query_metrics(sd, ed):
         AggDailyChannelOpen.时间区间 <= ed,
     )).first()
 
+    # 应用市场开户数：互联网引流里渠道名称属于应用市场大类的部分
+    opens_app = db.session.query(
+        func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0)
+    ).filter(and_(
+        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.渠道名称.in_(APP_MARKET_CHANNELS),
+        AggDailyChannelOpen.时间区间 >= sd,
+        AggDailyChannelOpen.时间区间 <= ed,
+    )).scalar() or 0
+
+    opens_total = int(ch_r.opens or 0)
+    opens_app_int = int(opens_app)
+    opens_other_int = opens_total - opens_app_int
+
     return {
         'cost': float(ad_r.cost or 0),
         'impressions': int(ad_r.impressions or 0),
         'leads_wx': int(leads_wx),
         'leads_app': int(ad_r.leads_app or 0),
-        'opens': int(ch_r.opens or 0),
+        'opens_app': opens_app_int,
+        'opens_other': opens_other_int,
+        'opens': opens_total,
         'valid': int(ch_r.valid or 0),
         'assets': float(ad_r.assets or 0),
     }
@@ -148,7 +172,8 @@ def get_weekly_data():
 
     week_over_week = {
         k: _calc_wow(current_week[k], prev_week[k]) for k in
-        ['cost', 'impressions', 'leads_wx', 'leads_app', 'opens', 'valid', 'assets']
+        ['cost', 'impressions', 'leads_wx', 'leads_app',
+         'opens_app', 'opens_other', 'opens', 'valid', 'assets']
     }
 
     opens_daily_rows = db.session.query(
