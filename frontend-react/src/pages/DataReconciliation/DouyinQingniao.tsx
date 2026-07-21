@@ -25,6 +25,7 @@ import type { UploadProps } from 'antd';
 import {
   CheckCircleOutlined, DownloadOutlined, ReloadOutlined, SearchOutlined,
   WarningOutlined, ExclamationCircleOutlined, CloseCircleOutlined, UploadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { dataService } from '@/services/dataService';
@@ -48,11 +49,15 @@ interface ReconcileRecord {
   青鸟是否开口: string;        // '是' / '否'
   青鸟是否有效: string;
   青鸟是否开户: string;
-  状态: '未匹到' | '疑似漏打标' | '疑似误打标' | '正确';
+  状态: '未匹到' | '疑似漏打标' | '疑似误打标' | '正确' | '已删除';
   差异详情: string | null;
   青鸟线索ID: number;
   客户来源: string | null;
   添加员工姓名: string | null;
+  // v3.3.10：系统侧 fact_conv_content 新增字段
+  是否删除企微: string | null;       // '是' / '否' / null（未匹到时为 null）
+  互动次数: number | null;          // 客户与营销人员的总互动轮次
+  营销人员互动次数: number | null;   // 营销人员主动发消息次数
 }
 
 interface ReconcileSummary {
@@ -62,6 +67,7 @@ interface ReconcileSummary {
   suspected_missed_tag: number;
   suspected_wrong_tag: number;
   correct_count: number;
+  deleted_count: number;
 }
 
 interface DateRangeResp {
@@ -84,6 +90,7 @@ const STATUS_TAG_COLOR: Record<ReconcileRecord['状态'], string> = {
   '疑似漏打标': 'warning',
   '疑似误打标': 'orange',
   '未匹到': 'error',
+  '已删除': 'default',
 };
 
 const STATUS_ICON: Record<ReconcileRecord['状态'], React.ReactNode> = {
@@ -91,6 +98,7 @@ const STATUS_ICON: Record<ReconcileRecord['状态'], React.ReactNode> = {
   '疑似漏打标': <WarningOutlined style={{ color: '#faad14' }} />,
   '疑似误打标': <ExclamationCircleOutlined style={{ color: '#fa8c16' }} />,
   '未匹到': <CloseCircleOutlined style={{ color: 'var(--color-error)' }} />,
+  '已删除': <DeleteOutlined style={{ color: 'var(--color-text-tertiary)' }} />,
 };
 
 const TOLERANCE_OPTIONS = [
@@ -106,6 +114,7 @@ const STATUS_FILTER_OPTIONS = [
   { label: '疑似漏打标', value: '疑似漏打标' },
   { label: '疑似误打标', value: '疑似误打标' },
   { label: '正确', value: '正确' },
+  { label: '已删除', value: '已删除' },
 ];
 
 const DouyinQingniaoReconciliationPage: React.FC = () => {
@@ -338,7 +347,8 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       '青鸟线索ID', '青鸟昵称', '青鸟日期', '企微昵称', '线索日期',
       '后台是否开口', '后台是否有效', '后台是否开户',
       '青鸟是否开口', '青鸟是否有效', '青鸟是否开户',
-      '状态', '差异详情', '客户来源', '添加员工姓名', '批次标注',
+      '状态', '差异详情', '客户来源', '添加员工姓名',
+      '是否删除企微', '互动轮次', '主动发消息次数', '批次标注',
     ];
     const rows = filteredRecords.map(r => [
       r.青鸟线索ID, r.青鸟昵称 ?? '', r.青鸟日期 ?? '',
@@ -346,6 +356,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       r.后台是否开口 ?? '', r.后台是否有效 ?? '', r.后台是否开户 ?? '',
       r.青鸟是否开口, r.青鸟是否有效, r.青鸟是否开户,
       r.状态, r.差异详情 ?? '', r.客户来源 ?? '', r.添加员工姓名 ?? '',
+      r.是否删除企微 ?? '', r.互动次数 ?? '', r.营销人员互动次数 ?? '',
       selectedBatchTag ?? '',
     ]);
     const csv = [headers, ...rows]
@@ -380,6 +391,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
         { text: '疑似漏打标', value: '疑似漏打标' },
         { text: '疑似误打标', value: '疑似误打标' },
         { text: '正确', value: '正确' },
+        { text: '已删除', value: '已删除' },
       ],
       onFilter: (val: React.Key | boolean, record: ReconcileRecord) => record.状态 === val,
     },
@@ -439,6 +451,30 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
     {
       title: '添加员工', dataIndex: '添加员工姓名', key: '添加员工姓名', width: 100,
       render: (v: string | null) => v ?? <Text type="secondary">—</Text>,
+    },
+    {
+      // v3.3.10：已删除的企微不再需要补打标/改标，作为特殊标志独立展示
+      title: '是否删除企微', dataIndex: '是否删除企微', key: '是否删除企微', width: 110,
+      render: (v: string | null) => {
+        if (v === null) return <Text type="secondary">—</Text>;
+        if (v === '是') return <Text type="secondary">是</Text>;
+        return <Text>否</Text>;
+      },
+    },
+    {
+      // v3.3.10：互动轮次（fact_conv_content.互动次数）
+      title: '互动轮次', dataIndex: '互动次数', key: '互动次数', width: 90, align: 'right' as const,
+      sorter: (a: ReconcileRecord, b: ReconcileRecord) =>
+        (a.互动次数 ?? -1) - (b.互动次数 ?? -1),
+      render: (v: number | null) => v != null ? v : <Text type="secondary">—</Text>,
+    },
+    {
+      // v3.3.10：主动发消息次数（fact_conv_content.营销人员互动次数）
+      title: '主动发消息次数', dataIndex: '营销人员互动次数', key: '营销人员互动次数',
+      width: 130, align: 'right' as const,
+      sorter: (a: ReconcileRecord, b: ReconcileRecord) =>
+        (a.营销人员互动次数 ?? -1) - (b.营销人员互动次数 ?? -1),
+      render: (v: number | null) => v != null ? v : <Text type="secondary">—</Text>,
     },
   ];
 
@@ -551,6 +587,13 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
               valueColor="#fa8c16"
               tooltip="系统侧标志=0 但青鸟侧对应标志位「已打」"
             />
+            <MetricCard
+              title="已删除"
+              value={summary.deleted_count}
+              icon={<DeleteOutlined />}
+              valueColor="var(--color-text-tertiary)"
+              tooltip="系统侧企微已删除，不再需要补打标/改标"
+            />
           </MetricSection>
         </FadeInSection>
       )}
@@ -592,7 +635,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
                 columns={columns}
                 dataSource={filteredRecords}
                 size="small"
-                scroll={{ x: 1600 }}
+                scroll={{ x: 1930 }}
                 pagination={{
                   pageSize: 50,
                   showSizeChanger: true,
@@ -608,10 +651,10 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       <FadeInSection duration={1.0} delay={0.6}>
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'fact_qingniao_leads + fact_conv_content（抖音引流线索）' },
+            { label: '数据源', value: 'fact_qingniao_leads + fact_conv_content（全渠道线索）' },
             { label: '匹配字段', value: '微信线索昵称（青鸟）+ 微信昵称（系统）；日期 + 线索日期（容差 ±N 天）' },
             { label: '对账端点', value: 'POST /api/v1/data-reconciliation/douyin-qingniao/match' },
-            { label: '状态判定', value: '系统=1 青鸟=未打 → 疑似漏打标；系统=0 青鸟=已打 → 疑似误打标；3 标志一致 → 正确' },
+            { label: '状态判定', value: '已删除 > 疑似漏打标 > 疑似误打标 > 正确；已删除企微不参与打标差异判定' },
           ]}
         />
       </FadeInSection>

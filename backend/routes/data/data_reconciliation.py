@@ -210,6 +210,7 @@ def douyin_qingniao_match():
         'suspected_missed_tag': 0,
         'suspected_wrong_tag': 0,
         'correct_count': 0,
+        'deleted_count': 0,
     }
 
     if not qn_rows:
@@ -223,6 +224,9 @@ def douyin_qingniao_match():
     # v3.3.6 修订：原口径「仅匹配抖音引流」会漏掉 36% 的线索（青鸟是抖音后端的全量回传，
     # 不区分引流路径；系统的广告投放/视频号引流/搜索等渠道线索也可能在青鸟侧出现）。
     # 实测放宽到全渠道后匹配率从 49.3% 提升到 85.5%。
+    # v3.3.10 新增：拉「是否删除企微 / 互动次数 / 营销人员互动次数」3 个字段
+    #   - 是否删除企微：已删除的企微不再需要补打标/改标，状态直接标「已删除」
+    #   - 互动次数 + 营销人员互动次数：业务观察客户沟通过程情况
     sys_rows = db.session.query(
         FactConvContent.微信昵称,
         FactConvContent.线索日期,
@@ -231,6 +235,9 @@ def douyin_qingniao_match():
         FactConvContent.是否开户,
         FactConvContent.客户来源,
         FactConvContent.添加员工姓名,
+        FactConvContent.是否删除企微,
+        FactConvContent.互动次数,
+        FactConvContent.营销人员互动次数,
     ).filter(FactConvContent.微信昵称.isnot(None)).all()
 
     # 构建系统侧索引：normalized_nickname -> list of dicts
@@ -252,6 +259,11 @@ def douyin_qingniao_match():
             '是否开户': int(r.是否开户 or 0),
             '客户来源': r.客户来源,
             '添加员工姓名': r.添加员工姓名,
+            '是否删除企微': int(r.是否删除企微 or 0),
+            '互动次数': int(r.互动次数) if r.互动次数 is not None else None,
+            '营销人员互动次数': (
+                int(r.营销人员互动次数) if r.营销人员互动次数 is not None else None
+            ),
             '_date_obj': d_obj,
         })
 
@@ -264,6 +276,7 @@ def douyin_qingniao_match():
         'suspected_missed_tag': 0,
         'suspected_wrong_tag': 0,
         'correct_count': 0,
+        'deleted_count': 0,
     }
 
     for qn in qn_rows:
@@ -306,12 +319,20 @@ def douyin_qingniao_match():
                 '青鸟线索ID': qn.id,
                 '客户来源': None,
                 '添加员工姓名': None,
+                '是否删除企微': None,
+                '互动次数': None,
+                '营销人员互动次数': None,
             })
             summary['missed_count'] += 1
             continue
 
-        # 取日期最接近的那条（候选集已确保容差内）
-        candidates.sort(key=lambda c: abs((c['_date_obj'] - qn_date_obj).days))
+        # v3.3.10：候选排序优先未删除的，再按日期接近度
+        # 业务规则：已删除的企微不再需要补打标/改标，所以匹配时优先选未删除的候选；
+        # 只有当所有候选都已删除时，才取已删除的（状态会标为「已删除」）。
+        candidates.sort(key=lambda c: (
+            c['是否删除企微'],
+            abs((c['_date_obj'] - qn_date_obj).days),
+        ))
         best = candidates[0]
         summary['matched_count'] += 1
 
@@ -320,6 +341,8 @@ def douyin_qingniao_match():
         # 系统 1 + 青鸟 0 → 疑似漏打标（青鸟漏标）
         # 系统 0 + 青鸟 1 → 疑似误打标（青鸟误标）
         # 两边一致 → 正确
+        # v3.3.10：已删除的企微不再需要补打标/改标，状态直接标「已删除」，
+        #          不参与差异判定（也不计入 漏打标/误打标/正确 任何一类）
         diff_flags = []
         has_missed = False  # 系统有+青鸟无 → 漏打标
         has_wrong = False    # 系统无+青鸟有 → 误打标
@@ -338,8 +361,12 @@ def douyin_qingniao_match():
                 diff_flags.append(f'{name}(系统无青鸟有)')
                 has_wrong = True
 
-        # 综合状态（优先级：疑似漏打标 > 疑似误打标 > 正确；混合时优先报漏打标）
-        if has_missed:
+        # 综合状态（优先级：已删除 > 疑似漏打标 > 疑似误打标 > 正确）
+        # 已删除的企微不参与补打标/改标判定，独立作为一种状态
+        if best['是否删除企微'] == 1:
+            state = '已删除'
+            summary['deleted_count'] += 1
+        elif has_missed:
             state = '疑似漏打标'
             summary['suspected_missed_tag'] += 1
         elif has_wrong:
@@ -365,6 +392,9 @@ def douyin_qingniao_match():
             '青鸟线索ID': qn.id,
             '客户来源': best['客户来源'],
             '添加员工姓名': best['添加员工姓名'],
+            '是否删除企微': _bool_to_str(best['是否删除企微']),
+            '互动次数': best['互动次数'],
+            '营销人员互动次数': best['营销人员互动次数'],
         })
 
     return jsonify({
