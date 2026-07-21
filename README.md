@@ -228,21 +228,21 @@ npm run test:report
 > 开发者只需更新版本号 + push tag，CI 自动构建 + 上传 GitHub Release。
 
 ```powershell
-# 本地
-scripts\release.bat 3.3.6          # 交互：先确认版本号 → 自动改 version.json → commit → tag → push
+# 本地（X.Y.Z 替换为目标版本号，具体见 version.json）
+scripts\release.bat X.Y.Z          # 交互：先确认版本号 → 自动改 version.json → commit → tag → push
 ```
 
 ```bash
-bash scripts/release.sh 3.3.6
+bash scripts/release.sh X.Y.Z
 ```
 
-push tag `v3.3.6` 后，`.github/workflows/release.yml` 自动：
+push tag `vX.Y.Z` 后，`.github/workflows/release.yml` 自动：
 
 1. 安装 Python 3.13 + Node 20
 2. `pip install -r requirements.txt` + PyInstaller
 3. `npm ci && npm run build` 生成 `frontend-react/dist/`
 4. `pyinstaller 省心投启动器.spec` 产出 `省心投启动器.exe`
-5. 把 `exe` + `app.py` + `backend/` + `dist/` + 启动脚本 + `.env.example` 打成 `shengxintou-bi-3.3.6-windows.zip`
+5. 把 `exe` + `app.py` + `backend/` + `dist/` + 启动脚本 + `.env.example` 打成 `shengxintou-bi-X.Y.Z-windows.zip`
 6. 从 `version.json` 提取 changelog 作为 Release notes
 7. 创建 GitHub Release，上传 exe + zip
 
