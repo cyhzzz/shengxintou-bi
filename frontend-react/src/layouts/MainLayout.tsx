@@ -188,7 +188,12 @@ export default function MainLayout() {
         {/* Sidebar Logo - Matching original frontend */}
         <div className={styles.sidebarHeader}>
           <div className={styles.logoContainer}>
-            <img src="/icons/LOGO.svg" className={styles.logoIcon} alt="申万宏源" />
+            {/* v3.3.10: 收起时换方形 LOGO（256×255），避免横版 logo 被报表区域截断成半个 */}
+            <img
+              src={collapsed ? '/icons/LOGO-square.png' : '/icons/LOGO.svg'}
+              className={styles.logoIcon}
+              alt="申万宏源"
+            />
             {!collapsed && (
               <img src="/icons/省心投.svg" className={styles.logoTextIcon} alt="省心投" />
             )}

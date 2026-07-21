@@ -39,11 +39,21 @@
   display: flex;
   align-items: center;
   gap: var(--spacer-8);
+  // v3.3.10: 收起状态下让方形 logo 居中占满 sidebarHeader 宽度
+  width: 100%;
+  justify-content: center;
 }
 
 .logoIcon {
   height: 23px;
   width: auto;
+
+  // v3.3.10: 收起状态下使用方形 LOGO，约束尺寸让它在窄栏里完整居中
+  :global(.ant-layout-sider-collapsed) & {
+    height: 32px;
+    width: 32px;
+    object-fit: contain;
+  }
 }
 
 .logoTextIcon {
