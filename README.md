@@ -218,10 +218,9 @@ npm run test:report
 
 - [docs/rules/README.md](docs/rules/README.md)：AI 与开发者规则导航、权威源和按任务阅读地图。
 - [docs/6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md](docs/6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md)：跨平台、跨 Agent、非破坏式项目建规指令。
-- [docs/部署指南.md](docs/部署指南.md)：开发、生产、性能优化、监控与故障排查。
 - [docs/design/weekly-poster-philosophy.md](docs/design/weekly-poster-philosophy.md)：周报海报设计哲学。
 - [docs/design/monochrome-data-canvas.pdf](docs/design/monochrome-data-canvas.pdf)：单色数据画布设计稿。
-- 历史设计文档已归档至 `docs/_archive/`：v3.1 报表重梳方案 / 前端 UI 优化 PRD / 前端全栈改造清单 / 库表重构设计 v2 & v3 / 数据库架构文档。新代码以 `AGENTS.md` 为权威源。
+- 历史设计文档已归档至 `docs/_archive/`：v3.1 报表重梳方案 / 前端 UI 优化 PRD / 前端全栈改造清单 / 库表重构设计 v2 & v3 / 数据库架构文档 / 部署指南（v1 时代 Gunicorn + Nginx + Docker 方案，已与当前 SQLite 单文件部署脱节）/ 3 份 v2 拆分 _legacy 报告。新代码以 `AGENTS.md` 为权威源。
 
 
 ## 📦 发布流程
