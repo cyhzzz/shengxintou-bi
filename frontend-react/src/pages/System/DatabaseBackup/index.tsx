@@ -3,11 +3,12 @@
  * 实现坚果云数据库备份/恢复功能
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Button, Space, Table, Modal, message, Alert } from 'antd';
-import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Card, Button, Space, Table, Modal, message, Alert, Spin, Tag } from 'antd';
+import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined } from '@ant-design/icons';
 import BackupProgress from './components/BackupProgress';
 import VersionUpdateModal from './components/VersionUpdateModal';
 import { http } from '@/services/http';
+import { dataServiceWebdav, type WebdavSyncStatus } from '@/services/dataService';
 import type {
   WebdavBackupFile,
   WebdavProgressResponse,
@@ -26,6 +27,11 @@ const DatabaseBackupPage: React.FC = () => {
     cloudVersion?: string;
     supportContact?: string;
   } | null>(null);
+
+  // v3.4.1: 同步状态（云端 vs 本地最新日期）
+  const [syncStatus, setSyncStatus] = useState<WebdavSyncStatus | null>(null);
+  const [syncChecking, setSyncChecking] = useState(false);
+  const [syncConfirmVisible, setSyncConfirmVisible] = useState(false);
 
   const taskIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,6 +56,21 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
+  // v3.4.1: 检测云端 vs 本地数据日期差
+  const loadSyncStatus = useCallback(async () => {
+    setSyncChecking(true);
+    try {
+      const res = await dataServiceWebdav.checkSyncStatus();
+      if (res?.success) {
+        setSyncStatus(res.data);
+      }
+    } catch {
+      // 静默：连接失败不弹错
+    } finally {
+      setSyncChecking(false);
+    }
+  }, []);
+
   const checkVersion = useCallback(async () => {
     try {
       const response = await http.get<VersionCompareResponse>('/version/compare');
@@ -70,7 +91,8 @@ const DatabaseBackupPage: React.FC = () => {
   useEffect(() => {
     loadBackupList();
     checkVersion();
-  }, [loadBackupList, checkVersion]);
+    loadSyncStatus();
+  }, [loadBackupList, checkVersion, loadSyncStatus]);
 
   // 清理轮询
   useEffect(() => {
@@ -101,6 +123,8 @@ const DatabaseBackupPage: React.FC = () => {
               setProgressVisible(false);
               if (data.status === 'completed') {
                 message.success('操作完成');
+                // v3.4.1: 同步/恢复完成后重新检测云端 vs 本地
+                loadSyncStatus();
               }
               loadBackupList();
             }, 2000);
@@ -174,6 +198,25 @@ const DatabaseBackupPage: React.FC = () => {
         }
       },
     });
+  };
+
+  const handleAutoSync = async () => {
+    setSyncConfirmVisible(false);
+    try {
+      const response = await http.post<{ task_id: string }>('/webdav/auto-sync', {});
+      if (response.success && response.data?.task_id) {
+        taskIdRef.current = response.data.task_id;
+        setProgress({ status: 'pending', progress: 0, message: '' });
+        setProgressVisible(true);
+        startPolling(response.data.task_id);
+      } else {
+        message.error('启动同步失败: ' + (response.message || '未知错误'));
+        // v3.4.1: 后端校验门拒绝(META_MISSING / NO_SYNC_NEEDED)后自动刷新一次状态
+        loadSyncStatus();
+      }
+    } catch {
+      message.error('同步失败');
+    }
   };
 
   const handleDelete = async (filename: string) => {
@@ -302,6 +345,69 @@ const DatabaseBackupPage: React.FC = () => {
           />
         )}
 
+        {/* v3.4.1: 云端 vs 本地同步状态卡片 */}
+        {syncStatus && (
+          <Alert
+            className={styles.syncAlert}
+            style={{ marginBottom: 16 }}
+            type={
+              !syncStatus.cloud_available ? 'info'
+              : syncStatus.need_sync ? 'warning'
+              : 'success'
+            }
+            showIcon
+            icon={!syncStatus.cloud_available ? <WifiOutlined /> : <CloudDownloadOutlined />}
+            message={
+              <Space size="small" wrap>
+                <span>
+                  {!syncStatus.cloud_available
+                    ? '坚果云未连接（同步检测不可用，请检查网络或配置）'
+                    : syncStatus.need_sync
+                      ? syncStatus.needs_meta_rebuild
+                        ? `云端备份新于本地但缺 meta，请先做一次本地备份补齐 meta（差异 ${syncStatus.diff_hours} 小时）`
+                        : `检测到云端数据新于本地（差异 ${syncStatus.diff_hours} 小时）`
+                      : '云端与本地数据日期一致，无需同步'}
+                </span>
+                <Spin spinning={syncChecking} size="small" />
+                {syncStatus.cloud_available && (
+                  <Space size={4}>
+                    <Tag>本地 {syncStatus.local_latest || '无'}</Tag>
+                    <Tag color="cyan">云端数据 {syncStatus.cloud_data_latest || syncStatus.cloud_latest || '无'}</Tag>
+                    {syncStatus.meta_source === 'file_mtime' && (
+                      <Tag color="orange">云端备份缺 meta(下次本地备份后自动补齐)</Tag>
+                    )}
+                  </Space>
+                )}
+              </Space>
+            }
+            description={
+              syncStatus.cloud_available ? (
+                <Space size="small" wrap style={{ marginTop: 4 }}>
+                  {syncStatus.need_sync ? (
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CloudDownloadOutlined />}
+                      onClick={() => setSyncConfirmVisible(true)}
+                      disabled={progressVisible || syncStatus.needs_meta_rebuild}
+                    >
+                      {syncStatus.needs_meta_rebuild ? '需先补 meta 才能同步' : '立即从坚果云同步最新备份'}
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={loadSyncStatus}
+                    disabled={syncChecking || progressVisible}
+                  >
+                    重新检测
+                  </Button>
+                </Space>
+              ) : null
+            }
+          />
+        )}
+
         {/* 备份列表 */}
         <div className={styles.backupHistoryBlock}><h4 className={styles.backupHistoryTitle}>备份历史</h4>
           <Table
@@ -341,6 +447,28 @@ const DatabaseBackupPage: React.FC = () => {
         supportContact={versionInfo?.supportContact}
         onClose={() => setVersionModalVisible(false)}
       />
+
+      {/* v3.4.1: 一键同步确认弹窗 */}
+      <Modal
+        title="确认从坚果云同步"
+        open={syncConfirmVisible}
+        onOk={handleAutoSync}
+        onCancel={() => setSyncConfirmVisible(false)}
+        okText="确认同步"
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+      >
+        <p>将从坚果云下载最新备份并恢复本地数据库：</p>
+        <ul>
+          <li>云端数据日期：<strong>{syncStatus?.cloud_data_latest || syncStatus?.cloud_latest || '-'}</strong></li>
+          <li>云端备份时间：<strong>{syncStatus?.cloud_latest || '-'}</strong></li>
+          <li>备份文件：<strong>{syncStatus?.cloud_filename || '-'}</strong></li>
+          <li>本地最新日期：<strong>{syncStatus?.local_latest || '无'}</strong></li>
+        </ul>
+        <p style={{ color: 'var(--color-warning)' }}>
+          ⚠️ 同步前会自动备份当前数据库；同步期间所有报表查询不可用，请避开业务高峰期操作。
+        </p>
+      </Modal>
     </div>
   );
 };

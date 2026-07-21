@@ -560,6 +560,36 @@ for rule in app.url_map.iter_rules():
         methods_str = ', '.join(list(rule.methods))
         logger.info(f"  {methods_str:20} {rule.rule:50} -> {rule.endpoint}")
 
+
+# v3.4.1: 启动时异步检测坚果云 vs 本地数据日期差
+#   - 走 daemon 线程，不阻塞启动流程
+#   - 连接失败只打 ERROR 日志，不影响正常使用
+#   - 用户在前端「数据库备份」页或「数据新鲜度」组件中点击「立即同步」即可恢复
+def _startup_check_webdav_sync():
+    try:
+        with app.app_context():
+            from backend.routes.webdav_backup import _check_sync_status
+            result = _check_sync_status()
+            data = result.get('data') or {}
+            if not data.get('cloud_available'):
+                logger.info("启动检查: 坚果云不可达，跳过同步检测")
+                return
+            if data.get('need_sync'):
+                logger.warning(
+                    f"启动检查: 坚果云备份 {data.get('cloud_latest')} 比本地 {data.get('local_latest')} 新 "
+                    f"({data.get('diff_hours')}h)，请在前端「数据库备份」页一键同步"
+                )
+            else:
+                logger.info(
+                    f"启动检查: 坚果云与本地数据日期一致 (本地 {data.get('local_latest')} / 云端 {data.get('cloud_latest')})"
+                )
+    except Exception as e:
+        logger.error(f"启动检查异常: {e}")
+
+import threading as _threading_v341
+_thread_v341 = _threading_v341.Thread(target=_startup_check_webdav_sync, daemon=True)
+_thread_v341.start()
+
 # React Router SPA 兜底路由
 # 通过 before_request 钩子处理，确保在所有其他路由之后检查
 from flask import request, send_from_directory

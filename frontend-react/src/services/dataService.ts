@@ -244,6 +244,32 @@ export interface AppMarketSummary {
   by_channel_type: Array<{ channel_type: string; app_market: string; counts: Record<string, number> }>;
 }
 
+// v3.4.1: 坚果云同步检测（启动时自动跑一次 + 前端一键同步按钮共用）
+//   返回 success=true + data.cloud_available=false 表示坚果云不可达（前端静默显示）
+export interface WebdavSyncStatus {
+  cloud_available: boolean;
+  cloud_latest: string | null;
+  cloud_filename: string | null;
+  cloud_data_latest: string | null;
+  meta_source: 'meta' | 'file_mtime' | null;
+  needs_meta_rebuild: boolean;
+  local_latest: string | null;
+  need_sync: boolean;
+  diff_hours: number;
+  local_sources: Record<string, string>;
+}
+export const dataServiceWebdav = {
+  checkSyncStatus: async (): Promise<{ success: boolean; data: WebdavSyncStatus }> => {
+    return http.get('/webdav/sync-check') as unknown as { success: boolean; data: WebdavSyncStatus };
+  },
+  autoSyncBackup: async (): Promise<{ success: boolean; task_id?: string; filename?: string; message?: string; error?: string }> => {
+    return http.post('/webdav/auto-sync', {}) as unknown as { success: boolean; task_id?: string; filename?: string; message?: string; error?: string };
+  },
+  getProgress: async (taskId: string): Promise<{ success: boolean; data?: { status: string; progress: number; message: string; pre_restore_backup?: string } }> => {
+    return http.get(`/webdav/progress/${taskId}`) as unknown as { success: boolean; data?: { status: string; progress: number; message: string; pre_restore_backup?: string } };
+  },
+};
+
 export const dataServiceReports = {
   getAppMarketSummary: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
     return http.post('/reports/app-market/summary', { filters });

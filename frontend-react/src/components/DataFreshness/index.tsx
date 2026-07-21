@@ -6,8 +6,10 @@ import {
   CloseCircleOutlined,
   QuestionCircleOutlined,
   SyncOutlined,
+  CloudDownloadOutlined,
 } from '@ant-design/icons';
 import { metadataService } from '@/services';
+import { dataServiceWebdav, type WebdavSyncStatus } from '@/services/dataService';
 import type { DataFreshness } from '@/services/metadataService';
 import styles from './index.module.scss';
 
@@ -61,6 +63,8 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<DataFreshness | null>(null);
     const [expanded, setExpanded] = useState(!compact);
+    // v3.4.1: 同步状态（云端 vs 本地最新日期）
+    const [syncStatus, setSyncStatus] = useState<WebdavSyncStatus | null>(null);
 
     // 加载数据
     const loadData = useCallback(async () => {
@@ -84,6 +88,16 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
       }
     }, [compact]);
 
+    // v3.4.1: 加载云端同步状态（静默：连接失败不报错）
+    const loadSyncStatus = useCallback(async () => {
+      try {
+        const res = await dataServiceWebdav.checkSyncStatus();
+        if (res?.success) setSyncStatus(res.data);
+      } catch {
+        // 静默
+      }
+    }, []);
+
     // 暴露 refresh 方法给父组件
     useImperativeHandle(ref, () => ({
       refresh: loadData,
@@ -91,10 +105,14 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
 
   useEffect(() => {
     loadData();
+    loadSyncStatus();
     // 5分钟自动刷新
-    const timer = setInterval(loadData, 5 * 60 * 1000);
+    const timer = setInterval(() => {
+      loadData();
+      loadSyncStatus();
+    }, 5 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [loadData]);
+  }, [loadData, loadSyncStatus]);
 
   // 计算汇总
   const calculateSummary = () => {
@@ -217,6 +235,21 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
 
       {/* 详情列表 */}
       <div className={styles.details}>
+        {/* v3.4.1: 云端 vs 本地对比 Tag */}
+        {syncStatus && syncStatus.cloud_available && (
+          <div className={styles.syncRow}>
+            <Tag
+              color={syncStatus.need_sync ? 'warning' : 'success'}
+              icon={<CloudDownloadOutlined />}
+            >
+              {syncStatus.need_sync
+                ? syncStatus.needs_meta_rebuild
+                  ? `云端备份新于本地但缺 meta(云端数据日期待重建)`
+                  : `云端数据日期 ${syncStatus.cloud_data_latest?.slice(5) || '-'} 比本地 ${syncStatus.local_latest?.slice(5) || '-'} 新 ${syncStatus.diff_hours}h`
+                : `云端与本地数据日期一致（${syncStatus.local_latest?.slice(5) || '-'}）`}
+            </Tag>
+          </div>
+        )}
         {renderGroups()}
 
         {/* 操作按钮 */}

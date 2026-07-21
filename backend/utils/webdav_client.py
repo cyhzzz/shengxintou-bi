@@ -462,3 +462,48 @@ class WebDAVBackupClient:
 
         except Exception as e:
             raise Exception(f"上传文件失败: {str(e)}")
+
+    def upload_json(self, data, remote_filename):
+        """
+        v3.4.1: 上传 JSON 数据（轻量级 meta 文件）到坚果云。
+        用于同步备份的元信息（data_latest / local_sources），
+        避免 sync-check 时需下载几十 MB 的备份文件本身。
+        """
+        import json as _json
+        try:
+            payload = _json.dumps(data, ensure_ascii=False).encode('utf-8')
+            remote_url = self._get_remote_url(remote_filename)
+            response = requests.put(
+                remote_url, data=payload, auth=self.auth,
+                headers={'Content-Type': 'application/json'},
+                **self._requests_kwargs()
+            )
+            if response.status_code not in [200, 201, 204]:
+                raise Exception(f"HTTP {response.status_code}: {response.text}")
+            return True
+        except Exception as e:
+            raise Exception(f"上传 JSON 失败: {str(e)}")
+
+    def download_json(self, remote_filename):
+        """
+        v3.4.1: 下载 JSON 文件（轻量级 meta 文件）。
+        返回 dict；文件不存在或解析失败抛异常。
+        """
+        import json as _json
+        remote_url = self._get_remote_url(remote_filename)
+        response = requests.get(remote_url, auth=self.auth, **self._requests_kwargs())
+        if response.status_code == 404:
+            raise RemoteResourceNotFound(f"meta 文件不存在: {remote_filename}")
+        if response.status_code not in [200, 206]:
+            raise Exception(f"HTTP {response.status_code}: {response.text}")
+        try:
+            return _json.loads(response.content)
+        except Exception as e:
+            raise Exception(f"解析 JSON 失败: {str(e)}")
+
+    def meta_filename_for(self, backup_filename):
+        """v3.4.1: 由备份文件名推导对应的 meta 文件名。
+        例: backup_20260721_111900.db.gz → backup_20260721_111900.db.gz.meta.json
+            backup_20260122_153000.db     → backup_20260122_153000.db.meta.json
+        """
+        return f'{backup_filename}.meta.json'

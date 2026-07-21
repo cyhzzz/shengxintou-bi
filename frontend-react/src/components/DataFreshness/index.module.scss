@@ -104,6 +104,14 @@
   gap: var(--spacer-12);
 }
 
+.syncRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-6);
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px dashed var(--border-default);
+}
+
 .group {
   display: flex;
   flex-direction: column;

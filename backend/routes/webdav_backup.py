@@ -110,6 +110,311 @@ def restore_backup():
     })
 
 
+@bp.route('/sync-check', methods=['GET'])
+@handle_exceptions
+def sync_check():
+    """v3.4.1: 检查坚果云最新备份 vs 本地业务数据最新日期，判断是否需要同步。
+
+    返回结构：
+    {
+        "success": true,
+        "data": {
+            "cloud_available": true,        # WebDAV 是否可达
+            "cloud_latest": "2026-07-21 10:30:00",  # 云端最新备份 created（北京时间）
+            "cloud_filename": "backup_xxx.db",
+            "local_latest": "2026-07-20",  # 本地 5 张业务表 MAX(日期字段) 并集
+            "need_sync": true,              # 云端更新于本地
+            "diff_hours": 18,               # 时差（小时，向下取整）
+            "local_sources": {              # 各业务表最新日期明细（debug 用）
+                "vendor_daily": "2026-07-20",
+                ...
+            }
+        }
+    }
+
+    任何一层失败（WebDAV 连不上 / 数据库查询失败）都返回 success: true + cloud_available: false，
+    前端静默显示「无法连接坚果云」，不报错弹窗。
+    """
+    result = _check_sync_status()
+    return jsonify(result)
+
+
+@bp.route('/auto-sync', methods=['POST'])
+@handle_exceptions
+def auto_sync():
+    """v3.4.1: 一键同步——自动从坚果云拉取最新备份恢复本地数据库。
+
+    复用 _restore_async 完整流程（含 pre_restore 备份 + 失败回滚）。
+    不接 filename 参数，自动选云端最新一份。
+    """
+    # v3.4.1: meta 校验门——避免「云端 created 看着新但其实是本地数据」的误触发
+    #   1. 调 _check_sync_status 拿到 cloud_data_latest / need_sync / meta_source
+    #   2. 若 needs_meta_rebuild（云端最新备份缺 meta）→ 拒绝执行，要求先做一次备份补 meta
+    #   3. 若 !need_sync → 拒绝执行（防止无限循环同步）
+    status = _check_sync_status()
+    sd = (status or {}).get('data') or {}
+    if not sd.get('cloud_available'):
+        return jsonify({
+            'success': False,
+            'error': 'CLOUD_UNAVAILABLE',
+            'message': '坚果云不可达，无法执行同步',
+        }), 502
+    if sd.get('needs_meta_rebuild'):
+        return jsonify({
+            'success': False,
+            'error': 'META_MISSING',
+            'message': '云端最新备份缺少 meta 信息，请先在本地做一次备份（会自动生成 meta），再执行同步',
+            'cloud_filename': sd.get('cloud_filename'),
+        }), 400
+    if not sd.get('need_sync'):
+        return jsonify({
+            'success': False,
+            'error': 'NO_SYNC_NEEDED',
+            'message': '云端数据日期不新于本地，无需同步（避免无限循环）',
+            'cloud_data_latest': sd.get('cloud_data_latest'),
+            'local_latest': sd.get('local_latest'),
+        }), 400
+
+    try:
+        from backend.utils.webdav_client import WebDAVBackupClient
+        from webdav3.exceptions import RemoteResourceNotFound
+        import config
+
+        client = WebDAVBackupClient(
+            url=config.WEBDAV_URL,
+            username=config.WEBDAV_USERNAME,
+            password=config.WEBDAV_PASSWORD,
+            backup_dir=config.WEBDAV_BACKUP_DIR
+        )
+
+        # 拉云端最新一份
+        backups = client.list_backups()
+        if not backups:
+            return jsonify({
+                'success': False,
+                'error': 'NO_CLOUD_BACKUP',
+                'message': '坚果云暂无备份文件',
+            }), 404
+
+        latest = backups[0]  # list_backups 已按 created 倒序
+
+        # 二次校验: meta 必须在场(防止 check_sync_status 与本端点之间 meta 被删)
+        try:
+            client.download_json(client.meta_filename_for(latest['filename']))
+        except RemoteResourceNotFound:
+            return jsonify({
+                'success': False,
+                'error': 'META_MISSING',
+                'message': '云端最新备份缺少 meta（已被并发删除？）',
+                'cloud_filename': latest['filename'],
+            }), 400
+
+        task_id = str(uuid.uuid4())
+        backup_tasks[task_id] = {
+            'status': 'running',
+            'progress': 0,
+            'message': f'正在从坚果云同步最新备份 {latest["filename"]}...',
+            'type': 'restore',
+        }
+
+        thread = threading.Thread(
+            target=_restore_async,
+            args=(task_id, latest['filename'])
+        )
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'task_id': task_id,
+            'filename': latest['filename'],
+            'cloud_latest': latest.get('created'),
+            'message': '同步任务已启动',
+        })
+    except Exception as e:
+        msg = str(e)
+        is_conn_err = (
+            ('无法连接' in msg) or
+            ('WebDAV' in msg and ('SSL' in msg or '握手' in msg or '重置' in msg or '拒绝' in msg))
+        )
+        if is_conn_err:
+            status_code = 502
+            error_code = 'UPSTREAM_UNAVAILABLE'
+        else:
+            status_code = 500
+            error_code = 'AUTO_SYNC_FAILED'
+        return jsonify({
+            'success': False,
+            'error': error_code,
+            'message': f'同步启动失败: {msg}',
+        }), status_code
+
+
+def _compute_local_sources(app):
+    """v3.4.1: 计算本地 5 张业务表各自的 MAX 日期 + 整体 MAX。
+
+    抽出来给 _check_sync_status 和 _backup_async 共享——
+    保证备份时的 meta 与 sync-check 时对比的 local_latest 来自同一份查询逻辑。
+    返回 (local_sources: dict, local_latest: str|None)。
+    """
+    from backend.database import db
+    from backend.models_v2 import (
+        AggVendorDaily, AggXhsNote, FactConvContent,
+        FactConvAppmarket, AggDailyChannelOpen,
+    )
+    from sqlalchemy import func as _func
+
+    local_sources = {}
+    with app.app_context():
+        with db.engine.connect() as conn:
+            for table_key, col in [
+                ('vendor_daily', AggVendorDaily.日期),
+                ('xhs_note', AggXhsNote.发布时间),
+                ('fact_conv_content', FactConvContent.线索日期),
+                ('fact_conv_appmarket', FactConvAppmarket.下载日期),
+                ('agg_daily_channel_open', AggDailyChannelOpen.时间区间),
+            ]:
+                try:
+                    v = conn.execute(_func.max(col).select()).scalar()
+                    if v:
+                        local_sources[table_key] = str(v)[:10]
+                except Exception:
+                    pass
+    local_latest = max(local_sources.values()) if local_sources else None
+    return local_sources, local_latest
+
+
+def _check_sync_status():
+    """v3.4.1: 内部同步状态计算逻辑（供 sync_check 端点 + 启动检查共用）。
+
+    关键修正：避免「坚果云 created 时间 vs 业务数据日期」的误判。
+      - 优先读云端最新备份的 .meta.json，从中取 data_latest（这是真正的"数据日期"）
+      - 若 meta 不存在（旧备份），fallback 到文件 modified time 并标 needs_meta_rebuild=True
+        （前端提示用户下次备份会自动补充 meta，不阻断当前流程）
+
+    返回结构同 sync_check 响应。任何异常一律返回 success: true + cloud_available: false，
+    不抛出（避免阻断正常使用 / 启动流程）。
+    """
+    empty_data = {
+        'cloud_available': False,
+        'cloud_latest': None,
+        'cloud_filename': None,
+        'local_latest': None,
+        'need_sync': False,
+        'diff_hours': 0,
+        'local_sources': {},
+        'needs_meta_rebuild': False,
+        'meta_source': None,           # 'meta' / 'file_mtime' / None
+        'cloud_data_latest': None,      # 云端备份里真正的"业务数据日期"
+    }
+
+    try:
+        # 1. 本地最新日期：5 张业务表 MAX(日期字段) 取并集
+        from backend.database import db
+        from backend.models_v2 import (
+            AggVendorDaily, AggXhsNote, FactConvContent,
+            FactConvAppmarket, AggDailyChannelOpen,
+        )
+        from sqlalchemy import func as _func
+
+        local_sources = {}
+        with db.engine.connect() as conn:
+            for table_key, col in [
+                ('vendor_daily', AggVendorDaily.日期),
+                ('xhs_note', AggXhsNote.发布时间),
+                ('fact_conv_content', FactConvContent.线索日期),
+                ('fact_conv_appmarket', FactConvAppmarket.下载日期),
+                ('agg_daily_channel_open', AggDailyChannelOpen.时间区间),
+            ]:
+                try:
+                    v = conn.execute(_func.max(col).select()).scalar()
+                    if v:
+                        local_sources[table_key] = str(v)[:10]
+                except Exception:
+                    pass
+
+        local_latest = max(local_sources.values()) if local_sources else None
+
+        # 2. 云端最新备份
+        from backend.utils.webdav_client import WebDAVBackupClient
+        from webdav3.exceptions import RemoteResourceNotFound
+        import config
+
+        client = WebDAVBackupClient(
+            url=config.WEBDAV_URL,
+            username=config.WEBDAV_USERNAME,
+            password=config.WEBDAV_PASSWORD,
+            backup_dir=config.WEBDAV_BACKUP_DIR
+        )
+        backups = client.list_backups()
+        if not backups:
+            return {
+                'success': True,
+                'data': {
+                    **empty_data,
+                    'local_latest': local_latest,
+                    'local_sources': local_sources,
+                }
+            }
+
+        latest_backup = backups[0]
+        cloud_filename = latest_backup.get('filename')
+        cloud_latest_str = latest_backup.get('created')  # YYYY-MM-DD HH:MM:SS 北京时间
+
+        # 3. 优先读 .meta.json 拿真正的 data_latest
+        meta_source = None
+        cloud_data_latest = None
+        needs_meta_rebuild = False
+        meta_filename = client.meta_filename_for(cloud_filename)
+        try:
+            meta = client.download_json(meta_filename)
+            cloud_data_latest = meta.get('data_latest')  # YYYY-MM-DD
+            meta_source = 'meta'
+        except RemoteResourceNotFound:
+            # 旧备份没有 meta：fallback 到文件 modified time，标记需补 meta
+            cloud_data_latest = (cloud_latest_str or '')[:10]
+            meta_source = 'file_mtime'
+            needs_meta_rebuild = True
+        except Exception:
+            cloud_data_latest = (cloud_latest_str or '')[:10]
+            meta_source = 'file_mtime'
+            needs_meta_rebuild = True
+
+        # 4. 比较：用 cloud_data_latest（真正的"数据日期"） vs local_latest
+        need_sync = False
+        diff_hours = 0
+        if cloud_data_latest and local_latest:
+            need_sync = cloud_data_latest > local_latest
+            try:
+                from datetime import datetime as _dt
+                cloud_dt = _dt.strptime(cloud_data_latest, '%Y-%m-%d')
+                local_dt = _dt.strptime(local_latest, '%Y-%m-%d')
+                diff_hours = max(0, int((cloud_dt - local_dt).total_seconds() // 3600))
+            except Exception:
+                pass
+
+        return {
+            'success': True,
+            'data': {
+                'cloud_available': True,
+                'cloud_latest': cloud_latest_str,
+                'cloud_filename': cloud_filename,
+                'cloud_data_latest': cloud_data_latest,
+                'meta_source': meta_source,
+                'needs_meta_rebuild': needs_meta_rebuild,
+                'local_latest': local_latest,
+                'need_sync': need_sync,
+                'diff_hours': diff_hours,
+                'local_sources': local_sources,
+            }
+        }
+    except Exception:
+        # 静默：返回云端不可达
+        return {
+            'success': True,
+            'data': {**empty_data, 'local_sources': {}},
+        }
+
+
 @bp.route('/list', methods=['GET'])
 @handle_exceptions
 def list_backups():
@@ -321,6 +626,24 @@ def _backup_async(task_id, description):
 
             backup_tasks[task_id]['progress'] = 90
 
+            # v3.4.1: 上传 meta.json(< 1KB),记录真正的数据日期。
+            # sync_check 时只下载这个小文件即可判断是否需要同步,避免下载几十 MB 备份。
+            # 没有 meta 的旧备份会在 sync-check 时 fallback 到文件 mtime 并标 needs_meta_rebuild。
+            try:
+                local_sources, local_latest = _compute_local_sources(app)
+                meta = {
+                    'filename': result['filename'],
+                    'created': result.get('upload_time'),
+                    'data_latest': local_latest,
+                    'local_sources': local_sources,
+                    'schema_version': 'v3.4.1',
+                }
+                client.upload_json(meta, client.meta_filename_for(result['filename']))
+                meta_info = f'meta: data_latest={local_latest or "无"}'
+            except Exception as meta_err:
+                # meta 上传失败不影响主备份任务,但在最终消息里提示
+                meta_info = f'meta 上传失败: {meta_err}'
+
             # 构建成功消息
             size_info = f"{result['size'] / 1024 / 1024:.2f} MB"
             if result.get('compressed'):
@@ -329,7 +652,7 @@ def _backup_async(task_id, description):
                 compression_ratio = (1 - compressed_mb / original_mb) * 100
                 size_info = f"{compressed_mb:.2f} MB (原始: {original_mb:.2f} MB, 压缩率: {compression_ratio:.1f}%)"
 
-            backup_tasks[task_id]['message'] = f'备份成功: {result["filename"]} ({size_info})'
+            backup_tasks[task_id]['message'] = f'备份成功: {result["filename"]} ({size_info}) [{meta_info}]'
 
             # 清理旧备份（保留最近N个）
             backup_tasks[task_id]['message'] = '正在清理旧备份...'
