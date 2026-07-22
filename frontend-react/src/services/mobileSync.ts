@@ -2,13 +2,19 @@
  * 移动端 WebDAV 同步（坚果云）
  *
  * 从坚果云下载 .db 文件并替换本地 SQLite 数据库。
- * 凭据存储在 @capacitor/preferences 中。
+ * 凭据存储在 @capacitor/preferences 中，首次安装时使用打包时内置的 .env 默认值。
  */
 import { Preferences } from '@capacitor/preferences';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { closeMobileDatabase, initMobileDatabase } from './mobileSqlite';
 
-const WEBDAV_BASE = 'https://dav.jianguoyun.com/dav/';
+// 打包时从项目根 .env 注入的内置默认值（v3.5.1）
+const BUILTIN_WEBDAV_URL = import.meta.env.VITE_WEBDAV_URL || '';
+const BUILTIN_WEBDAV_USERNAME = import.meta.env.VITE_WEBDAV_USERNAME || '';
+const BUILTIN_WEBDAV_PASSWORD = import.meta.env.VITE_WEBDAV_PASSWORD || '';
+const BUILTIN_WEBDAV_BASE_PATH = import.meta.env.VITE_WEBDAV_BASE_PATH || '';
+
+const WEBDAV_BASE = BUILTIN_WEBDAV_URL || 'https://dav.jianguoyun.com/dav/';
 
 export interface SyncResult {
   success: boolean;
@@ -35,8 +41,21 @@ export async function getWebDAVCredentials(): Promise<{
   const { value: username } = await Preferences.get({ key: 'webdav_username' });
   const { value: password } = await Preferences.get({ key: 'webdav_password' });
   const { value: remoteDir } = await Preferences.get({ key: 'webdav_remote_dir' });
-  if (!username || !password) return null;
-  return { username, password, remoteDir: remoteDir || '' };
+  // 用户已手动配置 → 优先用用户的
+  if (username && password) {
+    return { username, password, remoteDir: remoteDir || '' };
+  }
+  // 未手动配置 → 回退到打包时内置的 .env 默认值
+  if (BUILTIN_WEBDAV_USERNAME && BUILTIN_WEBDAV_PASSWORD) {
+    // WEBDAV_BASE_PATH 形如 /shengxintou-backup/，去掉首尾斜杠作为 remoteDir
+    const dir = BUILTIN_WEBDAV_BASE_PATH.replace(/^\/+|\/+$/g, '');
+    return {
+      username: BUILTIN_WEBDAV_USERNAME,
+      password: BUILTIN_WEBDAV_PASSWORD,
+      remoteDir: dir,
+    };
+  }
+  return null;
 }
 
 export async function hasWebDAVCredentials(): Promise<boolean> {

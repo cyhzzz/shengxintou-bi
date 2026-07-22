@@ -1,9 +1,10 @@
 {
-    "version": "3.5.0",
+    "version": "3.5.1",
     "release_date": "2026-07-22",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.5.1 安卓端修复：内置 .env 坚果云配置 + 默认横屏 + LOGO 应用图标",
         "v3.5.0 新增 Android 移动端支持（Capacitor 7 + 本地 SQLite + 坚果云 WebDAV 同步），项目完成 Web/桌面/安卓三端编译 release 支持",
         "v3.4.5 新增直播获客主播×周交叉表 + token 级筛选修复",
         "v3.4.4 功能显隐配置化 + 数据同步菜单新增手动双向同步 + 双端环境判断修复 + lint 修复",

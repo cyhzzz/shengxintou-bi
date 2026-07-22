@@ -4,9 +4,10 @@
   "description": "省心投 BI 移动端（Capacitor 封装）",
   "private": true,
   "scripts": {
-    "build": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android",
-    "build:apk": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "sync": "npx cap sync android",
+    "post-sync-patch": "powershell -ExecutionPolicy Bypass -File scripts/post-sync-patch.ps1",
+    "build": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && npm run post-sync-patch",
+    "build:apk": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && npm run post-sync-patch && cd android && ./gradlew assembleDebug",
+    "sync": "npx cap sync android && npm run post-sync-patch",
     "open": "npx cap open android"
   },
   "dependencies": {
