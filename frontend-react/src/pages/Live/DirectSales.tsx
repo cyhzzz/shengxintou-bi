@@ -1114,7 +1114,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
               />
             }
           >
-            <CalendarHeatmap data={heatmapData} loading={heatmapLoading} days={365} />
+            <CalendarHeatmap data={heatmapData} loading={heatmapLoading} days={365} preferredCellSize={16} />
           </Card>
         </FadeInSection>
 

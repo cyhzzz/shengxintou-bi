@@ -6,6 +6,8 @@ interface CalendarHeatmapProps {
   data: { date: string; value: number }[];
   loading?: boolean;
   days?: number;
+  /** 偏好 cell 大小（px）。组件优先按此值渲染，仅在容器放不下时往下压缩。 */
+  preferredCellSize?: number;
 }
 
 const WEEK_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -17,26 +19,25 @@ const MONTH_LABELS = [
 // feat-desktop-heatmap: cell 自适应计算参数
 // - 53 周 × 7 天 ≈ 1 列 = 1 周，cell 必须能放进容器内
 // - 减去 40px 周几 label 列 + 左右内边距 + gap 余量
-// - cell 必须 ≥ 4px（cell 渲染最小阈值）；过大限制到 24px（避免占用过大空白）
+// - 优先按 preferredCellSize 渲染，容器不够时往下压；最小 8px（避免看不清）
 const CELL_GAP = 3;       // 与 .grid gap 一致
 const LABEL_COL_WIDTH = 40;
-const SAFE_PADDING = 16;  // 容器内左右 padding 预留
-const MIN_CELL = 6;
-const MAX_CELL = 22;
-const DEFAULT_CELL = 14;  // 容器宽度尚未量出时的兜底值
+const SAFE_PADDING = 12;  // 容器内左右 padding 预留（Card body 24px，减去 label 列左 padding 后净余）
+const MIN_CELL = 8;
+const MAX_CELL = 24;
 
-function calcCellSize(containerWidth: number, totalWeeks: number): number {
-  if (!containerWidth || totalWeeks <= 0) return DEFAULT_CELL;
+function calcCellSize(containerWidth: number, totalWeeks: number, preferred: number): number {
+  if (!containerWidth || totalWeeks <= 0) return preferred;
   // 实际可用于 cell+gap 的横向空间 = 容器 - label 列 - padding
   const usable = containerWidth - LABEL_COL_WIDTH - SAFE_PADDING;
-  // 总列宽 = totalWeeks × cellSize + (totalWeeks - 1) × gap
-  // => cellSize = (usable - (totalWeeks - 1) × gap) / totalWeeks
-  const raw = (usable - (totalWeeks - 1) * CELL_GAP) / totalWeeks;
-  const clamped = Math.max(MIN_CELL, Math.min(MAX_CELL, raw));
-  return Math.floor(clamped);
+  // 容器能容纳的最大 cell size
+  const maxFit = Math.floor((usable - (totalWeeks - 1) * CELL_GAP) / totalWeeks);
+  // 优先按 preferred，不够则按容器能容纳的最大值，再不行则按 MIN_CELL 兜底
+  const clamped = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.min(preferred, maxFit)));
+  return clamped;
 }
 
-const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days = 365 }) => {
+const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days = 365, preferredCellSize = 16 }) => {
   // feat-desktop-heatmap: 监听 .wrap 容器宽度，动态算 cell size
   const wrapRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -124,7 +125,7 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
       <div
         className={styles.wrap}
         ref={wrapRef}
-        style={{ '--cell-size': `${calcCellSize(containerWidth, layout.totalWeeks)}px` } as React.CSSProperties}
+        style={{ '--cell-size': `${calcCellSize(containerWidth, layout.totalWeeks, preferredCellSize)}px` } as React.CSSProperties}
       >
         <div className={styles.statsRow}>
           <Space size={20} wrap>
