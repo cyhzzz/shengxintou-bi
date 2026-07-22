@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
@@ -6,6 +6,7 @@ import MainLayout from '@/layouts/MainLayout';
 import LoginPage from '@/pages/Login';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { featureFlags } from '@/config/features';
+import { isMobileClient } from '@/utils/isDesktop';
 
 // v3.2.5：所有页面改 React.lazy 按需加载，主包只保留 MainLayout，
 // 首屏只拉当前路由对应的 chunk，避免一次加载全部 21 个页面 + 重型依赖（echarts/plots/framer-motion）。
@@ -28,7 +29,7 @@ function withSuspense(Comp: React.ComponentType<any>, props?: Record<string, any
 
 /**
  * 受保护路由：未登录跳 /login?next=<当前位置>。
- * v3.4.3：仅在桌面版（Electron）启用认证流程；Web 开发版直接放行（后端 AUTH_ENABLED=false 时不要求 token）。
+ * 仅在桌面版（Electron）启用认证流程；Web 开发版直接放行（后端 AUTH_ENABLED=false 时不要求 token）。
  *   - 桌面版（Electron）：无 token → 跳 /login
  *   - Web 开发版（浏览器）：直接访问（无论后端 AUTH_ENABLED）
  *   - 浏览器访问桌面版后端（AUTH_ENABLED=true）：401 拦截器跳 /login，/login 路由始终注册
@@ -74,63 +75,53 @@ const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 // v3.3.10: 小红书计划分析（小红书二级菜单）
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
 
-const router = createBrowserRouter([
+// v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
+const isMobile = isMobileClient();
+
+// 主布局子路由（移动端和桌面端共享）
+const mainChildren = [
+  { index: true, element: <Navigate to="/omni-channel" replace /> },
+  { path: 'dashboard', element: withSuspense(DashboardPage) },
+
+  // v3.1 顶级菜单
+  { path: 'omni-channel', element: withSuspense(OmniChannelReportPage) },
+
+  { path: 'conversion-funnel', element: withSuspense(ConversionFunnelPage) },
+  { path: 'leads-detail', element: withSuspense(LeadsDetailPage) },
+  { path: 'anchor-clusters', element: withSuspense(AnchorClusterPage) },
+  { path: 'agency-analysis', element: withSuspense(AgencyAnalysisPage) },
   {
-    path: '/login',
-    element: <LoginPage />,
-    errorElement: <RouteErrorBoundary />,
+    path: 'xhs-notes',
+    children: [
+      { path: 'list', element: withSuspense(XhsNotesListPage) },
+      { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
+      // v3.3.10: 小红书计划分析
+      { path: 'plan-analysis', element: withSuspense(XhsPlanAnalysisPage) },
+    ],
   },
   {
-    path: '/',
-    element: (
-      <ProtectedRoute>
-        <MainLayout />
-      </ProtectedRoute>
-    ),
-    errorElement: <RouteErrorBoundary />,
+    path: 'employee-conversion',
     children: [
-      { index: true, element: <Navigate to="/omni-channel" replace /> },
-      { path: 'dashboard', element: withSuspense(DashboardPage) },
-
-      // v3.1 顶级菜单
-      { path: 'omni-channel', element: withSuspense(OmniChannelReportPage) },
-
-      { path: 'conversion-funnel', element: withSuspense(ConversionFunnelPage) },
-      { path: 'leads-detail', element: withSuspense(LeadsDetailPage) },
-      { path: 'anchor-clusters', element: withSuspense(AnchorClusterPage) },
-      { path: 'agency-analysis', element: withSuspense(AgencyAnalysisPage) },
-      {
-        path: 'xhs-notes',
-        children: [
-          { path: 'list', element: withSuspense(XhsNotesListPage) },
-          { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
-          // v3.3.10: 小红书计划分析
-          { path: 'plan-analysis', element: withSuspense(XhsPlanAnalysisPage) },
-        ],
-      },
-      {
-        path: 'employee-conversion',
-        children: [
-          { path: 'analysis', element: withSuspense(EmployeeConversionAnalysisPage) },
-          { path: 'weekly', element: withSuspense(EmployeeConversionWeeklyPage) },
-        ],
-      },
-      // 应用市场 v3.1: 顶级菜单 + 4 子页
-      {
-        path: 'app-market',
-        children: [
-          { index: true, element: <Navigate to="/app-market/funnel" replace /> },
-          { path: 'funnel', element: withSuspense(AppMarketFunnelPage) },
-          { path: 'comparison', element: withSuspense(AppMarketComparisonPage) },
-          { path: 'detail', element: withSuspense(AppMarketDetailPage) },
-          // v3.3.10: 计划分析（应用市场）
-          { path: 'plan-analysis', element: withSuspense(AppMarketPlanAnalysisPage) },
-          // v3.3.10: 旧路径 creative 重定向到 plan-analysis
-          { path: 'creative', element: <Navigate to="/app-market/plan-analysis" replace /> },
-        ],
-      },
-      // 直播 v3.1 占位
-      {
+      { path: 'analysis', element: withSuspense(EmployeeConversionAnalysisPage) },
+      { path: 'weekly', element: withSuspense(EmployeeConversionWeeklyPage) },
+    ],
+  },
+  // 应用市场 v3.1: 顶级菜单 + 4 子页
+  {
+    path: 'app-market',
+    children: [
+      { index: true, element: <Navigate to="/app-market/funnel" replace /> },
+      { path: 'funnel', element: withSuspense(AppMarketFunnelPage) },
+      { path: 'comparison', element: withSuspense(AppMarketComparisonPage) },
+      { path: 'detail', element: withSuspense(AppMarketDetailPage) },
+      // v3.3.10: 计划分析（应用市场）
+      { path: 'plan-analysis', element: withSuspense(AppMarketPlanAnalysisPage) },
+      // v3.3.10: 旧路径 creative 重定向到 plan-analysis
+      { path: 'creative', element: <Navigate to="/app-market/plan-analysis" replace /> },
+    ],
+  },
+  // 直播 v3.1 占位
+  {
     path: 'live',
     children: [
       { index: true, element: <Navigate to="/live/funnel" replace /> },
@@ -141,26 +132,53 @@ const router = createBrowserRouter([
       { path: 'analyst', element: withSuspense(LiveDirectSalesPage, { liveType: '分析师' }) },
     ],
   },
-      { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
-      { path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) },
-      // v3.3.10: 投放评审（内容平台二级菜单）
-      { path: 'investment-review', element: withSuspense(InvestmentReviewPage) },
+  { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
+  { path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) },
+  // v3.3.10: 投放评审（内容平台二级菜单）
+  { path: 'investment-review', element: withSuspense(InvestmentReviewPage) },
 
-      // v3.1 老路由重定向 (兼容旧链接)
-      { path: 'reports/app-market', element: <Navigate to="/app-market/funnel" replace /> },
-      { path: 'reports/omni-channel', element: <Navigate to="/omni-channel" replace /> },
+  // v3.1 老路由重定向 (兼容旧链接)
+  { path: 'reports/app-market', element: <Navigate to="/app-market/funnel" replace /> },
+  { path: 'reports/omni-channel', element: <Navigate to="/omni-channel" replace /> },
 
-      {
-        path: 'system',
-        children: [
-          { path: 'data-import', element: withSuspense(DataImportPage) },
-          { path: 'account-management', element: withSuspense(AccountManagementPage) },
-          { path: 'database-backup', element: withSuspense(DatabaseBackupPage) },
-        ],
-      },
+  {
+    path: 'system',
+    children: [
+      { path: 'data-import', element: withSuspense(DataImportPage) },
+      { path: 'account-management', element: withSuspense(AccountManagementPage) },
+      { path: 'database-backup', element: withSuspense(DatabaseBackupPage) },
     ],
   },
-]);
+];
+
+const routes = isMobile
+  ? [
+      {
+        path: '/',
+        element: <MainLayout />,
+        errorElement: <RouteErrorBoundary />,
+        children: mainChildren,
+      },
+    ]
+  : [
+      {
+        path: '/login',
+        element: <LoginPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: '/',
+        element: (
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+        children: mainChildren,
+      },
+    ];
+
+const router = isMobile ? createHashRouter(routes) : createBrowserRouter(routes);
 
 export default function AppRouter() {
   return <RouterProvider router={router} />;

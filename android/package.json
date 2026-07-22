@@ -1,0 +1,24 @@
+{
+  "name": "shengxintou-bi-android",
+  "version": "0.1.0",
+  "description": "省心投 BI 移动端（Capacitor 封装）",
+  "private": true,
+  "scripts": {
+    "build": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android",
+    "build:apk": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "sync": "npx cap sync android",
+    "open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/preferences": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capacitor-community/sqlite": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -63,7 +63,7 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<DataFreshness | null>(null);
     const [expanded, setExpanded] = useState(!compact);
-    // v3.4.1: 同步状态（云端 vs 本地最新日期）
+    // 同步状态（云端 vs 本地最新日期）
     const [syncStatus, setSyncStatus] = useState<WebdavSyncStatus | null>(null);
 
     // 加载数据
@@ -235,7 +235,7 @@ export const DataFreshnessIndicator = forwardRef<DataFreshnessIndicatorRef, Data
 
       {/* 详情列表 */}
       <div className={styles.details}>
-        {/* v3.4.1: 云端 vs 本地对比 Tag */}
+        {/* 云端 vs 本地对比 Tag */}
         {syncStatus && syncStatus.cloud_available && (
           <div className={styles.syncRow}>
             <Tag

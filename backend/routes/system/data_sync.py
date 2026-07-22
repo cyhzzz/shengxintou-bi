@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """数据双向同步 API（SQLite ↔ Supabase PG）
 
-v3.4.3：为「数据同步」页面提供手动双向同步功能。
+为「数据同步」页面提供手动双向同步功能。
 - 本地开发版主库走 SQLite，CLOUD_DATABASE_URL 指向 Supabase PG
 - 桌面版主库已走 PG，CLOUD_DATABASE_URL 不设时同步功能自动隐藏
 

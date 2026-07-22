@@ -113,7 +113,7 @@ def restore_backup():
 @bp.route('/sync-check', methods=['GET'])
 @handle_exceptions
 def sync_check():
-    """v3.4.1: 检查坚果云最新备份 vs 本地业务数据最新日期，判断是否需要同步。
+    """检查坚果云最新备份 vs 本地业务数据最新日期，判断是否需要同步。
 
     返回结构：
     {
@@ -142,12 +142,11 @@ def sync_check():
 @bp.route('/auto-sync', methods=['POST'])
 @handle_exceptions
 def auto_sync():
-    """v3.4.1: 一键同步——自动从坚果云拉取最新备份恢复本地数据库。
-
+    """一键同步——自动从坚果云拉取最新备份恢复本地数据库。
     复用 _restore_async 完整流程（含 pre_restore 备份 + 失败回滚）。
     不接 filename 参数，自动选云端最新一份。
     """
-    # v3.4.1: meta 校验门——避免「云端 created 看着新但其实是本地数据」的误触发
+    # meta 校验门——避免「云端 created 看着新但其实是本地数据」的误触发
     #   1. 调 _check_sync_status 拿到 cloud_data_latest / need_sync / meta_source
     #   2. 若 needs_meta_rebuild（云端最新备份缺 meta）→ 拒绝执行，要求先做一次备份补 meta
     #   3. 若 !need_sync → 拒绝执行（防止无限循环同步）
@@ -250,7 +249,7 @@ def auto_sync():
 
 
 def _compute_local_sources(app):
-    """v3.4.1: 计算本地 5 张业务表各自的 MAX 日期 + 整体 MAX。
+    """计算本地 5 张业务表各自的 MAX 日期 + 整体 MAX。
 
     抽出来给 _check_sync_status 和 _backup_async 共享——
     保证备份时的 meta 与 sync-check 时对比的 local_latest 来自同一份查询逻辑。
@@ -634,7 +633,7 @@ def _backup_async(task_id, description):
 
             backup_tasks[task_id]['progress'] = 90
 
-            # v3.4.1: 上传 meta.json(< 1KB),记录真正的数据日期。
+            # 上传 meta.json(< 1KB),记录真正的数据日期。
             # sync_check 时只下载这个小文件即可判断是否需要同步,避免下载几十 MB 备份。
             # 没有 meta 的旧备份会在 sync-check 时 fallback 到文件 mtime 并标 needs_meta_rebuild。
             try:

@@ -5,6 +5,8 @@
 import { API_URL, API_TIMEOUT } from './config';
 import type { ApiResponse } from '@/types';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { isMobileClient } from '@/utils/isDesktop';
+import { mobileRouteHandler } from './mobileRouteHandler';
 
 // 路由跳转函数（避免循环依赖，由调用方注入）
 let _navigateToLogin: ((next?: string) => void) | null = null;
@@ -79,6 +81,21 @@ class HttpClient {
 
   // 通用请求方法（接收已构建好的完整 URL）
   async request<T>(fullUrl: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
+    // 移动端拦截：将 API 请求路由到本地 SQLite 查询
+    if (isMobileClient() && fullUrl.includes('/api/v1/')) {
+      try {
+        const body = config.body ? JSON.parse(config.body as string) : {};
+        const data = await mobileRouteHandler(fullUrl, body);
+        return { success: true, data: data as T };
+      } catch (error) {
+        return {
+          success: false,
+          error: 'MOBILE_QUERY_ERROR',
+          message: error instanceof Error ? error.message : '本地查询失败',
+        };
+      }
+    }
+
     const { timeout = API_TIMEOUT, ...fetchConfig } = config;
 
     // 应用请求拦截器

@@ -71,7 +71,7 @@ def _process_file(task_id: str, filepath: str, data_type: str,
                   overwrite: bool, log_id: int, batch_tag: str = None):
     """异步处理文件（v2 原样导入）。
 
-    v3.3.6：qingniao_leads 支持 batch_tag 参数（批次标注），其他类型忽略此参数。
+    qingniao_leads 支持 batch_tag 参数（批次标注），其他类型忽略此参数。
     """
     try:
         from app import app
@@ -88,7 +88,7 @@ def _process_file(task_id: str, filepath: str, data_type: str,
 
             # v2 原样导入
             started = time.time()
-            # v3.3.6：qingniao_leads 传 batch_tag 给 write_to_db → handle_qingniao_leads
+            # qingniao_leads 传 batch_tag 给 write_to_db → handle_qingniao_leads
             if data_type == 'qingniao_leads':
                 meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
             else:
@@ -258,7 +258,7 @@ def upload_file():
             'status': 'pending',
             'message': f'文件已接收，使用 {DATA_TYPES[data_type]} 原样导入（v2，无中间计算）',
             'data_type': data_type,
-            # v3.3.6：回传 batch_tag 便于前端自动选中本次批次
+            # 回传 batch_tag 便于前端自动选中本次批次
             'batch_tag': batch_tag,
         }
     })

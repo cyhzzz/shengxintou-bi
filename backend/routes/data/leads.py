@@ -142,7 +142,7 @@ def get_anchor_clusters():
     ed = filters.get('end_date')
     platforms_filter = filters.get('platforms') or []
     agencies_filter = filters.get('agencies') or []
-    # v3.3.0: 直播类型筛选（分析师/投顾IP/投顾配合做带货/带货直播）
+    # 直播类型筛选（分析师/投顾IP/投顾配合做带货/带货直播）
     live_types_filter = filters.get('live_types') or []
 
     # 主播聚类正则: (平台)引流-(主播名)
@@ -201,7 +201,7 @@ def get_anchor_clusters():
     base_q = base_q.group_by(FactConvContent.客户来源, FactConvContent.平台来源)
     rows = base_q.all()
 
-    # v3.3.0: 加载主播直播类型映射表（source_token -> {anchor_name, live_type, remark}）
+    # 加载主播直播类型映射表（source_token -> {anchor_name, live_type, remark}）
     # 用于给每个 (platform, anchor) 聚类项打 live_type 标签 + 归一化 anchor_name（错字校正）
     live_type_rows = db.session.query(
         DimAnchorLiveType.source_token,
@@ -223,7 +223,7 @@ def get_anchor_clusters():
     PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
     SPLIT_PATTERN = re.compile(r"[,，;；、]+")
 
-    # v3.3.6: 平台归一化 — 把正则抽出的引流平台映射到 fact_conv_content.平台来源 的实际值
+    # 平台归一化 — 把正则抽出的引流平台映射到 fact_conv_content.平台来源 的实际值
     # 数据库 平台来源 字段只有「腾讯/抖音/小红书/财联社/yj/快手/高德」，没有「视频号」/「微信」
     # 但「视频号引流-XXX」/「微信引流-XXX」的记录在数据库中都归在 平台来源='腾讯' 下
     # 若不归一化，前端筛选项会出现「视频号」但用 平台来源.in_(['视频号']) 过滤会命中 0 行
@@ -233,7 +233,7 @@ def get_anchor_clusters():
         '微信': '腾讯',
     }
 
-    # v3.3.10: 预提取纯人名 token (JSON 里不含"引流-"/"直播带货-"的 source_token，如"黄天平"/"赵茜")
+    # 预提取纯人名 token (JSON 里不含"引流-"/"直播带货-"的 source_token，如"黄天平"/"赵茜")
     # 数据库"客户来源"字段可能是纯人名（分支投顾自IP），PATTERN 不匹配，需按 token 归类
     plain_name_tokens = {tok for tok in token_to_anchor
                          if '引流-' not in tok and '直播带货-' not in tok}
@@ -249,12 +249,12 @@ def get_anchor_clusters():
             m = PATTERN.match(segment)
             if m:
                 anchor_platform = m.group(1)
-                # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
+                # 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
                 anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
                 raw_anchor_name = m.group(2).strip()
                 if not raw_anchor_name:
                     continue
-                # v3.3.0: 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
+                # 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
                 # segment 是原始 token（如"直播带货-胡磊" / "抖音引流-直播带货-胡磊"）
                 # 若 token 在表中，用表里的 anchor_name；否则用正则解析的 raw_anchor_name
                 normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
@@ -286,7 +286,7 @@ def get_anchor_clusters():
                     'existing_assets': 0.0,
                     'assets': 0.0,
                     'raw_sources': set(),
-                    'live_types': set(),  # v3.3.0: 该 anchor 跨 token 涉及的所有直播类型
+                    'live_types': set(),  # 该 anchor 跨 token 涉及的所有直播类型
                 }
             a = agg_map[key]
             a['leads'] += int(r.leads or 0)
@@ -303,7 +303,7 @@ def get_anchor_clusters():
             a['existing_assets'] += float(r.existing_assets or 0)
             a['assets'] += float(r.assets or 0)
             a['raw_sources'].add(segment)
-            # v3.3.0: 累加该 anchor 的直播类型
+            # 累加该 anchor 的直播类型
             # 优先用 segment 精确查 token；查不到则用归一化 anchor_name 查该主播所有 live_type 兜底
             # （数据库"客户来源"字段值可能与 JSON source_token 有细微差异，但主播名能对上）
             lt = token_to_live_type.get(segment)
@@ -323,7 +323,7 @@ def get_anchor_clusters():
         valid = a['valid']
         new_valid = a['new_valid']
         new_valid_lead = a['new_valid_lead']
-        # v3.3.0: live_types 取该 anchor 跨 token 涉及的所有类型
+        # live_types 取该 anchor 跨 token 涉及的所有类型
         # 若配置表里该 anchor 涉及多种类型（如胡磊既有"投顾IP"又有"投顾配合做带货"），
         # 则取第一个非空的类型作为 primary live_type，其余放入 secondary_live_types
         anchor_live_types = sorted(a['live_types']) if a['live_types'] else []
@@ -334,7 +334,7 @@ def get_anchor_clusters():
         items.append({
             'platform': a['platform'],
             'anchor': a['anchor'],
-            'live_type': primary_live_type,  # v3.3.0: 直播类型（分析师/投顾IP/投顾配合做带货/带货直播/None=未映射）
+            'live_type': primary_live_type,  # 直播类型（分析师/投顾IP/投顾配合做带货/带货直播/None=未映射）
             'live_types': anchor_live_types,  # 该 anchor 涉及的全部直播类型
             'secondary_live_types': secondary_live_types,
             'leads': leads,
@@ -358,7 +358,7 @@ def get_anchor_clusters():
             'sources': sorted(a['raw_sources']),
         })
 
-    # v3.3.0: live_types 筛选（保留 items 中 live_types 与筛选有交集的项）
+    # live_types 筛选（保留 items 中 live_types 与筛选有交集的项）
     if live_types_filter:
         wanted = set(live_types_filter)
         items = [i for i in items if set(i['live_types']) & wanted]
@@ -383,7 +383,7 @@ def get_anchor_clusters():
         'total_assets': round(sum(i['assets'] for i in items), 2),
     }
 
-    # v3.3.0: 按 live_type 拆分的汇总（用于前端类型对比卡片）
+    # 按 live_type 拆分的汇总（用于前端类型对比卡片）
     live_type_breakdown = {}
     for i in items:
         lt = i['live_type'] or '未映射'
@@ -421,10 +421,10 @@ def get_anchor_clusters():
             'live_types': sorted(set(lt for i in items for lt in i['live_types'])),
         },
         'meta': {
-            'version': 'v3.3.0-anchor-cluster-with-live-type',
+            'version': 'anchor-cluster-with-live-type',
             'source': 'fact_conv_content.客户来源 + dim_anchor_live_type',
             'pattern': '^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$',
-            'note': 'v3.3.0 起新增 live_type / live_types / secondary_live_types 字段，由 dim_anchor_live_type 表按 source_token 映射得到；支持 live_types 筛选参数；新增 live_type_breakdown 按直播类型拆分汇总。存量剔除口径与 v3.1.26 一致（是否为存量客户==0 OR IS NULL）。未在配置表的 token 仍按正则解析得到 anchor_name，但 live_type=None。',
+            'note': '新增 live_type / live_types / secondary_live_types 字段，由 dim_anchor_live_type 表按 source_token 映射得到；支持 live_types 筛选参数；新增 live_type_breakdown 按直播类型拆分汇总。存量剔除口径与非存量条件一致（是否为存量客户==0 OR IS NULL）。未在配置表的 token 仍按正则解析得到 anchor_name，但 live_type=None。',
         },
     })
 
@@ -442,8 +442,9 @@ def get_anchor_clusters_trend():
     ed = filters.get('end_date')
     platforms_filter = filters.get('platforms') or []
     agencies_filter = filters.get('agencies') or []
-    # v3.3.0: 直播类型筛选
-    live_types_filter = filters.get('live_types') or []
+    # 直播类型筛选
+    live_types_filter = filters.get('live_types') or []  # noqa: F841
+
     if granularity == 'weekly':
         granularity = 'weekly'
         # dialect 无关：SQLite strftime('%Y-%W') / PG to_char('YYYY-IW')
@@ -458,9 +459,9 @@ def get_anchor_clusters_trend():
     period_label = period_expr.label('period')
     non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
 
-    # v3.4.2: 预加载 dim_anchor_live_type 表，构建 plain_name_tokens
-    # 与 get_anchor_clusters 同步：纯人名 token（如"黄天平"）不含"引流-"，
-    # 原有的 like('%引流-%') 过滤会漏掉这些记录，导致日历年度总开户数偏少
+    # 预加载 dim_anchor_live_type 表，构建 plain_name_tokens
+    # 纯人名 token（如"黄天平"）不含"引流-"，原有的 like('%引流-%') 过滤
+    # 会漏掉这些记录，导致日历年度总开户数偏少
     lt_rows_all = db.session.query(
         DimAnchorLiveType.source_token,
         DimAnchorLiveType.live_type,
@@ -503,7 +504,7 @@ def get_anchor_clusters_trend():
     if agencies_filter:
         q = q.filter(FactConvContent.广告代理商.in_(agencies_filter))
 
-    # v3.3.0: 若启用 live_types 筛选，从已加载的 lt_rows_all 构建 wanted_tokens
+    # 若启用 live_types 筛选，从已加载的 lt_rows_all 构建 wanted_tokens
     # （包含纯人名 token，与 get_anchor_clusters 口径一致）
     wanted_tokens = set()
     if live_types_filter:
@@ -520,7 +521,7 @@ def get_anchor_clusters_trend():
     all_platforms = set()
     SPLIT_PATTERN = re.compile(r"[,，;；、]+")
     for r in rows:
-        # v3.3.0: live_types 筛选 — 拆 客户来源 token，看是否命中 wanted_tokens
+        # live_types 筛选 — 拆 客户来源 token，看是否命中 wanted_tokens
         if live_types_filter:
             src = (r.客户来源 or '').strip()
             tokens = [t.strip() for t in SPLIT_PATTERN.split(src) if t.strip()]
@@ -558,10 +559,10 @@ def get_anchor_clusters_trend():
             },
             'platforms': sorted(all_platforms),
             'meta': {
-                'version': 'v3.3.0-anchor-trend-with-live-type',
+                'version': 'anchor-trend-with-live-type',
                 'source': 'fact_conv_content.客户来源 + dim_anchor_live_type',
                 'pattern': '%引流-% or plain_name_tokens',
-                'note': 'v3.3.0 起支持 live_types 筛选：按 dim_anchor_live_type 表中 source_token 集合过滤原始 客户来源。按 (period, platform) 聚合，主播层面落到平台维度。period 由 granularity 决定：daily=YYYY-MM-DD，weekly=YYYY-Www，monthly=YYYY-MM。存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量，与 anchor-clusters 口径一致。',
+                'note': '支持 live_types 筛选：按 dim_anchor_live_type 表中 source_token 集合过滤原始 客户来源。按 (period, platform) 聚合，主播层面落到平台维度。period 由 granularity 决定：daily=YYYY-MM-DD，weekly=YYYY-Www，monthly=YYYY-MM。存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量，与 anchor-clusters 口径一致。',
             }
         }
     })
@@ -570,7 +571,7 @@ def get_anchor_clusters_trend():
 @bp.route('/leads-detail/anchor-weekly-analysis', methods=['POST'])
 @handle_exceptions
 def get_anchor_weekly_analysis():
-    """主播周度拿量 + 各环节转化率分析（v3.4.5）
+    """主播周度拿量 + 各环节转化率分析
 
     业务定位：对齐应用市场 plan-analysis 的「主播 × 周」交叉表设计，
     回答两个核心问题：
@@ -633,8 +634,8 @@ def get_anchor_weekly_analysis():
     else:
         source_filter = and_(source_filter, FactConvContent.客户来源.like('%引流-%'))
 
-    # v3.4.5 P2: live_types 筛选改为 token 级（与 get_anchor_clusters 完全一致）
-    # 注意：不能用主播级筛选——一个主播在 dim 表里可能有多 token，分别属于不同 live_type
+    # live_types 筛选为 token 级（与 get_anchor_clusters 完全一致）
+    # 不能用主播级筛选：一个主播在 dim 表里可能有多 token，分别属于不同 live_type
     # （如黄天平有 '视频号引流-黄天平'(分析师) 和 '抖音引流-黄天平'(带货直播)）。
     # 主播级筛选会把该主播所有 token 都算进来，包括非目标 live_type 的 token，导致口径偏宽。
     wanted_live_types = set(live_types_filter) if live_types_filter else set()
@@ -794,7 +795,7 @@ def get_anchor_weekly_analysis():
             'all_count': len(anchor_items),
         },
         'meta': {
-            'version': 'v3.4.5-anchor-weekly-analysis',
+            'version': 'p2-anchor-weekly-analysis',
             'source': 'fact_conv_content.客户来源 + dim_anchor_live_type',
             'group_by': '主播 × 周起始日',
             'funnel_stages': ['客户线索', '客户开口', '有效线索', '有效线索(剔除存量)', '成功开户(新)', '有效户(新)'],

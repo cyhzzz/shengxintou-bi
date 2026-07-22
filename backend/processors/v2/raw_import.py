@@ -307,10 +307,10 @@ def handle_qingniao_leads(path: str, batch_tag: str = None):
             except Exception:
                 pass
     # 标志位列保留原样字符串「未打」/「已打」，不做转换
-    # 不主动设置 id 列，让数据库 AUTOINCREMENT 处理（v3.3.6 改 append 模式后避免主键冲突）
+    # 不主动设置 id 列，让数据库 AUTOINCREMENT 处理（append 模式下避免主键冲突）
     if "id" in df.columns:
         df = df.drop(columns=["id"])
-    # v3.3.6：批次标注列
+    # 批次标注列
     if not batch_tag:
         batch_tag = datetime.now().strftime('%Y%m%d%H%M')
     df = df.copy()
@@ -344,7 +344,7 @@ def process(data_type: str, file_path: str, **kwargs) -> dict:
 def _pg_copy_insert(df: pd.DataFrame, table_name: str, engine) -> None:
     """用 PostgreSQL COPY 命令批量写入 DataFrame。
 
-    v3.4.2 性能优化：COPY 比 method='multi' INSERT 快 10 倍以上。
+    性能优化：COPY 比 method='multi' INSERT 快 10 倍以上。
     - 流式写入，不受 PG 参数上限（65535）限制
     - 不需要分批提交（COPY 整体是一个事务，但写入是流式的）
     - 原样导入场景适用：数据均为覆盖写入，列顺序与 DataFrame 一致
@@ -377,7 +377,7 @@ def _pg_copy_insert(df: pd.DataFrame, table_name: str, engine) -> None:
 def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) -> dict:
     """处理并写入新表。
 
-    v3.4.0 feat-desktop-supabase 关键改造：
+    双端支持关键改造：
     - db_url 默认从 current_app.config['SQLALCHEMY_DATABASE_URI'] 取（兼容 SQLite + PG）
     - 改为 DELETE + append 模式，保留 ORM 建好的表结构（主键/序列/索引/中文列名映射）
       原因：to_sql(if_exists='replace') = DROP TABLE + 按 pandas 推断类型重建，
@@ -385,7 +385,7 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     - qingniao_leads 仍用纯 append（保留历史批次，不 DELETE）
     - 删除 sqlite_sequence 操作（SQLite 专属，PG 报错；DELETE + append 不需要重置序列）
 
-    v3.4.2 性能优化：
+    性能优化：
     - PG 使用 COPY 命令替代 INSERT（20万行从 199s → 预计 <30s）
     - SQLite 保持 to_sql（COPY 是 PG 专有命令）
     """

@@ -30,6 +30,7 @@ import {
   AuditOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
+import MobileSyncButton from '@/components/MobileSyncButton';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -161,18 +162,30 @@ const findLabel = (items: MenuProps['items'], key: string): string => {
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  // v3.4.3：用 featureFlags 控制菜单显隐（配置文件统一管理）
+  // 用 featureFlags 控制菜单显隐（配置文件统一管理）
   const visibleMenuItems = useMemo(() => {
-    if (featureFlags.showDataSyncMenu) return menuItems;
     return (menuItems || []).map(item => {
       if (!item || typeof item !== 'object') return item;
       const it = item as any;
-      if (it.key !== 'system') return item;
-      return {
-        ...it,
-        children: (it.children || []).filter((c: any) => c?.key !== '/system/database-backup'),
-      };
-    }) as MenuProps['items'];
+      // 过滤报告生成
+      if (it.key === '/report-generation' && !featureFlags.showReportGeneration) {
+        return null;
+      }
+      // 过滤系统配置子菜单
+      if (it.key === 'system' && it.children) {
+        const filteredChildren = it.children.filter((c: any) => {
+          if (!c) return false;
+          if (c.key === '/system/data-import' && !featureFlags.showDataImport) return false;
+          if (c.key === '/system/account-management' && !featureFlags.showAccountManagement) return false;
+          if (c.key === '/system/database-backup' && !featureFlags.showDatabaseBackup) return false;
+          return true;
+        });
+        // 如果没有子菜单了，隐藏整个系统配置
+        if (filteredChildren.length === 0) return null;
+        return { ...it, children: filteredChildren };
+      }
+      return item;
+    }).filter(Boolean) as MenuProps['items'];
   }, []);
   const navigate = useNavigate();
   const location = useLocation();
@@ -291,6 +304,7 @@ export default function MainLayout() {
             </span>
           </div>
           <div className={styles.headerRight}>
+            <MobileSyncButton />
             <Tooltip title={themeMode === 'dark' ? '切换亮色模式' : '切换暗色模式'}>
               <button
                 className={styles.themeToggle}

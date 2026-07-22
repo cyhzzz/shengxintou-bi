@@ -136,3 +136,8 @@ frontend-react/tmp_*.cjs
 
 # node_modules at root (accidental)
 node_modules/
+
+# ===== Android 移动端打包产物 =====
+android/android/
+android/node_modules/
+android/release/

@@ -28,7 +28,7 @@ const DatabaseBackupPage: React.FC = () => {
     supportContact?: string;
   } | null>(null);
 
-  // v3.4.1: 同步状态（云端 vs 本地最新日期）
+  // 同步状态（云端 vs 本地最新日期）
   const [syncStatus, setSyncStatus] = useState<WebdavSyncStatus | null>(null);
   const [syncChecking, setSyncChecking] = useState(false);
   const [syncConfirmVisible, setSyncConfirmVisible] = useState(false);
@@ -63,7 +63,7 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
-  // v3.4.1: 检测云端 vs 本地数据日期差
+  // 检测云端 vs 本地数据日期差
   const loadSyncStatus = useCallback(async () => {
     setSyncChecking(true);
     try {
@@ -78,7 +78,7 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
-  // v3.4.3: 加载双向同步状态（本地 SQLite vs 云端 PG）
+  // 加载双向同步状态（本地 SQLite vs 云端 PG）
   const loadDbSyncStatus = useCallback(async () => {
     setDbSyncLoading(true);
     try {
@@ -96,7 +96,7 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
-  // v3.4.3: 执行双向同步（上传 / 下载）
+  // 执行双向同步（上传 / 下载）
   const runDbSync = useCallback(async (direction: 'upload' | 'download') => {
     setDbSyncConfirm({ visible: false, direction });
     setDbSyncOperating(direction);
@@ -186,7 +186,7 @@ const DatabaseBackupPage: React.FC = () => {
               setProgressVisible(false);
               if (data.status === 'completed') {
                 message.success('操作完成');
-                // v3.4.1: 同步/恢复完成后重新检测云端 vs 本地
+                // 同步/恢复完成后重新检测云端 vs 本地
                 loadSyncStatus();
               }
               loadBackupList();
@@ -408,7 +408,7 @@ const DatabaseBackupPage: React.FC = () => {
           />
         )}
 
-        {/* v3.4.1: 云端 vs 本地同步状态卡片 */}
+        {/* 云端 vs 本地同步状态卡片 */}
         {syncStatus && (
           <Alert
             className={styles.syncAlert}
@@ -502,7 +502,7 @@ const DatabaseBackupPage: React.FC = () => {
         />
       </Card>
 
-      {/* v3.4.3: 双向同步卡片（SQLite ↔ Supabase PG） */}
+      {/* 双向同步卡片（SQLite ↔ Supabase PG） */}
       <Card className={styles.dbSyncCard}>
         <div className={styles.header}>
           <h3>数据库双向同步</h3>
@@ -654,7 +654,7 @@ const DatabaseBackupPage: React.FC = () => {
         </p>
       </Modal>
 
-      {/* v3.4.3: 双向同步确认弹窗 */}
+      {/* 双向同步确认弹窗 */}
       <Modal
         title={dbSyncConfirm.direction === 'upload' ? '确认上传到云端' : '确认从云端下载'}
         open={dbSyncConfirm.visible}
