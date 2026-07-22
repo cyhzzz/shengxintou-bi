@@ -2,7 +2,7 @@ appId: com.shengxintou.bi
 productName: 省心投 BI
 copyright: Copyright © 2026 省心投 BI
 directories:
-  output: C:\sxt_release
+  output: release
   buildResources: resources
 files:
   - dist/**/*
