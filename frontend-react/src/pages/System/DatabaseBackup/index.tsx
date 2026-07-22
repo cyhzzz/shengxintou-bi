@@ -4,11 +4,11 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, Button, Space, Table, Modal, message, Alert, Spin, Tag } from 'antd';
-import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined } from '@ant-design/icons';
+import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined, SyncOutlined } from '@ant-design/icons';
 import BackupProgress from './components/BackupProgress';
 import VersionUpdateModal from './components/VersionUpdateModal';
 import { http } from '@/services/http';
-import { dataServiceWebdav, type WebdavSyncStatus } from '@/services/dataService';
+import { dataServiceWebdav, dataServiceSync, type WebdavSyncStatus, type SyncStatus, type SyncResult } from '@/services/dataService';
 import type {
   WebdavBackupFile,
   WebdavProgressResponse,
@@ -32,6 +32,13 @@ const DatabaseBackupPage: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<WebdavSyncStatus | null>(null);
   const [syncChecking, setSyncChecking] = useState(false);
   const [syncConfirmVisible, setSyncConfirmVisible] = useState(false);
+
+  // v3.4.3: 双向同步（SQLite ↔ Supabase PG）
+  const [dbSyncStatus, setDbSyncStatus] = useState<SyncStatus | null>(null);
+  const [dbSyncLoading, setDbSyncLoading] = useState(false);
+  const [dbSyncOperating, setDbSyncOperating] = useState<null | 'upload' | 'download'>(null);
+  const [dbSyncResult, setDbSyncResult] = useState<SyncResult | null>(null);
+  const [dbSyncConfirm, setDbSyncConfirm] = useState<{ visible: boolean; direction: 'upload' | 'download' }>({ visible: false, direction: 'upload' });
 
   const taskIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -71,6 +78,61 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
+  // v3.4.3: 加载双向同步状态（本地 SQLite vs 云端 PG）
+  const loadDbSyncStatus = useCallback(async () => {
+    setDbSyncLoading(true);
+    try {
+      const res = await dataServiceSync.getStatus();
+      if (res?.success) {
+        setDbSyncStatus(res.data);
+        // 状态刷新后清空上次结果（避免显示与当前状态不一致的旧结果）
+        setDbSyncResult(null);
+      }
+    } catch (err) {
+      // 静默：云端不可达时不弹错
+      console.error('加载双向同步状态失败:', err);
+    } finally {
+      setDbSyncLoading(false);
+    }
+  }, []);
+
+  // v3.4.3: 执行双向同步（上传 / 下载）
+  const runDbSync = useCallback(async (direction: 'upload' | 'download') => {
+    setDbSyncConfirm({ visible: false, direction });
+    setDbSyncOperating(direction);
+    setDbSyncResult(null);
+    try {
+      const res = direction === 'upload'
+        ? await dataServiceSync.upload()
+        : await dataServiceSync.download();
+      if (res?.success) {
+        setDbSyncResult(res.data);
+        const dirLabel = direction === 'upload' ? '上传到云端' : '从云端下载';
+        const totalRows = res.data.total_rows;
+        const hasError = Object.values(res.data.results || {}).some((r: any) => r.error);
+        const skippedCount = Object.values(res.data.results || {}).filter((r: any) => r.skipped).length;
+        const tip = hasError
+          ? `${dirLabel}完成，共同步 ${totalRows.toLocaleString()} 行（部分表失败，请查看下方详情）`
+          : `${dirLabel}完成，共同步 ${totalRows.toLocaleString()} 行${skippedCount ? `（跳过 ${skippedCount} 张本地维护表）` : ''}`;
+        // v3.4.3: 用 message 弹一个保持 6 秒的醒目提示（默认 3s 容易错过）
+        message.open({
+          type: hasError ? 'warning' : 'success',
+          content: tip,
+          duration: 6,
+        });
+        // 同步完成后刷新状态
+        loadDbSyncStatus();
+      } else {
+        message.error(res?.message || '同步失败');
+      }
+    } catch (err: any) {
+      const status = err?.response?.status || err?.status || '网络层错误';
+      message.error(`同步失败（${status}）`);
+    } finally {
+      setDbSyncOperating(null);
+    }
+  }, [loadDbSyncStatus]);
+
   const checkVersion = useCallback(async () => {
     try {
       const response = await http.get<VersionCompareResponse>('/version/compare');
@@ -92,7 +154,8 @@ const DatabaseBackupPage: React.FC = () => {
     loadBackupList();
     checkVersion();
     loadSyncStatus();
-  }, [loadBackupList, checkVersion, loadSyncStatus]);
+    loadDbSyncStatus();
+  }, [loadBackupList, checkVersion, loadSyncStatus, loadDbSyncStatus]);
 
   // 清理轮询
   useEffect(() => {
@@ -439,6 +502,127 @@ const DatabaseBackupPage: React.FC = () => {
         />
       </Card>
 
+      {/* v3.4.3: 双向同步卡片（SQLite ↔ Supabase PG） */}
+      <Card className={styles.dbSyncCard}>
+        <div className={styles.header}>
+          <h3>数据库双向同步</h3>
+          <Space size="small">
+            <Tag color={dbSyncStatus?.local ? (dbSyncStatus.local.dialect === 'postgresql' ? 'purple' : 'blue') : 'default'}>
+              本地 {dbSyncStatus?.local?.dialect?.toUpperCase() || '-'}
+            </Tag>
+            <Tag color="cyan">
+              云端 {dbSyncStatus?.cloud?.dialect?.toUpperCase() || '-'}
+            </Tag>
+          </Space>
+        </div>
+
+        {!dbSyncStatus?.available ? (
+          <Alert
+            type="info"
+            showIcon
+            icon={<WifiOutlined />}
+            message={dbSyncStatus?.message || '未配置 CLOUD_DATABASE_URL，双向同步功能不可用'}
+            description={<span className={styles.syncHint}>此功能用于本地 SQLite 与云端 Supabase PG 之间的数据互相同步。请在后端 .env 中配置 CLOUD_DATABASE_URL 后启用。</span>}
+          />
+        ) : (
+          <>
+            <Space size="middle" wrap className={styles.actionsBar}>
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                loading={dbSyncOperating === 'upload'}
+                disabled={dbSyncOperating !== null}
+                onClick={() => setDbSyncConfirm({ visible: true, direction: 'upload' })}
+              >
+                上传到云端（本地 → PG）
+              </Button>
+              <Button
+                icon={<CloudDownloadOutlined />}
+                loading={dbSyncOperating === 'download'}
+                disabled={dbSyncOperating !== null}
+                onClick={() => setDbSyncConfirm({ visible: true, direction: 'download' })}
+              >
+                从云端下载（PG → 本地）
+              </Button>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={loadDbSyncStatus}
+                disabled={dbSyncLoading || dbSyncOperating !== null}
+              >
+                重新检测
+              </Button>
+              <Spin spinning={dbSyncLoading} size="small" />
+            </Space>
+
+            {/* 数据对比表 */}
+            {dbSyncStatus.local && dbSyncStatus.cloud && (
+              <div className={styles.dbSyncTableWrap}>
+                <div className={styles.dbSyncMeta}>
+                  <span>本地最新数据日期：<strong>{dbSyncStatus.local.latest_date || '无'}</strong></span>
+                  <span>云端最新数据日期：<strong>{dbSyncStatus.cloud.latest_date || '无'}</strong></span>
+                </div>
+                <Table
+                  size="small"
+                  rowKey="table"
+                  pagination={false}
+                  dataSource={Object.keys(dbSyncStatus.local.counts).map((t) => ({
+                    table: t,
+                    local: dbSyncStatus.local!.counts[t],
+                    cloud: dbSyncStatus.cloud!.counts[t],
+                  }))}
+                  columns={[
+                    { title: '业务表', dataIndex: 'table', key: 'table' },
+                    {
+                      title: '本地行数',
+                      dataIndex: 'local',
+                      key: 'local',
+                      render: (v: number) => v < 0 ? <Tag color="red">表缺失</Tag> : v.toLocaleString(),
+                    },
+                    {
+                      title: '云端行数',
+                      dataIndex: 'cloud',
+                      key: 'cloud',
+                      render: (v: number) => v < 0 ? <Tag color="red">表缺失</Tag> : v.toLocaleString(),
+                    },
+                    {
+                      title: '差异',
+                      key: 'diff',
+                      render: (_: unknown, r: { local: number; cloud: number }) => {
+                        if (r.local < 0 || r.cloud < 0) return <Tag color="red">异常</Tag>;
+                        const d = r.cloud - r.local;
+                        if (d === 0) return <Tag color="green">一致</Tag>;
+                        return <Tag color={d > 0 ? 'orange' : 'blue'}>{d > 0 ? `+${d}` : d}</Tag>;
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            )}
+
+            {/* 同步结果 */}
+            {dbSyncResult && (
+              <Alert
+                className={styles.dbSyncResult}
+                type={Object.values(dbSyncResult.results).some(r => r.error) ? 'warning' : 'success'}
+                showIcon
+                icon={<SyncOutlined />}
+                message={`${dbSyncResult.direction === 'upload' ? '上传到云端' : '从云端下载'}完成，共同步 ${dbSyncResult.total_rows.toLocaleString()} 行`}
+                description={
+                  <ul className={styles.usageList}>
+                    {Object.entries(dbSyncResult.results).map(([t, r]) => (
+                      <li key={t}>
+                        <strong>{t}</strong>：
+                        {r.skipped ? '已跳过' : r.error ? <span style={{ color: 'var(--color-danger)' }}>失败 — {r.error}</span> : `${(r.rows ?? 0).toLocaleString()} 行`}
+                      </li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
+          </>
+        )}
+      </Card>
+
       {/* 版本更新弹窗 */}
       <VersionUpdateModal
         visible={versionModalVisible}
@@ -467,6 +651,31 @@ const DatabaseBackupPage: React.FC = () => {
         </ul>
         <p style={{ color: 'var(--color-warning)' }}>
           ⚠️ 同步前会自动备份当前数据库；同步期间所有报表查询不可用，请避开业务高峰期操作。
+        </p>
+      </Modal>
+
+      {/* v3.4.3: 双向同步确认弹窗 */}
+      <Modal
+        title={dbSyncConfirm.direction === 'upload' ? '确认上传到云端' : '确认从云端下载'}
+        open={dbSyncConfirm.visible}
+        onOk={() => runDbSync(dbSyncConfirm.direction)}
+        onCancel={() => setDbSyncConfirm({ visible: false, direction: dbSyncConfirm.direction })}
+        okText={dbSyncConfirm.direction === 'upload' ? '确认上传' : '确认下载'}
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        confirmLoading={dbSyncOperating !== null}
+      >
+        <p>
+          {dbSyncConfirm.direction === 'upload'
+            ? '将本地数据库的全部业务表覆盖写入到云端 Supabase PG：'
+            : '将云端 Supabase PG 的全部业务表覆盖写入到本地数据库：'}
+        </p>
+        <ul>
+          <li>本地最新数据日期：<strong>{dbSyncStatus?.local?.latest_date || '无'}</strong></li>
+          <li>云端最新数据日期：<strong>{dbSyncStatus?.cloud?.latest_date || '无'}</strong></li>
+        </ul>
+        <p style={{ color: 'var(--color-warning)' }}>
+          ⚠️ 此操作会先删除目标库同名表全部数据再写入，<strong>不可撤销</strong>。请确认方向后再继续。
         </p>
       </Modal>
     </div>

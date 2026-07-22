@@ -270,6 +270,32 @@ export const dataServiceWebdav = {
   },
 };
 
+// v3.4.3：双向数据同步（SQLite ↔ Supabase PG）
+export interface SyncStatus {
+  available: boolean;
+  message?: string;
+  local?: { dialect: string; counts: Record<string, number>; latest_date: string | null };
+  cloud?: { dialect: string; counts: Record<string, number>; latest_date: string | null };
+}
+
+export interface SyncResult {
+  direction: 'upload' | 'download';
+  results: Record<string, { rows?: number; error?: string; skipped?: boolean }>;
+  total_rows: number;
+}
+
+export const dataServiceSync = {
+  getStatus: async (): Promise<{ success: boolean; data: SyncStatus }> => {
+    return http.get('/data-sync/status') as unknown as { success: boolean; data: SyncStatus };
+  },
+  upload: async (tables?: string[]): Promise<{ success: boolean; data: SyncResult; message?: string }> => {
+    return http.post('/data-sync/upload', { tables }) as unknown as { success: boolean; data: SyncResult; message?: string };
+  },
+  download: async (tables?: string[]): Promise<{ success: boolean; data: SyncResult; message?: string }> => {
+    return http.post('/data-sync/download', { tables }) as unknown as { success: boolean; data: SyncResult; message?: string };
+  },
+};
+
 export const dataServiceReports = {
   getAppMarketSummary: async (filters: { start_date?: string; end_date?: string; app_markets?: string[]; channel_types?: string[] }) => {
     return http.post('/reports/app-market/summary', { filters });

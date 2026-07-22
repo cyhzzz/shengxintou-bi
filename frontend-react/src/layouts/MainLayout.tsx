@@ -37,6 +37,7 @@ import { logout, changePassword } from '@/services/auth';
 import { useEffect } from 'react';
 import { fetchMe } from '@/services/auth';
 import type { MenuProps } from 'antd';
+import { featureFlags } from '@/config/features';
 import styles from './MainLayout.module.scss';
 
 const { Sider, Header, Content } = Layout;
@@ -160,10 +161,9 @@ const findLabel = (items: MenuProps['items'], key: string): string => {
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  // v3.4.1：桌面版（Electron）隐藏"数据同步"菜单（不和坚果云互通）
-  const isDesktop = useMemo(() => navigator.userAgent.includes('Electron'), []);
+  // v3.4.3：用 featureFlags 控制菜单显隐（配置文件统一管理）
   const visibleMenuItems = useMemo(() => {
-    if (!isDesktop) return menuItems;
+    if (featureFlags.showDataSyncMenu) return menuItems;
     return (menuItems || []).map(item => {
       if (!item || typeof item !== 'object') return item;
       const it = item as any;
@@ -173,7 +173,7 @@ export default function MainLayout() {
         children: (it.children || []).filter((c: any) => c?.key !== '/system/database-backup'),
       };
     }) as MenuProps['items'];
-  }, [isDesktop]);
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const { themeMode, toggleTheme } = useAppStore();
@@ -300,22 +300,24 @@ export default function MainLayout() {
                 {themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
               </button>
             </Tooltip>
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'email', label: email || '未登录', disabled: true },
-                  ...(profile?.role ? [{ key: 'role', label: `角色：${profile.role}`, disabled: true }] : []),
-                  { type: 'divider' as const },
-                  { key: 'change-password', label: '修改密码', onClick: handleOpenChangePwd },
-                  { key: 'logout', label: '退出', onClick: handleLogout },
-                ],
-              }}
-              placement="bottomRight"
-            >
-              <Button type="text" size="small">
-                {(email || '账号').split('@')[0]}
-              </Button>
-            </Dropdown>
+            {featureFlags.showAccountEntry && (
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'email', label: email || '未登录', disabled: true },
+                    ...(profile?.role ? [{ key: 'role', label: `角色：${profile.role}`, disabled: true }] : []),
+                    { type: 'divider' as const },
+                    { key: 'change-password', label: '修改密码', onClick: handleOpenChangePwd },
+                    { key: 'logout', label: '退出', onClick: handleLogout },
+                  ],
+                }}
+                placement="bottomRight"
+              >
+                <Button type="text" size="small">
+                  {(email || '账号').split('@')[0]}
+                </Button>
+              </Dropdown>
+            )}
             <HelpModal />
           </div>
         </Header>

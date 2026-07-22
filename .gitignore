@@ -5,6 +5,7 @@
 
 # ===== 敏感配置文件 =====
 .env
+.env.desktop
 .env.local
 .env.*.local
 

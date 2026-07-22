@@ -174,6 +174,10 @@ def configure_sqlite_optimization():
         @event.listens_for(Engine, "connect")
         def set_sqlite_pragma(dbapi_conn, connection_record):
             """设置SQLite PRAGMA参数以提升性能"""
+            # 跳过非 SQLite 连接（避免 PG 等其他库执行 PRAGMA 报错）
+            if 'sqlite' not in (dbapi_conn.__class__.__module__ or ''):
+                return
+
             cursor = dbapi_conn.cursor()
 
             # 更改为传统模式，避免WAL模式导致的数据库损坏问题
@@ -568,6 +572,7 @@ def health_check():
 # 注册API路由
 from backend.routes import metadata, upload, config, webdav_backup, version
 from backend.routes.system import self_update as system
+from backend.routes.system import data_sync
 
 # feat-cloud-supabase：鉴权蓝图（必须在所有 app.register_blueprint 之前 import）
 from backend.auth import bp as auth_bp, init_auth
@@ -622,6 +627,7 @@ app.register_blueprint(investment_review.bp, url_prefix=API_PREFIX)
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
+app.register_blueprint(data_sync.bp, url_prefix='/api/v1/data-sync')
 app.register_blueprint(system.bp)
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 app.register_blueprint(app_market_report_blueprint.bp)

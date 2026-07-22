@@ -34,6 +34,11 @@ elif _raw_db_url.startswith('postgresql://') and '+' not in _raw_db_url.split(':
 DATABASE_URL = _raw_db_url or None
 SQLALCHEMY_DATABASE_URI = DATABASE_URL or f'sqlite:///{DATABASE_PATH}'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# v3.4.3：云端数据库 URL（用于「数据同步」页面的 SQLite ↔ PG 双向同步功能）
+#   - 本地开发版：主库 SQLite，CLOUD_DATABASE_URL 指向 Supabase PG（同步功能可用）
+#   - 桌面版：主库已走 PG，CLOUD_DATABASE_URL 不设（同步功能自动隐藏）
+CLOUD_DATABASE_URL = os.getenv('CLOUD_DATABASE_URL', '').strip() or None
 # 记录当前 dialect 字符串（不含 URL 中的凭据），启动日志用。
 # 用 SQLAlchemy 的 make_url 解析；解析失败记 'unknown'。
 def _resolve_dialect():

@@ -46,3 +46,42 @@
 .sizeTag {
   margin-left: var(--spacer-8);
 }
+
+// v3.4.3: 双向同步卡片
+.dbSyncCard {
+  margin-top: var(--spacer-24);
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacer-16);
+
+    h3 {
+      margin: 0;
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-semibold);
+    }
+  }
+}
+
+.syncHint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.dbSyncTableWrap {
+  margin-top: var(--spacer-16);
+}
+
+.dbSyncMeta {
+  display: flex;
+  gap: var(--spacer-24);
+  margin-bottom: var(--spacer-12);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.dbSyncResult {
+  margin-top: var(--spacer-16);
+}
