@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Spin, Space } from "antd";
 import styles from "./CalendarHeatmap.module.scss";
 
@@ -14,7 +14,42 @@ const MONTH_LABELS = [
   "7月", "8月", "9月", "10月", "11月", "12月",
 ];
 
+// feat-desktop-heatmap: cell 自适应计算参数
+// - 53 周 × 7 天 ≈ 1 列 = 1 周，cell 必须能放进容器内
+// - 减去 40px 周几 label 列 + 左右内边距 + gap 余量
+// - cell 必须 ≥ 4px（cell 渲染最小阈值）；过大限制到 24px（避免占用过大空白）
+const CELL_GAP = 3;       // 与 .grid gap 一致
+const LABEL_COL_WIDTH = 40;
+const SAFE_PADDING = 16;  // 容器内左右 padding 预留
+const MIN_CELL = 6;
+const MAX_CELL = 22;
+const DEFAULT_CELL = 14;  // 容器宽度尚未量出时的兜底值
+
+function calcCellSize(containerWidth: number, totalWeeks: number): number {
+  if (!containerWidth || totalWeeks <= 0) return DEFAULT_CELL;
+  // 实际可用于 cell+gap 的横向空间 = 容器 - label 列 - padding
+  const usable = containerWidth - LABEL_COL_WIDTH - SAFE_PADDING;
+  // 总列宽 = totalWeeks × cellSize + (totalWeeks - 1) × gap
+  // => cellSize = (usable - (totalWeeks - 1) × gap) / totalWeeks
+  const raw = (usable - (totalWeeks - 1) * CELL_GAP) / totalWeeks;
+  const clamped = Math.max(MIN_CELL, Math.min(MAX_CELL, raw));
+  return Math.floor(clamped);
+}
+
 const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days = 365 }) => {
+  // feat-desktop-heatmap: 监听 .wrap 容器宽度，动态算 cell size
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setContainerWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const map = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of data || []) m.set(r.date, r.value || 0);
@@ -86,7 +121,11 @@ const CalendarHeatmap: React.FC<CalendarHeatmapProps> = ({ data, loading, days =
 
   return (
     <Spin spinning={loading}>
-      <div className={styles.wrap}>
+      <div
+        className={styles.wrap}
+        ref={wrapRef}
+        style={{ '--cell-size': `${calcCellSize(containerWidth, layout.totalWeeks)}px` } as React.CSSProperties}
+      >
         <div className={styles.statsRow}>
           <Space size={20} wrap>
             <span className={styles.stat}>

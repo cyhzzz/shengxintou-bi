@@ -1,21 +1,14 @@
-/* 开户日历热力图 - v3.1.10：cell 18×18 正方形（1.5×）+ body 横向滚动 + 图例右下角 */
-/* feat-responsive：cell 尺寸改为 CSS 变量，小屏自动降级避免溢出容器 */
+/* 开户日历热力图
+ * - v3.1.10：cell 18×18 + body 横向滚动 + 图例右下角
+ * - feat-desktop-heatmap：cell-size 改为 React 端 ResizeObserver 跟随容器宽度自适应，
+ *   避免 1280/1024 视口宽度断点与 .body 容器真实宽度不一致导致溢出。
+ *   --cell-size 仍作为 CSS 变量兜底（首次渲染前 / 容器宽度 0 时）。
+ */
 
 .wrap {
   --cell-size: 18px;
   padding: 8px 0;
-}
-
-@media (max-width: 1280px) {
-  .wrap {
-    --cell-size: 14px;
-  }
-}
-
-@media (max-width: 1024px) {
-  .wrap {
-    --cell-size: 11px;
-  }
+  min-width: 0;        /* 防止父 flex 卡片的 overflow:hidden 把我们挤掉 */
 }
 
 .statsRow {
