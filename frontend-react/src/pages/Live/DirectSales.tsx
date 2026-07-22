@@ -38,6 +38,7 @@ import {
   TrophyOutlined,
   BulbOutlined,
   SolutionOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
@@ -166,6 +167,29 @@ interface AnchorAggRow {
   sources: string[];
 }
 
+// v3.4.5 P2: 主播 × 周交叉表（参考应用市场 PlanAnalysis 的「拿量+率」周度表设计）
+interface AnchorWeeklyPoint {
+  week_start: string;
+  leads: number;
+  mouth: number;
+  valid_lead: number;
+  new_valid_lead: number;
+  new_opened: number;
+  new_valid: number;
+  '线索_开口率': number;
+  '开口_有效率': number;
+  '有效_非存量率': number;
+  '非存量_新开户率': number;
+  '新开户_新有效率': number;
+}
+
+interface AnchorWeeklyItem {
+  anchor: string;
+  live_type: LiveType | null;
+  totals: AnchorWeeklyPoint;
+  weekly: AnchorWeeklyPoint[];
+}
+
 interface DirectSalesPageProps {
   liveType?: LiveType;
 }
@@ -195,6 +219,11 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     Array<{ date: string; leads: number; new_opened: number; opening_rate: number; new_assets: number }>
   >([]);
   const [topQualityLoading, setTopQualityLoading] = useState(false);
+
+  // v3.4.5 P2: 主播 × 周交叉表（拿量能力 + 5 漏斗率周度稳定性）
+  const [anchorWeeklyItems, setAnchorWeeklyItems] = useState<AnchorWeeklyItem[]>([]);
+  const [anchorWeeklyTotals, setAnchorWeeklyTotals] = useState<any>(null);
+  const [anchorWeeklyLoading, setAnchorWeeklyLoading] = useState(false);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
@@ -313,6 +342,23 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     }
   };
   useEffect(() => { loadTopQualityDays(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+
+  // v3.4.5 P2: 主播 × 周交叉表（按主播 × 周聚合，6 阶段漏斗量 + 5 个转化率）
+  const loadAnchorWeekly = async () => {
+    setAnchorWeeklyLoading(true);
+    try {
+      const res: any = await http.post('/leads-detail/anchor-weekly-analysis', { filters, top_n: 50 });
+      if (res?.success) {
+        setAnchorWeeklyItems(res.data.anchor_items || []);
+        setAnchorWeeklyTotals(res.data.totals || null);
+      }
+    } catch (err) {
+      console.warn('anchor-weekly-analysis load failed', err);
+    } finally {
+      setAnchorWeeklyLoading(false);
+    }
+  };
+  useEffect(() => { loadAnchorWeekly(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   // 主播名多选筛选（前端二次过滤 items）
   const filteredItems = useMemo(() => {
@@ -572,6 +618,37 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     );
   };
 
+  // v3.4.5 P2: 主播×周交叉表 展开行 — 周明细（量+5率）
+  // 复用 PlanAnalysis 的 expandedRowRender 模式：长表 + Tag 着色（green/gold/default）
+  const expandedRowRenderWeekly = (r: AnchorWeeklyItem) => {
+    if (!r.weekly?.length) {
+      return <Empty description="该主播无周度数据" />;
+    }
+    return (
+      <Table<AnchorWeeklyPoint>
+        size="small"
+        rowKey={(w) => w.week_start}
+        dataSource={r.weekly}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+        columns={[
+          { title: '周起始日', dataIndex: 'week_start', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+          { title: '线索数', dataIndex: 'leads', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+          { title: '开口量', dataIndex: 'mouth', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+          { title: '有效线索', dataIndex: 'valid_lead', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+          { title: '有效(非存量)', dataIndex: 'new_valid_lead', align: 'right' as const, width: 110, render: (v: number) => v.toLocaleString() },
+          { title: '新开户', dataIndex: 'new_opened', align: 'right' as const, width: 90, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
+          { title: '新有效户', dataIndex: 'new_valid', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+          { title: '线索→开口', dataIndex: '线索_开口率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 60 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '开口→有效', dataIndex: '开口_有效率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 70 ? 'green' : v > 40 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '有效→非存量', dataIndex: '有效_非存量率', align: 'right' as const, width: 115, render: (v: number) => <Tag color={v > 85 ? 'green' : v > 60 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '非存量→新开户', dataIndex: '非存量_新开户率', align: 'right' as const, width: 120, render: (v: number) => <Tag color={v > 30 ? 'green' : v > 10 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+          { title: '新开户→新有效', dataIndex: '新开户_新有效率', align: 'right' as const, width: 120, render: (v: number) => <Tag color={v > 80 ? 'green' : v > 50 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
+        ]}
+      />
+    );
+  };
+
   // v3.3.3 P0-4: 主播产能对比柱图（横向柱状图，可切换 5 指标）
   const [anchorCompareMetric, setAnchorCompareMetric] = useState<
     'leads' | 'new_opened' | 'new_valid' | 'new_assets' | 'per_lead_assets'
@@ -802,6 +879,50 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     { title: '新开户率', dataIndex: 'opening_rate', align: 'right' as const, width: 100, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.opening_rate - b.opening_rate, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
     { title: '新有效率', dataIndex: 'valid_rate', align: 'right' as const, width: 100, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
     { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_assets - b.new_assets, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
+  ];
+
+  // v3.4.5 P2: 主播×周交叉表 主表列（6 量 + 5 率 + 覆盖周数）
+  const anchorWeeklyColumns = [
+    { title: '排名', width: 60, align: 'center' as const, render: (_: any, __: any, idx: number) => (
+      <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
+    ) },
+    { title: '主播', dataIndex: 'anchor', width: 130, fixed: 'left' as const, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+    { title: '直播类型', dataIndex: 'live_type', width: 110, render: (v: LiveType | null) => renderLiveTypeTag(v) },
+    {
+      title: '线索数', key: 'w_leads', align: 'right' as const, width: 100, sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals.leads - b.totals.leads,
+      render: (_: any, r: AnchorWeeklyItem) => r.totals.leads.toLocaleString(),
+    },
+    {
+      title: '有效(非存量)', key: 'w_new_valid_lead', align: 'right' as const, width: 120, sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals.new_valid_lead - b.totals.new_valid_lead,
+      render: (_: any, r: AnchorWeeklyItem) => r.totals.new_valid_lead.toLocaleString(),
+    },
+    {
+      title: '新开户', key: 'w_new_opened', align: 'right' as const, width: 100,
+      defaultSortOrder: 'descend' as const,
+      sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals.new_opened - b.totals.new_opened,
+      render: (_: any, r: AnchorWeeklyItem) => <strong style={{ color: 'var(--color-brand)' }}>{r.totals.new_opened.toLocaleString()}</strong>,
+    },
+    {
+      title: '新有效户', key: 'w_new_valid', align: 'right' as const, width: 100, sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals.new_valid - b.totals.new_valid,
+      render: (_: any, r: AnchorWeeklyItem) => r.totals.new_valid.toLocaleString(),
+    },
+    {
+      title: '非存量→新开户', key: 'w_rate_open', align: 'right' as const, width: 130,
+      sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals['非存量_新开户率'] - b.totals['非存量_新开户率'],
+      render: (_: any, r: AnchorWeeklyItem) => {
+        const v = r.totals['非存量_新开户率'] || 0;
+        return <Tag color={v > 30 ? 'green' : v > 10 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>;
+      },
+    },
+    {
+      title: '新开户→新有效', key: 'w_rate_valid', align: 'right' as const, width: 130,
+      sorter: (a: AnchorWeeklyItem, b: AnchorWeeklyItem) => a.totals['新开户_新有效率'] - b.totals['新开户_新有效率'],
+      render: (_: any, r: AnchorWeeklyItem) => {
+        const v = r.totals['新开户_新有效率'] || 0;
+        return <Tag color={v > 80 ? 'green' : v > 50 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag>;
+      },
+    },
+    { title: '覆盖周数', key: 'w_weeks', align: 'center' as const, width: 90, render: (_: any, r: AnchorWeeklyItem) => <Tag color="cyan">{r.weekly?.length || 0}</Tag> },
   ];
 
   return (
@@ -1077,6 +1198,51 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
             ) : (
               <Empty description={`暂无${meta.anchorLabel}数据（请检查日期区间是否覆盖${liveType}时段）`} />
             )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={2.1} duration={0.8}>
+          <Card
+            title={
+              <Space size={8} align="center">
+                <LineChartOutlined style={{ color: 'var(--color-success)' }} />
+                <span>{meta.anchorLabel}周度拿量与各环节转化率</span>
+                <Tooltip title="对齐应用市场·计划分析设计：主表按主播聚合 6 阶段漏斗量 + 5 个转化率（含覆盖周数），点击展开行查看该主播每周的量质走势。若某周转化率突降，可能对应：直播节奏变化 / 内容选题偏移 / 投放策略调整。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+            size="small"
+            style={{ marginBottom: 16 }}
+            extra={
+              <Space size={12}>
+                {anchorWeeklyTotals && (
+                  <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                    共 {anchorWeeklyTotals.total_anchors || 0} 位主播 · 跨 {anchorWeeklyTotals.total_weeks || 0} 周
+                  </span>
+                )}
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按新开户降序</span>
+              </Space>
+            }
+          >
+            <Spin spinning={anchorWeeklyLoading}>
+              {anchorWeeklyItems.length > 0 ? (
+                <Table<AnchorWeeklyItem>
+                  size="small"
+                  rowKey="anchor"
+                  dataSource={anchorWeeklyItems}
+                  pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+                  scroll={{ x: 'max-content' }}
+                  expandable={{
+                    expandedRowRender: expandedRowRenderWeekly,
+                    rowExpandable: (r: AnchorWeeklyItem) => (r.weekly?.length || 0) > 0,
+                  }}
+                  columns={anchorWeeklyColumns as any}
+                />
+              ) : (
+                <Empty description={anchorWeeklyLoading ? '加载中...' : `暂无${meta.anchorLabel}周度数据`} />
+              )}
+            </Spin>
           </Card>
         </FadeInSection>
 

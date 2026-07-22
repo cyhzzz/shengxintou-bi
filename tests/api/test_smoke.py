@@ -425,6 +425,38 @@ class ApiSmokeTest(unittest.TestCase):
             self.assertIn('new_leads', totals_first, 'totals 应包含 new_leads 字段')
             self.assertIn('new_opened', totals_first, 'totals 应包含 new_opened 字段')
 
+    def test_65_anchor_weekly_analysis(self):
+        # v3.4.5 P2: 主播 × 周交叉表（对齐应用市场 plan-analysis）
+        payload = {
+            'filters': {
+                'start_date': '2026-01-01',
+                'end_date': '2026-12-31',
+                'live_types': ['带货直播'],
+            },
+            'top_n': 30,
+        }
+        data = self._ok(
+            self._post('/api/v1/leads-detail/anchor-weekly-analysis', payload),
+            '/leads-detail/anchor-weekly-analysis (live_types=带货直播)')
+        self.assertIsInstance(data, dict)
+        for key in ('anchors', 'weekly_totals', 'anchor_items', 'totals'):
+            self.assertIn(key, data, f'响应应包含 {key}')
+        # 应返回 ≤3 位带货主播（与 test_63 口径一致）
+        self.assertLessEqual(len(data['anchors']), 3, '带货直播主播应≤3位')
+        # 每个 anchor_item 结构校验
+        for item in data['anchor_items']:
+            self.assertIn('anchor', item)
+            self.assertIn('live_type', item)
+            self.assertIn('totals', item)
+            self.assertIn('weekly', item)
+            t = item['totals']
+            for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid',
+                     '线索_开口率', '开口_有效率', '有效_非存量率', '非存量_新开户率', '新开户_新有效率'):
+                self.assertIn(k, t, f'totals 应包含 {k}')
+            for w in item['weekly']:
+                self.assertIn('week_start', w)
+                self.assertIn('leads', w)
+
     # ============================================================
     #  边界：空 payload 不应 500
     # ============================================================

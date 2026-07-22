@@ -567,3 +567,240 @@ def get_anchor_clusters_trend():
     })
 
 
+@bp.route('/leads-detail/anchor-weekly-analysis', methods=['POST'])
+@handle_exceptions
+def get_anchor_weekly_analysis():
+    """主播周度拿量 + 各环节转化率分析（v3.4.5）
+
+    业务定位：对齐应用市场 plan-analysis 的「主播 × 周」交叉表设计，
+    回答两个核心问题：
+      1. 拿量能力：主播线索/开户/有效户是否衰减（周度量趋势）
+      2. 精准性变化：各漏斗节点转化率是否稳定（周度率趋势）
+
+    数据源: fact_conv_content（按 主播 × 周起始日 聚合）
+    入参:
+      filters: { start_date, end_date, platforms, live_types }
+      top_n: int，Top N 主播（默认 30，按新开户降序）
+    返回:
+      anchors: 主播列表
+      weekly_totals: 整体周度走势
+      anchor_items: [{anchor, live_type, totals, weekly}]
+      totals: 整体汇总
+    """
+    import re as _re
+    from backend.utils.dialect_helpers import make_week_start_expr
+
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    top_n = int(data.get('top_n', 30))
+    sd = filters.get('start_date')
+    ed = filters.get('end_date')
+    platforms_filter = filters.get('platforms') or []
+    live_types_filter = filters.get('live_types') or []
+
+    # 周起始日（dialect 无关）：SQLite date(d, 'weekday 0', '-6 days')；PG date_trunc('week', d::date)
+    week_start_expr = make_week_start_expr(FactConvContent.线索日期).label('week_start')
+    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+
+    # 预加载 dim_anchor_live_type 表（与 get_anchor_clusters 同口径）
+    lt_rows_all = db.session.query(
+        DimAnchorLiveType.source_token,
+        DimAnchorLiveType.anchor_name,
+        DimAnchorLiveType.live_type,
+        DimAnchorLiveType.is_active,
+    ).all()
+    token_to_anchor = {r.source_token: r.anchor_name for r in lt_rows_all if r.is_active}
+    token_to_live_type = {r.source_token: r.live_type for r in lt_rows_all if r.is_active}
+    anchor_to_live_types = {}
+    for r in lt_rows_all:
+        if r.is_active:
+            anchor_to_live_types.setdefault(r.anchor_name, set()).add(r.live_type)
+    plain_name_tokens = {tok for tok in token_to_anchor
+                         if '引流-' not in tok and '直播带货-' not in tok}
+
+    source_filter = and_(
+        FactConvContent.客户来源.isnot(None),
+        FactConvContent.客户来源 != '',
+    )
+    if plain_name_tokens:
+        source_filter = and_(
+            source_filter,
+            or_(
+                FactConvContent.客户来源.like('%引流-%'),
+                FactConvContent.客户来源.in_(plain_name_tokens),
+            ),
+        )
+    else:
+        source_filter = and_(source_filter, FactConvContent.客户来源.like('%引流-%'))
+
+    # v3.4.5 P2: live_types 筛选改为 token 级（与 get_anchor_clusters 完全一致）
+    # 注意：不能用主播级筛选——一个主播在 dim 表里可能有多 token，分别属于不同 live_type
+    # （如黄天平有 '视频号引流-黄天平'(分析师) 和 '抖音引流-黄天平'(带货直播)）。
+    # 主播级筛选会把该主播所有 token 都算进来，包括非目标 live_type 的 token，导致口径偏宽。
+    wanted_live_types = set(live_types_filter) if live_types_filter else set()
+
+    # SQL 按 (week, platform, 客户来源) 聚合 6 阶段 SUM（主播归一化在 Python 端做）
+    q = db.session.query(
+        week_start_expr,
+        FactConvContent.平台来源.label('platform'),
+        FactConvContent.客户来源,
+        func.count(FactConvContent.id).label('leads'),
+        func.coalesce(func.sum(case((FactConvContent.是否客户开口 == 1, 1), else_=0)), 0).label('mouth'),
+        func.coalesce(func.sum(case((FactConvContent.是否有效线索 == 1, 1), else_=0)), 0).label('valid_lead'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否有效线索 == 1, non_existing), 1), else_=0)), 0).label('new_valid_lead'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), 1), else_=0)), 0).label('new_opened'),
+        func.coalesce(func.sum(case((and_(FactConvContent.是否为有效户 == 1, non_existing), 1), else_=0)), 0).label('new_valid'),
+    ).filter(source_filter)
+    if sd and ed:
+        q = q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
+    if platforms_filter:
+        q = q.filter(FactConvContent.平台来源.in_(platforms_filter))
+    rows = q.group_by(week_start_expr, FactConvContent.平台来源, FactConvContent.客户来源).all()
+
+    # Python 端按 (anchor, week) 二次聚合（复用 get_anchor_clusters 的 token 拆分逻辑）
+    PATTERN = _re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
+    SPLIT_PATTERN = _re.compile(r"[,，;；、]+")
+    PLATFORM_NORMALIZE = {'视频号': '腾讯', '视频号直播': '腾讯', '微信': '腾讯'}
+
+    anchor_map = {}   # anchor_name -> {totals: {...}, weekly: {week: {...}}}
+    weekly_agg = {}   # week_start -> totals（整体）
+    all_anchors = set()
+
+    def _calc_rates(leads, mouth, valid_lead, new_valid_lead, new_opened, new_valid):
+        """直播 6 阶段漏斗的 5 个转化率。"""
+        return {
+            '线索_开口率': round(mouth / leads * 100, 2) if leads > 0 else 0,
+            '开口_有效率': round(valid_lead / mouth * 100, 2) if mouth > 0 else 0,
+            '有效_非存量率': round(new_valid_lead / valid_lead * 100, 2) if valid_lead > 0 else 0,
+            '非存量_新开户率': round(new_opened / new_valid_lead * 100, 2) if new_valid_lead > 0 else 0,
+            '新开户_新有效率': round(new_valid / new_opened * 100, 2) if new_opened > 0 else 0,
+        }
+
+    for r in rows:
+        week = str(r.week_start)[:10] if r.week_start is not None else '未知周'
+        src = (r.客户来源 or '').strip()
+        matches = []  # (anchor_name, segment, segment_live_types)
+        for part in SPLIT_PATTERN.split(src):
+            segment = part.strip()
+            if not segment:
+                continue
+            m = PATTERN.match(segment)
+            if m:
+                anchor_platform = PLATFORM_NORMALIZE.get(m.group(1), m.group(1))
+                raw_anchor_name = m.group(2).strip()
+                if not raw_anchor_name:
+                    continue
+                normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
+            elif segment in plain_name_tokens:
+                normalized_anchor = token_to_anchor.get(segment, segment)
+            else:
+                continue
+
+            # token 级 live_type：先查 token 精确匹配，回退到该主播的所有 live_type
+            seg_lt = token_to_live_type.get(segment)
+            if seg_lt:
+                seg_lts = {seg_lt}
+            else:
+                seg_lts = set(anchor_to_live_types.get(normalized_anchor, set()))
+
+            # live_types 筛选：只保留 live_types 与 wanted 有交集的 (anchor, segment)
+            if wanted_live_types and not (seg_lts & wanted_live_types):
+                continue
+
+            matches.append((normalized_anchor, segment))
+
+        if not matches:
+            continue
+
+        for anchor_name, segment in sorted(set(matches)):
+            if anchor_name not in anchor_map:
+                # 取该主播的 primary live_type
+                anchor_lts = sorted(anchor_to_live_types.get(anchor_name, set()))
+                primary_lt = anchor_lts[0] if anchor_lts else None
+                anchor_map[anchor_name] = {
+                    'anchor': anchor_name,
+                    'live_type': primary_lt,
+                    'totals': {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0},
+                    'weekly': {},
+                }
+                all_anchors.add(anchor_name)
+
+            a = anchor_map[anchor_name]
+            for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid'):
+                a['totals'][k] += int(getattr(r, k) or 0)
+            w = a['weekly'].setdefault(week, {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0})
+            w['leads'] += int(r.leads or 0)
+            w['mouth'] += int(r.mouth or 0)
+            w['valid_lead'] += int(r.valid_lead or 0)
+            w['new_valid_lead'] += int(r.new_valid_lead or 0)
+            w['new_opened'] += int(r.new_opened or 0)
+            w['new_valid'] += int(r.new_valid or 0)
+
+            # 整体周度汇总
+            if week not in weekly_agg:
+                weekly_agg[week] = {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0}
+            for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid'):
+                weekly_agg[week][k] += int(getattr(r, k) or 0)
+
+    # 组装 anchor_items + 派生率
+    anchor_items = []
+    for a in anchor_map.values():
+        t = a['totals']
+        a['totals'] = {**t, **_calc_rates(t['leads'], t['mouth'], t['valid_lead'], t['new_valid_lead'], t['new_opened'], t['new_valid'])}
+        weekly_list = []
+        for wk in sorted(a['weekly'].keys()):
+            w = a['weekly'][wk]
+            weekly_list.append({
+                'week_start': wk,
+                **w,
+                **_calc_rates(w['leads'], w['mouth'], w['valid_lead'], w['new_valid_lead'], w['new_opened'], w['new_valid']),
+            })
+        a['weekly'] = weekly_list
+        anchor_items.append(a)
+
+    # Top N 排序（按新开户 → 线索量 降序）
+    anchor_items.sort(key=lambda x: (x['totals']['new_opened'], x['totals']['leads']), reverse=True)
+    top_anchors = anchor_items[:top_n]
+
+    # 整体周度走势
+    weekly_totals = []
+    for wk in sorted(weekly_agg.keys()):
+        t = weekly_agg[wk]
+        weekly_totals.append({
+            'week_start': wk,
+            **t,
+            **_calc_rates(t['leads'], t['mouth'], t['valid_lead'], t['new_valid_lead'], t['new_opened'], t['new_valid']),
+        })
+
+    # 整体汇总
+    totals = {
+        'total_anchors': len(anchor_items),
+        'top_anchors': len(top_anchors),
+        'total_leads': sum(a['totals']['leads'] for a in anchor_items),
+        'total_new_valid_lead': sum(a['totals']['new_valid_lead'] for a in anchor_items),
+        'total_new_opened': sum(a['totals']['new_opened'] for a in anchor_items),
+        'total_new_valid': sum(a['totals']['new_valid'] for a in anchor_items),
+        'total_weeks': len(weekly_totals),
+    }
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'anchors': sorted(all_anchors),
+            'weekly_totals': weekly_totals,
+            'anchor_items': top_anchors,
+            'totals': totals,
+            'top_n': top_n,
+            'all_count': len(anchor_items),
+        },
+        'meta': {
+            'version': 'v3.4.5-anchor-weekly-analysis',
+            'source': 'fact_conv_content.客户来源 + dim_anchor_live_type',
+            'group_by': '主播 × 周起始日',
+            'funnel_stages': ['客户线索', '客户开口', '有效线索', '有效线索(剔除存量)', '成功开户(新)', '有效户(新)'],
+            'rate_keys': ['线索_开口率', '开口_有效率', '有效_非存量率', '非存量_新开户率', '新开户_新有效率'],
+            'note': '存量剔除口径：是否为存量客户==0 OR IS NULL。周起始日为该日期所在周的周一。',
+        },
+    })
+
+
