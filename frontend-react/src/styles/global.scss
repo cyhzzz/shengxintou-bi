@@ -292,3 +292,14 @@ a {
     opacity: 1 !important;
   }
 }
+
+// ========================================
+// v3.5.2 移动端缩放
+// ========================================
+// 安卓横屏下前端整体偏大 ~1.5 倍，用 zoom 缩放到 67%（1/1.5）
+// 通过在 body 上加 .mobile-zoom class 触发（由 App.tsx 在移动端注入）
+// zoom 在 Chromium WebView 中受支持，比 transform: scale 更简单
+// （transform: scale 需手动调整 transform-origin 和容器尺寸）
+body.mobile-zoom {
+  zoom: 0.67;
+}

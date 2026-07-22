@@ -88,10 +88,19 @@ class HttpClient {
         const data = await mobileRouteHandler(fullUrl, body);
         return { success: true, data: data as T };
       } catch (error) {
+        const msg = error instanceof Error ? error.message : '本地查询失败';
+        // 数据库未初始化时给出更友好的提示
+        const hint = msg.includes('no such table') || msg.includes('no such column')
+          ? '数据库表结构不匹配，请重新同步数据'
+          : msg.includes('not implemented')
+            ? '该报表暂不支持移动端查看'
+            : msg.includes('database') || msg.includes('connection')
+              ? '数据库未就绪，请先同步数据'
+              : msg;
         return {
           success: false,
           error: 'MOBILE_QUERY_ERROR',
-          message: error instanceof Error ? error.message : '本地查询失败',
+          message: hint,
         };
       }
     }

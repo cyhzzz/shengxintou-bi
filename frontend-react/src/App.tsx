@@ -3,6 +3,8 @@ import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import AppRouter from '@/router';
 import { useAppStore } from '@/stores/useAppStore';
+import { isMobileClient } from '@/utils/isDesktop';
+import { initMobileDatabase, databaseExists } from '@/services/mobileSqlite';
 import './styles/global.scss';
 
 // 亮色模式主题 — 显式设定所有颜色 token
@@ -148,6 +150,28 @@ function App() {
       root.removeAttribute('data-theme');
     }
   }, [themeMode]);
+
+  // 移动端：应用启动时初始化本地 SQLite 数据库
+  // 如果数据库文件已存在（已同步过数据），打开连接供报表查询使用
+  // 如果不存在，跳过初始化（等待用户先同步数据）
+  useEffect(() => {
+    if (!isMobileClient()) return;
+    // 注入移动端缩放 class（v3.5.2：安卓横屏下前端整体偏大 1.5 倍）
+    document.body.classList.add('mobile-zoom');
+    (async () => {
+      try {
+        const exists = await databaseExists();
+        if (exists) {
+          await initMobileDatabase();
+          console.log('[mobile] SQLite 数据库已初始化');
+        } else {
+          console.log('[mobile] 数据库文件不存在，请先同步数据');
+        }
+      } catch (err) {
+        console.error('[mobile] 数据库初始化失败:', err);
+      }
+    })();
+  }, []);
 
   const isDark = themeMode === 'dark';
 
