@@ -6,6 +6,10 @@
   "author": "省心投 BI",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cyhzzz/shengxintou-bi.git"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc && electron .",
