@@ -397,8 +397,10 @@ def app_market_plan_analysis():
     ).order_by(FactConvAppmarket.应用市场).all()
     platforms = [r[0] for r in platform_rows]
 
-    # 周起始日表达式：SQLite date(d, 'weekday 0', '-6 days') = d 所在周的周一
-    week_start_expr = func.date(FactConvAppmarket.下载日期, 'weekday 0', '-6 days').label('week_start')
+    # 周起始日表达式（dialect 无关）：SQLite 用 date(d, 'weekday 0', '-6 days')；
+    # PG 用 date_trunc('week', d)，均返回 d 所在周的周一
+    from backend.utils.dialect_helpers import make_week_start_expr
+    week_start_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
 
     # 广告计划ID 归一化（与 /creative 一致）
     plan_expr = case(

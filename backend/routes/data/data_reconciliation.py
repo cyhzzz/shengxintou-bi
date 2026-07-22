@@ -412,7 +412,7 @@ def douyin_qingniao_date_range():
     v3.3.6：支持 batch_tag 查询参数，传入时只统计该批次的数据。
     """
     batch_tag = (request.args.get('batch_tag') or '').strip() or None
-    sql = "SELECT MIN(日期) as min_date, MAX(日期) as max_date, COUNT(*) as total FROM fact_qingniao_leads"
+    sql = 'SELECT MIN("日期") as min_date, MAX("日期") as max_date, COUNT(*) as total FROM fact_qingniao_leads'
     params = {}
     if batch_tag:
         sql += ' WHERE "批次标注" = :bt'
@@ -451,7 +451,7 @@ def douyin_qingniao_batches():
     """
     sql = (
         'SELECT "批次标注" as batch_tag, COUNT(*) as total, '
-        'MIN(日期) as min_date, MAX(日期) as max_date, MIN(id) as first_id '
+        'MIN("日期") as min_date, MAX("日期") as max_date, MIN(id) as first_id '
         'FROM fact_qingniao_leads '
         'WHERE "批次标注" IS NOT NULL '
         'GROUP BY "批次标注" '

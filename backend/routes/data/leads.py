@@ -432,11 +432,9 @@ def get_anchor_clusters_trend():
     live_types_filter = filters.get('live_types') or []
     if granularity == 'weekly':
         granularity = 'weekly'
-        period_expr = (
-            func.substr(FactConvContent.线索日期, 1, 4)
-            + '-W'
-            + func.substr(func.concat('0', func.strftime('%W', FactConvContent.线索日期)), -2)
-        )
+        # dialect 无关：SQLite strftime('%Y-%W') / PG to_char('YYYY-IW')
+        from backend.utils.dialect_helpers import make_period_expr
+        period_expr = make_period_expr(FactConvContent.线索日期, 'weekly')
     elif granularity == 'monthly':
         granularity = 'monthly'
         period_expr = func.substr(FactConvContent.线索日期, 1, 7)

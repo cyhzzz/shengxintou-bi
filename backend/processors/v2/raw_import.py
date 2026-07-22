@@ -25,14 +25,19 @@ from sqlalchemy import create_engine, text
 from datetime import datetime
 
 
-try:
-    from config import DATABASE_PATH as _DB_PATH
-    DB_PATH = _DB_PATH.replace("\\\\", "/")
-except Exception:
-    # 兼容直跑脚本：从 __file__ 反推项目根
-    _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    DB_PATH = os.path.join(_root, "database", "shengxintou.db").replace("\\\\", "/")
-DB_URL = f"sqlite:///{DB_PATH}"
+def _resolve_db_url() -> str:
+    """从 Flask current_app.config 取数据库 URI；脚本直跑场景兜底 SQLite。
+
+    feat-desktop-supabase：不再硬编码 sqlite:///，让上传导入跟随 DATABASE_URL
+    切换到 Supabase PG。upload._process_file 已在 app_context 内调用，故能读到。
+    """
+    try:
+        from flask import current_app
+        return current_app.config['SQLALCHEMY_DATABASE_URI']
+    except Exception:
+        _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        _db_path = os.path.join(_root, "database", "shengxintou.db").replace("\\\\", "/")
+        return f"sqlite:///{_db_path}"
 
 # 6 个新数据类型到处理器函数的映射
 HANDLERS = {}  # filled after function defs
@@ -335,34 +340,43 @@ def process(data_type: str, file_path: str, **kwargs) -> dict:
     meta["data_type"] = data_type
     return {"tables": tables, "meta": meta}
 
-def write_to_db(data_type: str, file_path: str, db_url: str = DB_URL, **kwargs) -> dict:
+def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) -> dict:
     """处理并写入新表。
 
-    v3.3.6 关键改造：
-    - qingniao_leads 使用 append 模式（保留历史批次数据）
-    - 其他类型继续使用 replace 模式（每次导入覆盖旧数据）
-    - qingniao_leads 支持 batch_tag 参数，附加到每行的 `批次标注` 列
+    v3.4.0 feat-desktop-supabase 关键改造：
+    - db_url 默认从 current_app.config['SQLALCHEMY_DATABASE_URI'] 取（兼容 SQLite + PG）
+    - 改为 DELETE + append 模式，保留 ORM 建好的表结构（主键/序列/索引/中文列名映射）
+      原因：to_sql(if_exists='replace') = DROP TABLE + 按 pandas 推断类型重建，
+      会摧毁 PG 的 BIGSERIAL 序列、主键约束、index=True 索引；下次 ORM 插入必报错。
+    - qingniao_leads 仍用纯 append（保留历史批次，不 DELETE）
+    - 删除 sqlite_sequence 操作（SQLite 专属，PG 报错；DELETE + append 不需要重置序列）
     """
     result = process(data_type, file_path, **kwargs)
     tables = result["tables"]
     meta = result["meta"]
 
-    engine = create_engine(db_url)
+    if db_url is None:
+        # feat-desktop-supabase：优先复用 Flask-SQLAlchemy 的 engine，
+        # 共享连接池配置（pool_pre_ping/pool_recycle），避免 Supabase 连接泄漏。
+        try:
+            from flask import current_app
+            from backend.database import db
+            engine = db.engine
+        except Exception:
+            engine = create_engine(_resolve_db_url())
+    else:
+        engine = create_engine(db_url)
     written = {}
     with engine.begin() as conn:
         for table_name, df in tables.items():
-            # v3.3.6：qingniao_leads 用 append（保留历史批次），其他类型仍 replace
             if data_type == "qingniao_leads":
-                # append 模式：不主动设置 id 列，让数据库 AUTOINCREMENT 处理
+                # append 模式：保留历史批次数据，不 DELETE
                 df.to_sql(table_name, con=conn, if_exists="append", index=False)
             else:
-                df.to_sql(table_name, con=conn, if_exists="replace", index=False)
-                # SQLite 自增主键保留
-                try:
-                    conn.execute(text(f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"))
-                except Exception:
-                    pass  # sqlite_sequence 不存在时跳过（新表无 AUTOINCREMENT）
-            cur = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
+                # DELETE + append：清空旧数据但保留 ORM 表结构（主键/序列/索引）
+                conn.execute(text(f'DELETE FROM "{table_name}"'))
+                df.to_sql(table_name, con=conn, if_exists="append", index=False)
+            cur = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
             n = cur.fetchone()[0]
             written[table_name] = n
     meta["written"] = written

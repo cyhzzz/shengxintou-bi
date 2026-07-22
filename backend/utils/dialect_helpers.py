@@ -1,0 +1,67 @@
+# -*- coding: utf-8 -*-
+"""
+SQL 方言工具：SQLite 与 Postgres 的日期函数差异在这里集中处理。
+
+feat-desktop-supabase：切到 Supabase PG 后，原 SQLite 专属语法会报错：
+- func.strftime('%Y-%W', col)          → PG 无 strftime
+- func.date(col, 'weekday 0', '-6 days') → PG date() 不接受修饰符
+
+集中在本模块，让报表路由保持 dialect 无关。
+"""
+from sqlalchemy import func, literal
+from sqlalchemy.sql.elements import ColumnElement
+
+from backend.database import db
+
+
+def _dialect() -> str:
+    """返回当前 dialect 字符串（'sqlite' / 'postgresql' / ...）。"""
+    try:
+        return db.session.get_bind().dialect.name
+    except Exception:
+        # 直跑脚本无 session 时兜底：读 config 全局
+        try:
+            import config as _cfg
+            return getattr(_cfg, 'DATABASE_DIALECT', 'sqlite')
+        except Exception:
+            return 'sqlite'
+
+
+def make_period_expr(col, granularity: str):
+    """按粒度返回周期分组表达式。
+
+    granularity:
+      - 'daily'   → 原值（'YYYY-MM-DD' 字符串）
+      - 'weekly'  → 'YYYY-WW'（ISO 周号；SQLite %W 与 PG IW 略有差异，但报表口径自洽）
+      - 'monthly' → 'YYYY-MM'
+
+    返回值可直接 .label('period') 使用。
+    """
+    if granularity == 'daily':
+        return col
+
+    d = _dialect()
+    if granularity == 'monthly':
+        # 两种 dialect 都支持 substr（PG 内置 substr(text,int,int)）
+        return func.substr(col, 1, 7)
+
+    # weekly
+    if d == 'postgresql':
+        # PG: to_char(col, 'YYYY-IW') 返回 ISO 周号（4 位年 + 2 位周号）
+        return func.to_char(col, 'YYYY-IW')
+    # SQLite: strftime('%Y-%W', col)，%W = 周一为周首日、00-53
+    return func.strftime('%Y-%W', col)
+
+
+def make_week_start_expr(col):
+    """返回 col 所在周的周一表达式（用于 plan-analysis 按周聚合）。
+
+    SQLite: date(col, 'weekday 0', '-6 days') = col 所在周周一（周一为 weekday 0）
+    PG:     date_trunc('week', col::date) = 所在周周一（PG 默认周一为周首日）
+    """
+    d = _dialect()
+    if d == 'postgresql':
+        # PG date_trunc 返回 timestamp，cast 为 date 与 SQLite 行为对齐
+        return func.date_trunc('week', col)
+    # SQLite 专属修饰符，PG 不支持
+    return func.date(col, 'weekday 0', '-6 days')

@@ -4,6 +4,15 @@
  */
 import { API_URL, API_TIMEOUT } from './config';
 import type { ApiResponse } from '@/types';
+import { useAuthStore } from '@/stores/useAuthStore';
+
+// 路由跳转函数（避免循环依赖，由调用方注入）
+let _navigateToLogin: ((next?: string) => void) | null = null;
+
+/** 由 main.tsx / router 启动时注册；用于 401 时跳登录页。 */
+export function registerUnauthorizedHandler(fn: (next?: string) => void) {
+  _navigateToLogin = fn;
+}
 
 // 请求配置接口
 interface RequestConfig extends RequestInit {
@@ -75,6 +84,18 @@ class HttpClient {
     // 应用请求拦截器
     let processedUrl = fullUrl;
     let processedConfig = fetchConfig;
+    // feat-cloud-supabase：若本地有 token，自动注入 Authorization 头
+    const token = useAuthStore.getState().accessToken;
+    const existingHeaders = (processedConfig.headers || {}) as Record<string, string>;
+    if (token && !existingHeaders['Authorization']) {
+      processedConfig = {
+        ...processedConfig,
+        headers: {
+          ...existingHeaders,
+          Authorization: `Bearer ${token}`,
+        },
+      };
+    }
     for (const interceptor of this.requestInterceptors) {
       const result = interceptor(processedUrl, processedConfig);
       processedUrl = result.url;
@@ -100,7 +121,17 @@ class HttpClient {
       }
 
       // 解析响应
-      const data = await processedResponse.json();
+      let data: any = {};
+      try { data = await processedResponse.json(); } catch { /* 非 JSON */ }
+
+      // feat-cloud-supabase：401 → 清 token + 跳登录（白名单 /api/health 不处理）
+      if (processedResponse.status === 401 && processedUrl.indexOf('/api/health') === -1) {
+        useAuthStore.getState().clear();
+        if (_navigateToLogin) {
+          const here = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+          _navigateToLogin(here);
+        }
+      }
 
       if (!processedResponse.ok || data.success === false) {
         return {
@@ -167,6 +198,17 @@ class HttpClient {
     const { timeout = API_TIMEOUT } = config || {};
     const fullUrl = this.buildUrl(url);
 
+    // feat-local-auth 方案 A：与 request 一致，自动注入 Authorization 头
+    // 否则鉴权中间件会拦截 /api/v1/upload 返回 401
+    const token = useAuthStore.getState().accessToken;
+    const existingHeaders = (config?.headers || {}) as Record<string, string>;
+    const headers = {
+      ...existingHeaders,
+      ...(token && !existingHeaders['Authorization']
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
+    };
+
     try {
       const response = await this.withTimeout(
         fetch(fullUrl, {
@@ -174,9 +216,7 @@ class HttpClient {
           body: formData,
           // 不设置 Content-Type，让浏览器自动设置 multipart/form-data 边界
           ...config,
-          headers: {
-            ...config?.headers,
-          },
+          headers,
         }),
         timeout
       );
@@ -210,5 +250,17 @@ class HttpClient {
 // 导出 HTTP 客户端实例
 export const http = new HttpClient(API_URL);
 
-// 导出便捷方法
-export const { get, post, put, delete: del, upload } = http;
+// 导出绑定 self 的便捷方法（feat-cloud-supabase 修复）
+//   原写法 `export const { post } = http` 在严格 class 语义下会丢失 this，
+//   调用时 this -> undefined -> 'reading buildUrl' 的崩溃。
+//   这里用箭头函数显式绑定：http 上的方法都能拿到 http 实例。
+export const get = <T>(url: string, params?: Record<string, unknown>, config?: RequestConfig) =>
+  http.get<T>(url, params, config);
+export const post = <T>(url: string, data?: unknown, config?: RequestConfig) =>
+  http.post<T>(url, data, config);
+export const put = <T>(url: string, data?: unknown, config?: RequestConfig) =>
+  http.put<T>(url, data, config);
+export const del = <T>(url: string, config?: RequestConfig) =>
+  http.delete<T>(url, config);
+export const upload = <T>(url: string, formData: FormData, config?: RequestConfig) =>
+  http.upload<T>(url, formData, config);

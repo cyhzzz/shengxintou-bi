@@ -103,8 +103,10 @@ def xhs_plan_analysis():
     ).all()
     agencies = [r[0] for r in agency_rows]
 
-    # 周起始日表达式：SQLite date(d, 'weekday 0', '-6 days') = d 所在周的周一
-    week_start_expr = func.date(FactConvContent.线索日期, 'weekday 0', '-6 days').label('week_start')
+    # 周起始日表达式（dialect 无关）：SQLite 用 date(d, 'weekday 0', '-6 days')；
+    # PG 用 date_trunc('week', d)，均返回 d 所在周的周一
+    from backend.utils.dialect_helpers import make_week_start_expr
+    week_start_expr = make_week_start_expr(FactConvContent.线索日期).label('week_start')
 
     # 广告ID 归一化（与 app-market 一致：NULL/空 fallback 到广告账号）
     plan_expr = case(

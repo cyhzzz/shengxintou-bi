@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+*.log
+.env
+
+# electron-builder 缓存（NSIS 工具等几百 MB，不入仓库）
+.eb-cache/
+

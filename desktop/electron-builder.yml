@@ -1,0 +1,43 @@
+appId: com.shengxintou.bi
+productName: 省心投 BI
+copyright: Copyright © 2026 省心投 BI
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**/*
+  - resources/**/*
+# B 阶段：PyInstaller 打包的 server.exe 已包含全部 Python 依赖，
+# 用户机器零 Python 依赖即可运行。
+extraResources:
+  - from: ../app.py
+    to: app.py
+  - from: ../config.py
+    to: config.py
+  - from: ../backend
+    to: backend
+  - from: ../frontend-react/dist
+    to: frontend-react/dist
+  - from: ../.env
+    to: .env
+  - from: ../version.json
+    to: version.json
+  - from: ../icon/LOGO.ico
+    to: icon/LOGO.ico
+  # PyInstaller onedir 产物（含 server.exe + _internal/）
+  - from: ../dist/server
+    to: server
+    filter: ['**/*']
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: 省心投 BI
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico

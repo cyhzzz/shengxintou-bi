@@ -14,6 +14,7 @@ from backend.models_v2 import AggVendorDaily, DimAccount
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls
+from backend.utils.dialect_helpers import make_period_expr
 from datetime import datetime, timedelta
 
 bp = Blueprint('dashboard', __name__)
@@ -193,12 +194,7 @@ def get_dashboard_trend_data():
         'agencies': data.get('agencies') or [],
         'business_models': data.get('business_models') or [],
     }
-    if granularity == 'weekly':
-        period = func.strftime('%Y-%W', AggVendorDaily.日期).label('period')
-    elif granularity == 'monthly':
-        period = func.strftime('%Y-%m', AggVendorDaily.日期).label('period')
-    else:
-        period = AggVendorDaily.日期.label('period')
+    period = make_period_expr(AggVendorDaily.日期, granularity).label('period')
     q = _apply_filters(
         db.session.query(
             period,

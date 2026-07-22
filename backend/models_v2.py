@@ -9,7 +9,9 @@
 原则：源表 1:1 原样存（保留全部原始列，含中文列名），加载期只做规范（已在 ETL 完成）。
 """
 
+from datetime import datetime
 from sqlalchemy import Column, Integer, BigInteger, String, Text, Date, DateTime, Numeric, Float
+from sqlalchemy.types import Uuid
 from backend.database import db
 
 
@@ -296,4 +298,58 @@ class FactQingniaoLeads(db.Model):
     微信用户确认意向 = Column(Text)                    # 「未打」/「已打」 → 对账「有效」标志
     开户 = Column(Text)                                # 「未打」/「已打」 → 对账「开户」标志
     批次标注 = Column(Text, index=True)                 # v3.3.6：导入批次标注（用户输入或默认时间戳），用于多次对账数据区分
+
+
+# ============================================================================
+# 用户鉴权元数据（feat-cloud-supabase 引入）
+# ============================================================================
+
+class UserProfile(db.Model):
+    """用户业务元数据。
+
+    设计：Supabase Auth 在 auth.users 表里保管登录凭据（邮箱/密码/Token），
+    本表只存"业务侧需要的元数据"。id 直接用 auth.users.id 的 UUID，作为本表主键。
+    关系上 auth.users 是 Supabase 自管的（位于 auth schema），本表只"引用"它的 id。
+    """
+    __tablename__ = 'user_profiles'
+
+    id = Column(Uuid, primary_key=True)               # 对应 auth.users.id (UUID)
+    email = Column(Text)                              # 冗余：减少 join auth.users，便于审计
+    display_name = Column(Text)                        # 显示名
+    department = Column(Text)                          # 部门（业务侧自由录入，本期未启用部门权限）
+    role = Column(Text, default='viewer')              # 角色：viewer/admin/...
+    is_active = Column(Integer, default=1)             # 1=启用 0=禁用
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 创建时间
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)  # 最后修改时间
+
+
+# ============================================================================
+# 本地鉴权用户（feat-local-auth：方案 A，绕过 Supabase Auth API）
+# ============================================================================
+
+class AppUser(db.Model):
+    """本地鉴权用户表（方案 A）。
+
+    设计：
+    - 不依赖 Supabase Auth API（避免网络层 TLS 重置问题）
+    - 密码用 werkzeug.security.generate_password_hash 存储（PBKDF2-SHA256）
+    - 后端自签 JWT（PyJWT），中间件用 jwt.decode 验证，零网络调用
+    - id 用 BIGSERIAL（PG）或 INTEGER PRIMARY KEY AUTOINCREMENT（SQLite）
+    - email 唯一索引，登录用 email + password
+    - role/is_active 与 UserProfile 同义，但直接在本表查询，避免 join
+
+    与 UserProfile 的关系：本表完全替代 UserProfile + auth.users 的鉴权职责。
+    UserProfile 表保留供历史代码引用，但不再参与鉴权流程。
+    """
+    __tablename__ = 'app_users'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    email = Column(Text, unique=True, nullable=False, index=True)  # 登录邮箱
+    password_hash = Column(Text, nullable=False)                   # werkzeug PBKDF2-SHA256
+    display_name = Column(Text)                                     # 显示名
+    department = Column(Text)                                       # 部门
+    role = Column(Text, default='viewer', nullable=False)          # viewer/admin
+    is_active = Column(Integer, default=1, nullable=False)          # 1=启用 0=禁用
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

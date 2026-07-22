@@ -6,6 +6,7 @@ import { Upload, message, Progress, Switch, Space, Spin } from 'antd';
 import type { UploadProps } from 'antd/es/upload/interface';
 import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { UploadResponse } from '@/types/api.schemas';
+import { http } from '@/services/http'; // feat-local-auth：用 http 客户端自动带 Authorization
 import ImportResult from './ImportResult';
 import styles from './FileUploader.module.scss';
 import type { DataType } from '../constants';
@@ -52,8 +53,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
 
   // 轮询任务状态
   const pollTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
-    const response = await fetch(`/api/v1/status/${taskId}`);
-    return response.json();
+    // feat-local-auth：用 http 客户端自动带 Authorization 头，避免 401
+    const resp = await http.get<TaskStatusData>(`/status/${taskId}`);
+    return {
+      success: resp.success,
+      data: resp.data as TaskStatusData,
+      message: resp.message,
+    };
   };
 
   // 将任务状态响应转换为导入结果格式
@@ -160,30 +166,29 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
       formData.append('overwrite', String(overwrite));
 
       try {
-        const response = await fetch('/api/v1/upload', {
-          method: 'POST',
-          body: formData,
-        });
+        // feat-local-auth：用 http.upload 自动带 Authorization 头，避免 401
+        const resp = await http.upload<{ task_id?: string; success_count?: number } & UploadResponse['data']>(
+          '/upload',
+          formData
+        );
 
-        const data = await response.json();
-
-        if (data.success && data.data?.task_id) {
+        if (resp.success && resp.data?.task_id) {
           // 后端返回了任务ID，开始轮询
           setStatusMessage('文件上传成功，正在处理...');
           setProgress(10);
-          await startPolling(data.data.task_id);
-        } else if (data.success && data.data?.success_count !== undefined) {
+          await startPolling(resp.data.task_id);
+        } else if (resp.success && resp.data?.success_count !== undefined) {
           // 同步返回结果（兼容旧模式）
           setUploading(false);
           setProgress(100);
-          setResult(data);
-          message.success(`导入成功！共 ${data.data?.success_count || 0} 条数据`);
+          setResult(resp as unknown as UploadResponse);
+          message.success(`导入成功！共 ${resp.data?.success_count || 0} 条数据`);
           onImportSuccess();
         } else {
           // 上传失败
           setUploading(false);
-          setResult(data);
-          message.error(data.message || '上传失败');
+          setResult(resp as unknown as UploadResponse);
+          message.error(resp.message || '上传失败');
         }
       } catch {
         message.error('上传失败，请检查网络');

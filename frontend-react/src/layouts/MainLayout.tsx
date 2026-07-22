@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layout, Menu, Tooltip } from 'antd';
+import { Layout, Menu, Tooltip, Button, Dropdown } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import {
@@ -32,6 +32,10 @@ import {
 import { HelpModal } from '@/components';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { logout } from '@/services/auth';
+import { useEffect } from 'react';
+import { fetchMe } from '@/services/auth';
 import type { MenuProps } from 'antd';
 import styles from './MainLayout.module.scss';
 
@@ -160,6 +164,18 @@ export default function MainLayout() {
   const location = useLocation();
   const { themeMode, toggleTheme } = useAppStore();
 
+  // feat-cloud-supabase：右上角"当前账号 + 退出"
+  const email = useAuthStore((s) => s.email);
+  const profile = useAuthStore((s) => s.profile);
+  useEffect(() => {
+    // 进入布局时拉一次当前用户元数据
+    fetchMe().catch(() => {/* 静默失败 */});
+  }, []);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key);
   };
@@ -231,6 +247,21 @@ export default function MainLayout() {
                 {themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
               </button>
             </Tooltip>
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'email', label: email || '未登录', disabled: true },
+                  ...(profile?.role ? [{ key: 'role', label: `角色：${profile.role}`, disabled: true }] : []),
+                  { type: 'divider' as const },
+                  { key: 'logout', label: '退出', onClick: handleLogout },
+                ],
+              }}
+              placement="bottomRight"
+            >
+              <Button type="text" size="small">
+                {(email || '账号').split('@')[0]}
+              </Button>
+            </Dropdown>
             <HelpModal />
           </div>
         </Header>

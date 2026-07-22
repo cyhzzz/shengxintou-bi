@@ -1,0 +1,23 @@
+{
+  "name": "shengxintou-bi-desktop",
+  "version": "0.1.0",
+  "description": "省心投 BI 桌面客户端（Electron 封装）",
+  "main": "dist/main.js",
+  "author": "省心投 BI",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && electron .",
+    "dist": "tsc && electron-builder --win",
+    "dist:portable": "tsc && electron-builder --win portable",
+    "clean": "rimraf dist release"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.4.5"
+  }
+}
