@@ -158,8 +158,8 @@ function App() {
   //   2. 后台异步从坚果云拉取最新数据覆盖内置版本（保证数据最新）
   useEffect(() => {
     if (!isMobileClient()) return;
-    // 注入移动端缩放 class（v3.5.3：transform: scale 方案，兼容 WebView）
-    document.documentElement.classList.add('mobile-scaled');
+    // 注入移动端缩放 class 到 <body>（v3.5.3：CSS zoom 方案）
+    document.body.classList.add('mobile-scaled');
     let cancelled = false;
     (async () => {
       try {

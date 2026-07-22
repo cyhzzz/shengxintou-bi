@@ -297,14 +297,18 @@ a {
 // v3.5.3 移动端缩放
 // ========================================
 // 安卓横屏下前端整体偏大 ~1.5 倍，缩放到 67%（1/1.5）
-// 改用 transform: scale 方案：zoom 在某些 WebView 下会被重置或不生效
-// 通过在 <html> 上加 .mobile-scaled class 触发（由 App.tsx 在移动端注入）
-// 注意：transform: scale 会保留布局尺寸，导致右下留白，
-//       用 width/height 反向放大抵消缩放后的视觉空白
-html.mobile-scaled {
-  transform: scale(0.67);
-  transform-origin: top left;
-  width: 149.25%;  // 100% / 0.67 ≈ 149.25%
-  height: 149.25%;
-  overflow: hidden;
+// v3.5.3 最终方案：CSS zoom（非标准但 Android WebView 原生支持）
+//   - transform: scale 在 <html>/<body> 上会导致布局尺寸异常（子元素定位错乱）
+//   - zoom 会自动缩放布局盒模型，不影响子元素相对定位
+// 通过在 <body> 上加 .mobile-scaled class 触发（由 App.tsx 在移动端注入）
+body.mobile-scaled {
+  zoom: 0.67 !important;
+  // 确保 zoom 后不出现多余滚动条
+  overflow: hidden !important;
+}
+
+// 防止 antd 组件用 transform 覆盖 zoom 效果
+body.mobile-scaled #root {
+  zoom: 1 !important;
+  transform: none !important;
 }

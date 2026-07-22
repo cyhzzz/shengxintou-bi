@@ -5,6 +5,7 @@
 #   2. 从 icon/LOGO.png 生成各尺寸 ic_launcher 图标
 #   3. patch 插件 build.gradle 的 JDK 21 → 17
 #   4. 确认 strings.xml 中 app_name 为"省心投"（非"省心投 BI"）
+#   4b. styles.xml 加 windowFullscreen（全屏沉浸式，隐藏状态栏）
 #   5. settings.gradle 加阿里云镜像（国内网络无法直连 maven.apache.org）
 #   6. gradle.properties 加 in-process kotlin + 关闭 daemon（避免 TRAE Sandbox 拦截 ~/.kotlin）
 #   7. gradle-wrapper.properties 改腾讯云镜像（services.gradle.org 超时）
@@ -93,6 +94,24 @@ if (Test-Path $stringsPath) {
         Write-Output "[skip] strings.xml: app_name already '省心投'"
     } else {
         Write-Output "[warn] strings.xml: app_name pattern not matched, manual check required"
+    }
+}
+
+# ========== 4b. styles.xml 加全屏沉浸式主题 ==========
+# v3.5.3：cap sync 会覆盖 styles.xml，需重新注入 windowFullscreen
+$stylesPath = Join-Path $androidNativeDir "app\src\main\res\values\styles.xml"
+if (Test-Path $stylesPath) {
+    $styles = Read-FileNoBom $stylesPath
+    if ($styles -notmatch 'android:windowFullscreen') {
+        # 在 AppTheme.NoActionBarLaunch 的 </style> 前插入全屏属性
+        if ($styles -match '(<style name="AppTheme\.NoActionBarLaunch"[^>]*>)([\s\S]*?)</style>') {
+            $newInner = "`n        <item name=`"android:windowFullscreen`">true</item>`n        <item name=`"android:windowNoTitle`">true</item>`n    "
+            $styles = $styles -replace '(<style name="AppTheme\.NoActionBarLaunch"[^>]*>)([\s\S]*?)</style>', "`$1$newInner</style>"
+            Write-FileNoBom $stylesPath $styles
+            Write-Output "[patch] styles.xml: windowFullscreen added to AppTheme.NoActionBarLaunch"
+        }
+    } else {
+        Write-Output "[skip] styles.xml: windowFullscreen already set"
     }
 }
 
