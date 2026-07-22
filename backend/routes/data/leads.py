@@ -233,6 +233,11 @@ def get_anchor_clusters():
         '微信': '腾讯',
     }
 
+    # v3.3.10: 预提取纯人名 token (JSON 里不含"引流-"/"直播带货-"的 source_token，如"黄天平"/"赵茜")
+    # 数据库"客户来源"字段可能是纯人名（分支投顾自IP），PATTERN 不匹配，需按 token 归类
+    plain_name_tokens = {tok for tok in token_to_anchor
+                         if '引流-' not in tok and '直播带货-' not in tok}
+
     agg_map = {}
     for r in rows:
         src = (r.客户来源 or "").strip()
@@ -242,19 +247,23 @@ def get_anchor_clusters():
             if not segment:
                 continue
             m = PATTERN.match(segment)
-            if not m:
-                continue
-            anchor_platform = m.group(1)
-            # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
-            anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
-            raw_anchor_name = m.group(2).strip()
-            if not raw_anchor_name:
-                continue
-            # v3.3.0: 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
-            # segment 是原始 token（如"直播带货-胡磊" / "抖音引流-直播带货-胡磊"）
-            # 若 token 在表中，用表里的 anchor_name；否则用正则解析的 raw_anchor_name
-            normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
-            matches.append((anchor_platform, normalized_anchor, segment))
+            if m:
+                anchor_platform = m.group(1)
+                # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
+                anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
+                raw_anchor_name = m.group(2).strip()
+                if not raw_anchor_name:
+                    continue
+                # v3.3.0: 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
+                # segment 是原始 token（如"直播带货-胡磊" / "抖音引流-直播带货-胡磊"）
+                # 若 token 在表中，用表里的 anchor_name；否则用正则解析的 raw_anchor_name
+                normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
+                matches.append((anchor_platform, normalized_anchor, segment))
+            elif segment in plain_name_tokens:
+                # 纯人名 token（如"黄天平"），平台用该记录的平台来源
+                anchor_platform = (r.平台来源 or '').strip()
+                normalized_anchor = token_to_anchor.get(segment, segment)
+                matches.append((anchor_platform, normalized_anchor, segment))
 
         # 同一个原始来源里若重复出现同一主播，只归因一次。
         for anchor_platform, anchor_name, segment in sorted(set(matches)):
@@ -294,10 +303,15 @@ def get_anchor_clusters():
             a['existing_assets'] += float(r.existing_assets or 0)
             a['assets'] += float(r.assets or 0)
             a['raw_sources'].add(segment)
-            # v3.3.0: 累加该 anchor 的直播类型（按 token 查表）
+            # v3.3.0: 累加该 anchor 的直播类型
+            # 优先用 segment 精确查 token；查不到则用归一化 anchor_name 查该主播所有 live_type 兜底
+            # （数据库"客户来源"字段值可能与 JSON source_token 有细微差异，但主播名能对上）
             lt = token_to_live_type.get(segment)
             if lt:
                 a['live_types'].add(lt)
+            elif anchor_name in anchor_to_live_types:
+                for t in anchor_to_live_types[anchor_name]:
+                    a['live_types'].add(t)
 
     items = []
     for a in agg_map.values():

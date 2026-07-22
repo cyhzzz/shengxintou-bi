@@ -23,8 +23,13 @@ from backend.models_v2 import DimAnchorLiveType
 # 这样即使PYTHONPATH环境变量不生效，也能正常导入第三方库
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, 'frozen', False):
-    # PyInstaller打包后的环境，使用exe所在目录
-    BASE_DIR = os.path.dirname(sys.executable)
+    # PyInstaller打包后，server_entry.py 已 chdir 到应用根目录（resources/），
+    # 用 cwd 而不是 sys.executable 的目录（resources/server/），否则找不到 frontend-react/dist
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, 'app.py')):
+        BASE_DIR = cwd
+    else:
+        BASE_DIR = os.path.dirname(sys.executable)
 
 LIB_DIR = os.path.join(BASE_DIR, 'lib')
 if os.path.exists(LIB_DIR):
@@ -81,8 +86,13 @@ except ImportError:
 # 使用config中的BASE_DIR，确保PyInstaller打包后路径正确
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, 'frozen', False):
-    # PyInstaller打包后的环境，使用exe所在目录
-    BASE_DIR = os.path.dirname(sys.executable)
+    # PyInstaller打包后，server_entry.py 已 chdir 到应用根目录（resources/），
+    # 用 cwd 而不是 sys.executable 的目录（resources/server/），否则找不到 frontend-react/dist
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, 'app.py')):
+        BASE_DIR = cwd
+    else:
+        BASE_DIR = os.path.dirname(sys.executable)
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'frontend-react', 'dist'),
@@ -363,6 +373,46 @@ def _migrate_qingniao_batch_tag():
         logger.info(f"✓ fact_qingniao_leads 表已重建（id 改为 INTEGER PRIMARY KEY AUTOINCREMENT，{n_old} 行数据已迁移）")
 
 
+def _reset_pg_sequences():
+    """feat-cloud-supabase：重置 PostgreSQL 所有自增序列到 MAX(id)。
+
+    背景：从 SQLite 迁移数据到 PG 时，数据 INSERT 带了显式 id 值，
+    但 PG 的 SERIAL/BIGSERIAL 序列不会自动前进。下次 ORM INSERT（不指定 id）
+    会从序列当前值（可能是 1）生成 id，跟已迁移的行主键冲突，报
+    UniqueViolation: duplicate key value violates unique constraint "<table>_pkey"。
+
+    修复：对每张有 SERIAL id 列的表执行
+      SELECT setval(pg_get_serial_sequence('<table>', 'id'), GREATEST(MAX(id), 1)) FROM <table>;
+
+    幂等：setval 可以重复执行，不会报错。
+    SQLite 下跳过（SQLite AUTOINCREMENT 跟随 ROWID 自动前进，不存在此问题）。
+    """
+    if top_config.DATABASE_DIALECT != 'postgresql':
+        return
+    from sqlalchemy import text, inspect
+    inspector = inspect(db.engine)
+    # 扫描所有表，找有 id 列且有 SERIAL 序列的表
+    reset_tables = []
+    for tbl_name in inspector.get_table_names():
+        try:
+            seq_sql = "SELECT pg_get_serial_sequence(:t, 'id')"
+            seq_name = db.session.execute(text(seq_sql), {'t': tbl_name}).scalar()
+            if seq_name:
+                reset_tables.append(tbl_name)
+        except Exception:
+            continue  # 该表无 id 列或无序列，跳过
+    if not reset_tables:
+        return
+    with db.engine.begin() as conn:
+        for tbl in reset_tables:
+            # setval(seq, MAX(id))；空表时设为 1（下次 INSERT 从 1 开始）
+            conn.execute(text(
+                f"SELECT setval(pg_get_serial_sequence('{tbl}', 'id'), "
+                f"GREATEST((SELECT COALESCE(MAX(id), 1) FROM \"{tbl}\"), 1))"
+            ))
+    logger.info(f"✓ PostgreSQL 自增序列已重置到 MAX(id)（{len(reset_tables)} 张表）")
+
+
 def ensure_database_exists():
     """确保数据库和所有表存在
 
@@ -432,6 +482,14 @@ def ensure_database_exists():
                 _migrate_qingniao_batch_tag()
             except Exception as e:
                 logger.warning(f"fact_qingniao_leads 批次标注列迁移失败（不影响启动）: {e}")
+
+            # feat-cloud-supabase：重置 PG 自增序列到 MAX(id)
+            #   从 SQLite 迁移数据后，PG SERIAL 序列不会自动前进，
+            #   导致 ORM INSERT 时主键冲突（data_import_log_pkey 等）
+            try:
+                _reset_pg_sequences()
+            except Exception as e:
+                logger.warning(f"PG 自增序列重置失败（可能导致主键冲突）: {e}")
 
             # 记录数据库文件位置
             logger.info(f"✓ 数据库位置: {database_path}")
