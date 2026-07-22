@@ -1,5 +1,5 @@
 /**
- * 直播类型 · 业务分析报表（通用组件，v3.3.4 参数化）
+ * 直播类型 · 业务分析报表（通用组件，按 liveType prop 参数化）
  *
  * 作为「直播获客」二级报表页，按 liveType prop 过滤，复用同一份代码服务 3 类主播：
  *   - 带货直播 (吴晓宇/杨毅/周乐意) → /live/direct-sales
@@ -27,6 +27,7 @@ import {
   SearchOutlined,
   VideoCameraOutlined,
   RiseOutlined,
+  FallOutlined,
   DollarOutlined,
   InfoCircleOutlined,
   AimOutlined,
@@ -167,7 +168,7 @@ interface AnchorAggRow {
   sources: string[];
 }
 
-// v3.4.5 P2: 主播 × 周交叉表（参考应用市场 PlanAnalysis 的「拿量+率」周度表设计）
+// 主播 × 周交叉表（参考应用市场 PlanAnalysis 的「拿量+率」周度表设计）
 interface AnchorWeeklyPoint {
   week_start: string;
   leads: number;
@@ -214,22 +215,24 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
   const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [heatmapMetric, setHeatmapMetric] = useState<'new_leads' | 'new_opened' | 'opening_rate'>('new_leads');
 
-  // v3.3.3 P3-8: 质效双高日 Top 10（开户率>5% AND 线索量>10，按开户数降序）
+  // 质效双高日 Top 10（开户率>5% AND 线索量>10，按开户数降序）
   const [topQualityDays, setTopQualityDays] = useState<
     Array<{ date: string; leads: number; new_opened: number; opening_rate: number; new_assets: number }>
   >([]);
   const [topQualityLoading, setTopQualityLoading] = useState(false);
 
-  // v3.4.5 P2: 主播 × 周交叉表（拿量能力 + 5 漏斗率周度稳定性）
+  // 主播 × 周交叉表（拿量能力 + 5 漏斗率周度稳定性）
   const [anchorWeeklyItems, setAnchorWeeklyItems] = useState<AnchorWeeklyItem[]>([]);
   const [anchorWeeklyTotals, setAnchorWeeklyTotals] = useState<any>(null);
+  // 整体周度走势数组（来自后端 weekly_totals，未按主播拆分，用于整体量质走势图）
+  const [weeklyTotals, setWeeklyTotals] = useState<AnchorWeeklyPoint[]>([]);
   const [anchorWeeklyLoading, setAnchorWeeklyLoading] = useState(false);
 
   const filters = useMemo(() => ({
     start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
     end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
     platforms: platformFilter.length ? platformFilter : undefined,
-    // v3.3.4: 固定 live_types = [liveType]，由路由 prop 决定
+    // 固定 live_types = [liveType]，由路由 prop 决定
     live_types: [liveType] as LiveType[],
   }), [dateRange, platformFilter, liveType]);
 
@@ -343,7 +346,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
   };
   useEffect(() => { loadTopQualityDays(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
-  // v3.4.5 P2: 主播 × 周交叉表（按主播 × 周聚合，6 阶段漏斗量 + 5 个转化率）
+  // 主播 × 周交叉表（按主播 × 周聚合，6 阶段漏斗量 + 5 个转化率）
   const loadAnchorWeekly = async () => {
     setAnchorWeeklyLoading(true);
     try {
@@ -351,6 +354,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
       if (res?.success) {
         setAnchorWeeklyItems(res.data.anchor_items || []);
         setAnchorWeeklyTotals(res.data.totals || null);
+        setWeeklyTotals(res.data.weekly_totals || []);
       }
     } catch (err) {
       console.warn('anchor-weekly-analysis load failed', err);
@@ -359,6 +363,140 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     }
   };
   useEffect(() => { loadAnchorWeekly(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+
+  // 整体周度拿量能力走势（双 Y 轴：左=线索数柱 + 右=新开户/新有效户折线）
+  const weeklyVolumeOption: EChartsOption = useMemo(() => {
+    if (!weeklyTotals.length) return {};
+    const weeks = weeklyTotals.map((w) => w.week_start);
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '6%', bottom: '12%', top: '12%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: weeks,
+        axisLabel: { rotate: 30, fontSize: 11 },
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '线索数(柱)',
+          position: 'left',
+          axisLine: { show: true, lineStyle: { color: pickEChartsColor(0) } },
+        },
+        {
+          type: 'value',
+          name: '开户/有效户(线)',
+          position: 'right',
+          axisLine: { show: true, lineStyle: { color: ECHARTS_COLORS[7] } },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        {
+          name: '线索数',
+          type: 'bar',
+          yAxisIndex: 0,
+          data: weeklyTotals.map((w) => w.leads),
+          itemStyle: { color: pickEChartsColor(0), opacity: 0.55 },
+          barMaxWidth: 32,
+        },
+        {
+          name: '新开户',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: { color: ECHARTS_COLORS[5] },
+          lineStyle: { width: 2 },
+          data: weeklyTotals.map((w) => w.new_opened),
+        },
+        {
+          name: '新有效户',
+          type: 'line',
+          yAxisIndex: 1,
+          smooth: true,
+          symbol: 'diamond',
+          symbolSize: 8,
+          itemStyle: { color: ECHARTS_COLORS[7] },
+          lineStyle: { width: 3 },
+          data: weeklyTotals.map((w) => w.new_valid),
+          label: {
+            show: true,
+            position: 'top',
+            formatter: (p: any) => Number(p.value).toLocaleString(),
+          },
+        },
+      ],
+    };
+  }, [weeklyTotals]);
+
+  // 整体周度精准性走势（多线：5 个转化率周度稳定性）
+  const weeklyRateOption: EChartsOption = useMemo(() => {
+    if (!weeklyTotals.length) return {};
+    const weeks = weeklyTotals.map((w) => w.week_start);
+    const series = [
+      { key: '线索_开口率' as const, name: '线索→开口', color: pickEChartsColor(0) },
+      { key: '开口_有效率' as const, name: '开口→有效', color: ECHARTS_COLORS[5] },
+      { key: '有效_非存量率' as const, name: '有效→非存量', color: ECHARTS_COLORS[3] },
+      { key: '非存量_新开户率' as const, name: '非存量→新开户', color: ECHARTS_COLORS[7] },
+      { key: '新开户_新有效率' as const, name: '新开户→新有效', color: ECHARTS_COLORS[2] },
+    ].map((s, idx) => ({
+      name: s.name,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      itemStyle: { color: s.color },
+      lineStyle: { width: 2 },
+      data: weeklyTotals.map((w) => Number(w[s.key] || 0)),
+      _idx: idx,
+    }));
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        valueFormatter: (v: any) => (v == null ? '-' : `${Number(v).toFixed(2)}%`),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: weeks,
+        axisLabel: { rotate: 30, fontSize: 11 },
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '转化率(%)',
+          axisLabel: { formatter: '{value}%' },
+        },
+      ],
+      series: series as any,
+    };
+  }, [weeklyTotals]);
+
+  // 整体首尾周环比（量能是否衰减）
+  const weeklyDecayInfo = useMemo(() => {
+    if (weeklyTotals.length < 2) return null;
+    const first = weeklyTotals[0];
+    const last = weeklyTotals[weeklyTotals.length - 1];
+    const leadsDiff = last.leads - first.leads;
+    const newOpenDiff = last.new_opened - first.new_opened;
+    const isDecay = leadsDiff < 0 || newOpenDiff < 0;
+    return {
+      firstWeek: first.week_start,
+      lastWeek: last.week_start,
+      leadsDiff,
+      newOpenDiff,
+      isDecay,
+    };
+  }, [weeklyTotals]);
 
   // 主播名多选筛选（前端二次过滤 items）
   const filteredItems = useMemo(() => {
@@ -568,7 +706,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     return rows;
   }, [filteredItems, platformFilter]);
 
-  // v3.3.3 P3-12: 主播详情表 expandable 行展开内容（token 来源拆分）
+  // 主播详情表 expandable 行展开内容（token 来源拆分）
   const expandedRowRender = (r: AnchorAggRow) => {
     const platforms = r.platforms || [];
     const sources = r.sources || [];
@@ -618,7 +756,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     );
   };
 
-  // v3.4.5 P2: 主播×周交叉表 展开行 — 周明细（量+5率）
+  // 主播×周交叉表 展开行 — 周明细（量+5率）
   // 复用 PlanAnalysis 的 expandedRowRender 模式：长表 + Tag 着色（green/gold/default）
   const expandedRowRenderWeekly = (r: AnchorWeeklyItem) => {
     if (!r.weekly?.length) {
@@ -707,7 +845,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     };
   }, [anchorAggRows, anchorCompareMetric]);
 
-  // v3.3.3 P1-9: 月度量质剪刀差（双 Y 轴：左线索量柱图 + 右开户率折线）
+  // 月度量质剪刀差（双 Y 轴：左线索量柱图 + 右开户率折线）
   // 复用 trendData，跟随 trendGranularity；展示「量大质差」或「量质双高」的反向关系
   const scissorOption: EChartsOption = useMemo(() => {
     if (!trendData?.periods?.length || !trendData?.totals) return {};
@@ -785,7 +923,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     };
   }, [trendData, trendGranularity]);
 
-  // v3.3.3 P3-11: 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱图）
+  // 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱图）
   const [funnelMode, setFunnelMode] = useState<'overall' | 'by_anchor'>('overall');
   const funnelByAnchorOption: EChartsOption = useMemo(() => {
     if (!anchorAggRows.length) return {};
@@ -881,7 +1019,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     { title: '新开户资产', dataIndex: 'new_assets', align: 'right' as const, width: 140, sorter: (a: AnchorAggRow, b: AnchorAggRow) => a.new_assets - b.new_assets, render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-' },
   ];
 
-  // v3.4.5 P2: 主播×周交叉表 主表列（6 量 + 5 率 + 覆盖周数）
+  // 主播×周交叉表 主表列（6 量 + 5 率 + 覆盖周数）
   const anchorWeeklyColumns = [
     { title: '排名', width: 60, align: 'center' as const, render: (_: any, __: any, idx: number) => (
       <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
@@ -1203,6 +1341,60 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
 
         <FadeInSection delay={2.1} duration={0.8}>
           <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <BarChartOutlined style={{ color: 'var(--color-brand)' }} />
+                <span>整体周度拿量能力走势</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  左轴：线索数(柱) · 右轴：新开户 / 新有效户(线)
+                </span>
+                {weeklyDecayInfo && (
+                  <Tooltip title={`首周 ${weeklyDecayInfo.firstWeek} → 末周 ${weeklyDecayInfo.lastWeek}：线索 ${weeklyDecayInfo.leadsDiff >= 0 ? '+' : ''}${weeklyDecayInfo.leadsDiff}，新开户 ${weeklyDecayInfo.newOpenDiff >= 0 ? '+' : ''}${weeklyDecayInfo.newOpenDiff}`}>
+                    <Tag color={weeklyDecayInfo.isDecay ? 'red' : 'green'} style={{ marginLeft: 8 }}>
+                      {weeklyDecayInfo.isDecay ? <><FallOutlined /> 量能衰减</> : <><RiseOutlined /> 量能增长</>}
+                    </Tag>
+                  </Tooltip>
+                )}
+              </Space>
+            }
+          >
+            {weeklyTotals.length > 0 ? (
+              <EChartsComponent option={weeklyVolumeOption} height={320} />
+            ) : (
+              <Empty description={anchorWeeklyLoading ? '加载中...' : '暂无周度走势数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={2.2} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <AimOutlined style={{ color: 'var(--color-error)' }} />
+                <span>整体周度精准性走势</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  各漏斗节点转化率周度稳定性（波动越小说明精准性越稳）
+                </span>
+                <Tooltip title="若某周转化率突降，可能对应：直播节奏变化 / 内容选题偏移 / 投放策略调整。建议结合「拿量能力走势」一起看——量增率降通常是流量泛化。">
+                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            {weeklyTotals.length > 0 ? (
+              <EChartsComponent option={weeklyRateOption} height={320} />
+            ) : (
+              <Empty description={anchorWeeklyLoading ? '加载中...' : '暂无周度走势数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={2.3} duration={0.8}>
+          <Card
             title={
               <Space size={8} align="center">
                 <LineChartOutlined style={{ color: 'var(--color-success)' }} />
@@ -1246,7 +1438,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={2.3} duration={0.8}>
+        <FadeInSection delay={2.4} duration={0.8}>
           <Card
             size="small"
             style={{ marginBottom: 16 }}
@@ -1287,7 +1479,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
           </Card>
         </FadeInSection>
 
-        <FadeInSection delay={2.4} duration={0.8}>
+        <FadeInSection delay={2.5} duration={0.8}>
           <ReportFooter
             sources={[
               { label: '数据源', value: `fact_conv_content.客户来源 中 token 命中 dim_anchor_live_type.live_type='${liveType}' 的记录` },

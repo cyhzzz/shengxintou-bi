@@ -61,6 +61,11 @@ export function startFlask(): ChildProcess {
     console.warn(`[Flask] 警告: .env 不存在于 ${projectRoot}；将走 SQLite 默认配置`);
   }
 
+  // 启动前先清掉占用 5000 的旧进程（开发模式残留的 python app.py 等），
+  // 否则两个进程会同时 LISTEN 同端口，Windows 静默把请求给先绑的那个——
+  // 结果前端登录请求被开发版（SQLite）吃掉，看起来像"密码错了"。
+  killPortOccupantsWindows();
+
   const env = { ...process.env } as Record<string, string>;
   env.DEV_MODE = '1';
 
@@ -116,6 +121,55 @@ function pipeStdio(child: ChildProcess): void {
   });
 }
 
+/**
+ * 杀掉占用 FLASK_PORT 的所有进程（Windows）。
+ * 用途：用户在开发模式开过 `python app.py` 后没关就启动桌面版，
+ *       两个进程会同时 LISTEN 同一端口，Windows 静默让先绑的进程接请求，
+ *       导致前端登录请求被开发版（SQLite/非桌面配置）吃掉——看起来像"密码错了"。
+ * 排除：跳过 Electron 主进程自身 / 本子进程（比对 server.exe 路径）。
+ */
+function killPortOccupantsWindows(): void {
+  if (process.platform !== 'win32') return;
+  try {
+    const { execSync } = require('node:child_process');
+    // netstat 查 LISTENING 的 PID 列
+    const out = execSync(`netstat -ano | findstr ":${FLASK_PORT}" | findstr "LISTENING"`, {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    const myPid = process.pid;
+    const ppid = process.ppid;
+    let killed = 0;
+    let skipped = 0;
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.match(/\s(\d+)\s*$/);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      if (pid === myPid || pid === ppid) {
+        skipped++;
+        continue;
+      }
+      try {
+        // /T 杀整棵进程树，避开 Windows 句柄残留
+        execSync(`taskkill /F /T /PID ${pid}`, {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        killed++;
+      } catch {
+        /* 进程可能并发退出 */
+      }
+    }
+    if (killed > 0 || skipped > 0) {
+      console.log(
+        `[Flask] 清理 ${FLASK_PORT} 端口占用：杀掉 ${killed} 个，跳过 ${skipped} 个（Electron 主进程）`,
+      );
+    }
+  } catch {
+    /* netstat 解析失败时静默，不阻塞启动 */
+  }
+}
+
 /** 用 GET /api/health 探活。返回是否就绪。 */
 function checkHealth(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -155,6 +209,9 @@ export async function waitForFlaskHealthy(
     const ok = await checkHealth();
     if (ok) {
       console.log(`[Flask] ✓ 健康检查通过（用时 ${Date.now() - start}ms）`);
+      // 二次确认：确保 /api/health 响应的进程就是当前 Electron 的子进程，
+      // 避免"端口被旧 python app.py 静默抢占"导致登录请求被错的服务处理。
+      verifyPortBoundByUs();
       return;
     }
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -162,6 +219,37 @@ export async function waitForFlaskHealthy(
   throw new Error(
     `[Flask] 等待 ${timeoutMs}ms 后仍未就绪。请检查 server.exe / Python 进程是否启动成功，以及 ${FLASK_PORT} 端口是否被占用。`
   );
+}
+
+/**
+ * 健康检查通过后再扫一次 5000 端口 LISTEN 的 PID，
+ * 如果不是 Electron 主进程或其子进程 pid，说明响应来自另一个无关进程。
+ * 这种情况下用户登录请求会被那个进程消化——应主动 kill 我们自己 spawn 的子进程并报错。
+ */
+function verifyPortBoundByUs(): void {
+  if (process.platform !== 'win32') return;
+  try {
+    const { execSync } = require('node:child_process');
+    const out = execSync(`netstat -ano | findstr ":${FLASK_PORT}" | findstr "LISTENING"`, {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    const ourPids = new Set<number>([process.pid, process.ppid]);
+    // 把 Electron 主进程整棵进程树（我们自己 spawn 的 child 也算子树）纳入白名单：
+    // 若 LISTEN PID 不在白名单且不是当前主进程的子进程，则提示。
+    const pids = [...out.matchAll(/\s(\d+)\s*$/g)].map((m) => Number(m[1]));
+    const alien = pids.filter((pid) => !ourPids.has(pid));
+    if (alien.length > 0) {
+      console.error(
+        `[Flask] ⚠️ ${FLASK_PORT} 端口被以下非 Electron 进程占用：${alien.join(',')}。` +
+          '登录请求可能被错误的服务处理，请确认没有开发版 Flask 残留。',
+      );
+    } else {
+      console.log(`[Flask] ✓ 端口 ${FLASK_PORT} 由 Electron 进程树持有`);
+    }
+  } catch {
+    /* 解析失败不影响主流程 */
+  }
 }
 
 /** Windows 下用 taskkill /F /T 强杀进程树。 */
