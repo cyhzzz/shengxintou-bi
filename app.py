@@ -12,6 +12,7 @@ import threading
 import time
 from flask import Flask, render_template, jsonify
 from flask_cors import CORS
+import config as top_config  # 顶层 config 模块；后面 from backend.routes import config 会覆盖此名
 from config import *
 from backend.database import db
 # v3.3.10: 把 DimAnchorLiveType 提到顶层 import，避免 _sync_anchor_live_types_from_json
@@ -22,8 +23,13 @@ from backend.models_v2 import DimAnchorLiveType
 # 这样即使PYTHONPATH环境变量不生效，也能正常导入第三方库
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, 'frozen', False):
-    # PyInstaller打包后的环境，使用exe所在目录
-    BASE_DIR = os.path.dirname(sys.executable)
+    # PyInstaller打包后，server_entry.py 已 chdir 到应用根目录（resources/），
+    # 用 cwd 而不是 sys.executable 的目录（resources/server/），否则找不到 frontend-react/dist
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, 'app.py')):
+        BASE_DIR = cwd
+    else:
+        BASE_DIR = os.path.dirname(sys.executable)
 
 LIB_DIR = os.path.join(BASE_DIR, 'lib')
 if os.path.exists(LIB_DIR):
@@ -80,8 +86,13 @@ except ImportError:
 # 使用config中的BASE_DIR，确保PyInstaller打包后路径正确
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, 'frozen', False):
-    # PyInstaller打包后的环境，使用exe所在目录
-    BASE_DIR = os.path.dirname(sys.executable)
+    # PyInstaller打包后，server_entry.py 已 chdir 到应用根目录（resources/），
+    # 用 cwd 而不是 sys.executable 的目录（resources/server/），否则找不到 frontend-react/dist
+    cwd = os.getcwd()
+    if os.path.exists(os.path.join(cwd, 'app.py')):
+        BASE_DIR = cwd
+    else:
+        BASE_DIR = os.path.dirname(sys.executable)
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'frontend-react', 'dist'),
@@ -136,6 +147,9 @@ CORS(app, resources={r"/api/*": {"origins": "*", "headers": "Content-Type,Author
 # 应用配置
 app.config.from_object('config')
 
+# feat-cloud-supabase：把 AUTH_ENABLED 显式传给 app.config；中间件读这里
+app.config['AUTH_ENABLED'] = bool(getattr(top_config, 'AUTH_ENABLED', True))
+
 # 初始化数据库
 db.init_app(app)
 
@@ -144,7 +158,15 @@ db.init_app(app)
 # ============================================================================
 
 def configure_sqlite_optimization():
-    """配置SQLite性能优化参数（WAL模式、缓存、同步模式）"""
+    """配置SQLite性能优化参数（WAL模式、缓存、同步模式）
+
+    feat-cloud-supabase：仅当当前 dialect 为 sqlite 时挂 PRAGMA 监听器。
+    Postgres 下挂 SQLite PRAGMA 会触发 'PRAGMA is not supported' 异常或被忽略。
+    """
+    # dialect 来自 top_config.DATABASE_DIALECT（feat-cloud-supabase）
+    if top_config.DATABASE_DIALECT != 'sqlite':
+        logger.info(f"当前数据库 dialect='{top_config.DATABASE_DIALECT}'，跳过 SQLite PRAGMA 配置")
+        return
     try:
         from sqlalchemy import event
         from sqlalchemy.engine import Engine
@@ -264,7 +286,13 @@ def _migrate_qingniao_batch_tag():
     - 修复方案：重建表为 `id INTEGER PRIMARY KEY AUTOINCREMENT`，历史数据自动生成 id。
 
     幂等：列已存在且 id 已是 PRIMARY KEY 时跳过。
+
+    feat-cloud-supabase：SQLite 专属 ALTER/重建只在历史 SQLite db 上需要；Postgres 全新库
+    上 db.create_all() 已经建好所有列，跳过整段逻辑。
     """
+    if top_config.DATABASE_DIALECT != 'sqlite':
+        logger.info(f"跳过 _migrate_qingniao_batch_tag：dialect='{top_config.DATABASE_DIALECT}' 不需要 SQLite 表重建")
+        return
     from sqlalchemy import text, inspect
     inspector = inspect(db.engine)
     if not inspector.has_table('fact_qingniao_leads'):
@@ -345,22 +373,77 @@ def _migrate_qingniao_batch_tag():
         logger.info(f"✓ fact_qingniao_leads 表已重建（id 改为 INTEGER PRIMARY KEY AUTOINCREMENT，{n_old} 行数据已迁移）")
 
 
+def _reset_pg_sequences():
+    """feat-cloud-supabase：重置 PostgreSQL 所有自增序列到 MAX(id)。
+
+    背景：从 SQLite 迁移数据到 PG 时，数据 INSERT 带了显式 id 值，
+    但 PG 的 SERIAL/BIGSERIAL 序列不会自动前进。下次 ORM INSERT（不指定 id）
+    会从序列当前值（可能是 1）生成 id，跟已迁移的行主键冲突，报
+    UniqueViolation: duplicate key value violates unique constraint "<table>_pkey"。
+
+    修复：对每张有 SERIAL id 列的表执行
+      SELECT setval(pg_get_serial_sequence('<table>', 'id'), GREATEST(MAX(id), 1)) FROM <table>;
+
+    幂等：setval 可以重复执行，不会报错。
+    SQLite 下跳过（SQLite AUTOINCREMENT 跟随 ROWID 自动前进，不存在此问题）。
+    """
+    if top_config.DATABASE_DIALECT != 'postgresql':
+        return
+    from sqlalchemy import text, inspect
+    inspector = inspect(db.engine)
+    # 扫描所有表，找有 id 列且有 SERIAL 序列的表
+    reset_tables = []
+    for tbl_name in inspector.get_table_names():
+        try:
+            seq_sql = "SELECT pg_get_serial_sequence(:t, 'id')"
+            seq_name = db.session.execute(text(seq_sql), {'t': tbl_name}).scalar()
+            if seq_name:
+                reset_tables.append(tbl_name)
+        except Exception:
+            continue  # 该表无 id 列或无序列，跳过
+    if not reset_tables:
+        return
+    with db.engine.begin() as conn:
+        for tbl in reset_tables:
+            # setval(seq, MAX(id))；空表时设为 1（下次 INSERT 从 1 开始）
+            conn.execute(text(
+                f"SELECT setval(pg_get_serial_sequence('{tbl}', 'id'), "
+                f"GREATEST((SELECT COALESCE(MAX(id), 1) FROM \"{tbl}\"), 1))"
+            ))
+    logger.info(f"✓ PostgreSQL 自增序列已重置到 MAX(id)（{len(reset_tables)} 张表）")
+
+
 def ensure_database_exists():
-    """确保数据库和所有表存在"""
+    """确保数据库和所有表存在
+
+    feat-cloud-supabase：dialect 不为 sqlite 时跳过本地 db 文件存在性检查；
+    '业务表存在且有内容' 的安全网仍打 WARN，但不会阻塞启动（不强制迁移历史数据）。
+    """
     try:
         database_path = DATABASE_PATH
+        # feat-cloud-supabase：当前 dialect 与 URI 在启动日志显式打出，便于排查
+        # 使用 top_config 别名，避免被 from backend.routes import config 覆盖
+        logger.info(f"✓ 数据库接入: dialect='{top_config.DATABASE_DIALECT}' uri=<redacted>")
 
-        # 检查数据库文件是否存在
-        if not os.path.exists(database_path):
-            logger.info("数据库文件不存在，正在创建...")
+        # 仅 SQLite 需要检查本地 db 文件
+        if top_config.DATABASE_DIALECT == 'sqlite':
+            # 检查数据库文件是否存在
+            if not os.path.exists(database_path):
+                logger.info("数据库文件不存在，正在创建...")
 
-            # 确保数据库目录存在
-            db_dir = os.path.dirname(database_path)
-            if db_dir and not os.path.exists(db_dir):
-                os.makedirs(db_dir)
-                logger.info(f"创建数据库目录: {db_dir}")
+                # 确保数据库目录存在
+                db_dir = os.path.dirname(database_path)
+                if db_dir and not os.path.exists(db_dir):
+                    os.makedirs(db_dir)
+                    logger.info(f"创建数据库目录: {db_dir}")
+            else:
+                logger.info(f"数据库文件已存在: {database_path}")
         else:
-            logger.info(f"数据库文件已存在: {database_path}")
+            # Postgres：直接走 db.create_all；不存在不会自动建库，需要 supabase 控制台先建 PG 实例
+            logger.info(
+                f"Postgres 模式：跳过本地文件检查。请确认 Supabase 项目里已经"
+                f"存在数据库（Free 计划默认会自动建库，无需手动建）。"
+            )
 
         # create_all 幂等：已存在的表不受影响，新表会自动创建
         with app.app_context():
@@ -399,6 +482,14 @@ def ensure_database_exists():
                 _migrate_qingniao_batch_tag()
             except Exception as e:
                 logger.warning(f"fact_qingniao_leads 批次标注列迁移失败（不影响启动）: {e}")
+
+            # feat-cloud-supabase：重置 PG 自增序列到 MAX(id)
+            #   从 SQLite 迁移数据后，PG SERIAL 序列不会自动前进，
+            #   导致 ORM INSERT 时主键冲突（data_import_log_pkey 等）
+            try:
+                _reset_pg_sequences()
+            except Exception as e:
+                logger.warning(f"PG 自增序列重置失败（可能导致主键冲突）: {e}")
 
             # 记录数据库文件位置
             logger.info(f"✓ 数据库位置: {database_path}")
@@ -478,6 +569,9 @@ def health_check():
 from backend.routes import metadata, upload, config, webdav_backup, version
 from backend.routes.system import self_update as system
 
+# feat-cloud-supabase：鉴权蓝图（必须在所有 app.register_blueprint 之前 import）
+from backend.auth import bp as auth_bp, init_auth
+
 # Import weekly_reports module
 from backend.routes import weekly_reports
 from backend.routes.reports import app_market as app_market_report_blueprint
@@ -507,6 +601,8 @@ from backend.routes.data import (
 # 如需重新加载代码，请重启服务器
 
 app.register_blueprint(metadata.bp, url_prefix=API_PREFIX)
+# feat-cloud-supabase：注册鉴权蓝图，挂在 /api/v1 前缀下
+app.register_blueprint(auth_bp, url_prefix=API_PREFIX)
 
 # 注册所有拆分后的数据模块Blueprint
 app.register_blueprint(query.bp, url_prefix=API_PREFIX)
@@ -534,11 +630,52 @@ app.register_blueprint(omni_channel_report_blueprint.bp)
 app.register_blueprint(xhs_plan_analysis_report_blueprint.bp)
 
 # ============================================================================
+# 鉴权中间件注册（feat-cloud-supabase）
+# 必须放在所有蓝图 register 之后，before_request 才不会漏端点
+# ============================================================================
+try:
+    init_auth(app)
+    logger.info("✓ 鉴权中间件已注册：所有 /api/v1/* 需 Bearer token（/auth/login 白名单）")
+except Exception as e:
+    logger.error(f"鉴权中间件注册失败：{e}")
+
+# ============================================================================
 # 数据库初始化（必须在所有 ORM 模型被 import 之后调用，否则 db.create_all()
 # 看不到完整 metadata，会导致部分表（如 data_import_log）在全新数据库上不被创建）
 # ============================================================================
 with app.app_context():
     ensure_database_exists()
+
+    # feat-local-auth 方案 A：首次启动创建默认 admin 账号
+    # 如果 app_users 表为空，自动创建 admin@shengxintou.local / shengxintou2026
+    try:
+        from backend.models_v2 import AppUser
+        from backend.auth.jwt_utils import hash_password
+        from datetime import datetime
+        if AppUser.query.count() == 0:
+            admin_email = top_config.DEFAULT_ADMIN_EMAIL
+            admin_password = top_config.DEFAULT_ADMIN_PASSWORD
+            admin = AppUser(
+                email=admin_email,
+                password_hash=hash_password(admin_password),
+                display_name='管理员',
+                department='',
+                role='admin',
+                is_active=1,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.session.add(admin)
+            db.session.commit()
+            logger.info(f"✓ 默认 admin 账号已创建：{admin_email}（请尽快修改密码）")
+        else:
+            logger.debug("app_users 表已有用户，跳过默认 admin 创建")
+    except Exception as e:
+        logger.warning(f"创建默认 admin 账号失败（忽略）：{e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 # ============================================================================
 # Swagger/OpenAPI 文档初始化

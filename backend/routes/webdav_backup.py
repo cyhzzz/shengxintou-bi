@@ -592,6 +592,14 @@ def _backup_async(task_id, description):
         from backend.utils.webdav_client import WebDAVBackupClient
 
         with app.app_context():
+            # feat-desktop-supabase：PG 模式下不支持 WebDAV 文件级备份，
+            # 数据由 Supabase 托管，请用 Supabase Dashboard 自带备份功能。
+            if getattr(config, 'DATABASE_DIALECT', 'sqlite') == 'postgresql':
+                backup_tasks[task_id]['status'] = 'failed'
+                backup_tasks[task_id]['message'] = 'PostgreSQL 模式不支持 WebDAV 文件备份，请使用 Supabase Dashboard 自带的备份功能'
+                backup_tasks[task_id]['progress'] = 100
+                return
+
             backup_tasks[task_id]['message'] = '正在连接坚果云...'
             backup_tasks[task_id]['progress'] = 10
 
@@ -754,6 +762,13 @@ def _restore_async(task_id, filename):
         from backend.database import db
 
         with app.app_context():
+            # feat-desktop-supabase：PG 模式下不支持 WebDAV 文件级恢复。
+            if getattr(config, 'DATABASE_DIALECT', 'sqlite') == 'postgresql':
+                backup_tasks[task_id]['status'] = 'failed'
+                backup_tasks[task_id]['message'] = 'PostgreSQL 模式不支持 WebDAV 文件恢复，请使用 Supabase Dashboard 自带的恢复功能'
+                backup_tasks[task_id]['progress'] = 100
+                return
+
             backup_tasks[task_id]['message'] = '正在连接坚果云...'
             backup_tasks[task_id]['progress'] = 5
 

@@ -455,7 +455,7 @@ const DashboardPage: React.FC = () => {
             }
             description="过去一年每日互联网引流开户密度（蓝色越深 = 当日开户数越多）"
           >
-            <CalendarHeatmap data={calendarData} loading={calendarLoading} />
+            <CalendarHeatmap data={calendarData} loading={calendarLoading} preferredCellSize={16} />
           </MetricSection>
         </FadeInSection>
       </Spin>

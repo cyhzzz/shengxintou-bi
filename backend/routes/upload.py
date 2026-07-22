@@ -383,7 +383,7 @@ def get_data_types():
 def _target_tables(data_type: str):
     """返回 data_type 落库的目标表（前端可显示）。"""
     return {
-        'account_mapping':      ['dim_account', 'dim_vendor'],
+        'account_mapping':      ['dim_account'],
         'conversion_content':   ['fact_conv_content'],
         'conversion_appmarket': ['fact_conv_appmarket'],
         'vendor_daily':         ['agg_vendor_daily'],

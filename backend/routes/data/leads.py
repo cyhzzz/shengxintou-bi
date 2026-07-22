@@ -233,6 +233,11 @@ def get_anchor_clusters():
         '微信': '腾讯',
     }
 
+    # v3.3.10: 预提取纯人名 token (JSON 里不含"引流-"/"直播带货-"的 source_token，如"黄天平"/"赵茜")
+    # 数据库"客户来源"字段可能是纯人名（分支投顾自IP），PATTERN 不匹配，需按 token 归类
+    plain_name_tokens = {tok for tok in token_to_anchor
+                         if '引流-' not in tok and '直播带货-' not in tok}
+
     agg_map = {}
     for r in rows:
         src = (r.客户来源 or "").strip()
@@ -242,19 +247,23 @@ def get_anchor_clusters():
             if not segment:
                 continue
             m = PATTERN.match(segment)
-            if not m:
-                continue
-            anchor_platform = m.group(1)
-            # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
-            anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
-            raw_anchor_name = m.group(2).strip()
-            if not raw_anchor_name:
-                continue
-            # v3.3.0: 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
-            # segment 是原始 token（如"直播带货-胡磊" / "抖音引流-直播带货-胡磊"）
-            # 若 token 在表中，用表里的 anchor_name；否则用正则解析的 raw_anchor_name
-            normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
-            matches.append((anchor_platform, normalized_anchor, segment))
+            if m:
+                anchor_platform = m.group(1)
+                # v3.3.6: 归一化平台名，让前端筛选项与 fact_conv_content.平台来源 一致
+                anchor_platform = PLATFORM_NORMALIZE.get(anchor_platform, anchor_platform)
+                raw_anchor_name = m.group(2).strip()
+                if not raw_anchor_name:
+                    continue
+                # v3.3.0: 通过 dim_anchor_live_type 表做 anchor_name 归一化 + 错字校正
+                # segment 是原始 token（如"直播带货-胡磊" / "抖音引流-直播带货-胡磊"）
+                # 若 token 在表中，用表里的 anchor_name；否则用正则解析的 raw_anchor_name
+                normalized_anchor = token_to_anchor.get(segment, raw_anchor_name)
+                matches.append((anchor_platform, normalized_anchor, segment))
+            elif segment in plain_name_tokens:
+                # 纯人名 token（如"黄天平"），平台用该记录的平台来源
+                anchor_platform = (r.平台来源 or '').strip()
+                normalized_anchor = token_to_anchor.get(segment, segment)
+                matches.append((anchor_platform, normalized_anchor, segment))
 
         # 同一个原始来源里若重复出现同一主播，只归因一次。
         for anchor_platform, anchor_name, segment in sorted(set(matches)):
@@ -294,10 +303,15 @@ def get_anchor_clusters():
             a['existing_assets'] += float(r.existing_assets or 0)
             a['assets'] += float(r.assets or 0)
             a['raw_sources'].add(segment)
-            # v3.3.0: 累加该 anchor 的直播类型（按 token 查表）
+            # v3.3.0: 累加该 anchor 的直播类型
+            # 优先用 segment 精确查 token；查不到则用归一化 anchor_name 查该主播所有 live_type 兜底
+            # （数据库"客户来源"字段值可能与 JSON source_token 有细微差异，但主播名能对上）
             lt = token_to_live_type.get(segment)
             if lt:
                 a['live_types'].add(lt)
+            elif anchor_name in anchor_to_live_types:
+                for t in anchor_to_live_types[anchor_name]:
+                    a['live_types'].add(t)
 
     items = []
     for a in agg_map.values():
@@ -432,11 +446,9 @@ def get_anchor_clusters_trend():
     live_types_filter = filters.get('live_types') or []
     if granularity == 'weekly':
         granularity = 'weekly'
-        period_expr = (
-            func.substr(FactConvContent.线索日期, 1, 4)
-            + '-W'
-            + func.substr(func.concat('0', func.strftime('%W', FactConvContent.线索日期)), -2)
-        )
+        # dialect 无关：SQLite strftime('%Y-%W') / PG to_char('YYYY-IW')
+        from backend.utils.dialect_helpers import make_period_expr
+        period_expr = make_period_expr(FactConvContent.线索日期, 'weekly')
     elif granularity == 'monthly':
         granularity = 'monthly'
         period_expr = func.substr(FactConvContent.线索日期, 1, 7)
@@ -445,6 +457,33 @@ def get_anchor_clusters_trend():
         period_expr = func.substr(FactConvContent.线索日期, 1, 10)
     period_label = period_expr.label('period')
     non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+
+    # v3.4.2: 预加载 dim_anchor_live_type 表，构建 plain_name_tokens
+    # 与 get_anchor_clusters 同步：纯人名 token（如"黄天平"）不含"引流-"，
+    # 原有的 like('%引流-%') 过滤会漏掉这些记录，导致日历年度总开户数偏少
+    lt_rows_all = db.session.query(
+        DimAnchorLiveType.source_token,
+        DimAnchorLiveType.live_type,
+        DimAnchorLiveType.is_active,
+    ).all()
+    plain_name_tokens = {row.source_token for row in lt_rows_all
+                         if row.is_active and '引流-' not in row.source_token and '直播带货-' not in row.source_token}
+
+    source_filter = and_(
+        FactConvContent.客户来源.isnot(None),
+        FactConvContent.客户来源 != '',
+    )
+    if plain_name_tokens:
+        source_filter = and_(
+            source_filter,
+            or_(
+                FactConvContent.客户来源.like('%引流-%'),
+                FactConvContent.客户来源.in_(plain_name_tokens),
+            ),
+        )
+    else:
+        source_filter = and_(source_filter, FactConvContent.客户来源.like('%引流-%'))
+
     q = db.session.query(
         period_label,
         FactConvContent.平台来源.label('platform'),
@@ -456,11 +495,7 @@ def get_anchor_clusters_trend():
         func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), 1), else_=0)), 0).label('new_opened'),
         func.coalesce(func.sum(case((and_(FactConvContent.是否为有效户 == 1, non_existing), 1), else_=0)), 0).label('new_valid'),
         func.coalesce(func.sum(case((and_(FactConvContent.是否开户 == 1, non_existing), FactConvContent.资产), else_=0)), 0).label('new_assets'),
-    ).filter(and_(
-        FactConvContent.客户来源.isnot(None),
-        FactConvContent.客户来源 != '',
-        FactConvContent.客户来源.like('%引流-%'),
-    ))
+    ).filter(source_filter)
     if sd and ed:
         q = q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms_filter:
@@ -468,17 +503,12 @@ def get_anchor_clusters_trend():
     if agencies_filter:
         q = q.filter(FactConvContent.广告代理商.in_(agencies_filter))
 
-    # v3.3.0: 若启用 live_types 筛选，先加载 dim_anchor_live_type 表得到 token 集合
-    # 然后在 Python 端用 SPLIT_PATTERN 拆 客户来源，看是否有任一 token 命中
+    # v3.3.0: 若启用 live_types 筛选，从已加载的 lt_rows_all 构建 wanted_tokens
+    # （包含纯人名 token，与 get_anchor_clusters 口径一致）
     wanted_tokens = set()
     if live_types_filter:
         wanted = set(live_types_filter)
-        lt_rows = db.session.query(
-            DimAnchorLiveType.source_token,
-            DimAnchorLiveType.live_type,
-            DimAnchorLiveType.is_active,
-        ).all()
-        for lt_row in lt_rows:
+        for lt_row in lt_rows_all:
             if not lt_row.is_active:
                 continue
             if lt_row.live_type in wanted:
@@ -530,7 +560,7 @@ def get_anchor_clusters_trend():
             'meta': {
                 'version': 'v3.3.0-anchor-trend-with-live-type',
                 'source': 'fact_conv_content.客户来源 + dim_anchor_live_type',
-                'pattern': '%引流-%',
+                'pattern': '%引流-% or plain_name_tokens',
                 'note': 'v3.3.0 起支持 live_types 筛选：按 dim_anchor_live_type 表中 source_token 集合过滤原始 客户来源。按 (period, platform) 聚合，主播层面落到平台维度。period 由 granularity 决定：daily=YYYY-MM-DD，weekly=YYYY-Www，monthly=YYYY-MM。存量客户只贡献存量资产，new_opened/new_valid/new_assets 仅含非存量，与 anchor-clusters 口径一致。',
             }
         }

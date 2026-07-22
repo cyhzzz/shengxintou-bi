@@ -69,35 +69,63 @@ AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询�
 ### 后端
 
 ```text
-app.py                         Flask、蓝图、SPA、中间件、SQLite、主播映射同步
-config.py                      环境变量与路径
+app.py                         Flask、蓝图、SPA、中间件、主播映射同步
+config.py                      环境变量与路径（DATABASE_URL 归一化 + AUTH_ENABLED 开关）
+server_entry.py                PyInstaller 打包入口（仅桌面版构建用，开发版不引用）
 backend/models.py              系统表
 backend/models_v2.py           当前业务 ORM（含中文列）
-backend/processors/v2/         唯一业务导入处理器
+backend/auth/                  JWT 本地鉴权（AUTH_ENABLED 开关控制）
+backend/processors/v2/         唯一业务导入处理器（PG 用 COPY / SQLite 用 to_sql）
 backend/routes/data/           通用查询与对账
 backend/routes/reports/        全渠道、应用市场专题报表
 backend/routes/system/         自更新
-backend/utils/                 异常、代理商、WebDAV、周报工具
+backend/scripts/               一次性脚本（SQLite→PG 迁移等）
+backend/utils/                 异常、代理商、WebDAV、周报工具、方言辅助
 ```
 
 - API 前缀：`/api/v1`。
-- SQLite 默认 `database/shengxintou.db`，可由 `DATABASE_PATH` 覆盖；保持 `journal_mode=DELETE`。
+- 数据库：`DATABASE_URL` 优先（PG/Supabase），未设走 SQLite（`DATABASE_PATH`）；`raw_import.py` 用 `is_pg` 判断自动走 COPY 或 to_sql。
+- 鉴权：`AUTH_ENABLED=true` 启用 JWT 中间件（桌面版默认）；`false` 全放行（开发版默认）。
 - Flask 生产时托管 `frontend-react/dist/`，SPA 深链接由 `serve_react_app` 兜底。
 - `DoubleApiRewriteMiddleware` 兼容旧缓存产生的 `/api/api/...`。
 
 ### 前端
 
 ```text
-frontend-react/src/router/      lazy 路由与旧路径重定向
-frontend-react/src/layouts/     主布局、菜单与滚动容器
-frontend-react/src/pages/       报表与系统页面
+frontend-react/src/router/      lazy 路由与旧路径重定向（ProtectedRoute 仅 Electron 启用）
+frontend-react/src/layouts/     主布局、菜单与滚动容器（isDesktop 运行时判断菜单显隐）
+frontend-react/src/pages/       报表与系统页面（含 Login 页面）
 frontend-react/src/components/  共享组件
-frontend-react/src/services/    HTTP、数据、上传、元数据、版本
-frontend-react/src/stores/      Zustand 状态
+frontend-react/src/services/    HTTP（自动注入 Bearer token）、数据、上传、元数据、版本、auth
+frontend-react/src/stores/      Zustand 状态（含 useAuthStore）
 frontend-react/src/types/       业务类型与生成类型
 frontend-react/src/styles/      token、变量和全局样式
 frontend-react/src/utils/       筛选、文本清洗和图表工具
 ```
+
+### 桌面版（Electron）
+
+```text
+desktop/                        Electron 客户端（main.ts + preload.ts + flask-manager.ts）
+desktop/electron-builder.yml    electron-builder 配置
+省心投-server.spec              PyInstaller 打包 server.exe
+scripts/build-installer.ps1     三阶段打包脚本（PyInstaller + 前端 build + NSIS）
+server_entry.py                 桌面版 Flask 入口（frozen 模式路径解析）
+```
+
+### 双端支持
+
+单一代码库支持两种运行模式，仅配置不同，代码完全一致：
+
+| 模式 | 数据库 | 鉴权 | 前端构建 | 打包 |
+| --- | --- | --- | --- | --- |
+| 开发版（Web） | SQLite（默认） | `AUTH_ENABLED=false` | `npm run build` | 无 |
+| 桌面版（Electron） | PG/Supabase | `AUTH_ENABLED=true` | `npm run build` + PyInstaller + electron-builder | `scripts/build-installer.ps1` |
+
+- 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
+- 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
+- 前端运行时判断：`navigator.userAgent.includes('Electron')` 控制菜单显隐 + ProtectedRoute。
+- 桌面版打包：`scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）。
 
 ## 6. 按任务读取规则
 

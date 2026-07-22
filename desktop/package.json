@@ -1,0 +1,28 @@
+{
+  "name": "shengxintou-bi-desktop",
+  "version": "3.4.2",
+  "description": "省心投 BI 桌面客户端（Electron 封装）。版本号同步自根目录 version.json。",
+  "main": "dist/main.js",
+  "author": "省心投 BI",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cyhzzz/shengxintou-bi.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && electron .",
+    "dist": "tsc && electron-builder --win",
+    "dist:portable": "tsc && electron-builder --win portable",
+    "sync-version": "node -e \"const fs=require('fs');const v=JSON.parse(fs.readFileSync('../version.json','utf8')).version;const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=v;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\\n');console.log('desktop/package.json version synced to '+v);\"",
+    "clean": "rimraf dist release"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.4.5"
+  }
+}

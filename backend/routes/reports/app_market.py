@@ -9,7 +9,7 @@
 所有端点返 SUM 聚合（counts） + 派生（conversion_rate），前端可自行用 sums 重算。
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, case, or_
+from sqlalchemy import func, and_, case, or_, cast, String, type_coerce
 from backend.models_v2 import FactConvAppmarket
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -300,10 +300,13 @@ def app_market_creative():
     ]
 
     # CASE WHEN 广告计划ID IS NULL OR 广告计划ID = 0 THEN COALESCE(投放账号, '未归因') ELSE 广告计划ID END
+    # feat-cloud-supabase：PG 上 广告计划ID=bigint，投放账号=text，
+    # CASE 分支必须显式 cast 到同一类型（SQLite 隐式转换不会报错，PG 严格）。
+    # 用 type_coerce + cast 让 SQLAlchemy 输出 CASE WHEN ... THEN ... ELSE col::VARCHAR END
     plan_expr = case(
         (or_(FactConvAppmarket.广告计划ID.is_(None), FactConvAppmarket.广告计划ID == 0),
          func.coalesce(FactConvAppmarket.投放账号, '未归因')),
-        else_=FactConvAppmarket.广告计划ID
+        else_=cast(type_coerce(FactConvAppmarket.广告计划ID, String), String)
     ).label('plan_key')
 
     q = db.session.query(
@@ -397,14 +400,18 @@ def app_market_plan_analysis():
     ).order_by(FactConvAppmarket.应用市场).all()
     platforms = [r[0] for r in platform_rows]
 
-    # 周起始日表达式：SQLite date(d, 'weekday 0', '-6 days') = d 所在周的周一
-    week_start_expr = func.date(FactConvAppmarket.下载日期, 'weekday 0', '-6 days').label('week_start')
+    # 周起始日表达式（dialect 无关）：SQLite 用 date(d, 'weekday 0', '-6 days')；
+    # PG 用 date_trunc('week', d)，均返回 d 所在周的周一
+    from backend.utils.dialect_helpers import make_week_start_expr
+    week_start_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
 
     # 广告计划ID 归一化（与 /creative 一致）
+    # feat-cloud-supabase：PG 上 广告计划ID=bigint，投放账号=text，
+    # CASE 分支必须显式 cast 到同一类型（SQLite 隐式转换不会报错，PG 严格）。
     plan_expr = case(
         (or_(FactConvAppmarket.广告计划ID.is_(None), FactConvAppmarket.广告计划ID == 0),
          func.coalesce(FactConvAppmarket.投放账号, '未归因')),
-        else_=FactConvAppmarket.广告计划ID
+        else_=cast(type_coerce(FactConvAppmarket.广告计划ID, String), String)
     ).label('plan_key')
 
     funnels = [

@@ -6,6 +6,7 @@ from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls
+from backend.utils.dialect_helpers import make_period_expr
 
 bp = Blueprint('trend', __name__)
 
@@ -21,12 +22,7 @@ def get_trend():
     start_date = filters.get('start_date') or (filters.get('date_range', [None, None])[0] if filters.get('date_range') else None)
     end_date = filters.get('end_date') or (filters.get('date_range', [None, None])[1] if filters.get('date_range') else None)
 
-    if granularity == 'weekly':
-        period = func.strftime('%Y-%W', AggVendorDaily.日期).label('period')
-    elif granularity == 'monthly':
-        period = func.strftime('%Y-%m', AggVendorDaily.日期).label('period')
-    else:
-        period = AggVendorDaily.日期.label('period')
+    period = make_period_expr(AggVendorDaily.日期, granularity).label('period')
 
     metric_map = {
         'cost': AggVendorDaily.花费,

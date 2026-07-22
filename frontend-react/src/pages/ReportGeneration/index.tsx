@@ -22,6 +22,7 @@ import type { EChartsType } from 'echarts/core';
 import type { EChartsOption } from 'echarts';
 import '@/components/Chart/ECharts'; // 触发 echarts.use 副作用（幂等）
 import { FadeInSection } from '@/components';
+import { http } from '@/services/http'; // feat-local-auth：用 http 客户端自动带 Authorization
 import styles from './index.module.scss';
 
 // 类型定义
@@ -255,17 +256,17 @@ const ReportGeneration: React.FC = () => {
   const loadWeekOptions = useCallback(async () => {
     try {
       setPeriodsLoading(true);
-      const response = await fetch('/api/v1/reports/weekly/periods');
-      const result = await response.json();
-      if (result.success) {
-        setPeriodOptions(result.data || []);
-        const first = (result.data || []).find((o: PeriodOption) => !o.disabled);
+      // feat-local-auth：用 http 客户端自动带 Authorization 头，避免 401
+      const resp = await http.get<PeriodOption[]>('/reports/weekly/periods');
+      if (resp.success && resp.data) {
+        setPeriodOptions(resp.data);
+        const first = resp.data.find((o) => !o.disabled);
         if (first) {
           setSelectedPeriod(first);
           handleLoadData(first);
         }
       } else {
-        message.error('加载报告期失败');
+        message.error(resp.message || '加载报告期失败');
       }
     } catch (error) {
       console.error('加载报告期失败:', error);
@@ -280,19 +281,15 @@ const ReportGeneration: React.FC = () => {
     if (!period) return;
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/reports/weekly/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          report_year: period.report_year,
-          report_week: period.report_week,
-        }),
+      // feat-local-auth：用 http 客户端自动带 Authorization 头
+      const resp = await http.post<WeeklyData>('/reports/weekly/data', {
+        report_year: period.report_year,
+        report_week: period.report_week,
       });
-      const result = await response.json();
-      if (result.success) {
-        setWeeklyData(result.data);
+      if (resp.success && resp.data) {
+        setWeeklyData(resp.data);
       } else {
-        message.error(result.error || '生成周报失败');
+        message.error(resp.error || '生成周报失败');
       }
     } catch (error) {
       console.error('生成周报失败:', error);

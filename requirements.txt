@@ -25,5 +25,13 @@ requests==2.34.2
 webdavclient3==3.14.7
 lxml==6.1.1
 
+# feat-desktop-supabase：Supabase PostgreSQL + Auth 依赖
+psycopg[binary]>=3.2,<4
+supabase>=2.7,<3
+
+# feat-local-auth 方案 A：本地 JWT 鉴权（不依赖 Supabase Auth API）
+PyJWT>=2.8,<3
+werkzeug>=3.0,<4
+
 # 可选：Swagger/OpenAPI 文档（app.py 已对缺失做兼容，装了才有 /apidocs）
 # flasgger

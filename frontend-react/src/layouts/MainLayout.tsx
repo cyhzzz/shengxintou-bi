@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Layout, Menu, Tooltip } from 'antd';
+import { useState, useMemo } from 'react';
+import { Layout, Menu, Tooltip, Button, Dropdown, Modal, Form, Input, App as AntApp } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import {
@@ -32,6 +32,10 @@ import {
 import { HelpModal } from '@/components';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { logout, changePassword } from '@/services/auth';
+import { useEffect } from 'react';
+import { fetchMe } from '@/services/auth';
 import type { MenuProps } from 'antd';
 import styles from './MainLayout.module.scss';
 
@@ -156,9 +160,74 @@ const findLabel = (items: MenuProps['items'], key: string): string => {
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  // v3.4.1：桌面版（Electron）隐藏"数据同步"菜单（不和坚果云互通）
+  const isDesktop = useMemo(() => navigator.userAgent.includes('Electron'), []);
+  const visibleMenuItems = useMemo(() => {
+    if (!isDesktop) return menuItems;
+    return (menuItems || []).map(item => {
+      if (!item || typeof item !== 'object') return item;
+      const it = item as any;
+      if (it.key !== 'system') return item;
+      return {
+        ...it,
+        children: (it.children || []).filter((c: any) => c?.key !== '/system/database-backup'),
+      };
+    }) as MenuProps['items'];
+  }, [isDesktop]);
   const navigate = useNavigate();
   const location = useLocation();
   const { themeMode, toggleTheme } = useAppStore();
+
+  // feat-desktop：右上角账号下拉 → 修改密码
+  const [pwdModalOpen, setPwdModalOpen] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+  const [pwdForm] = Form.useForm<{ old_password: string; new_password: string; confirm_password: string }>();
+  const { message: antdMessage } = AntApp.useApp();
+
+  // feat-cloud-supabase：右上角"当前账号 + 退出"
+  const email = useAuthStore((s) => s.email);
+  const profile = useAuthStore((s) => s.profile);
+  useEffect(() => {
+    // 进入布局时拉一次当前用户元数据
+    fetchMe().catch(() => {/* 静默失败 */});
+  }, []);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+  const handleOpenChangePwd = () => {
+    pwdForm.resetFields();
+    setPwdModalOpen(true);
+  };
+  const handleChangePwdOk = async () => {
+    try {
+      const values = await pwdForm.validateFields();
+      if (values.new_password !== values.confirm_password) {
+        antdMessage.error('两次输入的新密码不一致');
+        return;
+      }
+      if (values.old_password === values.new_password) {
+        antdMessage.warning('新密码不能与原密码相同');
+        return;
+      }
+      setPwdSubmitting(true);
+      try {
+        await changePassword(values.old_password, values.new_password);
+        antdMessage.success('密码修改成功，请重新登录');
+        setPwdModalOpen(false);
+        // 改完密码强制重新登录
+        await logout();
+        navigate('/login', { replace: true });
+      } catch (e: unknown) {
+        const err = e as { message?: string };
+        antdMessage.error(err.message || '修改密码失败');
+      } finally {
+        setPwdSubmitting(false);
+      }
+    } catch {
+      /* validateFields 已显示具体错误 */
+    }
+  };
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     navigate(key);
@@ -207,7 +276,7 @@ export default function MainLayout() {
           mode="inline"
           selectedKeys={getSelectedKeys()}
           defaultOpenKeys={getOpenKeys()}
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={handleMenuClick}
           className={styles.menu}
         />
@@ -231,6 +300,22 @@ export default function MainLayout() {
                 {themeMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
               </button>
             </Tooltip>
+            <Dropdown
+              menu={{
+                items: [
+                  { key: 'email', label: email || '未登录', disabled: true },
+                  ...(profile?.role ? [{ key: 'role', label: `角色：${profile.role}`, disabled: true }] : []),
+                  { type: 'divider' as const },
+                  { key: 'change-password', label: '修改密码', onClick: handleOpenChangePwd },
+                  { key: 'logout', label: '退出', onClick: handleLogout },
+                ],
+              }}
+              placement="bottomRight"
+            >
+              <Button type="text" size="small">
+                {(email || '账号').split('@')[0]}
+              </Button>
+            </Dropdown>
             <HelpModal />
           </div>
         </Header>
@@ -240,6 +325,56 @@ export default function MainLayout() {
           </LazyMotion>
         </Content>
       </Layout>
+
+      {/* feat-desktop：修改自己的密码（无 admin 角色显示） */}
+      <Modal
+        title="修改密码"
+        open={pwdModalOpen}
+        onOk={handleChangePwdOk}
+        onCancel={() => setPwdModalOpen(false)}
+        confirmLoading={pwdSubmitting}
+        okText="确认修改"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={pwdForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="old_password"
+            label="原密码"
+            rules={[{ required: true, message: '请输入原密码' }]}
+          >
+            <Input.Password autoComplete="current-password" placeholder="原密码" />
+          </Form.Item>
+          <Form.Item
+            name="new_password"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 6, message: '新密码至少 6 位' },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder="新密码（至少 6 位）" />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label="确认新密码"
+            dependencies={['new_password']}
+            rules={[
+              { required: true, message: '请再次输入新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('new_password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的新密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 }

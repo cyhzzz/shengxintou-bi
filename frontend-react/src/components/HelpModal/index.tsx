@@ -24,6 +24,9 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const { message: antdMessage } = AntApp.useApp();
+  // feat-desktop：客户端（Electron）环境标志，用于隐藏 git pull 自更新入口
+  // 客户端通过安装包分发更新，不再走 GitHub 源码热更新
+  const isDesktopClient = Boolean((window as unknown as { desktop?: unknown }).desktop);
   // v3.1.17: 自更新状态机
   const [gitBusy, setGitBusy] = useState(false);
   const [gitStatus, setGitStatus] = useState<{
@@ -310,16 +313,25 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           ，可用 git pull 拉取最新代码
                         </Text>
                       </div>
-                      <Button
-                        type="primary"
-                        icon={<CloudDownloadOutlined />}
-                        loading={gitBusy}
-                        onClick={() => startSelfUpdate(true)}
-                        className={styles.updateBtn}
-                        block
-                      >
-                        {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
-                      </Button>
+                      {isDesktopClient ? (
+                        // feat-desktop：客户端环境提示用户用安装包更新
+                        <div className={styles.updateTip} style={{ marginTop: 8, padding: 8, background: 'var(--bg-secondary, #f5f5f5)', borderRadius: 4 }}>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            桌面客户端版本不通过 git pull 自更新，请从仓库 Releases 页面下载新安装包覆盖安装。
+                          </Text>
+                        </div>
+                      ) : (
+                        <Button
+                          type="primary"
+                          icon={<CloudDownloadOutlined />}
+                          loading={gitBusy}
+                          onClick={() => startSelfUpdate(true)}
+                          className={styles.updateBtn}
+                          block
+                        >
+                          {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
+                        </Button>
+                      )}
                     </div>
 
                   </div>

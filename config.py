@@ -19,9 +19,70 @@ else:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # 数据库配置
+# feat-cloud-supabase：DATABASE_URL 优先于 DATABASE_PATH。
+#   - 设置 DATABASE_URL（postgresql+psycopg://...）→ 走 Postgres（默认连 Supabase）
+#   - 未设置 → 走 SQLite，路径由 DATABASE_PATH 控制
 DATABASE_PATH = os.path.join(BASE_DIR, os.getenv('DATABASE_PATH', 'database/shengxintou.db'))
-SQLALCHEMY_DATABASE_URI = f'sqlite:///{DATABASE_PATH}'
+# feat-desktop-supabase：归一化 DATABASE_URL 前缀。
+# Supabase Dashboard 复制的连接串默认是 postgres://，SQLAlchemy 不认（只认 postgresql）。
+# 统一改为 postgresql+psycopg://，确保用 psycopg 驱动。
+_raw_db_url = os.getenv('DATABASE_URL', '').strip()
+if _raw_db_url.startswith('postgres://'):
+    _raw_db_url = 'postgresql+psycopg://' + _raw_db_url[len('postgres://'):]
+elif _raw_db_url.startswith('postgresql://') and '+' not in _raw_db_url.split('://', 1)[0]:
+    _raw_db_url = 'postgresql+psycopg://' + _raw_db_url[len('postgresql://'):]
+DATABASE_URL = _raw_db_url or None
+SQLALCHEMY_DATABASE_URI = DATABASE_URL or f'sqlite:///{DATABASE_PATH}'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+# 记录当前 dialect 字符串（不含 URL 中的凭据），启动日志用。
+# 用 SQLAlchemy 的 make_url 解析；解析失败记 'unknown'。
+def _resolve_dialect():
+    try:
+        from sqlalchemy.engine.url import make_url
+        url = make_url(SQLALCHEMY_DATABASE_URI)
+        # sqlalchemy.make_url 会把 password 替换成 *** 暴露，这里只取 drivername
+        return (url.drivername or '').split('+')[0] or 'sqlite'
+    except Exception:
+        return 'unknown'
+DATABASE_DIALECT = _resolve_dialect()
+# feat-desktop-supabase：PG（Supabase）需要连接池保活配置，避免空闲超时被踢。
+# SQLite 不支持这些参数，按 dialect 条件设置。
+if DATABASE_DIALECT == 'postgresql':
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,       # 每次借连接前 ping，避免用已断开的连接
+        'pool_recycle': 300,         # 5 分钟回收（小于 Supabase 默认空闲超时）
+        'pool_size': 5,
+        'max_overflow': 5,
+        # feat-desktop：Supabase 用 PgBouncer transit 时多会话会复用一个 connection 的 prepared statement 名字，
+        # 触发 `DuplicatePreparedStatement: prepared statement "_pg3_0" already exists`。
+        # 关掉 psycopg 自动 prepared statement（每个 query 不缓存执行计划），
+        # 改由 Supabase PgBouncer / PG 自有 plan cache 优化，避开 prepared statement 命名冲突。
+        'connect_args': {'prepare_threshold': None},
+    }
+else:
+    SQLALCHEMY_ENGINE_OPTIONS = {}
+
+# Supabase / 云端 DB 配置（feat-cloud-supabase）
+# SUPABASE_URL 与 SUPABASE_*_KEY 不会进日志或异常体，所有后续模块通过本模块取。
+# 凭据缺失仅启动期打 ERROR，不抛异常（兼容本地开发继续用 SQLite）。
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').strip() or None
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '').strip() or None
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip() or None
+# 鉴权总开关：true 时全局中间件强制 /api/v1/* 鉴权；false 时回退旧行为（本期开发期可临时 false 调试）
+AUTH_ENABLED = os.getenv('AUTH_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
+
+# feat-local-auth 方案 A：JWT 本地鉴权配置
+# - 不依赖 Supabase Auth API，完全本地签发/验证
+# - JWT_SECRET 用于签名 JWT（必须配置，建议生产用强随机值）
+# - JWT_EXPIRES_HOURS：JWT 过期时间（小时），默认 24
+SECRET_KEY = os.getenv('SECRET_KEY', os.urandom(32))
+JWT_SECRET = os.getenv('JWT_SECRET', '').strip() or SECRET_KEY
+JWT_EXPIRES_HOURS = float(os.getenv('JWT_EXPIRES_HOURS', '24'))
+
+# feat-local-auth 方案 A：默认 admin 账号
+# 首次启动时，如果 app_users 表为空，自动创建此账号
+DEFAULT_ADMIN_EMAIL = os.getenv('DEFAULT_ADMIN_EMAIL', 'admin@shengxintou.local')
+DEFAULT_ADMIN_PASSWORD = os.getenv('DEFAULT_ADMIN_PASSWORD', 'shengxintou2026')
 
 # 文件上传配置
 UPLOAD_FOLDER = os.path.join(BASE_DIR, os.getenv('UPLOAD_FOLDER', 'uploads'))

@@ -1,8 +1,11 @@
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom';
 import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import MainLayout from '@/layouts/MainLayout';
+import LoginPage from '@/pages/Login';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { registerUnauthorizedHandler } from '@/services/http';
 
 // v3.2.5：所有页面改 React.lazy 按需加载，主包只保留 MainLayout，
 // 首屏只拉当前路由对应的 chunk，避免一次加载全部 21 个页面 + 重型依赖（echarts/plots/framer-motion）。
@@ -22,6 +25,28 @@ function withSuspense(Comp: React.ComponentType<any>, props?: Record<string, any
     </Suspense>
   );
 }
+
+/**
+ * 受保护路由：未登录跳 /login?next=<当前位置>。
+ * v3.4.3：仅在桌面版（Electron）启用认证流程；Web 开发版直接放行（后端 AUTH_ENABLED=false 时不要求 token）。
+ *   - 桌面版（Electron）：无 token → 跳 /login
+ *   - Web 开发版（浏览器）：直接访问（无论后端 AUTH_ENABLED）
+ *   - 浏览器访问桌面版后端（AUTH_ENABLED=true）：401 拦截器跳 /login，/login 路由始终注册
+ */
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const token = useAuthStore((s) => s.accessToken);
+  const isDesktop = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+  if (isDesktop && !token) {
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
+  }
+  return <>{children}</>;
+}
+
+/** 401 拦截器需要：跳登录页。 */
+let _routerNavigate: ((to: string) => void) | null = null;
+export function authNavigate(to: string) { if (_routerNavigate) _routerNavigate(to); }
 
 const DashboardPage = lazy(() => import('@/pages/Dashboard'));
 const ConversionFunnelPage = lazy(() => import('@/pages/ConversionFunnel'));
@@ -56,8 +81,17 @@ const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'
 
 const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: '/',
-    element: <MainLayout />,
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Navigate to="/omni-channel" replace /> },
@@ -136,3 +170,6 @@ const router = createBrowserRouter([
 export default function AppRouter() {
   return <RouterProvider router={router} />;
 }
+
+/** 由 App.tsx 在登录组件挂载前后注册（用 useNavigate 替代当前 location） */
+export { registerUnauthorizedHandler };
