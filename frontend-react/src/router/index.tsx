@@ -55,6 +55,8 @@ const EmployeeConversionWeeklyPage = lazy(() => import('@/pages/EmployeeConversi
 const DataImportPage = lazy(() => import('@/pages/System/DataImport'));
 const AccountManagementPage = lazy(() => import('@/pages/System/AccountManagement'));
 const DatabaseBackupPage = lazy(() => import('@/pages/System/DatabaseBackup'));
+// v3.5.3：移动端简化版数据同步页（仅下载，替代桌面端 DatabaseBackup 复杂逻辑）
+const MobileDatabaseSyncPage = lazy(() => import('@/pages/System/MobileDatabaseSync'));
 const OmniChannelReportPage = lazy(() => import('@/pages/Reports/OmniChannel'));
 
 // 应用市场 v3.1: 拆为 4 个独立子报表
@@ -146,7 +148,8 @@ const mainChildren = [
     children: [
       { path: 'data-import', element: withSuspense(DataImportPage) },
       { path: 'account-management', element: withSuspense(AccountManagementPage) },
-      { path: 'database-backup', element: withSuspense(DatabaseBackupPage) },
+      // v3.5.3：移动端走简化版同步页（避免触发未实现的 /webdav/list 等 API）
+      { path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) },
     ],
   },
 ];

@@ -1,9 +1,10 @@
 {
-    "version": "3.5.2",
-    "release_date": "2026-07-22",
+    "version": "3.5.3",
+    "release_date": "2026-07-23",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.5.3 安卓端修复：内置 DB 兜底 + 重写移动端数据同步页（仅下载）+ transform:scale 缩放 + APK 中文名/版本号/应用图标对齐",
         "v3.5.2 安卓端修复：LOGO 图标切割 + 应用启动时初始化 SQLite + 移动端 CSS zoom 0.67 缩放",
         "v3.5.1 安卓端修复：内置 .env 坚果云配置 + 默认横屏 + LOGO 应用图标",
         "v3.5.0 新增 Android 移动端支持（Capacitor 7 + 本地 SQLite + 坚果云 WebDAV 同步），项目完成 Web/桌面/安卓三端编译 release 支持",

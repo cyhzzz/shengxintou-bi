@@ -4,7 +4,8 @@ import zhCN from 'antd/locale/zh_CN';
 import AppRouter from '@/router';
 import { useAppStore } from '@/stores/useAppStore';
 import { isMobileClient } from '@/utils/isDesktop';
-import { initMobileDatabase, databaseExists } from '@/services/mobileSqlite';
+import { initMobileDatabase, databaseExists, copyDatabaseFromAssets } from '@/services/mobileSqlite';
+import { syncFromWebDAV } from '@/services/mobileSync';
 import './styles/global.scss';
 
 // 亮色模式主题 — 显式设定所有颜色 token
@@ -152,25 +153,47 @@ function App() {
   }, [themeMode]);
 
   // 移动端：应用启动时初始化本地 SQLite 数据库
-  // 如果数据库文件已存在（已同步过数据），打开连接供报表查询使用
-  // 如果不存在，跳过初始化（等待用户先同步数据）
+  // v3.5.3 双保险方案：
+  //   1. DB 不存在 → 先 copyFromAssets 从 APK 内置 DB 初始化（开箱即用，无需联网）
+  //   2. 后台异步从坚果云拉取最新数据覆盖内置版本（保证数据最新）
   useEffect(() => {
     if (!isMobileClient()) return;
-    // 注入移动端缩放 class（v3.5.2：安卓横屏下前端整体偏大 1.5 倍）
-    document.body.classList.add('mobile-zoom');
+    // 注入移动端缩放 class（v3.5.3：transform: scale 方案，兼容 WebView）
+    document.documentElement.classList.add('mobile-scaled');
+    let cancelled = false;
     (async () => {
       try {
-        const exists = await databaseExists();
+        let exists = await databaseExists();
+        if (!exists) {
+          console.log('[mobile] 首次启动：从 APK 内置 assets 复制数据库...');
+          try {
+            await copyDatabaseFromAssets(false);
+            exists = true;
+            console.log('[mobile] 内置 DB 复制成功');
+          } catch (err) {
+            console.warn('[mobile] 内置 DB 复制失败，尝试从坚果云拉取:', err);
+            // 兜底：从坚果云拉取
+            const r = await syncFromWebDAV();
+            if (r.success) {
+              exists = true;
+              console.log('[mobile] 坚果云首次拉取成功');
+            } else {
+              console.warn('[mobile] 坚果云首次拉取失败:', r.message);
+            }
+          }
+        }
+        if (cancelled) return;
         if (exists) {
           await initMobileDatabase();
           console.log('[mobile] SQLite 数据库已初始化');
         } else {
-          console.log('[mobile] 数据库文件不存在，请先同步数据');
+          console.warn('[mobile] 数据库仍未就绪，请在"数据同步"页手动同步');
         }
       } catch (err) {
         console.error('[mobile] 数据库初始化失败:', err);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const isDark = themeMode === 'dark';

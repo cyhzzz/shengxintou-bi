@@ -1,12 +1,27 @@
 /**
  * 移动端 WebDAV 同步（坚果云）
  *
- * 从坚果云下载 .db 文件并替换本地 SQLite 数据库。
+ * v3.5.3 关键修复：
+ *   旧版直接用 Filesystem.writeFile(Directory.Data) 写入 .db，
+ *   但 SQLite 插件实际读取的目录是 /data/data/<pkg>/databases/，
+ *   导致同步下来的文件根本不会被 SQLite 读取。
+ *
+ *   本版本改为：
+ *     1. fetch 坚果云的 shengxintou.db
+ *     2. base64 编码后写到 Directory.Cache
+ *     3. 调用 SQLite 插件的 moveDatabasesAndAddSuffix('cache')
+ *        原生把 cache/shengxintou.db 移动到 databases/shengxintouSQLite.db
+ *
  * 凭据存储在 @capacitor/preferences 中，首次安装时使用打包时内置的 .env 默认值。
  */
 import { Preferences } from '@capacitor/preferences';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { closeMobileDatabase, initMobileDatabase } from './mobileSqlite';
+import {
+  closeMobileDatabase,
+  initMobileDatabase,
+  moveDatabaseFromCache,
+  deleteMobileDatabase,
+} from './mobileSqlite';
 
 // 打包时从项目根 .env 注入的内置默认值（v3.5.1）
 const BUILTIN_WEBDAV_URL = import.meta.env.VITE_WEBDAV_URL || '';
@@ -83,10 +98,10 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
   }
 
   try {
-    // 1. 关闭数据库连接
+    // 1. 关闭现有连接，避免文件锁
     await closeMobileDatabase();
 
-    // 2. 从坚果云下载 .db
+    // 2. 从坚果云下载 shengxintou.db
     const remotePath = creds.remoteDir
       ? `${creds.remoteDir}/shengxintou.db`
       : 'shengxintou.db';
@@ -104,18 +119,32 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
       return { success: false, message: `下载失败: HTTP ${response.status}` };
     }
 
-    // 3. 写入本地文件系统
+    // 3. base64 编码后写到 Cache 目录（/data/data/<pkg>/cache/）
+    //    文件名必须为 shengxintou.db（无 SQLite 后缀），moveDatabasesAndAddSuffix 会自动加后缀
     const blob = await response.blob();
     const base64 = await blobToBase64(blob);
 
+    // 3.1 先删除 cache 中可能残留的同名文件，避免 moveDatabasesAndAddSuffix 重复处理
+    try {
+      await Filesystem.deleteFile({ path: 'shengxintou.db', directory: Directory.Cache });
+    } catch {
+      /* file not exists is fine */
+    }
+
     await Filesystem.writeFile({
-      path: 'shengxintouSQLite.db',
+      path: 'shengxintou.db',
       data: base64,
-      directory: Directory.Data,
+      directory: Directory.Cache,
       recursive: true,
     });
 
-    // 4. 重新打开数据库
+    // 4. 删除现有 DB（如有），避免 move 时冲突
+    await deleteMobileDatabase();
+
+    // 5. 原生层把 cache/shengxintou.db 移到 databases/shengxintouSQLite.db
+    await moveDatabaseFromCache();
+
+    // 6. 重新打开数据库连接
     await initMobileDatabase();
 
     return {

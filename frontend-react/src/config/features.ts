@@ -64,7 +64,8 @@ const mobileFlags: FeatureFlags = {
   showGithubSyncButton: false,
   showDataImport: false,
   showAccountManagement: false,
-  showDatabaseBackup: false,
+  // v3.5.3：移动端开放数据同步菜单，进入简化版同步页（仅下载）
+  showDatabaseBackup: true,
   showReportGeneration: false,
 };
 
