@@ -17,7 +17,7 @@
  *   4. 365 天日历热力图（线索数 / 开户数 / 开户率 切换）
  *   5. 6 阶段业务漏斗 + 阶段转化明细表（整体/按主播 对比）
  *   6. 主播详情表（跨平台聚合 + 质效分级 Tag + expandable token 拆分）
- *   7. 主播产能对比柱图 / 量质剪刀差 / 主播×阶段热力图 / 雷达图 / 质效双高日 Top 10
+ *   7. 主播产能对比柱图 / 量质剪刀差 / 雷达图 / 质效双高日 Top 10
  *   8. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -35,7 +35,6 @@ import {
   ShoppingCartOutlined,
   BarChartOutlined,
   ScissorOutlined,
-  HeatMapOutlined,
   RadarChartOutlined,
   TrophyOutlined,
   BulbOutlined,
@@ -710,82 +709,6 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     };
   }, [trendData, trendGranularity]);
 
-  // v3.3.3 P1-10: 主播 × 漏斗阶段热力图（横向 6 阶段 × 纵向 N 主播，单元格 = 阶段转化率）
-  const anchorFunnelHeatmapOption: EChartsOption = useMemo(() => {
-    if (!anchorAggRows.length) return {};
-    const stages = [
-      { key: 'leads', label: '客户线索' },
-      { key: 'mouth', label: '客户开口' },
-      { key: 'valid_lead', label: '有效线索' },
-      { key: 'new_valid_lead', label: '有效(非存量)' },
-      { key: 'new_opened', label: '成功开户(新)' },
-      { key: 'new_valid', label: '有效户(新)' },
-    ] as const;
-    const rows = [...anchorAggRows].sort((a, b) => b.leads - a.leads);
-    const data: Array<[number, number, number]> = [];
-    rows.forEach((r, yIdx) => {
-      const values: Record<string, number> = {
-        leads: r.leads, mouth: r.mouth, valid_lead: r.valid_lead,
-        new_valid_lead: r.new_valid_lead, new_opened: r.new_opened, new_valid: r.new_valid,
-      };
-      stages.forEach((s, xIdx) => {
-        const cur = values[s.key] || 0;
-        const prev = xIdx > 0 ? values[stages[xIdx - 1].key] || 0 : cur;
-        const rate = prev > 0 ? +((cur / prev) * 100).toFixed(2) : 0;
-        data.push([xIdx, yIdx, rate]);
-      });
-    });
-    return {
-      tooltip: {
-        position: 'top',
-        formatter: (p: any) => {
-          const xName = stages[p.value[0]].label;
-          const yName = rows[p.value[1]]?.anchor || '-';
-          return `${yName}<br/>${xName}<br/>阶段转化率: <b>${Number(p.value[2]).toFixed(2)}%</b>`;
-        },
-      },
-      grid: { left: '3%', right: '4%', bottom: '5%', top: '5%', containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: stages.map((s) => s.label),
-        splitArea: { show: true },
-        axisLabel: { fontSize: 11, interval: 0, rotate: 0 },
-      },
-      yAxis: {
-        type: 'category',
-        data: rows.map((r) => r.anchor),
-        splitArea: { show: true },
-        axisLabel: { fontSize: 12 },
-      },
-      visualMap: {
-        min: 0,
-        max: 100,
-        calculable: true,
-        orient: 'horizontal',
-        left: 'center',
-        bottom: 0,
-        inRange: { color: ['#f5f5f5', '#ffd6e7', '#ff85c0', '#eb2f96', '#9e1068'] },
-        text: ['高', '低'],
-        textStyle: { fontSize: 11 },
-      },
-      series: [
-        {
-          name: '阶段转化率',
-          type: 'heatmap',
-          data,
-          label: {
-            show: true,
-            formatter: (p: any) => `${Number(p.value[2]).toFixed(0)}%`,
-            fontSize: 11,
-          },
-          emphasis: {
-            itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' },
-          },
-        },
-      ],
-    };
-  }, [anchorAggRows]);
-
   // v3.3.3 P3-5: 主播雷达图（5 维度归一化对比）
   // 维度：线索量/开口率/有效率/开户率/单线索资产，按各自维度 max 归一化到 0-100
   const radarOption: EChartsOption = useMemo(() => {
@@ -1195,31 +1118,6 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
         </FadeInSection>
 
         <FadeInSection delay={1.8} duration={0.8}>
-          <Card
-            size="small"
-            style={{ marginBottom: 16 }}
-            title={
-              <Space size={8} align="center">
-                <HeatMapOutlined style={{ color: 'var(--color-error)' }} />
-                <span>主播 × 漏斗阶段 热力图</span>
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-                  横向 6 阶段 × 纵向主播 · 单元格 = 阶段转化率(%)
-                </span>
-                <Tooltip title="单元格颜色越深表示该主播在该阶段转化率越高。便于一眼看出哪位主播在哪个阶段断档、哪位主播在开户阶段最强。">
-                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
-                </Tooltip>
-              </Space>
-            }
-          >
-            {anchorAggRows.length > 0 ? (
-              <EChartsComponent option={anchorFunnelHeatmapOption} height={Math.max(280, anchorAggRows.length * 80 + 80)} />
-            ) : (
-              <Empty description={'暂无主播数据'} />
-            )}
-          </Card>
-        </FadeInSection>
-
-        <FadeInSection delay={2.0} duration={0.8}>
           <Card title={`${meta.anchorLabel}详情（${anchorAggRows.length} 位主播·同名跨平台聚合）`} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序</span>}>
             {anchorAggRows.length > 0 ? (
               <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={false} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} expandable={{ expandedRowRender, rowExpandable: (r) => (r.sources?.length || 0) > 0 }} />

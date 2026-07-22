@@ -18,6 +18,7 @@ v2 原样导入处理器（无中间计算）
 4. 不派生冗余表（如 dim_vendor，直接从 dim_account 去重使用）
 """
 import os
+import io
 import re
 import numpy as np
 import pandas as pd
@@ -340,6 +341,39 @@ def process(data_type: str, file_path: str, **kwargs) -> dict:
     meta["data_type"] = data_type
     return {"tables": tables, "meta": meta}
 
+def _pg_copy_insert(df: pd.DataFrame, table_name: str, engine) -> None:
+    """用 PostgreSQL COPY 命令批量写入 DataFrame。
+
+    v3.4.2 性能优化：COPY 比 method='multi' INSERT 快 10 倍以上。
+    - 流式写入，不受 PG 参数上限（65535）限制
+    - 不需要分批提交（COPY 整体是一个事务，但写入是流式的）
+    - 原样导入场景适用：数据均为覆盖写入，列顺序与 DataFrame 一致
+    """
+    buf = io.StringIO()
+    # 写 CSV（无 header，NaN → 空字符串 = NULL）
+    df.to_csv(buf, index=False, header=False, na_rep='', date_format='%Y-%m-%d %H:%M:%S')
+    buf.seek(0)
+
+    columns = ', '.join(f'"{c}"' for c in df.columns)
+    sql = f"COPY \"{table_name}\" ({columns}) FROM STDIN WITH (FORMAT csv, NULL '')"
+
+    raw = engine.raw_connection()
+    try:
+        with raw.cursor() as cur:
+            with cur.copy(sql) as copy:
+                while True:
+                    chunk = buf.read(65536)
+                    if not chunk:
+                        break
+                    copy.write(chunk)
+        raw.commit()
+    except Exception:
+        raw.rollback()
+        raise
+    finally:
+        raw.close()
+
+
 def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) -> dict:
     """处理并写入新表。
 
@@ -350,6 +384,10 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
       会摧毁 PG 的 BIGSERIAL 序列、主键约束、index=True 索引；下次 ORM 插入必报错。
     - qingniao_leads 仍用纯 append（保留历史批次，不 DELETE）
     - 删除 sqlite_sequence 操作（SQLite 专属，PG 报错；DELETE + append 不需要重置序列）
+
+    v3.4.2 性能优化：
+    - PG 使用 COPY 命令替代 INSERT（20万行从 199s → 预计 <30s）
+    - SQLite 保持 to_sql（COPY 是 PG 专有命令）
     """
     result = process(data_type, file_path, **kwargs)
     tables = result["tables"]
@@ -367,26 +405,24 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     else:
         engine = create_engine(db_url)
     written = {}
-    # v3.4.1 性能修复：避免 engine.begin() 大事务（20万行单事务导致 PG 超时）
-    # - to_sql 加 method='multi' 批量参数化 INSERT（多行合并到一条 INSERT）
-    # - 加 chunksize=500 分批提交（每批独立事务，避免 PgBouncer statement_timeout）
-    # - PG 参数上限 65535，500 行 × 30 列 = 15000 参数，安全
     is_pg = str(engine.url).startswith(("postgresql://", "postgresql+psycopg://"))
-    chunk = 500 if is_pg else 1000
 
     with engine.connect() as conn:
         for table_name, df in tables.items():
             if data_type == "qingniao_leads":
                 # append 模式：保留历史批次数据，不 DELETE
-                df.to_sql(table_name, con=engine, if_exists="append", index=False,
-                          method='multi', chunksize=chunk)
+                if is_pg:
+                    _pg_copy_insert(df, table_name, engine)
+                else:
+                    df.to_sql(table_name, con=engine, if_exists="append", index=False, chunksize=1000)
             else:
                 # DELETE + append：清空旧数据但保留 ORM 表结构（主键/序列/索引）
                 conn.execute(text(f'DELETE FROM "{table_name}"'))
                 conn.commit()
-                # 用 engine 而非 conn，让 to_sql 自动分批提交（每 chunksize 行一个事务）
-                df.to_sql(table_name, con=engine, if_exists="append", index=False,
-                          method='multi', chunksize=chunk)
+                if is_pg:
+                    _pg_copy_insert(df, table_name, engine)
+                else:
+                    df.to_sql(table_name, con=engine, if_exists="append", index=False, chunksize=1000)
             cur = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
             n = cur.fetchone()[0]
             written[table_name] = n
