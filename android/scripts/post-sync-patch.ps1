@@ -8,7 +8,8 @@
 #   5. settings.gradle 加阿里云镜像（国内网络无法直连 maven.apache.org）
 #   6. gradle.properties 加 in-process kotlin + 关闭 daemon（避免 TRAE Sandbox 拦截 ~/.kotlin）
 #   7. gradle-wrapper.properties 改腾讯云镜像（services.gradle.org 超时）
-#   8. APK 打包后重命名为中文名（省心投-vX.Y.Z.apk）
+#   8. 内置 DB 打包进 APK assets（public/assets/databases/shengxintouSQLite.db）
+#   9. APK 打包后重命名为中文名（省心投-vX.Y.Z.apk）
 #
 # 注意：PowerShell 5.1 的 Set-Content -Encoding UTF8 会写 BOM，
 # Gradle 不支持 BOM，必须用 [System.IO.File]::WriteAllText 写无 BOM 的 UTF-8
@@ -190,29 +191,80 @@ if (Test-Path $wrapperPropsPath) {
     }
 }
 
+# ========== 8. 内置 DB 打包进 APK assets ==========
+# v3.5.3：SQLite 插件 UtilsFile.java 期望路径为 public/assets/databases/
+#         从 database/shengxintou.db 复制到 APK assets 最终位置 + Vite public 目录
+#         首次启动时 copyFromAssets(false) 即可初始化本地 DB
+$sourceDb = Join-Path $PSScriptRoot "..\..\database\shengxintou.db"
+if (-not (Test-Path $sourceDb)) {
+    # 兜底：从 frontend-react/public 旧位置取
+    $sourceDb = Join-Path $PSScriptRoot "..\..\frontend-react\public\databases\shengxintouSQLite.db"
+}
+if (Test-Path $sourceDb) {
+    # APK assets 最终位置（cap sync 后 dist 内容已复制到此，再补 DB）
+    $apkAssetsDir = Join-Path $androidNativeDir "app\src\main\assets\public\assets\databases"
+    New-Item -ItemType Directory -Force -Path $apkAssetsDir | Out-Null
+    $apkDst = Join-Path $apkAssetsDir "shengxintouSQLite.db"
+    Copy-Item -Path $sourceDb -Destination $apkDst -Force
+    $sizeMB = [math]::Round((Get-Item $apkDst).Length / 1MB, 2)
+    Write-Output "[patch] APK assets DB: $apkDst ($sizeMB MB)"
+
+    # 同步到 Vite public 目录，让下次 npm run build 也包含
+    $vitePublicDir = Join-Path $PSScriptRoot "..\..\frontend-react\public\assets\databases"
+    New-Item -ItemType Directory -Force -Path $vitePublicDir | Out-Null
+    $viteDst = Join-Path $vitePublicDir "shengxintouSQLite.db"
+    Copy-Item -Path $sourceDb -Destination $viteDst -Force
+    Write-Output "[patch] Vite public DB: $viteDst"
+
+    # 清理旧位置（避免重复打包）
+    $oldPublicDb = Join-Path $PSScriptRoot "..\..\frontend-react\public\databases\shengxintouSQLite.db"
+    if ((Test-Path $oldPublicDb) -and ($oldPublicDb -ne $sourceDb)) {
+        Remove-Item $oldPublicDb -Force
+        Write-Output "[patch] removed old public/databases/shengxintouSQLite.db"
+    }
+} else {
+    Write-Output "[warn] source DB not found: database/shengxintou.db — 内置 DB 不会打包"
+}
+
 Write-Output "[done] post-sync-patch complete"
 
-# ========== 8. 打包后重命名 APK（中文名） ==========
+# ========== 9. 打包后重命名 APK（中文名） ==========
 # build.gradle 中 outputFileName 用 ASCII（shengxintou-vX.Y.Z.apk），
-# 打包完成后由本函数重命名为中文（省心投-vX.Y.Z.apk）
-# 此函数不在 sync 时调用，而是由 build 脚本在 assembleRelease 后调用
+# 打包完成后由本函数重命名为中文（省心投-vX.Y.Z.apk）并复制到 android/release/
+# v3.5.3：改用 assembleDebug（debug keystore 自动签名），默认搜 debug 目录
+# 此函数不在 sync 时调用，而是由 build 脚本在 assembleDebug 后调用
 function Rename-ApkToChinese {
     param([string]$ApkDir = "")
+    # 优先 debug 目录（v3.5.3 起用 debug 签名），兜底 release 目录
+    $debugDir = Join-Path $androidNativeDir "app\build\outputs\apk\debug"
+    $releaseDir = Join-Path $androidNativeDir "app\build\outputs\apk\release"
     if (-not $ApkDir) {
-        $ApkDir = Join-Path $androidNativeDir "app\build\outputs\apk\release"
+        if (Test-Path $debugDir) {
+            $ApkDir = $debugDir
+        } else {
+            $ApkDir = $releaseDir
+        }
     }
     if (-not (Test-Path $ApkDir)) {
-        Write-Output "[skip] Rename-ApkToChinese: apk release dir not found"
+        Write-Output "[skip] Rename-ApkToChinese: apk dir not found"
         return
     }
     $apk = Get-ChildItem -Path $ApkDir -Filter "shengxintou-v*.apk" -Recurse | Select-Object -First 1
+    if (-not $apk) {
+        # 兜底：app-debug.apk
+        $apk = Get-ChildItem -Path $ApkDir -Filter "app-debug.apk" -Recurse | Select-Object -First 1
+    }
     if (-not $apk) {
         Write-Output "[skip] Rename-ApkToChinese: shengxintou-v*.apk not found"
         return
     }
     $newName = $apk.Name -replace '^shengxintou-', '省心投-'
-    $newPath = Join-Path $apk.DirectoryName $newName
-    if (Test-Path $newPath) { Remove-Item $newPath -Force }
-    Rename-Item -Path $apk.FullName -NewName $newName
-    Write-Output "[done] APK renamed: $($apk.Name) -> $newName"
+    $newName = $newName -replace '^app-debug', '省心投-debug'
+    # 复制到 android/release/（项目约定输出位置）
+    $releaseOutDir = Join-Path $PSScriptRoot "..\release"
+    New-Item -ItemType Directory -Force -Path $releaseOutDir | Out-Null
+    $finalPath = Join-Path $releaseOutDir $newName
+    Copy-Item -Path $apk.FullName -Destination $finalPath -Force
+    $sizeMB = [math]::Round((Get-Item $finalPath).Length / 1MB, 2)
+    Write-Output "[done] APK copied: $($apk.Name) -> $finalPath ($sizeMB MB)"
 }
