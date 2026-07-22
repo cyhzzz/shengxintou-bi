@@ -367,15 +367,26 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     else:
         engine = create_engine(db_url)
     written = {}
-    with engine.begin() as conn:
+    # v3.4.1 性能修复：避免 engine.begin() 大事务（20万行单事务导致 PG 超时）
+    # - to_sql 加 method='multi' 批量参数化 INSERT（多行合并到一条 INSERT）
+    # - 加 chunksize=500 分批提交（每批独立事务，避免 PgBouncer statement_timeout）
+    # - PG 参数上限 65535，500 行 × 30 列 = 15000 参数，安全
+    is_pg = str(engine.url).startswith(("postgresql://", "postgresql+psycopg://"))
+    chunk = 500 if is_pg else 1000
+
+    with engine.connect() as conn:
         for table_name, df in tables.items():
             if data_type == "qingniao_leads":
                 # append 模式：保留历史批次数据，不 DELETE
-                df.to_sql(table_name, con=conn, if_exists="append", index=False)
+                df.to_sql(table_name, con=engine, if_exists="append", index=False,
+                          method='multi', chunksize=chunk)
             else:
                 # DELETE + append：清空旧数据但保留 ORM 表结构（主键/序列/索引）
                 conn.execute(text(f'DELETE FROM "{table_name}"'))
-                df.to_sql(table_name, con=conn, if_exists="append", index=False)
+                conn.commit()
+                # 用 engine 而非 conn，让 to_sql 自动分批提交（每 chunksize 行一个事务）
+                df.to_sql(table_name, con=engine, if_exists="append", index=False,
+                          method='multi', chunksize=chunk)
             cur = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
             n = cur.fetchone()[0]
             written[table_name] = n

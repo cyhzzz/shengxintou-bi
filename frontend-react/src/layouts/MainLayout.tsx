@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Layout, Menu, Tooltip, Button, Dropdown, Modal, Form, Input, App as AntApp } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LazyMotion, domAnimation } from 'framer-motion';
@@ -160,6 +160,20 @@ const findLabel = (items: MenuProps['items'], key: string): string => {
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  // v3.4.1：桌面版（Electron）隐藏"数据同步"菜单（不和坚果云互通）
+  const isDesktop = useMemo(() => navigator.userAgent.includes('Electron'), []);
+  const visibleMenuItems = useMemo(() => {
+    if (!isDesktop) return menuItems;
+    return (menuItems || []).map(item => {
+      if (!item || typeof item !== 'object') return item;
+      const it = item as any;
+      if (it.key !== 'system') return item;
+      return {
+        ...it,
+        children: (it.children || []).filter((c: any) => c?.key !== '/system/database-backup'),
+      };
+    }) as MenuProps['items'];
+  }, [isDesktop]);
   const navigate = useNavigate();
   const location = useLocation();
   const { themeMode, toggleTheme } = useAppStore();
@@ -262,7 +276,7 @@ export default function MainLayout() {
           mode="inline"
           selectedKeys={getSelectedKeys()}
           defaultOpenKeys={getOpenKeys()}
-          items={menuItems}
+          items={visibleMenuItems}
           onClick={handleMenuClick}
           className={styles.menu}
         />
