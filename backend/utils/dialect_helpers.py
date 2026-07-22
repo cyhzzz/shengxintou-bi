@@ -8,7 +8,8 @@ feat-desktop-supabase：切到 Supabase PG 后，原 SQLite 专属语法会报�
 
 集中在本模块，让报表路由保持 dialect 无关。
 """
-from sqlalchemy import func, literal
+from sqlalchemy import func, literal, cast
+from sqlalchemy.types import Date
 from sqlalchemy.sql.elements import ColumnElement
 
 from backend.database import db
@@ -58,10 +59,13 @@ def make_week_start_expr(col):
 
     SQLite: date(col, 'weekday 0', '-6 days') = col 所在周周一（周一为 weekday 0）
     PG:     date_trunc('week', col::date) = 所在周周一（PG 默认周一为周首日）
+
+    feat-cloud-supabase：日期字段在 ORM 里是 Text（'YYYY-MM-DD'），
+    PG 必须显式 ::date cast 才能传给 date_trunc；SQLite 直接 date() 自带隐式转换。
     """
     d = _dialect()
     if d == 'postgresql':
-        # PG date_trunc 返回 timestamp，cast 为 date 与 SQLite 行为对齐
-        return func.date_trunc('week', col)
+        # PG date_trunc 接收 timestamp/date；Text 必须显式 cast
+        return func.date_trunc('week', cast(col, Date))
     # SQLite 专属修饰符，PG 不支持
     return func.date(col, 'weekday 0', '-6 days')

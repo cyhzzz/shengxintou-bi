@@ -53,6 +53,11 @@ if DATABASE_DIALECT == 'postgresql':
         'pool_recycle': 300,         # 5 分钟回收（小于 Supabase 默认空闲超时）
         'pool_size': 5,
         'max_overflow': 5,
+        # feat-desktop：Supabase 用 PgBouncer transit 时多会话会复用一个 connection 的 prepared statement 名字，
+        # 触发 `DuplicatePreparedStatement: prepared statement "_pg3_0" already exists`。
+        # 关掉 psycopg 自动 prepared statement（每个 query 不缓存执行计划），
+        # 改由 Supabase PgBouncer / PG 自有 plan cache 优化，避开 prepared statement 命名冲突。
+        'connect_args': {'prepare_threshold': None},
     }
 else:
     SQLALCHEMY_ENGINE_OPTIONS = {}

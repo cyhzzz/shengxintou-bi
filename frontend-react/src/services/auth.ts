@@ -55,6 +55,20 @@ export async function logout(): Promise<void> {
   useAuthStore.getState().clear();
 }
 
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const resp = await http.post<{ message: string }>('/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  });
+  if (!resp.success) {
+    const code = resp.error || 'UNKNOWN';
+    const msg = resp.message || '修改密码失败';
+    const err = new Error(`${code}: ${msg}`);
+    (err as Error & { code?: string }).code = code;
+    throw err;
+  }
+}
+
 export async function fetchMe(): Promise<MeResponse | null> {
   const resp = await http.get<MeResponse>('/auth/me');
   if (!resp.success || !resp.data) return null;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layout, Menu, Tooltip, Button, Dropdown } from 'antd';
+import { Layout, Menu, Tooltip, Button, Dropdown, Modal, Form, Input, App as AntApp } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LazyMotion, domAnimation } from 'framer-motion';
 import {
@@ -33,7 +33,7 @@ import { HelpModal } from '@/components';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { logout } from '@/services/auth';
+import { logout, changePassword } from '@/services/auth';
 import { useEffect } from 'react';
 import { fetchMe } from '@/services/auth';
 import type { MenuProps } from 'antd';
@@ -164,6 +164,12 @@ export default function MainLayout() {
   const location = useLocation();
   const { themeMode, toggleTheme } = useAppStore();
 
+  // feat-desktop：右上角账号下拉 → 修改密码
+  const [pwdModalOpen, setPwdModalOpen] = useState(false);
+  const [pwdSubmitting, setPwdSubmitting] = useState(false);
+  const [pwdForm] = Form.useForm<{ old_password: string; new_password: string; confirm_password: string }>();
+  const { message: antdMessage } = AntApp.useApp();
+
   // feat-cloud-supabase：右上角"当前账号 + 退出"
   const email = useAuthStore((s) => s.email);
   const profile = useAuthStore((s) => s.profile);
@@ -174,6 +180,39 @@ export default function MainLayout() {
   const handleLogout = async () => {
     await logout();
     navigate('/login', { replace: true });
+  };
+  const handleOpenChangePwd = () => {
+    pwdForm.resetFields();
+    setPwdModalOpen(true);
+  };
+  const handleChangePwdOk = async () => {
+    try {
+      const values = await pwdForm.validateFields();
+      if (values.new_password !== values.confirm_password) {
+        antdMessage.error('两次输入的新密码不一致');
+        return;
+      }
+      if (values.old_password === values.new_password) {
+        antdMessage.warning('新密码不能与原密码相同');
+        return;
+      }
+      setPwdSubmitting(true);
+      try {
+        await changePassword(values.old_password, values.new_password);
+        antdMessage.success('密码修改成功，请重新登录');
+        setPwdModalOpen(false);
+        // 改完密码强制重新登录
+        await logout();
+        navigate('/login', { replace: true });
+      } catch (e: unknown) {
+        const err = e as { message?: string };
+        antdMessage.error(err.message || '修改密码失败');
+      } finally {
+        setPwdSubmitting(false);
+      }
+    } catch {
+      /* validateFields 已显示具体错误 */
+    }
   };
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -253,6 +292,7 @@ export default function MainLayout() {
                   { key: 'email', label: email || '未登录', disabled: true },
                   ...(profile?.role ? [{ key: 'role', label: `角色：${profile.role}`, disabled: true }] : []),
                   { type: 'divider' as const },
+                  { key: 'change-password', label: '修改密码', onClick: handleOpenChangePwd },
                   { key: 'logout', label: '退出', onClick: handleLogout },
                 ],
               }}
@@ -271,6 +311,56 @@ export default function MainLayout() {
           </LazyMotion>
         </Content>
       </Layout>
+
+      {/* feat-desktop：修改自己的密码（无 admin 角色显示） */}
+      <Modal
+        title="修改密码"
+        open={pwdModalOpen}
+        onOk={handleChangePwdOk}
+        onCancel={() => setPwdModalOpen(false)}
+        confirmLoading={pwdSubmitting}
+        okText="确认修改"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={pwdForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="old_password"
+            label="原密码"
+            rules={[{ required: true, message: '请输入原密码' }]}
+          >
+            <Input.Password autoComplete="current-password" placeholder="原密码" />
+          </Form.Item>
+          <Form.Item
+            name="new_password"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 6, message: '新密码至少 6 位' },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder="新密码（至少 6 位）" />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label="确认新密码"
+            dependencies={['new_password']}
+            rules={[
+              { required: true, message: '请再次输入新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('new_password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的新密码不一致'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password autoComplete="new-password" placeholder="再次输入新密码" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 }
