@@ -78,7 +78,7 @@ backend/auth/                  JWT 本地鉴权（AUTH_ENABLED 开关控制）
 backend/processors/v2/         唯一业务导入处理器（PG 用 COPY / SQLite 用 to_sql）
 backend/routes/data/           通用查询与对账
 backend/routes/reports/        全渠道、应用市场专题报表
-backend/routes/system/         自更新
+backend/routes/system/         自更新、数据同步（SQLite ↔ PG 双向同步）
 backend/scripts/               一次性脚本（SQLite→PG 迁移等）
 backend/utils/                 异常、代理商、WebDAV、周报工具、方言辅助
 ```
@@ -92,15 +92,16 @@ backend/utils/                 异常、代理商、WebDAV、周报工具、方�
 ### 前端
 
 ```text
-frontend-react/src/router/      lazy 路由与旧路径重定向（ProtectedRoute 仅 Electron 启用）
-frontend-react/src/layouts/     主布局、菜单与滚动容器（isDesktop 运行时判断菜单显隐）
+frontend-react/src/router/      lazy 路由与旧路径重定向（ProtectedRoute 仅桌面版启用）
+frontend-react/src/layouts/     主布局、菜单与滚动容器（featureFlags 控制菜单显隐）
 frontend-react/src/pages/       报表与系统页面（含 Login 页面）
 frontend-react/src/components/  共享组件
+frontend-react/src/config/      功能开关（features.ts：Web 版 vs 桌面版显隐配置）
 frontend-react/src/services/    HTTP（自动注入 Bearer token）、数据、上传、元数据、版本、auth
 frontend-react/src/stores/      Zustand 状态（含 useAuthStore）
 frontend-react/src/types/       业务类型与生成类型
 frontend-react/src/styles/      token、变量和全局样式
-frontend-react/src/utils/       筛选、文本清洗和图表工具
+frontend-react/src/utils/       筛选、文本清洗、图表工具、环境判断（isDesktop）
 ```
 
 ### 桌面版（Electron）
@@ -124,7 +125,7 @@ server_entry.py                 桌面版 Flask 入口（frozen 模式路径解�
 
 - 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
 - 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
-- 前端运行时判断：`navigator.userAgent.includes('Electron')` 控制菜单显隐 + ProtectedRoute。
+- 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 功能开关控制菜单显隐与 ProtectedRoute。
 - 桌面版打包：`scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）。
 
 ## 6. 按任务读取规则

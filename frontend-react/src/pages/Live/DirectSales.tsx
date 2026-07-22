@@ -17,7 +17,7 @@
  *   4. 365 天日历热力图（线索数 / 开户数 / 开户率 切换）
  *   5. 6 阶段业务漏斗 + 阶段转化明细表（整体/按主播 对比）
  *   6. 主播详情表（跨平台聚合 + 质效分级 Tag + expandable token 拆分）
- *   7. 主播产能对比柱图 / 量质剪刀差 / 雷达图 / 质效双高日 Top 10
+ *   7. 主播产能对比柱图 / 量质剪刀差 / 质效双高日 Top 10
  *   8. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -35,7 +35,6 @@ import {
   ShoppingCartOutlined,
   BarChartOutlined,
   ScissorOutlined,
-  RadarChartOutlined,
   TrophyOutlined,
   BulbOutlined,
   SolutionOutlined,
@@ -709,52 +708,6 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     };
   }, [trendData, trendGranularity]);
 
-  // v3.3.3 P3-5: 主播雷达图（5 维度归一化对比）
-  // 维度：线索量/开口率/有效率/开户率/单线索资产，按各自维度 max 归一化到 0-100
-  const radarOption: EChartsOption = useMemo(() => {
-    if (!anchorAggRows.length) return {};
-    const rows = [...anchorAggRows].sort((a, b) => b.leads - a.leads);
-    const indicators = [
-      { name: '线索量', max: Math.max(...rows.map((r) => r.leads), 1) },
-      { name: '开口率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.mouth / r.leads) * 100 : 0)), 100) },
-      { name: '新有效率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.new_valid / r.leads) * 100 : 0)), 100) },
-      { name: '新开户率(%)', max: Math.max(...rows.map((r) => (r.leads ? (r.new_opened / r.leads) * 100 : 0)), 100) },
-      { name: '单线索资产', max: Math.max(...rows.map((r) => (r.leads ? r.new_assets / r.leads : 0)), 1) },
-    ];
-    const series = rows.map((r, idx) => ({
-      name: r.anchor,
-      value: [
-        r.leads,
-        r.leads ? +((r.mouth / r.leads) * 100).toFixed(2) : 0,
-        r.leads ? +((r.new_valid / r.leads) * 100).toFixed(2) : 0,
-        r.leads ? +((r.new_opened / r.leads) * 100).toFixed(2) : 0,
-        r.leads ? +(r.new_assets / r.leads).toFixed(0) : 0,
-      ],
-      itemStyle: { color: pickEChartsColor(idx) },
-      areaStyle: { opacity: 0.1 },
-      lineStyle: { width: 2 },
-    }));
-    return {
-      tooltip: { trigger: 'item' },
-      legend: { bottom: 0, type: 'scroll' },
-      radar: {
-        indicator: indicators,
-        center: ['50%', '50%'],
-        radius: '62%',
-        axisName: { color: 'var(--color-text-secondary)', fontSize: 12 },
-        splitArea: {
-          areaStyle: { color: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.04)'] },
-        },
-      },
-      series: [
-        {
-          type: 'radar',
-          data: series,
-        },
-      ] as any,
-    } as EChartsOption;
-  }, [anchorAggRows]);
-
   // v3.3.3 P3-11: 漏斗对比模式（整体 FunnelChart / 按主播 堆叠柱图）
   const [funnelMode, setFunnelMode] = useState<'overall' | 'by_anchor'>('overall');
   const funnelByAnchorOption: EChartsOption = useMemo(() => {
@@ -1123,31 +1076,6 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
               <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={false} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} expandable={{ expandedRowRender, rowExpandable: (r) => (r.sources?.length || 0) > 0 }} />
             ) : (
               <Empty description={`暂无${meta.anchorLabel}数据（请检查日期区间是否覆盖${liveType}时段）`} />
-            )}
-          </Card>
-        </FadeInSection>
-
-        <FadeInSection delay={2.2} duration={0.8}>
-          <Card
-            size="small"
-            style={{ marginBottom: 16 }}
-            title={
-              <Space size={8} align="center">
-                <RadarChartOutlined style={{ color: 'var(--color-success)' }} />
-                <span>主播多维画像雷达</span>
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-                  5 维度按各自 max 归一化 · 直观对比主播能力分布
-                </span>
-                <Tooltip title="5 维度：线索量 / 开口率 / 新有效率 / 新开户率 / 单线索资产。每个维度按所有主播中的最大值归一化，便于对比主播能力分布。">
-                  <InfoCircleOutlined style={{ color: 'var(--color-text-tertiary)' }} />
-                </Tooltip>
-              </Space>
-            }
-          >
-            {anchorAggRows.length > 0 ? (
-              <EChartsComponent option={radarOption} height={360} />
-            ) : (
-              <Empty description={'暂无主播数据'} />
             )}
           </Card>
         </FadeInSection>

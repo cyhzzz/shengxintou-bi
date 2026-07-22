@@ -73,6 +73,11 @@ export default function LoginPage() {
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <img
+            src="/icons/login-logo.png"
+            alt="省心投 BI"
+            style={{ height: 48, marginBottom: 12, display: 'inline-block' }}
+          />
           <Title level={3} style={{ marginBottom: 4 }}>省心投 BI</Title>
           <Typography.Text type="secondary">请登录</Typography.Text>
         </div>

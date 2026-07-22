@@ -17,7 +17,7 @@
 | 后端 | Python、Flask、SQLAlchemy、pandas、SQLite |
 | 前端 | React、TypeScript、Vite、Ant Design、ECharts、Ant Design Charts/Plots、Zustand |
 | 测试 | Python `unittest` API smoke、Playwright 路由/功能/回归测试 |
-| 桌面与发布 | PyInstaller 启动器、GitHub Actions、Windows 便携包 |
+| 桌面与发布 | Electron 客户端、PyInstaller 打包 server.exe、electron-builder NSIS 安装包、GitHub Actions |
 
 具体版本以 `requirements.txt`、`frontend-react/package.json` 和工作流配置为准，不在规则中复制。
 
@@ -48,7 +48,7 @@
 | `backend/processors/v2/raw_import.py` | 当前唯一业务数据导入处理器 |
 | `backend/routes/data/` | Dashboard、漏斗、线索、厂商、员工、小红书、对账等查询蓝图 |
 | `backend/routes/reports/` | 全渠道和应用市场专题报表 |
-| `backend/routes/system/` | Git 自更新相关系统端点 |
+| `backend/routes/system/` | Git 自更新、数据同步（SQLite ↔ PG 双向同步） |
 | `backend/utils/` | 异常装饰器、代理商映射、WebDAV 和周报工具 |
 
 ### API 与 SPA
@@ -71,14 +71,15 @@
 | 模块 | 职责 |
 | --- | --- |
 | `frontend-react/src/router/` | Browser Router、lazy 页面、旧路径重定向 |
-| `frontend-react/src/layouts/` | 主框架、菜单、顶部栏和滚动容器 |
+| `frontend-react/src/layouts/` | 主框架、菜单、顶部栏和滚动容器（featureFlags 控制显隐） |
 | `frontend-react/src/pages/` | 业务总览、内容平台、应用市场、小红书、直播、员工和系统页面 |
 | `frontend-react/src/components/` | 指标卡、报表脚注、筛选器、图表、错误边界和动效 |
+| `frontend-react/src/config/` | 功能开关（features.ts：Web 版 vs 桌面版显隐配置） |
 | `frontend-react/src/services/` | HTTP、数据、上传、元数据、版本和 Orval mutator |
 | `frontend-react/src/stores/` | Zustand 应用与筛选状态 |
 | `frontend-react/src/types/` | 业务类型和 Orval 生成 API 类型 |
 | `frontend-react/src/styles/` | 全局 token、变量、mixins 和基础样式 |
-| `frontend-react/src/utils/` | 筛选适配、文本清洗和图表辅助函数 |
+| `frontend-react/src/utils/` | 筛选适配、文本清洗、图表辅助函数、环境判断（isDesktop） |
 
 ### 页面分区
 
