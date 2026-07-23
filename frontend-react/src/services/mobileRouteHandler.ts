@@ -849,6 +849,2321 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
 }
 
 // ============================================================================
+// 转化漏斗 (conversion-funnel/split)
+// ============================================================================
+
+/**
+ * 转化漏斗 split：内容平台 + 应用市场 双漏斗
+ *
+ * 内容平台 8 阶段：
+ *   广告曝光(agg_vendor_daily.展示量) → 客户点击(agg_vendor_daily.点击量)
+ *   → 客户线索 → 客户开口 → 有效线索 → 有效线索(剔除存量) → 成功开户 → 有效户
+ *   （后 6 阶段从 fact_conv_content 取）
+ *
+ * 应用市场 9 阶段（强制 渠道类型='互联网引流'）：
+ *   激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功
+ *   → 新开户 → 入金 → 有效户
+ *   （新开户作为漏斗阶段呈现存量剔除，不做 WHERE 过滤，避免漏斗变平）
+ *
+ * 存量剔除口径（内容平台）：是否为存量客户 = 0 OR IS NULL（在有效线索之后剔除）
+ */
+async function handleConversionFunnelSplit(url: string, body: any): Promise<any> {
+  // POST 请求 filters 在 body；GET 请求参数在 URL query
+  let sd: string | undefined, ed: string | undefined;
+  let platforms: string[] = [];
+  let is_employee_mode = false;
+
+  if (body?.filters) {
+    const f = body.filters;
+    sd = f.start_date; ed = f.end_date;
+    platforms = f.platforms || [];
+    is_employee_mode = !!body.is_employee_mode;
+  } else {
+    const q = parseQueryParams(url);
+    sd = q.start_date; ed = q.end_date;
+    platforms = q.platforms ? q.platforms.split(',').filter(Boolean) : [];
+    is_employee_mode = (q.is_employee_mode || 'false').toLowerCase() === 'true';
+  }
+
+  // ---- 内容平台漏斗 ----
+  // 1) 全量统计：客户线索/客户开口/有效线索（含存量）
+  const cAllWhere = buildWhere([
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+  ]);
+  const cAllSql = `SELECT
+    COUNT(*) as leads,
+    COALESCE(SUM("是否客户开口"), 0) as mouth,
+    COALESCE(SUM("是否有效线索"), 0) as valid_lead
+  FROM fact_conv_content ${cAllWhere.clause}`;
+  const cAllRows = await querySql<Row>(cAllSql, cAllWhere.params);
+  const cAll = cAllRows[0] || {};
+  const leads = toInt(cAll.leads);
+  const mouth = toInt(cAll.mouth);
+  const valid_lead = toInt(cAll.valid_lead);
+
+  // 2) 非存量：有效线索(剔除存量)/成功开户/有效户
+  const cNewWhere = buildWhere([
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    { sql: '("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)', params: [] as unknown[] },
+  ]);
+  const cNewSql = `SELECT
+    COALESCE(SUM("是否有效线索"), 0) as new_valid_lead,
+    COALESCE(SUM("是否开户"), 0) as opened,
+    COALESCE(SUM("是否为有效户"), 0) as valid
+  FROM fact_conv_content ${cNewWhere.clause}`;
+  const cNewRows = await querySql<Row>(cNewSql, cNewWhere.params);
+  const cNew = cNewRows[0] || {};
+  const new_valid_lead = toInt(cNew.new_valid_lead);
+  const opened = toInt(cNew.opened);
+  const valid = toInt(cNew.valid);
+
+  // 3) extra_new_opened：非有效线索但新开户
+  const cExtraWhere = buildWhere([
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    { sql: '("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)', params: [] as unknown[] },
+    { sql: '"是否有效线索" != 1', params: [] as unknown[] },
+  ]);
+  const cExtraSql = `SELECT COALESCE(SUM("是否开户"), 0) as extra_opened
+  FROM fact_conv_content ${cExtraWhere.clause}`;
+  const cExtraRows = await querySql<Row>(cExtraSql, cExtraWhere.params);
+  const extra_new_opened = toInt(cExtraRows[0]?.extra_opened);
+
+  // 4) 内容平台新开户引进资产 = 非存量且开户成功的客户资产 SUM
+  const cAssetWhere = buildWhere([
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    { sql: '("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)', params: [] as unknown[] },
+    { sql: '"是否开户" = 1', params: [] as unknown[] },
+  ]);
+  const cAssetSql = `SELECT COALESCE(SUM("资产"), 0) as new_open_assets
+  FROM fact_conv_content ${cAssetWhere.clause}`;
+  const cAssetRows = await querySql<Row>(cAssetSql, cAssetWhere.params);
+  const content_new_open_assets = round2(toFloat(cAssetRows[0]?.new_open_assets));
+
+  // 5) 前 2 阶段（广告曝光/客户点击）从 agg_vendor_daily 取
+  const vWhere = buildWhere([
+    dateClause('日期', sd, ed),
+    inClause('平台', platforms),
+  ]);
+  const vSql = `SELECT
+    COALESCE(SUM("展示量"), 0) as impressions,
+    COALESCE(SUM("点击量"), 0) as clicks,
+    COALESCE(SUM("花费"), 0) as cost
+  FROM agg_vendor_daily ${vWhere.clause}`;
+  const vRows = await querySql<Row>(vSql, vWhere.params);
+  const v = vRows[0] || {};
+  const impressions = toInt(v.impressions);
+  const clicks = toInt(v.clicks);
+  const cost_total = toFloat(v.cost);
+
+  // 内容平台 8 阶段
+  const content_top = impressions > 0 ? impressions : 1;
+  const content_stages = [
+    { step: '广告曝光', value: impressions, rate: 100.0, step_rate: 100.0 },
+    { step: '客户点击', value: clicks,
+      rate: impressions > 0 ? round2(clicks / impressions * 100) : 0,
+      step_rate: round2(clicks / content_top * 100) },
+    { step: '客户线索', value: leads,
+      rate: clicks > 0 ? round2(leads / clicks * 100) : 0,
+      step_rate: round2(leads / content_top * 100) },
+    { step: '客户开口', value: mouth,
+      rate: leads > 0 ? round2(mouth / leads * 100) : 0,
+      step_rate: round2(mouth / content_top * 100) },
+    { step: '有效线索', value: valid_lead,
+      rate: mouth > 0 ? round2(valid_lead / mouth * 100) : 0,
+      step_rate: round2(valid_lead / content_top * 100) },
+    { step: '有效线索(剔除存量)', value: new_valid_lead,
+      rate: valid_lead > 0 ? round2(new_valid_lead / valid_lead * 100) : 0,
+      step_rate: round2(new_valid_lead / content_top * 100) },
+    { step: '成功开户', value: opened,
+      rate: new_valid_lead > 0 ? round2(opened / new_valid_lead * 100) : 0,
+      step_rate: round2(opened / content_top * 100) },
+    { step: '有效户', value: valid,
+      rate: opened > 0 ? round2(valid / opened * 100) : 0,
+      step_rate: round2(valid / content_top * 100) },
+  ];
+
+  // ---- 应用市场漏斗 ----
+  // 强制 渠道类型='互联网引流'；新开户作为阶段呈现，不做 WHERE 过滤
+  const aWhere = buildWhere([
+    dateClause('下载日期', sd, ed),
+    { sql: '"渠道类型" = ?', params: ['互联网引流'] },
+  ]);
+  const aFunnelCols = [
+    ['是否激活APP', '激活APP'],
+    ['是否开户注册', '开户注册'],
+    ['是否注册身份证', '注册身份证'],
+    ['是否注册银行卡', '注册银行卡'],
+    ['是否提交开户', '提交开户'],
+    ['是否开户成功', '开户成功'],
+    ['是否新开户', '新开户'],
+    ['是否入金', '入金'],
+    ['是否有效户', '有效户'],
+  ] as [string, string][];
+  const aSelectCols = aFunnelCols.map(
+    ([col, alias]) => `COALESCE(SUM("${col}"), 0) as "${alias}"`
+  ).join(', ');
+  const aSql = `SELECT ${aSelectCols} FROM fact_conv_appmarket ${aWhere.clause}`;
+  const aRows = await querySql<Row>(aSql, aWhere.params);
+  const ar = aRows[0] || {};
+  const a_counts: Record<string, number> = {};
+  for (const [, alias] of aFunnelCols) {
+    a_counts[alias] = toInt(ar[alias]);
+  }
+  const a_base = a_counts['激活APP'];
+  const appmarket_stages: any[] = [];
+  let a_prev = a_base;
+  for (const [, alias] of aFunnelCols) {
+    const v = a_counts[alias];
+    const rate = a_prev > 0 ? round2(v / a_prev * 100) : 0;
+    const step_rate = round2(v / (a_base || 1) * 100);
+    appmarket_stages.push({ step: alias, value: v, rate, step_rate });
+    a_prev = v;
+  }
+
+  // 应用市场新开户引进资产 = 是否新开户==1 的行总资产 SUM
+  const aAssetWhere = buildWhere([
+    dateClause('下载日期', sd, ed),
+    { sql: '"渠道类型" = ?', params: ['互联网引流'] },
+    { sql: '"是否新开户" = 1', params: [] as unknown[] },
+  ]);
+  const aAssetSql = `SELECT COALESCE(SUM("总资产"), 0) as new_open_assets
+  FROM fact_conv_appmarket ${aAssetWhere.clause}`;
+  const aAssetRows = await querySql<Row>(aAssetSql, aAssetWhere.params);
+  const appmarket_new_open_assets = round2(toFloat(aAssetRows[0]?.new_open_assets));
+
+  return {
+    funnels: {
+      content: {
+        stages: content_stages,
+        data_source: 'fact_conv_content + agg_vendor_daily(前 2 段)',
+        channel_category: 'content',
+        extra_new_opened,
+        new_open_assets: content_new_open_assets,
+      },
+      appmarket: {
+        stages: appmarket_stages,
+        data_source: 'fact_conv_appmarket',
+        channel_category: 'appmarket',
+        new_open_assets: appmarket_new_open_assets,
+      },
+    },
+    core_metrics: {
+      cost: round2(cost_total),
+      lead_users: leads + a_counts['激活APP'],
+      opened_account_users: opened + a_counts['开户成功'],
+      valid_customer_users: valid + a_counts['有效户'],
+    },
+    is_employee_mode,
+  };
+}
+
+// ============================================================================
+// 线索明细 (leads-detail)
+// ============================================================================
+
+/** 线索明细分页查询（GET 请求，参数在 URL query） */
+async function handleLeadsDetail(url: string): Promise<any> {
+  const q = parseQueryParams(url);
+  const page = Math.max(1, toInt(q.page) || 1);
+  const page_size = Math.max(1, Math.min(200, toInt(q.page_size) || 50));
+  const offset = (page - 1) * page_size;
+  const sd = q.start_date || undefined;
+  const ed = q.end_date || undefined;
+  const platforms = q.platforms ? q.platforms.split(',').filter(Boolean) : [];
+  const agencies = q.agencies ? q.agencies.split(',').filter(Boolean) : [];
+  const employee_name = q.employee_name || '';
+  const is_opened_account = q.is_opened_account;
+
+  const conditions: ({ sql: string; params: unknown[] } | null)[] = [
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    inClause('广告代理商', agencies),
+  ];
+  if (employee_name) {
+    conditions.push({ sql: '"添加员工姓名" = ?', params: [employee_name] });
+  }
+  if (is_opened_account === 'true') {
+    conditions.push({ sql: '"是否开户" = 1', params: [] as unknown[] });
+  } else if (is_opened_account === 'false') {
+    conditions.push({ sql: '("是否开户" = 0 OR "是否开户" IS NULL)', params: [] as unknown[] });
+  }
+  const where = buildWhere(conditions);
+
+  // 总数
+  const totalSql = `SELECT COUNT(*) as c FROM fact_conv_content ${where.clause}`;
+  const totalRows = await querySql<Row>(totalSql, where.params);
+  const total = toInt(totalRows[0]?.c);
+
+  // 分页查询（ORDER BY 线索日期 DESC）
+  // LIMIT/OFFSET 用字符串拼接（page/page_size 已被 Math.min/Math.max 夹紧到安全范围）
+  const sql = `SELECT * FROM fact_conv_content ${where.clause}
+    ORDER BY "线索日期" DESC LIMIT ${page_size} OFFSET ${offset}`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  const items = rows.map(r => ({
+    wechat_nickname: r['微信昵称'],
+    capital_account: r['资金账号'],
+    opening_branch: r['开户营业部'],
+    customer_gender: r['客户性别'],
+    platform_source: r['平台来源'],
+    traffic_type: r['流量类型'],
+    customer_source: r['客户来源'],
+    is_customer_mouth: !!toInt(r['是否客户开口']),
+    is_valid_lead: !!toInt(r['是否有效线索']),
+    is_open_account_interrupted: !!toInt(r['是否开户中断']),
+    open_account_interrupted_date: r['开户中断日期'],
+    is_opened_account: !!toInt(r['是否开户']),
+    is_valid_customer: !!toInt(r['是否为有效户']),
+    is_existing_customer: !!toInt(r['是否为存量客户']),
+    is_existing_valid_customer: !!toInt(r['是否为存量有效户']),
+    is_delete_enterprise_wechat: !!toInt(r['是否删除企微']),
+    lead_date: r['线索日期'],
+    first_contact_time: r['首次触达时间'],
+    last_contact_time: r['最近互动时间'],
+    account_opening_time: r['开户时间'],
+    wechat_verify_status: r['微信认证状态'] != null ? String(r['微信认证状态']) : null,
+    wechat_verify_time: r['微信认证时间'],
+    valid_customer_time: r['有效户时间'],
+    ad_click_date: r['广告点击日期'],
+    interaction_count: toInt(r['互动次数']),
+    sales_interaction_count: toFloat(r['营销人员互动次数']),
+    assets: toFloat(r['资产']),
+    customer_contribution: toFloat(r['客户贡献']),
+    add_employee_no: r['添加员工号'] != null ? String(r['添加员工号']) : null,
+    add_employee_name: r['添加员工姓名'],
+    ad_account: r['广告账号'],
+    agency: r['广告代理商'],
+    ad_id: r['广告ID'],
+    creative_id: r['创意ID'],
+    note_id: r['笔记ID'],
+    note_title: r['笔记名称'],
+    platform_user_id: r['平台用户ID'],
+    platform_user_nickname: r['平台用户昵称'],
+    producer: r['生产者'],
+    enterprise_wechat_tags: r['企微标签'],
+  }));
+
+  return {
+    items,
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size),
+  };
+}
+
+/** 线索明细筛选选项（平台 / 代理商 / 员工） */
+async function handleLeadsDetailFilterOptions(): Promise<any> {
+  const platforms = await querySql<Row>(
+    `SELECT DISTINCT "平台来源" as v FROM fact_conv_content
+     WHERE "平台来源" IS NOT NULL AND "平台来源" != ''
+     ORDER BY "平台来源"`
+  );
+  const agencies = await querySql<Row>(
+    `SELECT DISTINCT "广告代理商" as v FROM fact_conv_content
+     WHERE "广告代理商" IS NOT NULL AND "广告代理商" != ''
+     ORDER BY "广告代理商"`
+  );
+  const employees = await querySql<Row>(
+    `SELECT DISTINCT "添加员工姓名" as v FROM fact_conv_content
+     WHERE "添加员工姓名" IS NOT NULL AND "添加员工姓名" != ''
+     ORDER BY "添加员工姓名"`
+  );
+  // 注：移动端不做 full_to_short 简称归一化（无 dim_account 表），直接返回全称
+  return {
+    platforms: platforms.map(r => ({ value: r.v, label: r.v })),
+    agencies: agencies.map(r => ({ value: r.v, label: r.v })),
+    employees: employees.map(r => ({ value: r.v, label: r.v })),
+  };
+}
+
+// ============================================================================
+// 主播聚类 (anchor-clusters) — 直播获客 5 个页面共用
+// ============================================================================
+// 数据源：fact_conv_content.客户来源 + dim_anchor_live_type
+// 业务规则：
+//   - 存量剔除口径：是否为存量客户 = 0 OR IS NULL
+//   - token 解析：客户来源 按 [,，;；、] 拆分，匹配 ^(平台)引流-(主播)$
+//   - 平台归一化：视频号/视频号直播/微信 → 腾讯
+//   - live_types 筛选：3 个 endpoint 拦截时机不同（见各 handler）
+
+const ANCHOR_PATTERN = /^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$/;
+const ANCHOR_SPLIT = /[,，;；、]+/;
+const ANCHOR_PLATFORM_NORMALIZE: Record<string, string> = {
+  '视频号': '腾讯',
+  '视频号直播': '腾讯',
+  '微信': '腾讯',
+};
+
+interface AnchorLiveTypeMap {
+  token_to_anchor: Record<string, string>;
+  token_to_live_type: Record<string, string>;
+  anchor_to_live_types: Record<string, Set<string>>;
+  plain_name_tokens: Set<string>;
+}
+
+/** 加载 dim_anchor_live_type 表，构建 token → anchor_name / live_type 映射 */
+async function loadAnchorLiveTypeMap(): Promise<AnchorLiveTypeMap> {
+  const m: AnchorLiveTypeMap = {
+    token_to_anchor: {},
+    token_to_live_type: {},
+    anchor_to_live_types: {},
+    plain_name_tokens: new Set(),
+  };
+  try {
+    const rows = await querySql<Row>(
+      `SELECT source_token, anchor_name, live_type, is_active FROM dim_anchor_live_type`
+    );
+    for (const r of rows) {
+      if (!r.is_active) continue;
+      const tok = String(r.source_token || '');
+      const name = String(r.anchor_name || '');
+      const lt = String(r.live_type || '');
+      if (!tok || !name || !lt) continue;
+      m.token_to_anchor[tok] = name;
+      m.token_to_live_type[tok] = lt;
+      if (!m.anchor_to_live_types[name]) m.anchor_to_live_types[name] = new Set();
+      m.anchor_to_live_types[name].add(lt);
+      if (!tok.includes('引流-') && !tok.includes('直播带货-')) {
+        m.plain_name_tokens.add(tok);
+      }
+    }
+  } catch {
+    // dim_anchor_live_type 表缺失或为空，退化为无映射模式
+  }
+  return m;
+}
+
+/** 解析客户来源字段，返回 [{platform, anchor, segment}] */
+function parseAnchorTokens(
+  src: string,
+  rowPlatform: string,
+  ltMap: AnchorLiveTypeMap
+): Array<{ platform: string; anchor: string; segment: string }> {
+  const out: Array<{ platform: string; anchor: string; segment: string }> = [];
+  for (const part of src.split(ANCHOR_SPLIT)) {
+    const segment = part.trim();
+    if (!segment) continue;
+    const m = ANCHOR_PATTERN.exec(segment);
+    if (m) {
+      const anchorPlatform = ANCHOR_PLATFORM_NORMALIZE[m[1]] || m[1];
+      const rawAnchorName = m[2].trim();
+      if (!rawAnchorName) continue;
+      const normalizedAnchor = ltMap.token_to_anchor[segment] || rawAnchorName;
+      out.push({ platform: anchorPlatform, anchor: normalizedAnchor, segment });
+    } else if (ltMap.plain_name_tokens.has(segment)) {
+      const anchorPlatform = (rowPlatform || '').trim();
+      const normalizedAnchor = ltMap.token_to_anchor[segment] || segment;
+      out.push({ platform: anchorPlatform, anchor: normalizedAnchor, segment });
+    }
+  }
+  return out;
+}
+
+/** 主播聚类：按 (平台, 主播) 聚合线索/开口/开户/有效户/资产 */
+async function handleAnchorClusters(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const top_n = toInt(body?.top_n ?? 50);
+  const sd = filters.start_date;
+  const ed = filters.end_date;
+  const platforms_filter = filters.platforms || [];
+  const agencies_filter = filters.agencies || [];
+  const live_types_filter: string[] = filters.live_types || [];
+
+  const where = buildWhere([
+    { sql: '"客户来源" IS NOT NULL AND "客户来源" != \'\'', params: [] as unknown[] },
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms_filter),
+    inClause('广告代理商', agencies_filter),
+  ]);
+
+  const sql = `SELECT
+    "客户来源" as customer_source,
+    "平台来源" as platform,
+    COUNT(id) as leads,
+    COALESCE(SUM(CASE WHEN "是否为存量客户" = 1 THEN 1 ELSE 0 END), 0) as existing_leads,
+    COALESCE(SUM(CASE WHEN ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL) THEN 1 ELSE 0 END), 0) as new_leads,
+    COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+    COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+    COALESCE(SUM(CASE WHEN ("是否有效线索" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_valid_lead,
+    COALESCE(SUM(CASE WHEN "是否开户" = 1 THEN 1 ELSE 0 END), 0) as opened,
+    COALESCE(SUM(CASE WHEN ("是否开户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_opened,
+    COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid,
+    COALESCE(SUM(CASE WHEN ("是否为有效户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_valid,
+    COALESCE(SUM(CASE WHEN ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL) THEN "资产" ELSE 0 END), 0) as new_assets,
+    COALESCE(SUM(CASE WHEN "是否为存量客户" = 1 THEN "资产" ELSE 0 END), 0) as existing_assets,
+    COALESCE(SUM("资产"), 0) as assets
+  FROM fact_conv_content ${where.clause}
+  GROUP BY "客户来源", "平台来源"`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  const ltMap = await loadAnchorLiveTypeMap();
+
+  interface AggItem {
+    platform: string; anchor: string;
+    leads: number; existing_leads: number; new_leads: number;
+    mouth: number; valid_lead: number; new_valid_lead: number;
+    opened: number; new_opened: number;
+    valid: number; new_valid: number;
+    new_assets: number; existing_assets: number; assets: number;
+    raw_sources: Set<string>; live_types: Set<string>;
+  }
+  const aggMap: Record<string, AggItem> = {};
+
+  for (const r of rows) {
+    const src = String(r.customer_source || '').trim();
+    const rowPlatform = String(r.platform || '').trim();
+    const matches = parseAnchorTokens(src, rowPlatform, ltMap);
+    // 同一原始来源里若重复出现同一主播，只归因一次
+    const seen = new Set<string>();
+    const sortedMatches = matches.slice().sort((a, b) =>
+      `${a.platform}|||${a.anchor}`.localeCompare(`${b.platform}|||${b.anchor}`)
+    );
+    for (const match of sortedMatches) {
+      const key = `${match.platform}|||${match.anchor}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!aggMap[key]) {
+        aggMap[key] = {
+          platform: match.platform, anchor: match.anchor,
+          leads: 0, existing_leads: 0, new_leads: 0,
+          mouth: 0, valid_lead: 0, new_valid_lead: 0,
+          opened: 0, new_opened: 0, valid: 0, new_valid: 0,
+          new_assets: 0, existing_assets: 0, assets: 0,
+          raw_sources: new Set(), live_types: new Set(),
+        };
+      }
+      const a = aggMap[key];
+      a.leads += toInt(r.leads);
+      a.existing_leads += toInt(r.existing_leads);
+      a.new_leads += toInt(r.new_leads);
+      a.mouth += toInt(r.mouth);
+      a.valid_lead += toInt(r.valid_lead);
+      a.new_valid_lead += toInt(r.new_valid_lead);
+      a.opened += toInt(r.opened);
+      a.new_opened += toInt(r.new_opened);
+      a.valid += toInt(r.valid);
+      a.new_valid += toInt(r.new_valid);
+      a.new_assets += toFloat(r.new_assets);
+      a.existing_assets += toFloat(r.existing_assets);
+      a.assets += toFloat(r.assets);
+      a.raw_sources.add(match.segment);
+      // 累加该 anchor 的直播类型（先查 token 精确匹配，回退到该主播所有 live_type）
+      const segLt = ltMap.token_to_live_type[match.segment];
+      if (segLt) {
+        a.live_types.add(segLt);
+      } else if (ltMap.anchor_to_live_types[match.anchor]) {
+        for (const t of ltMap.anchor_to_live_types[match.anchor]) {
+          a.live_types.add(t);
+        }
+      }
+    }
+  }
+
+  // 组装 items
+  const items: any[] = [];
+  for (const a of Object.values(aggMap)) {
+    const anchorLiveTypes = Array.from(a.live_types).sort();
+    const primaryLiveType = anchorLiveTypes.length > 0 ? anchorLiveTypes[0] : null;
+    const secondaryLiveTypes = anchorLiveTypes.length > 1 ? anchorLiveTypes.slice(1) : [];
+    items.push({
+      platform: a.platform,
+      anchor: a.anchor,
+      live_type: primaryLiveType,
+      live_types: anchorLiveTypes,
+      secondary_live_types: secondaryLiveTypes,
+      leads: a.leads,
+      existing_leads: a.existing_leads,
+      new_leads: a.new_leads,
+      mouth: a.mouth,
+      valid_lead: a.valid_lead,
+      new_valid_lead: a.new_valid_lead,
+      opened: a.opened,
+      new_opened: a.new_opened,
+      existing_opened: a.opened - a.new_opened,
+      valid: a.valid,
+      new_valid: a.new_valid,
+      existing_valid: a.valid - a.new_valid,
+      new_assets: round2(a.new_assets),
+      existing_assets: round2(a.existing_assets),
+      assets: round2(a.assets),
+      opening_rate: a.leads > 0 ? round2(a.new_opened / a.leads * 100) : 0,
+      valid_rate: a.leads > 0 ? round2(a.new_valid / a.leads * 100) : 0,
+      sources: Array.from(a.raw_sources).sort(),
+    });
+  }
+
+  // live_types 筛选（保留 items 中 live_types 与筛选有交集的项）
+  let filteredItems = items;
+  if (live_types_filter.length > 0) {
+    const wanted = new Set(live_types_filter);
+    filteredItems = items.filter(i => i.live_types.some((lt: string) => wanted.has(lt)));
+  }
+
+  filteredItems.sort((a, b) => (b.leads - a.leads) || (b.new_opened - a.new_opened));
+
+  const totals = {
+    total_anchors: filteredItems.length,
+    total_leads: filteredItems.reduce((s, i) => s + i.leads, 0),
+    total_existing_leads: filteredItems.reduce((s, i) => s + i.existing_leads, 0),
+    total_new_leads: filteredItems.reduce((s, i) => s + i.new_leads, 0),
+    total_valid_lead: filteredItems.reduce((s, i) => s + i.valid_lead, 0),
+    total_new_valid_lead: filteredItems.reduce((s, i) => s + i.new_valid_lead, 0),
+    total_opened: filteredItems.reduce((s, i) => s + i.opened, 0),
+    total_new_opened: filteredItems.reduce((s, i) => s + i.new_opened, 0),
+    total_existing_opened: filteredItems.reduce((s, i) => s + i.existing_opened, 0),
+    total_valid: filteredItems.reduce((s, i) => s + i.valid, 0),
+    total_new_valid: filteredItems.reduce((s, i) => s + i.new_valid, 0),
+    total_existing_valid: filteredItems.reduce((s, i) => s + i.existing_valid, 0),
+    total_new_assets: round2(filteredItems.reduce((s, i) => s + i.new_assets, 0)),
+    total_existing_assets: round2(filteredItems.reduce((s, i) => s + i.existing_assets, 0)),
+    total_assets: round2(filteredItems.reduce((s, i) => s + i.assets, 0)),
+  };
+
+  // 按 live_type 拆分的汇总
+  const liveTypeBreakdownMap: Record<string, any> = {};
+  for (const i of filteredItems) {
+    const lt = i.live_type || '未映射';
+    if (!liveTypeBreakdownMap[lt]) {
+      liveTypeBreakdownMap[lt] = {
+        live_type: lt, anchors: 0, leads: 0, new_leads: 0,
+        new_opened: 0, new_valid: 0, new_assets: 0,
+      };
+    }
+    const b = liveTypeBreakdownMap[lt];
+    b.anchors += 1;
+    b.leads += i.leads;
+    b.new_leads += i.new_leads;
+    b.new_opened += i.new_opened;
+    b.new_valid += i.new_valid;
+    b.new_assets += i.new_assets;
+  }
+  const live_type_breakdown = Object.values(liveTypeBreakdownMap).map((b: any) => ({
+    ...b,
+    new_assets: round2(b.new_assets),
+    opening_rate: b.leads > 0 ? round2(b.new_opened / b.leads * 100) : 0,
+    valid_rate: b.leads > 0 ? round2(b.new_valid / b.leads * 100) : 0,
+  }));
+
+  return {
+    items: filteredItems.slice(0, top_n),
+    totals,
+    live_type_breakdown,
+    top_n,
+    all_count: filteredItems.length,
+    platforms: Array.from(new Set(filteredItems.map(i => i.platform))).sort(),
+    live_types: Array.from(new Set(filteredItems.flatMap(i => i.live_types))).sort(),
+  };
+}
+
+/** 主播引流走势：按粒度（日/周/月）聚合 period × 平台 */
+async function handleAnchorClustersTrend(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const granularity = body?.granularity || 'daily';
+  const sd = filters.start_date;
+  const ed = filters.end_date;
+  const platforms_filter = filters.platforms || [];
+  const agencies_filter = filters.agencies || [];
+  const live_types_filter: string[] = filters.live_types || [];
+
+  const ltMap = await loadAnchorLiveTypeMap();
+
+  // 周期表达式（SQLite）
+  let periodExpr: string;
+  if (granularity === 'weekly') {
+    periodExpr = `strftime('%Y-%W', "线索日期")`;
+  } else if (granularity === 'monthly') {
+    periodExpr = `substr("线索日期", 1, 7)`;
+  } else {
+    periodExpr = `substr("线索日期", 1, 10)`;
+  }
+
+  // source 过滤：like('%引流-%') OR in plain_name_tokens
+  const sourceConds: { sql: string; params: unknown[] }[] = [
+    { sql: '"客户来源" IS NOT NULL AND "客户来源" != \'\'', params: [] as unknown[] },
+  ];
+  if (ltMap.plain_name_tokens.size > 0) {
+    const tokensArr = Array.from(ltMap.plain_name_tokens);
+    const placeholders = tokensArr.map(() => '?').join(', ');
+    sourceConds.push({
+      sql: `("客户来源" LIKE '%引流-%' OR "客户来源" IN (${placeholders}))`,
+      params: tokensArr,
+    });
+  } else {
+    sourceConds.push({ sql: `"客户来源" LIKE '%引流-%'`, params: [] as unknown[] });
+  }
+
+  const where = buildWhere([
+    ...sourceConds,
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms_filter),
+    inClause('广告代理商', agencies_filter),
+  ]);
+
+  const sql = `SELECT
+    ${periodExpr} as period,
+    "平台来源" as platform,
+    "客户来源" as customer_source,
+    COUNT(id) as leads,
+    COALESCE(SUM(CASE WHEN ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL) THEN 1 ELSE 0 END), 0) as new_leads,
+    COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+    COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+    COALESCE(SUM(CASE WHEN ("是否开户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_opened,
+    COALESCE(SUM(CASE WHEN ("是否为有效户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_valid,
+    COALESCE(SUM(CASE WHEN ("是否开户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN "资产" ELSE 0 END), 0) as new_assets
+  FROM fact_conv_content ${where.clause}
+  GROUP BY period, "平台来源", "客户来源"
+  ORDER BY period, "平台来源"`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  // wanted_tokens（用于 live_types 筛选：聚合前用）
+  let wantedTokens: Set<string> | null = null;
+  if (live_types_filter.length > 0) {
+    const wanted = new Set(live_types_filter);
+    wantedTokens = new Set();
+    for (const [tok, lt] of Object.entries(ltMap.token_to_live_type)) {
+      if (wanted.has(lt)) wantedTokens.add(tok);
+    }
+  }
+
+  const periodTotals: Record<string, any> = {};
+  const byPlatform: Record<string, Record<string, any>> = {};
+  const allPlatforms = new Set<string>();
+
+  for (const r of rows) {
+    // live_types 筛选 — 拆 客户来源 token，看是否命中 wanted_tokens
+    if (wantedTokens) {
+      const src = String(r.customer_source || '').trim();
+      const tokens = src.split(ANCHOR_SPLIT).map(t => t.trim()).filter(Boolean);
+      if (!tokens.some(t => wantedTokens.has(t))) continue;
+    }
+    const period = String(r.period ?? '');
+    const platform = String(r.platform || '未知');
+    allPlatforms.add(platform);
+
+    if (!periodTotals[period]) {
+      periodTotals[period] = { leads: 0, new_leads: 0, mouth: 0, valid_lead: 0, new_opened: 0, new_valid: 0, new_assets: 0 };
+    }
+    const b = periodTotals[period];
+    b.leads += toInt(r.leads);
+    b.new_leads += toInt(r.new_leads);
+    b.mouth += toInt(r.mouth);
+    b.valid_lead += toInt(r.valid_lead);
+    b.new_opened += toInt(r.new_opened);
+    b.new_valid += toInt(r.new_valid);
+    b.new_assets += toFloat(r.new_assets);
+
+    if (!byPlatform[period]) byPlatform[period] = {};
+    if (!byPlatform[period][platform]) {
+      byPlatform[period][platform] = { leads: 0, new_leads: 0, mouth: 0, valid_lead: 0, new_opened: 0, new_valid: 0, new_assets: 0 };
+    }
+    const bx = byPlatform[period][platform];
+    bx.leads += toInt(r.leads);
+    bx.new_leads += toInt(r.new_leads);
+    bx.mouth += toInt(r.mouth);
+    bx.valid_lead += toInt(r.valid_lead);
+    bx.new_opened += toInt(r.new_opened);
+    bx.new_valid += toInt(r.new_valid);
+    bx.new_assets += toFloat(r.new_assets);
+  }
+
+  const periods = Object.keys(periodTotals).sort();
+
+  return {
+    granularity,
+    periods,
+    totals: periodTotals,
+    by_platform: byPlatform,
+    platforms: Array.from(allPlatforms).sort(),
+  };
+}
+
+/** 主播周度拿量 + 各环节转化率分析（主播 × 周交叉表） */
+function anchorCalcRates(leads: number, mouth: number, valid_lead: number, new_valid_lead: number, new_opened: number, new_valid: number) {
+  return {
+    '线索_开口率': leads > 0 ? round2(mouth / leads * 100) : 0,
+    '开口_有效率': mouth > 0 ? round2(valid_lead / mouth * 100) : 0,
+    '有效_非存量率': valid_lead > 0 ? round2(new_valid_lead / valid_lead * 100) : 0,
+    '非存量_新开户率': new_valid_lead > 0 ? round2(new_opened / new_valid_lead * 100) : 0,
+    '新开户_新有效率': new_opened > 0 ? round2(new_valid / new_opened * 100) : 0,
+  };
+}
+
+async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const top_n = toInt(body?.top_n ?? 30);
+  const sd = filters.start_date;
+  const ed = filters.end_date;
+  const platforms_filter = filters.platforms || [];
+  const live_types_filter: string[] = filters.live_types || [];
+
+  const ltMap = await loadAnchorLiveTypeMap();
+  const wantedLiveTypes = new Set(live_types_filter);
+
+  // source 过滤
+  const sourceConds: { sql: string; params: unknown[] }[] = [
+    { sql: '"客户来源" IS NOT NULL AND "客户来源" != \'\'', params: [] as unknown[] },
+  ];
+  if (ltMap.plain_name_tokens.size > 0) {
+    const tokensArr = Array.from(ltMap.plain_name_tokens);
+    const placeholders = tokensArr.map(() => '?').join(', ');
+    sourceConds.push({
+      sql: `("客户来源" LIKE '%引流-%' OR "客户来源" IN (${placeholders}))`,
+      params: tokensArr,
+    });
+  } else {
+    sourceConds.push({ sql: `"客户来源" LIKE '%引流-%'`, params: [] as unknown[] });
+  }
+
+  const where = buildWhere([
+    ...sourceConds,
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms_filter),
+  ]);
+
+  // SQLite 周起始日：date(d, 'weekday 0', '-6 days') = 周一
+  const sql = `SELECT
+    date("线索日期", 'weekday 0', '-6 days') as week_start,
+    "平台来源" as platform,
+    "客户来源" as customer_source,
+    COUNT(id) as leads,
+    COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+    COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+    COALESCE(SUM(CASE WHEN ("是否有效线索" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_valid_lead,
+    COALESCE(SUM(CASE WHEN ("是否开户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_opened,
+    COALESCE(SUM(CASE WHEN ("是否为有效户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)) THEN 1 ELSE 0 END), 0) as new_valid
+  FROM fact_conv_content ${where.clause}
+  GROUP BY week_start, "平台来源", "客户来源"`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  interface AnchorAgg {
+    anchor: string;
+    live_type: string | null;
+    totals: { leads: number; mouth: number; valid_lead: number; new_valid_lead: number; new_opened: number; new_valid: number };
+    weekly: Record<string, { leads: number; mouth: number; valid_lead: number; new_valid_lead: number; new_opened: number; new_valid: number }>;
+  }
+  const anchorMap: Record<string, AnchorAgg> = {};
+  const weeklyAgg: Record<string, { leads: number; mouth: number; valid_lead: number; new_valid_lead: number; new_opened: number; new_valid: number }> = {};
+  const allAnchors = new Set<string>();
+
+  for (const r of rows) {
+    const week = r.week_start ? String(r.week_start).slice(0, 10) : '未知周';
+    const src = String(r.customer_source || '').trim();
+    const matches: Array<{ anchor: string; segment: string }> = [];
+    for (const part of src.split(ANCHOR_SPLIT)) {
+      const segment = part.trim();
+      if (!segment) continue;
+      const m = ANCHOR_PATTERN.exec(segment);
+      let normalizedAnchor: string | null = null;
+      if (m) {
+        const rawAnchorName = m[2].trim();
+        if (!rawAnchorName) continue;
+        normalizedAnchor = ltMap.token_to_anchor[segment] || rawAnchorName;
+      } else if (ltMap.plain_name_tokens.has(segment)) {
+        normalizedAnchor = ltMap.token_to_anchor[segment] || segment;
+      } else {
+        continue;
+      }
+
+      // token 级 live_type：先查 token 精确匹配，回退到该主播的所有 live_type
+      const segLt = ltMap.token_to_live_type[segment];
+      let segLts: Set<string>;
+      if (segLt) {
+        segLts = new Set([segLt]);
+      } else {
+        segLts = ltMap.anchor_to_live_types[normalizedAnchor] || new Set();
+      }
+
+      // live_types 筛选：只保留 live_types 与 wanted 有交集的 (anchor, segment)
+      if (wantedLiveTypes.size > 0) {
+        let hasIntersection = false;
+        for (const lt of segLts) {
+          if (wantedLiveTypes.has(lt)) { hasIntersection = true; break; }
+        }
+        if (!hasIntersection) continue;
+      }
+
+      matches.push({ anchor: normalizedAnchor, segment });
+    }
+
+    if (matches.length === 0) continue;
+
+    const seen = new Set<string>();
+    const sortedMatches = matches.slice().sort((a, b) => a.anchor.localeCompare(b.anchor));
+    for (const match of sortedMatches) {
+      if (seen.has(match.anchor)) continue;
+      seen.add(match.anchor);
+
+      if (!anchorMap[match.anchor]) {
+        const anchorLts = ltMap.anchor_to_live_types[match.anchor];
+        const sortedLts = anchorLts ? Array.from(anchorLts).sort() : [];
+        const primaryLt = sortedLts.length > 0 ? sortedLts[0] : null;
+        anchorMap[match.anchor] = {
+          anchor: match.anchor,
+          live_type: primaryLt,
+          totals: { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 },
+          weekly: {},
+        };
+        allAnchors.add(match.anchor);
+      }
+
+      const a = anchorMap[match.anchor];
+      a.totals.leads += toInt(r.leads);
+      a.totals.mouth += toInt(r.mouth);
+      a.totals.valid_lead += toInt(r.valid_lead);
+      a.totals.new_valid_lead += toInt(r.new_valid_lead);
+      a.totals.new_opened += toInt(r.new_opened);
+      a.totals.new_valid += toInt(r.new_valid);
+
+      if (!a.weekly[week]) {
+        a.weekly[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
+      }
+      const w = a.weekly[week];
+      w.leads += toInt(r.leads);
+      w.mouth += toInt(r.mouth);
+      w.valid_lead += toInt(r.valid_lead);
+      w.new_valid_lead += toInt(r.new_valid_lead);
+      w.new_opened += toInt(r.new_opened);
+      w.new_valid += toInt(r.new_valid);
+
+      if (!weeklyAgg[week]) {
+        weeklyAgg[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
+      }
+      const wa = weeklyAgg[week];
+      wa.leads += toInt(r.leads);
+      wa.mouth += toInt(r.mouth);
+      wa.valid_lead += toInt(r.valid_lead);
+      wa.new_valid_lead += toInt(r.new_valid_lead);
+      wa.new_opened += toInt(r.new_opened);
+      wa.new_valid += toInt(r.new_valid);
+    }
+  }
+
+  // 组装 anchor_items + 派生率
+  const anchorItems: any[] = [];
+  for (const a of Object.values(anchorMap)) {
+    const t = a.totals;
+    const totalsWithRates = {
+      ...t,
+      ...anchorCalcRates(t.leads, t.mouth, t.valid_lead, t.new_valid_lead, t.new_opened, t.new_valid),
+    };
+    const weeklyList: any[] = [];
+    for (const wk of Object.keys(a.weekly).sort()) {
+      const w = a.weekly[wk];
+      weeklyList.push({
+        week_start: wk,
+        ...w,
+        ...anchorCalcRates(w.leads, w.mouth, w.valid_lead, w.new_valid_lead, w.new_opened, w.new_valid),
+      });
+    }
+    anchorItems.push({
+      anchor: a.anchor,
+      live_type: a.live_type,
+      totals: totalsWithRates,
+      weekly: weeklyList,
+    });
+  }
+
+  // Top N 排序（按新开户 → 线索量 降序）
+  anchorItems.sort((a, b) =>
+    (b.totals.new_opened - a.totals.new_opened) || (b.totals.leads - a.totals.leads)
+  );
+  const topAnchors = anchorItems.slice(0, top_n);
+
+  const weeklyTotals: any[] = [];
+  for (const wk of Object.keys(weeklyAgg).sort()) {
+    const t = weeklyAgg[wk];
+    weeklyTotals.push({
+      week_start: wk,
+      ...t,
+      ...anchorCalcRates(t.leads, t.mouth, t.valid_lead, t.new_valid_lead, t.new_opened, t.new_valid),
+    });
+  }
+
+  const totals = {
+    total_anchors: anchorItems.length,
+    top_anchors: topAnchors.length,
+    total_leads: anchorItems.reduce((s, a) => s + a.totals.leads, 0),
+    total_new_valid_lead: anchorItems.reduce((s, a) => s + a.totals.new_valid_lead, 0),
+    total_new_opened: anchorItems.reduce((s, a) => s + a.totals.new_opened, 0),
+    total_new_valid: anchorItems.reduce((s, a) => s + a.totals.new_valid, 0),
+    total_weeks: weeklyTotals.length,
+  };
+
+  return {
+    anchors: Array.from(allAnchors).sort(),
+    weekly_totals: weeklyTotals,
+    anchor_items: topAnchors,
+    totals,
+    top_n,
+    all_count: anchorItems.length,
+  };
+}
+
+// ============================================================================
+// 投放评审 (investment-review)
+// ============================================================================
+
+/**
+ * 投放评审：按厂商 × 月度展示消耗/企微/开口/开户/加微成本/开户成本
+ * 数据源：agg_vendor_daily（与厂商分析共用）
+ */
+async function handleInvestmentReview(url: string, body: any): Promise<any> {
+  let sd: string | undefined, ed: string | undefined;
+  let platforms: string[] = [], agencies: string[] = [], business_models: string[] = [];
+
+  if (body?.filters) {
+    const f = body.filters;
+    sd = f.start_date; ed = f.end_date;
+    platforms = f.platforms || []; agencies = f.agencies || []; business_models = f.business_models || [];
+  } else {
+    const q = parseQueryParams(url);
+    sd = q.start_date; ed = q.end_date;
+    platforms = q.platforms ? q.platforms.split(',').filter(Boolean) : [];
+    agencies = q.agencies ? q.agencies.split(',').filter(Boolean) : [];
+    business_models = q.business_models ? q.business_models.split(',').filter(Boolean) : [];
+  }
+
+  const where = buildWhere([
+    dateClause('日期', sd, ed),
+    inClause('平台', platforms),
+    inClause('厂商', agencies),
+    inClause('业务模式', business_models),
+  ]);
+
+  // 按 厂商 × 月(substr(日期,1,7)) 聚合
+  const sql = `SELECT "厂商" as agency,
+    substr("日期", 1, 7) as month,
+    COALESCE(SUM("花费"), 0) as cost,
+    COALESCE(SUM("线索数"), 0) as leads,
+    COALESCE(SUM("开口人数"), 0) as opened_conversation,
+    COALESCE(SUM("开户人数"), 0) as opened_account
+  FROM agg_vendor_daily ${where.clause}
+  GROUP BY "厂商", month ORDER BY "厂商", month`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  // 按厂商分桶
+  const byAgency: Record<string, any[]> = {};
+  for (const r of rows) {
+    const agency = r.agency || '未归因';
+    if (!byAgency[agency]) byAgency[agency] = [];
+    const cost = toFloat(r.cost);
+    const leads = toInt(r.leads);
+    const opened_conv = toInt(r.opened_conversation);
+    const opened_acc = toInt(r.opened_account);
+    byAgency[agency].push({
+      month: r.month || '',
+      cost: round2(cost),
+      leads,
+      opened_conversation: opened_conv,
+      opened_account: opened_acc,
+      lead_cost: leads > 0 ? round2(cost / leads) : null,
+      account_cost: opened_acc > 0 ? round2(cost / opened_acc) : null,
+    });
+  }
+
+  // 每个厂商追加"总计"行
+  const monthly_payload: Record<string, any[]> = {};
+  const trend_payload: Record<string, any[]> = {};
+  for (const agency in byAgency) {
+    const items = byAgency[agency];
+    const total_cost = items.reduce((s, it) => s + it.cost, 0);
+    const total_leads = items.reduce((s, it) => s + it.leads, 0);
+    const total_conv = items.reduce((s, it) => s + it.opened_conversation, 0);
+    const total_acc = items.reduce((s, it) => s + it.opened_account, 0);
+    const total_row = {
+      month: '总计',
+      cost: round2(total_cost),
+      leads: total_leads,
+      opened_conversation: total_conv,
+      opened_account: total_acc,
+      lead_cost: total_leads > 0 ? round2(total_cost / total_leads) : null,
+      account_cost: total_acc > 0 ? round2(total_cost / total_acc) : null,
+      is_total: true,
+    };
+    monthly_payload[agency] = items.concat([total_row]);
+    trend_payload[agency] = items;
+  }
+
+  // 厂商列表（按消耗降序）
+  const agency_list = Object.keys(byAgency).sort(
+    (a, b) => byAgency[b].reduce((s, it) => s + it.cost, 0) - byAgency[a].reduce((s, it) => s + it.cost, 0)
+  );
+  // 移动端无 full_to_short，简称=全称
+  const agency_short_map: Record<string, string> = {};
+  for (const a of agency_list) agency_short_map[a] = a;
+
+  const month_set = new Set<string>();
+  for (const items of Object.values(byAgency)) {
+    for (const it of items) month_set.add(it.month);
+  }
+
+  return {
+    agencies: agency_list,
+    agency_short_map,
+    monthly: monthly_payload,
+    trend: trend_payload,
+    meta: { agency_count: agency_list.length, month_count: month_set.size },
+  };
+}
+
+// ============================================================================
+// 应用市场计划分析 (reports/app-market/plan-analysis)
+// ============================================================================
+
+/** SQLite 周起始日（周一）：date(d, 'weekday 0', '-6 days') */
+const WEEK_START_EXPR = `date("下载日期", 'weekday 0', '-6 days')`;
+
+async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+  const app_market = filters.app_market || filters.app_markets?.[0];
+  const top_n = Math.max(1, toInt(body?.top_n) || 30);
+
+  // 强制 渠道类型='互联网引流'
+  const where = buildWhere([
+    dateClause('下载日期', sd, ed),
+    { sql: '"渠道类型" = ?', params: ['互联网引流'] },
+    app_market ? { sql: '"应用市场" = ?', params: [app_market] } : null,
+  ]);
+
+  // 5 阶段漏斗
+  const funnelCols: [string, string][] = [
+    ['是否激活APP', '激活APP'],
+    ['是否开户成功', '开户成功'],
+    ['是否新开户', '新开户'],
+    ['是否入金', '入金'],
+    ['是否有效户', '有效户'],
+  ];
+  const selectCols = funnelCols.map(([c, a]) => `COALESCE(SUM("${c}"), 0) as "${a}"`).join(', ');
+
+  // 整体周度走势
+  const weeklySql = `SELECT ${WEEK_START_EXPR} as week_start, ${selectCols}
+    FROM fact_conv_appmarket ${where.clause}
+    GROUP BY week_start ORDER BY week_start`;
+  const weeklyRows = await querySql<Row>(weeklySql, where.params);
+  const weekly_totals = weeklyRows.map(r => {
+    const cnt: Record<string, number> = {};
+    for (const [, a] of funnelCols) cnt[a] = toInt(r[a]);
+    return {
+      week_start: String(r.week_start).slice(0, 10),
+      ...cnt,
+      激活_开户率: cnt['激活APP'] > 0 ? round2(cnt['开户成功'] / cnt['激活APP'] * 100) : 0,
+      激活_新开户率: cnt['激活APP'] > 0 ? round2(cnt['新开户'] / cnt['激活APP'] * 100) : 0,
+      激活_有效率: cnt['激活APP'] > 0 ? round2(cnt['有效户'] / cnt['激活APP'] * 100) : 0,
+      开户_新开户率: cnt['开户成功'] > 0 ? round2(cnt['新开户'] / cnt['开户成功'] * 100) : 0,
+      开户_有效率: cnt['开户成功'] > 0 ? round2(cnt['有效户'] / cnt['开户成功'] * 100) : 0,
+    };
+  });
+
+  // plan_key：广告计划ID NULL/0 fallback 投放账号
+  const planExpr = `CASE WHEN "广告计划ID" IS NULL OR "广告计划ID" = 0 THEN COALESCE("投放账号", '未归因') ELSE CAST("广告计划ID" AS TEXT) END`;
+  const planSql = `SELECT ${planExpr} as plan_key, "投放账号", ${WEEK_START_EXPR} as week_start, ${selectCols}
+    FROM fact_conv_appmarket ${where.clause}
+    GROUP BY plan_key, "投放账号", week_start ORDER BY week_start`;
+  const planRows = await querySql<Row>(planSql, where.params);
+
+  // 按 plan_key 聚合
+  const planMap: Record<string, { plan_id: string; 投放账号: string; totals: any; weekly: any[] }> = {};
+  for (const r of planRows) {
+    const pk = String(r.plan_key || '未归因');
+    if (!planMap[pk]) {
+      planMap[pk] = {
+        plan_id: pk,
+        投放账号: r['投放账号'] || '-',
+        totals: { 激活APP: 0, 开户成功: 0, 新开户: 0, 入金: 0, 有效户: 0 },
+        weekly: [],
+      };
+    }
+    const cnt: Record<string, number> = {};
+    for (const [, a] of funnelCols) cnt[a] = toInt(r[a]);
+    for (const [, a] of funnelCols) planMap[pk].totals[a] += cnt[a];
+    planMap[pk].weekly.push({
+      week_start: String(r.week_start).slice(0, 10),
+      ...cnt,
+      激活_开户率: cnt['激活APP'] > 0 ? round2(cnt['开户成功'] / cnt['激活APP'] * 100) : 0,
+      激活_新开户率: cnt['激活APP'] > 0 ? round2(cnt['新开户'] / cnt['激活APP'] * 100) : 0,
+      激活_有效率: cnt['激活APP'] > 0 ? round2(cnt['有效户'] / cnt['激活APP'] * 100) : 0,
+      开户_新开户率: cnt['开户成功'] > 0 ? round2(cnt['新开户'] / cnt['开户成功'] * 100) : 0,
+      开户_有效率: cnt['开户成功'] > 0 ? round2(cnt['有效户'] / cnt['开户成功'] * 100) : 0,
+    });
+  }
+
+  const all_plans = Object.values(planMap);
+  // Top N 排序（按 新开户 → 开户成功 → 激活APP 降序）
+  all_plans.sort((a, b) =>
+    b.totals['新开户'] - a.totals['新开户'] ||
+    b.totals['开户成功'] - a.totals['开户成功'] ||
+    b.totals['激活APP'] - a.totals['激活APP']
+  );
+  const top_plans = all_plans.slice(0, top_n);
+
+  // 平台列表
+  const platSql = `SELECT DISTINCT "应用市场" as v FROM fact_conv_appmarket
+    WHERE "渠道类型" = '互联网引流' AND "应用市场" IS NOT NULL`;
+  const platRows = await querySql<Row>(platSql);
+  const platforms = platRows.map(r => r.v).filter(Boolean).sort();
+
+  const totals = {
+    total_plans: all_plans.length,
+    top_plans: top_plans.length,
+    total_activate: all_plans.reduce((s, p) => s + p.totals['激活APP'], 0),
+    total_open: all_plans.reduce((s, p) => s + p.totals['开户成功'], 0),
+    total_new_open: all_plans.reduce((s, p) => s + p.totals['新开户'], 0),
+    total_deposit: all_plans.reduce((s, p) => s + p.totals['入金'], 0),
+    total_valid: all_plans.reduce((s, p) => s + p.totals['有效户'], 0),
+    total_weeks: weekly_totals.length,
+  };
+
+  return {
+    platforms,
+    selected_platform: app_market || null,
+    weekly_totals,
+    plan_items: top_plans,
+    totals,
+    top_n,
+    all_count: all_plans.length,
+  };
+}
+
+// ============================================================================
+// 应用市场创意 (reports/app-market/creative)
+// ============================================================================
+
+async function handleAppMarketCreative(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+  const top_n = Math.max(1, toInt(body?.top_n) || 50);
+
+  // 强制 渠道类型='互联网引流'（_funnel_filters 业务规则）
+  const where = buildWhere([
+    dateClause('下载日期', sd, ed),
+    { sql: '"渠道类型" = ?', params: ['互联网引流'] },
+    inClause('应用市场', filters.app_markets),
+  ]);
+
+  const planExpr = `CASE WHEN "广告计划ID" IS NULL OR "广告计划ID" = 0 THEN COALESCE("投放账号", '未归因') ELSE CAST("广告计划ID" AS TEXT) END`;
+  const sql = `SELECT ${planExpr} as plan_key,
+    "投放账号", "应用市场", "渠道类型",
+    COALESCE(SUM("是否激活APP"), 0) as 激活APP,
+    COALESCE(SUM("是否开户成功"), 0) as 开户成功,
+    COALESCE(SUM("是否新开户"), 0) as 新开户,
+    COALESCE(SUM("是否入金"), 0) as 入金,
+    COALESCE(SUM("是否有效户"), 0) as 有效户
+  FROM fact_conv_appmarket ${where.clause}
+  GROUP BY plan_key, "投放账号", "应用市场", "渠道类型"`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  const items = rows.map(r => {
+    const activate = toInt(r['激活APP']);
+    const opened = toInt(r['开户成功']);
+    const newOpen = toInt(r['新开户']);
+    const deposit = toInt(r['入金']);
+    const valid = toInt(r['有效户']);
+    const planId = String(r.plan_key || '未归因');
+    return {
+      plan_id: planId,
+      plan_label: planId,
+      投放账号: r['投放账号'] || '-',
+      应用市场: r['应用市场'] || '未归因',
+      渠道类型: r['渠道类型'] || '未归因',
+      激活APP: activate, 开户成功: opened, 新开户: newOpen, 入金: deposit, 有效户: valid,
+      激活_开户率: activate > 0 ? round2(opened / activate * 100) : 0,
+      激活_新开户率: activate > 0 ? round2(newOpen / activate * 100) : 0,
+      激活_有效率: activate > 0 ? round2(valid / activate * 100) : 0,
+      开户_有效率: opened > 0 ? round2(valid / opened * 100) : 0,
+      开户_新开户率: opened > 0 ? round2(newOpen / opened * 100) : 0,
+    };
+  });
+  items.sort((a, b) => b.新开户 - a.新开户 || b.开户成功 - a.开户成功 || b.激活APP - a.激活APP);
+  const top_items = items.slice(0, top_n);
+
+  return {
+    items: top_items,
+    totals: {
+      total_plans: items.length,
+      top_plans: top_items.length,
+      total_activate: items.reduce((s, i) => s + i.激活APP, 0),
+      total_open: items.reduce((s, i) => s + i.开户成功, 0),
+      total_new_open: items.reduce((s, i) => s + i.新开户, 0),
+      total_deposit: items.reduce((s, i) => s + i.入金, 0),
+      total_valid: items.reduce((s, i) => s + i.有效户, 0),
+    },
+    top_n,
+    all_count: items.length,
+  };
+}
+
+// ============================================================================
+// 小红书笔记列表 (xhs-notes-list / xhs-notes/list)
+// ============================================================================
+
+/** agg_xhs_note 字段白名单（用于 sort_field 校验） */
+const XHS_NOTE_SORT_FIELDS = new Set([
+  '发布时间', '消费金额', '总展现量', '点击量', '总互动量', '私信进线人数',
+  '添加企微人数', '企微成功添加人数', '开户人数', '加微成本', '开户成本', '推广展现量', '推广点击量',
+]);
+
+/** 小红书笔记列表（POST 与 GET 共享） */
+async function handleXhsNotesList(url: string, body: any): Promise<any> {
+  // 参数解析：POST 在 body.filters；GET 在 URL query
+  let filters: any, page: number, page_size: number, sort_field: string, sort_order: string;
+  if (body?.filters || body?.page) {
+    filters = body.filters || {};
+    page = Math.max(1, toInt(body.page) || 1);
+    page_size = Math.max(1, Math.min(200, toInt(body.page_size) || 50));
+    sort_field = (body.sort_field || '').trim() || '开户人数';
+    sort_order = (body.sort_order || '').trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
+  } else {
+    const q = parseQueryParams(url);
+    filters = {};
+    if (q.publish_start_date) filters.publish_start_date = q.publish_start_date;
+    if (q.publish_end_date) filters.publish_end_date = q.publish_end_date;
+    if (q.creator) filters.creators = [q.creator];
+    if (q.ad_strategies) filters.ad_strategies = q.ad_strategies.split(',').filter(Boolean);
+    if (q.content_types) filters.content_types = q.content_types.split(',').filter(Boolean);
+    if (q.account) filters.account = q.account;
+    page = Math.max(1, toInt(q.page) || 1);
+    page_size = Math.max(1, Math.min(200, toInt(q.page_size) || 50));
+    sort_field = (q.sort_field || '').trim() || '开户人数';
+    sort_order = (q.sort_order || '').trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
+  }
+
+  // 兼容 filters.date_range → publish_start/end
+  const publish_start = filters.publish_start_date || (filters.date_range?.[0]);
+  let publish_end = filters.publish_end_date || (filters.date_range?.[1]);
+  if (publish_end && publish_end.length === 10) publish_end = publish_end + ' 23:59:59';
+
+  const conditions: ({ sql: string; params: unknown[] } | null)[] = [];
+  if (publish_start && publish_end) {
+    conditions.push({ sql: '"发布时间" >= ? AND "发布时间" <= ?', params: [publish_start, publish_end] });
+  } else if (publish_start) {
+    conditions.push({ sql: '"发布时间" >= ?', params: [publish_start] });
+  } else if (publish_end) {
+    conditions.push({ sql: '"发布时间" <= ?', params: [publish_end] });
+  }
+  if (filters.creators) conditions.push(inClause('创作者', filters.creators));
+  if (filters.ad_strategies) conditions.push(inClause('广告策略', filters.ad_strategies));
+  if (filters.content_types) conditions.push(inClause('内容类型', filters.content_types));
+  if (filters.account) conditions.push({ sql: '"笔记账号" = ?', params: [filters.account] });
+  const where = buildWhere(conditions);
+
+  // 排序字段校验：白名单内才用，否则 fallback 到 发布时间
+  const sort_col = XHS_NOTE_SORT_FIELDS.has(sort_field) ? sort_field : '发布时间';
+
+  // 总数
+  const totalSql = `SELECT COUNT(*) as c FROM agg_xhs_note ${where.clause}`;
+  const totalRows = await querySql<Row>(totalSql, where.params);
+  const total = toInt(totalRows[0]?.c);
+  const offset = (page - 1) * page_size;
+
+  const sql = `SELECT * FROM agg_xhs_note ${where.clause}
+    ORDER BY "${sort_col}" ${sort_order === 'asc' ? 'ASC' : 'DESC'}
+    LIMIT ${page_size} OFFSET ${offset}`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  const notes = rows.map(r => ({
+    id: r.id,
+    note_id: r['笔记ID'],
+    note_title: r['笔记标题'] || '',
+    note_type: r['笔记类型'] || '',
+    content_type: r['内容类型'] || '',
+    publish_account: r['笔记账号'] || '',
+    creator_name: r['创作者'] || '',
+    producer: r['创作者'] || '',
+    ad_strategy: r['广告策略'] || '',
+    publish_time: r['发布时间'] || '',
+    note_url: r['笔记链接'] || '',
+    impressions: toInt(r['总展现量']),
+    clicks: toInt(r['点击量']),
+    click_rate: toFloat(r['总点击率']),
+    interactions: toInt(r['总互动量']),
+    cost: toFloat(r['消费金额']),
+    ad_impressions: toInt(r['推广展现量']),
+    ad_clicks: toInt(r['推广点击量']),
+    ad_click_rate: toFloat(r['推广点击率']),
+    ad_interactions: toInt(r['推广互动量']),
+    private_messages: toInt(r['私信进线人数']),
+    lead_users: toInt(r['添加企微人数']),
+    customer_mouth_users: toInt(r['企微成功添加人数']),
+    add_wechat_cost: toFloat(r['加微成本']),
+    opened_account_users: toInt(r['开户人数']),
+    open_account_cost: toFloat(r['开户成本']),
+  }));
+
+  return {
+    notes,
+    pagination: {
+      page, page_size, total,
+      total_pages: Math.ceil(total / page_size) || 0,
+    },
+  };
+}
+
+/** 小红书筛选选项（distinct 枚举） */
+async function handleXhsNotesFilterOptions(): Promise<any> {
+  const mkOpts = async (col: string) => {
+    const rows = await querySql<Row>(
+      `SELECT DISTINCT "${col}" as v FROM agg_xhs_note
+       WHERE "${col}" IS NOT NULL AND "${col}" != ''
+       ORDER BY "${col}"`
+    );
+    return rows.map(r => ({ value: r.v, label: String(r.v) }));
+  };
+  return {
+    creators: await mkOpts('创作者'),
+    content_types: await mkOpts('内容类型'),
+    ad_strategies: await mkOpts('广告策略'),
+    publish_accounts: await mkOpts('笔记账号'),
+  };
+}
+
+// ============================================================================
+// 小红书运营分析 (xhs-notes-operation-analysis)
+// ============================================================================
+
+const XHS_ASSISTANTS = ['史菡漾', '何泳萍', '杨华', '贾芳', '陈鸿', '袁孝春', '赵梅', '张杰明'];
+
+/** 上周五到本周四的周标签（与后端 _week_label 一致） */
+function xhsWeekLabel(dateStr: string): string | null {
+  const d = new Date(dateStr.slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d.getTime())) return null;
+  const weekday = d.getUTCDay();           // Sun=0...Sat=6
+  const wd = (weekday + 6) % 7;            // Mon=0...Sun=6（与 Python weekday() 对齐）
+  const weekStart = new Date(d);
+  if (wd >= 4) {                            // Fri/Sat/Sun → 本周五
+    weekStart.setUTCDate(d.getUTCDate() - (wd - 4));
+  } else {                                   // Mon-Thu → 上周五
+    weekStart.setUTCDate(d.getUTCDate() - (wd + 3));
+  }
+  return weekStart.toISOString().slice(0, 10);
+}
+
+async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const date_range = filters.date_range || [];
+  const publish_start = date_range[0];
+  let publish_end = date_range[1];
+  if (publish_end && publish_end.length === 10) publish_end = publish_end + ' 23:59:59';
+
+  const tn_range = filters.top_notes_date_range || [];
+  const ca_range = filters.creator_annual_date_range || [];
+
+  // ---- A. notes 基础集合（按 publish_start/publish_end 过滤发布时间） ----
+  const baseWhere = buildWhere([
+    publish_start && publish_end
+      ? { sql: '"发布时间" >= ? AND "发布时间" <= ?', params: [publish_start, publish_end] }
+      : null,
+  ]);
+  const notesSql = `SELECT * FROM agg_xhs_note ${baseWhere.clause}`;
+  const notes = await querySql<Row>(notesSql, baseWhere.params);
+
+  // ---- B. top_notes_subset（独立时间范围） ----
+  const tnConditions: ({ sql: string; params: unknown[] } | null)[] = [];
+  if (tn_range[0]) tnConditions.push({ sql: '"发布时间" >= ?', params: [tn_range[0]] });
+  if (tn_range[1]) {
+    const te = tn_range[1].length === 10 ? tn_range[1] + ' 23:59:59' : tn_range[1];
+    tnConditions.push({ sql: '"发布时间" <= ?', params: [te] });
+  }
+  const tnWhere = buildWhere(tnConditions);
+  const top_notes_subset = tn_range[0] || tn_range[1]
+    ? await querySql<Row>(`SELECT * FROM agg_xhs_note ${tnWhere.clause}`, tnWhere.params)
+    : notes;
+
+  // ---- C. creator_annual_subset（独立时间范围） ----
+  const caConditions: ({ sql: string; params: unknown[] } | null)[] = [];
+  if (ca_range[0]) caConditions.push({ sql: '"发布时间" >= ?', params: [ca_range[0]] });
+  if (ca_range[1]) {
+    const ce = ca_range[1].length === 10 ? ca_range[1] + ' 23:59:59' : ca_range[1];
+    caConditions.push({ sql: '"发布时间" <= ?', params: [ce] });
+  }
+  const caWhere = buildWhere(caConditions);
+  const creator_annual_subset = ca_range[0] || ca_range[1]
+    ? await querySql<Row>(`SELECT * FROM agg_xhs_note ${caWhere.clause}`, caWhere.params)
+    : notes;
+
+  // ---- core_metrics ----
+  let total_cost = 0, total_impressions = 0, total_clicks = 0, total_interactions = 0;
+  let total_pmsg = 0, total_lead_users = 0, total_mouth_users = 0, total_opened = 0;
+  const note_id_set = new Set<string>();
+  for (const n of notes) {
+    total_cost += toFloat(n['消费金额']);
+    total_impressions += toInt(n['总展现量']);
+    total_clicks += toInt(n['点击量']);
+    total_interactions += toInt(n['总互动量']);
+    total_pmsg += toInt(n['私信进线人数']);
+    total_lead_users += toInt(n['添加企微人数']);
+    total_mouth_users += toInt(n['企微成功添加人数']);
+    total_opened += toInt(n['开户人数']);
+    if (n['笔记ID']) note_id_set.add(String(n['笔记ID']));
+  }
+  const pct = (a: number, b: number) => b > 0 ? round2(a / b * 100) : 0;
+  const core_metrics = {
+    new_notes_count: note_id_set.size,
+    ad_notes_count: notes.length,
+    total_cost: round2(total_cost),
+    total_impressions,
+    total_clicks,
+    total_interactions,
+    total_private_messages: total_pmsg,
+    total_lead_users,
+    total_opened_accounts: total_opened,
+    impression_click_rate: pct(total_clicks, total_impressions),
+    click_interaction_rate: pct(total_interactions, total_clicks),
+    click_lead_rate: pct(total_pmsg, total_clicks),
+    cost_per_private_message: total_pmsg > 0 ? round2(total_cost / total_pmsg) : 0,
+    cost_per_lead_user: total_lead_users > 0 ? round2(total_cost / total_lead_users) : 0,
+    cost_per_opened_account: total_opened > 0 ? round2(total_cost / total_opened) : 0,
+    lead_to_wechat_rate: pct(total_lead_users, total_pmsg),
+    wechat_to_account_rate: pct(total_opened, total_lead_users),
+    cost_per_mille: total_impressions > 0 ? round2(total_cost / total_impressions * 1000) : 0,
+    cost_per_click: total_clicks > 0 ? round2(total_cost / total_clicks) : 0,
+  };
+
+  // ---- creator_content / creator_conversion ----
+  const creator_content: Record<string, any> = {};
+  const creator_conversion: Record<string, any> = {};
+  for (const n of notes) {
+    const c = n['创作者'] || '未知';
+    if (!creator_content[c]) {
+      creator_content[c] = { note_count: 0, total_impressions: 0, total_clicks: 0, total_interactions: 0, total_cost: 0 };
+    }
+    if (!creator_conversion[c]) {
+      creator_conversion[c] = { lead_users: 0, opened_account_users: 0, total_cost: 0, private_messages: 0, customer_mouth_users: 0, valid_lead_users: 0, valid_customer_users: 0 };
+    }
+    const cc = creator_content[c];
+    cc.note_count++;
+    cc.total_impressions += toInt(n['总展现量']);
+    cc.total_clicks += toInt(n['点击量']);
+    cc.total_interactions += toInt(n['总互动量']);
+    cc.total_cost += toFloat(n['消费金额']);
+    const cv = creator_conversion[c];
+    cv.lead_users += toInt(n['添加企微人数']);
+    cv.opened_account_users += toInt(n['开户人数']);
+    cv.total_cost += toFloat(n['消费金额']);
+    cv.private_messages += toInt(n['私信进线人数']);
+    cv.customer_mouth_users += toInt(n['企微成功添加人数']);
+  }
+  const creator_content_data = Object.entries(creator_content).map(([k, v]) => ({
+    producer: k, note_count: v.note_count,
+    total_impressions: v.total_impressions, total_clicks: v.total_clicks,
+    total_interactions: v.total_interactions, total_cost: round2(v.total_cost),
+    avg_click_rate: v.total_impressions > 0 ? round2(v.total_clicks / v.total_impressions * 100) : 0,
+    avg_interaction_rate: v.total_impressions > 0 ? round2(v.total_interactions / v.total_impressions * 100) : 0,
+  }));
+  const creator_conversion_data = Object.entries(creator_conversion).map(([k, v]) => ({
+    producer: k, lead_users: v.lead_users, opened_account_users: v.opened_account_users,
+    total_cost: round2(v.total_cost), private_messages: v.private_messages,
+    customer_mouth_users: v.customer_mouth_users, valid_lead_users: 0, valid_customer_users: 0,
+  }));
+
+  // ---- creation_trend（按月聚合，限 2026+） ----
+  const by_month: Record<string, any> = {};
+  const by_month_producer: Record<string, Record<string, number>> = {};
+  for (const n of notes) {
+    const pt = String(n['发布时间'] || '');
+    if (!pt || pt.slice(0, 4) < '2026') continue;
+    const m = pt.slice(0, 7);
+    if (!by_month[m]) by_month[m] = { note_count: 0, impressions: 0, interactions: 0, cost: 0 };
+    by_month[m].note_count++;
+    by_month[m].impressions += toInt(n['总展现量']);
+    by_month[m].interactions += toInt(n['总互动量']);
+    by_month[m].cost += toFloat(n['消费金额']);
+    const prod = n['创作者'] || '未知';
+    if (!by_month_producer[m]) by_month_producer[m] = {};
+    by_month_producer[m][prod] = (by_month_producer[m][prod] || 0) + 1;
+  }
+  const sorted_months = Object.keys(by_month).sort();
+  // Top 10 创作者
+  const producer_total: Record<string, number> = {};
+  for (const m in by_month_producer) {
+    for (const p in by_month_producer[m]) {
+      producer_total[p] = (producer_total[p] || 0) + by_month_producer[m][p];
+    }
+  }
+  const top_producers = Object.entries(producer_total)
+    .sort((a, b) => b[1] - a[1]).slice(0, 10).map(x => x[0]);
+  const creation_trend = {
+    dates: sorted_months,
+    note_counts: sorted_months.map(m => by_month[m].note_count),
+    impression_series: sorted_months.map(m => by_month[m].impressions),
+    interaction_series: sorted_months.map(m => by_month[m].interactions),
+    cost_series: sorted_months.map(m => round2(by_month[m].cost)),
+    click_series: [],
+    interaction_rate_series: sorted_months.map(m => by_month[m].impressions > 0 ? round2(by_month[m].interactions / by_month[m].impressions * 100) : 0),
+    cost_per_mille_series: sorted_months.map(m => by_month[m].impressions > 0 ? round2(by_month[m].cost / by_month[m].impressions * 1000) : 0),
+    producer_matrix: {
+      producers: top_producers,
+      months: sorted_months,
+      matrix: Object.fromEntries(top_producers.map(p => [p, sorted_months.map(m => by_month_producer[m]?.[p] || 0)])),
+    },
+  };
+
+  // ---- top_notes（按消费金额 desc Top 20） ----
+  const top_notes = [...top_notes_subset]
+    .sort((a, b) => toFloat(b['消费金额']) - toFloat(a['消费金额']))
+    .slice(0, 20)
+    .map(n => {
+      const cost_v = toFloat(n['消费金额']);
+      const interactions = toInt(n['总互动量']);
+      return {
+        note_id: n['笔记ID'],
+        note_title: n['笔记标题'] || '',
+        producer: n['创作者'] || '',
+        publish_time: n['发布时间'] || '',
+        ad_strategy: n['广告策略'] || '',
+        total_impressions: toInt(n['总展现量']),
+        total_clicks: toInt(n['点击量']),
+        total_private_messages: toInt(n['私信进线人数']),
+        interaction_count: interactions,
+        lead_users: toInt(n['添加企微人数']),
+        opened_account_users: toInt(n['开户人数']),
+        total_cost: round2(cost_v),
+        cost_per_interaction: interactions > 0 ? round2(cost_v / interactions) : 0,
+      };
+    });
+
+  // ---- creator_annual_ranking（前 50，按 total_score desc） ----
+  const by_creator: Record<string, any> = {};
+  for (const n of creator_annual_subset) {
+    const c = n['创作者'] || '未知';
+    if (!by_creator[c]) {
+      by_creator[c] = { cost: 0, lead_users: 0, opened: 0, interactions: 0, note_count: 0, total_impressions: 0, total_clicks: 0, total_private_messages: 0 };
+    }
+    const v = by_creator[c];
+    v.cost += toFloat(n['消费金额']);
+    v.lead_users += toInt(n['添加企微人数']);
+    v.opened += toInt(n['开户人数']);
+    v.interactions += toInt(n['总互动量']);
+    v.note_count++;
+    v.total_impressions += toInt(n['总展现量']);
+    v.total_clicks += toInt(n['点击量']);
+    v.total_private_messages += toInt(n['私信进线人数']);
+  }
+  const creator_annual_ranking = Object.entries(by_creator).map(([k, v]) => ({
+    producer: k, note_count: v.note_count,
+    total_impressions: v.total_impressions, total_clicks: v.total_clicks,
+    total_private_messages: v.total_private_messages, total_cost: round2(v.cost),
+    total_interactions: v.interactions, lead_users: v.lead_users,
+    opened_account_users: v.opened,
+    total_score: v.lead_users * 10 + v.opened * 100 + v.interactions * 0.01,
+  })).sort((a, b) => b.total_score - a.total_score).slice(0, 50);
+
+  // ---- agency_data（agg_vendor_daily 平台='小红书'） ----
+  const agWhere = buildWhere([
+    { sql: '"厂商" IS NOT NULL AND "厂商" != \'\'', params: [] as unknown[] },
+    { sql: '"平台" = ?', params: ['小红书'] },
+    publish_start && publish_end
+      ? { sql: '"日期" >= ? AND "日期" <= ?', params: [publish_start, publish_end.slice(0, 10)] }
+      : null,
+  ]);
+  const agSql = `SELECT "厂商",
+    COALESCE(SUM("花费"), 0) as total_cost,
+    COALESCE(SUM("展示量"), 0) as total_impressions,
+    COALESCE(SUM("点击量"), 0) as total_clicks,
+    COALESCE(SUM("线索数"), 0) as lead_users,
+    COALESCE(SUM("开口人数"), 0) as customer_mouth_users,
+    COALESCE(SUM("有效线索数"), 0) as valid_lead_users,
+    COALESCE(SUM("开户人数"), 0) as opened_account_users,
+    COALESCE(SUM("有效户人数"), 0) as valid_customer_users
+  FROM agg_vendor_daily ${agWhere.clause}
+  GROUP BY "厂商"`;
+  const agRows = await querySql<Row>(agSql, agWhere.params);
+  const agency_data = agRows.map(r => ({
+    agency: r['厂商'] || '未归因',
+    total_cost: round2(toFloat(r.total_cost)),
+    total_impressions: toInt(r.total_impressions),
+    total_clicks: toInt(r.total_clicks),
+    lead_users: toInt(r.lead_users),
+    potential_customers: toInt(r.customer_mouth_users),
+    customer_mouth_users: toInt(r.customer_mouth_users),
+    valid_lead_users: toInt(r.valid_lead_users),
+    opened_account_users: toInt(r.opened_account_users),
+    valid_customer_users: toInt(r.valid_customer_users),
+  })).sort((a, b) => b.total_cost - a.total_cost);
+
+  // ---- conversion_trend（fact_conv_content 平台来源='小红书'，周维度） ----
+  const convWhere = buildWhere([
+    { sql: '"平台来源" = ?', params: ['小红书'] },
+    publish_start && publish_end
+      ? { sql: '"线索日期" >= ? AND "线索日期" <= ?', params: [publish_start, publish_end.slice(0, 10)] }
+      : null,
+  ]);
+  const convSql = `SELECT "线索日期", "是否客户开口", "是否有效线索", "是否开户"
+    FROM fact_conv_content ${convWhere.clause}`;
+  const convRows = await querySql<Row>(convSql, convWhere.params);
+  const by_week: Record<string, { leads: number; mouth: number; valid_lead: number; opened: number }> = {};
+  for (const r of convRows) {
+    const ld = String(r['线索日期'] || '');
+    if (!ld || ld.slice(0, 4) < '2026') continue;
+    const w = xhsWeekLabel(ld);
+    if (!w || w < '2026-01-01') continue;
+    if (!by_week[w]) by_week[w] = { leads: 0, mouth: 0, valid_lead: 0, opened: 0 };
+    by_week[w].leads++;
+    by_week[w].mouth += toInt(r['是否客户开口']);
+    by_week[w].valid_lead += toInt(r['是否有效线索']);
+    by_week[w].opened += toInt(r['是否开户']);
+  }
+  const sorted_weeks = Object.keys(by_week).sort();
+  const conversion_trend = {
+    weeks: sorted_weeks,
+    dateRanges: sorted_weeks,
+    lead_users: sorted_weeks.map(w => by_week[w].leads),
+    customer_mouth_users: sorted_weeks.map(w => by_week[w].mouth),
+    valid_lead_users: sorted_weeks.map(w => by_week[w].valid_lead),
+    opened_account_users: sorted_weeks.map(w => by_week[w].opened),
+  };
+
+  // ---- note_conversion_ranking（前 10，按 lead_users desc） ----
+  const note_conversion_ranking = notes
+    .filter(n => n['笔记ID'] && toInt(n['添加企微人数']) > 0)
+    .map(n => ({
+      note_id: n['笔记ID'],
+      note_title: n['笔记标题'] || '',
+      producer: n['创作者'] || '',
+      lead_users: toInt(n['添加企微人数']),
+      opened_account_users: toInt(n['开户人数']),
+      conversion_rate: pct(toInt(n['开户人数']), toInt(n['添加企微人数'])),
+    }))
+    .sort((a, b) => b.lead_users - a.lead_users)
+    .slice(0, 10);
+
+  const creator_creation_data = Object.entries(creator_content).map(([k, v]) => ({
+    producer: k, note_count: v.note_count, impressions: v.total_impressions,
+  }));
+  const creator_interaction_data = Object.entries(creator_content).map(([k, v]) => ({
+    producer: k, total_interactions: v.total_interactions,
+  }));
+
+  // ---- employee_conversion_ranking（fact_conv_content 平台来源='小红书'，按员工分组，固定 8 人） ----
+  const empWhere = buildWhere([
+    { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+    { sql: '"平台来源" = ?', params: ['小红书'] },
+    publish_start && publish_end
+      ? { sql: '"线索日期" >= ? AND "线索日期" <= ?', params: [publish_start, publish_end.slice(0, 10)] }
+      : null,
+  ]);
+  const empSql = `SELECT "添加员工姓名",
+    COUNT(id) as leads,
+    COALESCE(SUM("是否有效线索"), 0) as valid_leads,
+    COALESCE(SUM("是否开户"), 0) as opened,
+    COALESCE(SUM("是否为有效户"), 0) as valid,
+    COALESCE(SUM("资产"), 0) as assets
+  FROM fact_conv_content ${empWhere.clause}
+  GROUP BY "添加员工姓名"`;
+  const empRows = await querySql<Row>(empSql, empWhere.params);
+  const xhs_set = new Set(XHS_ASSISTANTS);
+  let emp_ranking = empRows
+    .filter(r => xhs_set.has(r['添加员工姓名']))
+    .map(r => {
+      const leads = toInt(r.leads); const opened = toInt(r.opened); const valid = toInt(r.valid);
+      return {
+        employee_name: r['添加员工姓名'],
+        lead_users: leads, wechat_adds: leads,
+        valid_lead_users: toInt(r.valid_leads), opened_account_users: opened,
+        valid_customer_users: valid,
+        opening_rate: leads > 0 ? round2(opened / leads * 100) : 0,
+        valid_customer_rate: opened > 0 ? round2(valid / opened * 100) : 0,
+        total_assets: round2(toFloat(r.assets)),
+      };
+    })
+    .sort((a, b) => b.opened_account_users - a.opened_account_users);
+  // 补齐名单中没数据的员工
+  const existing_names = new Set(emp_ranking.map(r => r.employee_name));
+  for (const name of XHS_ASSISTANTS) {
+    if (!existing_names.has(name)) {
+      emp_ranking.push({
+        employee_name: name, lead_users: 0, wechat_adds: 0,
+        valid_lead_users: 0, opened_account_users: 0, valid_customer_users: 0,
+        opening_rate: 0, valid_customer_rate: 0, total_assets: 0,
+      });
+    }
+  }
+
+  return {
+    core_metrics,
+    creator_content_data,
+    creator_conversion_data,
+    creation_trend,
+    top_notes,
+    creator_annual_ranking,
+    agency_data,
+    conversion_trend,
+    note_conversion_ranking,
+    creator_creation_data,
+    creator_interaction_data,
+    employee_conversion_ranking: emp_ranking,
+  };
+}
+
+// ============================================================================
+// 小红书计划分析 (reports/xhs/plan-analysis)
+// ============================================================================
+
+const XHS_TARGET_AGENCIES = ['直投', '量子', '绩牛', '美洋'];
+const XHS_PLAN_FUNNEL_KEYS = ['企微', '开口', '有效线索', '有效线索_不含存量', '新开户', '有效户'] as const;
+
+/** 计算小红书计划分析的 7 个转化率 */
+function xhsPlanCalcRates(qiwei: number, kaihou: number, youxiao: number, youxiao_bcq: number, xinkaihu: number, youxiao_hu: number) {
+  return {
+    '企微_开口率': qiwei > 0 ? round2(kaihou / qiwei * 100) : 0,
+    '企微_有效线索率': qiwei > 0 ? round2(youxiao / qiwei * 100) : 0,
+    '企微_不含存量率': qiwei > 0 ? round2(youxiao_bcq / qiwei * 100) : 0,
+    '企微_新开户率': qiwei > 0 ? round2(xinkaihu / qiwei * 100) : 0,
+    '企微_有效户率': qiwei > 0 ? round2(youxiao_hu / qiwei * 100) : 0,
+    '开口_新开户率': kaihou > 0 ? round2(xinkaihu / kaihou * 100) : 0,
+    '不含存量_有效户率': youxiao_bcq > 0 ? round2(youxiao_hu / youxiao_bcq * 100) : 0,
+  };
+}
+
+async function handleXhsPlanAnalysis(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+  const agency = filters.agency;
+  const top_n = Math.max(1, toInt(body?.top_n) || 30);
+
+  // 主聚合 SQL（plan × week）
+  const planExpr = `CASE WHEN "广告ID" IS NULL OR "广告ID" = '' THEN COALESCE("广告账号", '未归因') ELSE "广告ID" END`;
+  const conditions: ({ sql: string; params: unknown[] } | null)[] = [
+    { sql: '"平台来源" = ?', params: ['小红书'] },
+    dateClause('线索日期', sd, ed),
+  ];
+  if (agency) conditions.push({ sql: '"广告代理商" = ?', params: [String(agency)] });
+  const where = buildWhere(conditions);
+
+  const sql = `SELECT ${planExpr} as plan_key,
+    "广告账号", "广告代理商",
+    date("线索日期", 'weekday 0', '-6 days') as week_start,
+    COUNT(id) as "企微",
+    COALESCE(SUM("是否客户开口"), 0) as "开口",
+    COALESCE(SUM("是否有效线索"), 0) as "有效线索",
+    COALESCE(SUM(CASE WHEN "是否有效线索" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL) THEN 1 ELSE 0 END), 0) as "有效线索_不含存量",
+    COALESCE(SUM(CASE WHEN "是否开户" = 1 AND ("是否为存量客户" = 0 OR "是否为存量客户" IS NULL) THEN 1 ELSE 0 END), 0) as "新开户",
+    COALESCE(SUM("是否为有效户"), 0) as "有效户"
+  FROM fact_conv_content ${where.clause}
+  GROUP BY plan_key, "广告账号", "广告代理商", week_start
+  ORDER BY week_start`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  // plan_map + weekly_agg
+  const plan_map: Record<string, any> = {};
+  const weekly_agg: Record<string, any> = {};
+  for (const r of rows) {
+    const plan_key = String(r.plan_key ?? '未归因');
+    const week = String(r.week_start ?? '未知周');
+    const vals: Record<string, number> = {};
+    for (const k of XHS_PLAN_FUNNEL_KEYS) vals[k] = toInt(r[k]);
+
+    if (!plan_map[plan_key]) {
+      plan_map[plan_key] = {
+        plan_id: plan_key,
+        '广告账号': r['广告账号'] || '-',
+        '广告代理商': r['广告代理商'] || '-',
+        totals: Object.fromEntries(XHS_PLAN_FUNNEL_KEYS.map(k => [k, 0])),
+        weekly: [],
+      };
+    }
+    const p = plan_map[plan_key];
+    for (const k of XHS_PLAN_FUNNEL_KEYS) p.totals[k] += vals[k];
+    p.weekly.push({
+      week_start: week,
+      ...vals,
+      ...xhsPlanCalcRates(vals['企微'], vals['开口'], vals['有效线索'], vals['有效线索_不含存量'], vals['新开户'], vals['有效户']),
+    });
+    if (!weekly_agg[week]) weekly_agg[week] = Object.fromEntries(XHS_PLAN_FUNNEL_KEYS.map(k => [k, 0]));
+    for (const k of XHS_PLAN_FUNNEL_KEYS) weekly_agg[week][k] += vals[k];
+  }
+
+  // plan_items 加 rates + 排序
+  const plan_items = Object.values(plan_map) as any[];
+  for (const p of plan_items) {
+    const t = p.totals;
+    p.totals = { ...t, ...xhsPlanCalcRates(t['企微'], t['开口'], t['有效线索'], t['有效线索_不含存量'], t['新开户'], t['有效户']) };
+    p.weekly.sort((a: any, b: any) => a.week_start.localeCompare(b.week_start));
+  }
+  plan_items.sort((a, b) =>
+    (b.totals['新开户'] - a.totals['新开户']) ||
+    (b.totals['有效线索_不含存量'] - a.totals['有效线索_不含存量']) ||
+    (b.totals['开口'] - a.totals['开口'])
+  );
+  const top_plans = plan_items.slice(0, top_n);
+
+  // 整体周度走势
+  const weekly_totals = Object.keys(weekly_agg).sort().map(week => {
+    const t = weekly_agg[week];
+    return {
+      week_start: week,
+      ...t,
+      ...xhsPlanCalcRates(t['企微'], t['开口'], t['有效线索'], t['有效线索_不含存量'], t['新开户'], t['有效户']),
+    };
+  });
+
+  // 代理商列表
+  const agCond: ({ sql: string; params: unknown[] } | null)[] = [
+    { sql: '"平台来源" = ?', params: ['小红书'] },
+    { sql: '"广告代理商" IS NOT NULL AND "广告代理商" != \'\'', params: [] as unknown[] },
+    dateClause('线索日期', sd, ed),
+  ];
+  if (agency) agCond.push({ sql: '"广告代理商" = ?', params: [String(agency)] });
+  const agWhere = buildWhere(agCond);
+  const agSql = `SELECT DISTINCT "广告代理商" as v FROM fact_conv_content ${agWhere.clause} ORDER BY "广告代理商"`;
+  const agRows = await querySql<Row>(agSql, agWhere.params);
+  const agencies = agRows.map(r => r.v).filter(Boolean);
+
+  const totals = {
+    total_plans: plan_items.length,
+    top_plans: top_plans.length,
+    total_qiwei: plan_items.reduce((s, p) => s + p.totals['企微'], 0),
+    total_kaihou: plan_items.reduce((s, p) => s + p.totals['开口'], 0),
+    total_youxiao: plan_items.reduce((s, p) => s + p.totals['有效线索'], 0),
+    total_youxiao_bcq: plan_items.reduce((s, p) => s + p.totals['有效线索_不含存量'], 0),
+    total_xinkaihu: plan_items.reduce((s, p) => s + p.totals['新开户'], 0),
+    total_youxiao_hu: plan_items.reduce((s, p) => s + p.totals['有效户'], 0),
+    total_weeks: weekly_totals.length,
+  };
+
+  return {
+    agencies,
+    target_agencies: XHS_TARGET_AGENCIES,
+    selected_agency: agency || null,
+    weekly_totals,
+    plan_items: top_plans,
+    totals,
+    top_n,
+    all_count: plan_items.length,
+  };
+}
+
+// ============================================================================
+// 员工转化 (employee-conversion)
+// ============================================================================
+
+const EMP_CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', '快手', '财联社'];
+const EMP_WEEKLY_ASSISTANTS = [
+  '陈鸿', '荣杜娟', '贾芳', '赵梅', '袁孝春', '张杰明',
+  '吴茂秋', '何泳萍', '李兆俊', '史菡漾', '朱橙青', '杨华',
+];
+
+/** 全表合格员工名单（总线索数 ≥ min_leads） */
+async function empGetQualifiedEmployees(min_leads: number): Promise<string[]> {
+  const rows = await querySql<Row>(
+    `SELECT "添加员工姓名" as emp, COUNT(id) as n
+     FROM fact_conv_content
+     WHERE "添加员工姓名" IS NOT NULL AND "添加员工姓名" != ''
+     GROUP BY "添加员工姓名"`
+  );
+  return rows.filter(r => toInt(r.n) >= min_leads).map(r => r.emp).filter(Boolean) as string[];
+}
+
+/** 月度趋势（实际聚合粒度是月） */
+async function empGetWeeklyTrend(platforms: string[], sd?: string, ed?: string, employees?: string[]): Promise<any[]> {
+  const where = buildWhere([
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    inClause('添加员工姓名', employees),
+  ]);
+  const sql = `SELECT substr("线索日期", 1, 7) as period,
+    COUNT(id) as leads,
+    COALESCE(SUM(CASE WHEN "是否开户" = 1 THEN 1 ELSE 0 END), 0) as opened,
+    COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid
+  FROM fact_conv_content ${where.clause}
+  GROUP BY period ORDER BY period`;
+  const rows = await querySql<Row>(sql, where.params);
+  return rows.map(r => ({ period: r.period, leads: toInt(r.leads), opened: toInt(r.opened), valid: toInt(r.valid) }));
+}
+
+/** 平台概览（每平台一次查询） */
+async function empGetPlatformOverview(platforms: string[], sd?: string, ed?: string, employees?: string[]): Promise<Record<string, any>> {
+  const overview: Record<string, any> = {};
+  for (const p of platforms) {
+    const where = buildWhere([
+      { sql: '"平台来源" = ?', params: [p] },
+      dateClause('线索日期', sd, ed),
+      inClause('添加员工姓名', employees),
+    ]);
+    const sql = `SELECT
+      COUNT(id) as leads,
+      COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+      COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+      COALESCE(SUM(CASE WHEN "是否开户" = 1 THEN 1 ELSE 0 END), 0) as opened,
+      COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid,
+      COALESCE(SUM("资产"), 0) as assets
+    FROM fact_conv_content ${where.clause}`;
+    const rows = await querySql<Row>(sql, where.params);
+    const r = rows[0] || {};
+    const leads = toInt(r.leads); const opened = toInt(r.opened);
+    overview[p] = {
+      total_leads: leads,
+      mouth_count: toInt(r.mouth),
+      valid_lead_count: toInt(r.valid_lead),
+      opened_count: opened,
+      valid_customer_count: toInt(r.valid),
+      total_assets: round2(toFloat(r.assets)),
+      opening_rate: leads > 0 ? round2(opened / leads * 100) : 0,
+    };
+  }
+  return overview;
+}
+
+/** 员工转化排行（4 种 lead_type） */
+async function empGetRanking(
+  platforms: string[], sd?: string, ed?: string,
+  lead_type: 'all' | 'existing' | 'new' | 'existing_new_open' = 'all',
+  employees?: string[]
+): Promise<any[]> {
+  // existing_new_open 分支：双查询
+  if (lead_type === 'existing_new_open' && sd) {
+    // 查询 1：存量线索总数（线索日期 < start_date）
+    const leadsWhere = buildWhere([
+      { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+      { sql: '"线索日期" < ?', params: [sd] },
+      inClause('添加员工姓名', employees),
+      inClause('平台来源', platforms),
+    ]);
+    const leadsSql = `SELECT "添加员工姓名" as emp, "平台来源" as platform, COUNT(id) as total_leads
+      FROM fact_conv_content ${leadsWhere.clause}
+      GROUP BY "添加员工姓名", "平台来源"`;
+    const leadsRows = await querySql<Row>(leadsSql, leadsWhere.params);
+    const leads_map: Record<string, number> = {};
+    for (const r of leadsRows) {
+      leads_map[`${r.emp}|||${r.platform}`] = toInt(r.total_leads);
+    }
+
+    // 查询 2：本周新开户的存量线索
+    const q2Where = buildWhere([
+      { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+      { sql: '"线索日期" < ?', params: [sd] },
+      { sql: '"开户时间" IS NOT NULL AND "开户时间" != \'\'', params: [] as unknown[] },
+      dateClause('开户时间', sd, ed),
+      { sql: '"是否开户" = 1', params: [] as unknown[] },
+      inClause('添加员工姓名', employees),
+      inClause('平台来源', platforms),
+    ]);
+    const q2Sql = `SELECT "添加员工姓名" as emp, "平台来源" as platform,
+      COUNT(id) as opened,
+      COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+      COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+      COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid_customer,
+      COALESCE(SUM("资产"), 0) as assets
+    FROM fact_conv_content ${q2Where.clause}
+    GROUP BY "添加员工姓名", "平台来源"`;
+    const q2Rows = await querySql<Row>(q2Sql, q2Where.params);
+
+    const ranking: any[] = [];
+    const ranked_keys = new Set<string>();
+    for (const r of q2Rows) {
+      const emp = r.emp; const platform = r.platform;
+      const key = `${emp}|||${platform}`;
+      ranked_keys.add(key);
+      const total_leads = leads_map[key] || 0;
+      const opened = toInt(r.opened);
+      const valid_customer = toInt(r.valid_customer);
+      ranking.push({
+        employee_name: emp, platform,
+        total_leads,
+        mouth_count: toInt(r.mouth),
+        valid_lead_count: toInt(r.valid_lead),
+        opened_count: opened,
+        valid_customer_count: valid_customer,
+        total_assets: round2(toFloat(r.assets)),
+        opening_rate: total_leads > 0 ? round2(opened / total_leads * 100) : 0,
+        valid_customer_rate: opened > 0 ? round2(valid_customer / opened * 100) : 0,
+      });
+    }
+    // 补全：有存量线索但本周未新开户的固定员工
+    if (employees) {
+      for (const emp of employees) {
+        for (const p of platforms) {
+          const key = `${emp}|||${p}`;
+          if (ranked_keys.has(key)) continue;
+          const leads = leads_map[key] || 0;
+          if (leads > 0) {
+            ranking.push({
+              employee_name: emp, platform: p,
+              total_leads: leads, mouth_count: 0, valid_lead_count: 0,
+              opened_count: 0, valid_customer_count: 0, total_assets: 0,
+              opening_rate: 0, valid_customer_rate: 0,
+            });
+          }
+        }
+      }
+    }
+    ranking.sort((a, b) => (b.opened_count - a.opened_count) || (b.total_leads - a.total_leads));
+    return ranking;
+  }
+
+  // all / existing / new 分支：单查询
+  const lead_type_cond = lead_type === 'existing'
+    ? { sql: '"是否为存量客户" = 1', params: [] as unknown[] }
+    : lead_type === 'new'
+      ? { sql: '("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)', params: [] as unknown[] }
+      : null;
+  const where = buildWhere([
+    { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+    dateClause('线索日期', sd, ed),
+    inClause('平台来源', platforms),
+    inClause('添加员工姓名', employees),
+    lead_type_cond,
+  ]);
+  const sql = `SELECT "添加员工姓名" as emp, "平台来源" as platform,
+    COUNT(id) as total_leads,
+    COALESCE(SUM(CASE WHEN "是否客户开口" = 1 THEN 1 ELSE 0 END), 0) as mouth,
+    COALESCE(SUM(CASE WHEN "是否有效线索" = 1 THEN 1 ELSE 0 END), 0) as valid_lead,
+    COALESCE(SUM(CASE WHEN "是否开户" = 1 THEN 1 ELSE 0 END), 0) as opened,
+    COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid_customer,
+    COALESCE(SUM("资产"), 0) as assets
+  FROM fact_conv_content ${where.clause}
+  GROUP BY "添加员工姓名", "平台来源"`;
+  const rows = await querySql<Row>(sql, where.params);
+  const ranking = rows.map(r => {
+    const leads = toInt(r.total_leads); const opened = toInt(r.opened); const valid = toInt(r.valid_customer);
+    return {
+      employee_name: r.emp, platform: r.platform,
+      total_leads: leads,
+      mouth_count: toInt(r.mouth),
+      valid_lead_count: toInt(r.valid_lead),
+      opened_count: opened,
+      valid_customer_count: valid,
+      total_assets: round2(toFloat(r.assets)),
+      opening_rate: leads > 0 ? round2(opened / leads * 100) : 0,
+      valid_customer_rate: opened > 0 ? round2(valid / opened * 100) : 0,
+    };
+  });
+  ranking.sort((a, b) => b.opening_rate - a.opening_rate);
+  return ranking;
+}
+
+/** 年度拆分（2025/2026） */
+async function empGetYearlyBreakdown(platforms: string[], ed?: string, employees?: string[]): Promise<Record<string, any>> {
+  const result: Record<string, any> = {};
+  const qualified = await empGetQualifiedEmployees(5);
+  for (const year of [2025, 2026]) {
+    const ys = `${year}-01-01`; const ye = `${year}-12-31`;
+    const conditions: ({ sql: string; params: unknown[] } | null)[] = [
+      { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+      { sql: '"线索日期" >= ? AND "线索日期" <= ?', params: [ys, ye] },
+      { sql: '"线索日期" <= ?', params: [ed || ye] },
+      inClause('平台来源', platforms),
+      inClause('添加员工姓名', qualified.length > 0 ? qualified : employees),
+      inClause('添加员工姓名', employees),
+    ];
+    const where = buildWhere(conditions);
+    const sql = `SELECT
+      COUNT(id) as total_leads,
+      COALESCE(SUM(CASE WHEN "是否开户" = 1 THEN 1 ELSE 0 END), 0) as opened,
+      COALESCE(SUM(CASE WHEN "是否为有效户" = 1 THEN 1 ELSE 0 END), 0) as valid_customer,
+      COALESCE(SUM("资产"), 0) as assets
+    FROM fact_conv_content ${where.clause}`;
+    const rows = await querySql<Row>(sql, where.params);
+    const r = rows[0] || {};
+    const leads = toInt(r.total_leads); const opened = toInt(r.opened); const valid = toInt(r.valid_customer);
+    result[`y${year}`] = {
+      label: `${year % 100}年线索\n${year % 100}年开户`,
+      total_leads: leads,
+      opened_count: opened,
+      valid_customer_count: valid,
+      total_assets: round2(toFloat(r.assets)),
+      opening_rate: leads > 0 ? round2(opened / leads * 100) : 0,
+      valid_customer_rate: opened > 0 ? round2(valid / opened * 100) : 0,
+    };
+  }
+  return result;
+}
+
+/** 获取默认周范围（latest_date 所在周的周一到周日） */
+async function empGetDefaultWeekRange(): Promise<{ latest_date: string; default_week_start: string; default_week_end: string }> {
+  const rows = await querySql<Row>(`SELECT MAX("线索日期") as v FROM fact_conv_content`);
+  const latest = rows[0]?.v ? String(rows[0].v).slice(0, 10) : '';
+  if (!latest) {
+    const today = new Date().toISOString().slice(0, 10);
+    const td = new Date(today + 'T00:00:00Z');
+    const jsDay = td.getUTCDay();
+    const wd = jsDay === 0 ? 6 : jsDay - 1;
+    const start = new Date(td);
+    start.setUTCDate(td.getUTCDate() - wd);
+    const end = new Date(start);
+    end.setUTCDate(start.getUTCDate() + 6);
+    return {
+      latest_date: '',
+      default_week_start: start.toISOString().slice(0, 10),
+      default_week_end: end.toISOString().slice(0, 10),
+    };
+  }
+  const d = new Date(latest + 'T00:00:00Z');
+  const jsDay = d.getUTCDay();
+  const wd = jsDay === 0 ? 6 : jsDay - 1;
+  const start = new Date(d);
+  start.setUTCDate(d.getUTCDate() - wd);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  return {
+    latest_date: latest,
+    default_week_start: start.toISOString().slice(0, 10),
+    default_week_end: end.toISOString().slice(0, 10),
+  };
+}
+
+async function handleEmployeeConversionAnalysis(body: any): Promise<any> {
+  const platforms = body?.platforms || EMP_CONTENT_PLATFORMS;
+  const sd = body?.start_date;
+  const ed = body?.end_date;
+  const employees = body?.employees || [];
+  const lead_type = body?.lead_type || 'all';
+
+  const qualified = await empGetQualifiedEmployees(5);
+  const filter_emps = employees.length > 0 ? employees : qualified;
+
+  const ranking = await empGetRanking(platforms, sd, ed, lead_type, filter_emps);
+  const overview = await empGetPlatformOverview(platforms, sd, ed, filter_emps);
+  const trend = await empGetWeeklyTrend(platforms, sd, ed, filter_emps);
+  const rate_trend = trend; // 后端用同一个函数
+
+  const total_leads = ranking.reduce((s, r) => s + r.total_leads, 0);
+  const total_opened = ranking.reduce((s, r) => s + r.opened_count, 0);
+  const total_valid = ranking.reduce((s, r) => s + r.valid_customer_count, 0);
+  const total_mouth = ranking.reduce((s, r) => s + r.mouth_count, 0);
+  const total_assets = ranking.reduce((s, r) => s + r.total_assets, 0);
+
+  const core = {
+    total_leads,
+    total_mouth,
+    total_valid_lead: ranking.reduce((s, r) => s + r.valid_lead_count, 0),
+    total_opened,
+    total_valid_customer: total_valid,
+    avg_opening_rate: total_leads > 0 ? round2(total_opened * 100 / total_leads) : 0,
+    total_assets: round2(total_assets),
+  };
+
+  return {
+    core_metrics: core,
+    platform_overview: Object.entries(overview).map(([p, v]) => ({ platform: p, ...v })),
+    conversion_trend: { weeks: trend },
+    employee_rate_trend: { periods: rate_trend },
+    ranking,
+  };
+}
+
+async function handleEmployeeConversionWeekly(body: any): Promise<any> {
+  const platforms = body?.platforms || EMP_CONTENT_PLATFORMS;
+  const sd = body?.start_date;
+  const ed = body?.end_date;
+
+  const rankings: Record<string, any> = {};
+  const year_breakdown: Record<string, any> = {};
+  for (const p of platforms) {
+    rankings[p] = {
+      total: await empGetRanking([p], undefined, ed, 'all', EMP_WEEKLY_ASSISTANTS),
+      existing: await empGetRanking([p], sd, ed, 'existing', EMP_WEEKLY_ASSISTANTS),
+      new: await empGetRanking([p], sd, ed, 'new', EMP_WEEKLY_ASSISTANTS),
+      existing_new_open: await empGetRanking([p], sd, ed, 'existing_new_open', EMP_WEEKLY_ASSISTANTS),
+    };
+    year_breakdown[p] = await empGetYearlyBreakdown([p], ed, EMP_WEEKLY_ASSISTANTS);
+  }
+
+  const overview = await empGetPlatformOverview(platforms, sd, ed, EMP_WEEKLY_ASSISTANTS);
+  const trend = await empGetWeeklyTrend(platforms, sd, ed, EMP_WEEKLY_ASSISTANTS);
+
+  return {
+    roster_count: EMP_WEEKLY_ASSISTANTS.length,
+    rankings,
+    year_breakdown,
+    overview,
+    trend,
+  };
+}
+
+async function handleEmployeeConversionAnalysisChannelOverview(body: any): Promise<any> {
+  const sd = body?.start_date;
+  const ed = body?.end_date;
+  const employees = body?.employees || [];
+  let platforms_param = body?.platforms || EMP_CONTENT_PLATFORMS;
+  if (typeof platforms_param === 'string') {
+    platforms_param = (platforms_param as string).split(',').map(s => s.trim()).filter(Boolean);
+  }
+  const lead_type = body?.lead_type || 'all';
+
+  // 员工明细口径（fact_conv_content）
+  const qualified = await empGetQualifiedEmployees(5);
+  const filter_emps = employees.length > 0 ? employees : qualified;
+  const detailWhere = buildWhere([
+    { sql: '"添加员工姓名" IS NOT NULL AND "添加员工姓名" != \'\'', params: [] as unknown[] },
+    dateClause('线索日期', sd, ed),
+    inClause('添加员工姓名', filter_emps),
+    inClause('平台来源', platforms_param),
+    lead_type === 'existing'
+      ? { sql: '"是否为存量客户" = 1', params: [] as unknown[] }
+      : lead_type === 'new'
+        ? { sql: '("是否为存量客户" = 0 OR "是否为存量客户" IS NULL)', params: [] as unknown[] }
+        : null,
+  ]);
+  const detailSql = `SELECT
+    COUNT(id) as leads,
+    COALESCE(SUM("是否客户开口"), 0) as mouth,
+    COALESCE(SUM("是否有效线索"), 0) as valid_lead,
+    COALESCE(SUM("是否开户"), 0) as opened,
+    COALESCE(SUM("是否为有效户"), 0) as valid,
+    COALESCE(SUM("资产"), 0) as assets
+  FROM fact_conv_content ${detailWhere.clause}`;
+  const detailRows = await querySql<Row>(detailSql, detailWhere.params);
+  const dr = detailRows[0] || {};
+
+  // 渠道参考口径（agg_daily_channel_open，仅互联网引流）
+  const chanWhere = buildWhere([
+    { sql: '"渠道类别" = ?', params: ['互联网引流'] },
+    dateClause('时间区间', sd, ed),
+  ]);
+  const chanSql = `SELECT
+    COALESCE(SUM("开户成功人数"), 0) as opens,
+    COALESCE(SUM("入金户数"), 0) as deposit,
+    COALESCE(SUM("有效户数"), 0) as valid
+  FROM agg_daily_channel_open ${chanWhere.clause}`;
+  const chanRows = await querySql<Row>(chanSql, chanWhere.params);
+  const cr = chanRows[0] || {};
+
+  return {
+    detail_caliber: {
+      source: 'fact_conv_content',
+      scope: '内容平台·员工级（添加员工姓名 非空）',
+      leads: toInt(dr.leads),
+      mouth: toInt(dr.mouth),
+      valid_lead: toInt(dr.valid_lead),
+      opened: toInt(dr.opened),
+      valid: toInt(dr.valid),
+      assets: round2(toFloat(dr.assets)),
+    },
+    channel_caliber: {
+      source: 'agg_daily_channel_open',
+      scope: '互联网引流·渠道级（仅互联网引流）',
+      opens: toInt(cr.opens),
+      deposit: toInt(cr.deposit),
+      valid: toInt(cr.valid),
+    },
+    note: '核心指标只统计内容平台中已填写员工姓名的线索；互联网引流数据来自独立渠道汇总表，仅作外部参考，不纳入员工核心指标。',
+  };
+}
+
+async function handleEmployeeConversionFilterOptions(): Promise<any> {
+  const default_range = await empGetDefaultWeekRange();
+  const employees = await empGetQualifiedEmployees(5);
+  return {
+    platforms: EMP_CONTENT_PLATFORMS,
+    content_platform_label: '内容平台（抖音 / 小红书 / 腾讯 / 快手 / 财联社），员工承接营销转化的核心口径',
+    default_platforms: EMP_CONTENT_PLATFORMS,
+    employees: employees.sort(),
+    lead_types: [
+      { value: 'all', label: '全部线索' },
+      { value: 'existing', label: '存量线索' },
+      { value: 'new', label: '新增线索' },
+    ],
+    ...default_range,
+  };
+}
+
+// ============================================================================
 // 路由分发
 // ============================================================================
 
@@ -902,6 +3217,55 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     // 代理商分析（GET 请求，参数在 URL query）
     case 'agency-analysis':
       return handleAgencyAnalysis(url, body);
+
+    // 转化漏斗（POST 走 split；GET 兼容旧版）
+    case 'conversion-funnel/split':
+      return handleConversionFunnelSplit(url, body);
+
+    // 线索明细（GET 请求，参数在 URL query）
+    case 'leads-detail':
+      return handleLeadsDetail(url);
+    case 'leads-detail/filter-options':
+      return handleLeadsDetailFilterOptions();
+
+    // 主播聚类（直播获客：直播漏斗 / 直播带货 / 投顾IP / 分析师 / 主播分析 共用）
+    case 'leads-detail/anchor-clusters':
+      return handleAnchorClusters(body);
+    case 'leads-detail/anchor-clusters-trend':
+      return handleAnchorClustersTrend(body);
+    case 'leads-detail/anchor-weekly-analysis':
+      return handleAnchorWeeklyAnalysis(body);
+
+    // 投放评审（GET 请求，参数在 URL query）
+    case 'investment-review':
+      return handleInvestmentReview(url, body);
+
+    // 应用市场计划分析 + 创意
+    case 'reports/app-market/plan-analysis':
+      return handleAppMarketPlanAnalysis(body);
+    case 'reports/app-market/creative':
+      return handleAppMarketCreative(body);
+
+    // 小红书
+    case 'xhs-notes-list':
+    case 'xhs-notes/list':
+      return handleXhsNotesList(url, body);
+    case 'xhs-notes/filter-options':
+      return handleXhsNotesFilterOptions();
+    case 'xhs-notes-operation-analysis':
+      return handleXhsNotesOperationAnalysis(body);
+    case 'reports/xhs/plan-analysis':
+      return handleXhsPlanAnalysis(body);
+
+    // 员工转化
+    case 'employee-conversion/analysis':
+      return handleEmployeeConversionAnalysis(body);
+    case 'employee-conversion/weekly':
+      return handleEmployeeConversionWeekly(body);
+    case 'employee-conversion/analysis-channel-overview':
+      return handleEmployeeConversionAnalysisChannelOverview(body);
+    case 'employee-conversion/filter-options':
+      return handleEmployeeConversionFilterOptions();
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);
