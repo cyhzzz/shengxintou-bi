@@ -1,5 +1,7 @@
 .layout {
-  height: 100vh;
+  // v3.5.3：用 100% 继承 #root 高度（移动端 body 有 zoom 补偿高度），
+  // 不用 100vh（vh 不受 zoom 影响，会导致 zoom 后下方空白）
+  height: 100%;
   overflow: hidden;
 }
 
@@ -8,7 +10,7 @@
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
   position: relative;
   z-index: 10;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -112,7 +114,8 @@
 }
 
 .mainLayout {
-  height: 100vh;
+  // v3.5.3：同 .layout，用 100% 替代 100vh
+  height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;

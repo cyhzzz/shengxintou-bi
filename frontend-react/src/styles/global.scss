@@ -301,14 +301,21 @@ a {
 //   - transform: scale 在 <html>/<body> 上会导致布局尺寸异常（子元素定位错乱）
 //   - zoom 会自动缩放布局盒模型，不影响子元素相对定位
 // 通过在 <body> 上加 .mobile-scaled class 触发（由 App.tsx 在移动端注入）
+//
+// v3.5.3 关键修复：zoom 0.67 会把 body 视觉高度缩到 67vh，
+// 但子元素用 height:100vh（vh 不受 zoom 影响）会被缩成 67vh 视觉高度，
+// 导致下方 33vh 空白。修复：把 body 逻辑高度补偿到 100vh/0.67 ≈ 149.25vh，
+// zoom 后视觉高度 = 149.25vh × 0.67 = 100vh，正好填满视口。
+// 子元素改用 height:100%（继承 body 补偿高度）替代 100vh。
 body.mobile-scaled {
   zoom: 0.67 !important;
-  // 确保 zoom 后不出现多余滚动条
+  // 补偿 zoom：逻辑高度 = 视口 / zoom，zoom 后视觉 = 视口
+  height: calc(100vh / 0.67) !important;
   overflow: hidden !important;
 }
 
-// 防止 antd 组件用 transform 覆盖 zoom 效果
+// #root 继承 body 的补偿高度，不做额外缩放
 body.mobile-scaled #root {
-  zoom: 1 !important;
-  transform: none !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }

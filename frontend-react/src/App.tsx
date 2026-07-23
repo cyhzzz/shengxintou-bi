@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import AppRouter from '@/router';
 import { useAppStore } from '@/stores/useAppStore';
 import { isMobileClient } from '@/utils/isDesktop';
@@ -160,6 +161,23 @@ function App() {
     if (!isMobileClient()) return;
     // 注入移动端缩放 class 到 <body>（v3.5.3：CSS zoom 方案）
     document.body.classList.add('mobile-scaled');
+
+    // v3.5.3：隐藏系统状态栏（电量/时间/通知图标），
+    // 防止右上角系统信息栏遮挡 Header 按钮。
+    // Android 12+ Splash Screen API 在启动动画结束后会恢复状态栏，
+    // 仅靠 styles.xml 的 windowFullscreen 不够，需 JS 主动隐藏。
+    // setOverlaysWebview(false) 作为兜底：即使状态栏仍显示，内容也不延伸到其下方。
+    (async () => {
+      try {
+        await StatusBar.setOverlaysWebView({ overlay: false });
+        await StatusBar.setStyle({ style: Style.Light });
+        await StatusBar.hide();
+        console.log('[mobile] StatusBar hidden');
+      } catch (err) {
+        console.warn('[mobile] StatusBar hide failed (non-critical):', err);
+      }
+    })();
+
     let cancelled = false;
     (async () => {
       try {
