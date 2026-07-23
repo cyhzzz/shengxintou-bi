@@ -102,9 +102,77 @@
 
 ## 9. 文档交付
 
-- README 只维护产品、安装、使用、结构和面向使用者的文档索引。
+- README 只维护产品、安装、使用、使用、结构和面向使用者的文档索引。
 - 规则只描述当前有效状态；版本历史进入 `version.json`，过期设计进入 `docs/_archive/`。
 - 修改 `AGENTS.md` 或 `CLAUDE.md` 必须同步并运行规则检查。
 - 文档提到文件、命令、端点和表时，至少通过当前仓库存在性或代码搜索交叉验证。
 - 不把本地被 `.gitignore` 排除的 spec 当成已交付的版本化文档，除非项目明确选择该目录。
+
+## 10. 移动端（Android）测试与调试
+
+### 测试能力现状
+
+Android 端目前**没有**自动化 UI 测试框架（Appium / Detox / WDIO 均未接入），也没有 Android Studio / Emulator / adb 工具链。移动端验证依赖真机安装 + 人工操作。
+
+| 测试方式 | 状态 | 说明 |
+| --- | --- | --- |
+| `adb logcat` | 未配置 | 本机无 Android SDK，需要先下载 platform-tools（约 10MB） |
+| Android Emulator | 未配置 | 需要 Android Studio + system image |
+| Appium / WDIO | 未接入 | 重型，需要模拟器或真机先就绪 |
+| 真机 + 错误浮层 | **已内置** | `main.tsx` 全局未捕获错误捕获器，移动端原生环境自动启用 |
+| SQLite 路由单元测试 | 已有 | `scripts/test_mobile_routes.py` 验证 10 个路由 SQL |
+
+### 移动端错误捕获器（内置）
+
+`frontend-react/src/main.tsx` 在 `Capacitor.isNative() === true` 时自动注册：
+
+- `window.addEventListener('error', ...)`：捕获同步错误
+- `window.addEventListener('unhandledrejection', ...)`：捕获 Promise 异步错误
+
+**行为**：
+1. 完整 `error.stack` 写入 `localStorage.mobile_errors`（保留最近 10 条）。
+2. 屏幕顶部弹出全屏黑色浮层，显示错误消息、时间、URL、完整堆栈。
+3. 「复制全部」按钮：一键复制错误文本到剪贴板，方便用户反馈给开发。
+4. 「清除并刷新」按钮：清空错误记录并重新加载页面。
+
+**桌面端不启用**：Chrome DevTools 已足够，避免干扰开发。
+
+### 调试流程（真机无 adb）
+
+1. 打包新 APK → 真机安装 → 触发错误。
+2. 错误浮层自动弹出 → 点「复制全部」→ 粘贴反馈给开发。
+3. 开发根据 stack trace 定位代码位置，无需反复猜测 minified 变量名。
+
+### 调试流程（有 adb，可选）
+
+若已安装 Android platform-tools：
+
+```powershell
+adb logcat -c
+adb install android\release\省心投-v<版本号>.apk
+adb shell am start -n com.shengxintou.app/.MainActivity
+adb logcat *:E
+```
+
+### 移动端打包验证清单
+
+每次 `cap sync android` 后、`assembleDebug` 前，必须运行 `android/scripts/post-sync-patch.ps1`：
+
+1. `AndroidManifest.xml`：`screenOrientation=landscape`
+2. `strings.xml`：`app_name = 省心投`（非"省心投 BI"）
+3. `styles.xml`：`windowFullscreen=true`（全屏沉浸式）
+4. 插件 `build.gradle`：JDK 21 → 17
+5. `settings.gradle`：阿里云 Maven 镜像
+6. `gradle.properties`：`kotlin.compiler.execution.strategy=in-process` + `org.gradle.daemon=false`
+7. `gradle-wrapper.properties`：腾讯云 Gradle 镜像
+8. `database/shengxintou.db` → `app/src/main/assets/public/assets/databases/shengxintouSQLite.db`
+9. `assembleDebug`（非 release，debug keystore 自动签名，可直接安装）
+10. `Rename-ApkToChinese` 复制到 `android/release/省心投-v<版本号>.apk`
+
+### 版本号与命名
+
+- APK 文件名：`省心投-v<version.json 的 version>.apk`
+- 应用名：`省心投`（非"省心投 BI"）
+- versionCode：`major * 1000 + minor * 10 + patch`（从 `version.json` 计算）
+- 签名方式：debug keystore（自动签名，可直接安装；未配置 release signingConfig）
 
