@@ -319,3 +319,10 @@ body.mobile-scaled #root {
   height: 100% !important;
   overflow: hidden !important;
 }
+
+// antd v5 <App> 组件会渲染 <section class="ant-app">，
+// 必须设 height:100% 否则高度链断裂 → 菜单塌缩
+body.mobile-scaled .ant-app {
+  height: 100% !important;
+  overflow: hidden !important;
+}

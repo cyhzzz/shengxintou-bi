@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, theme, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import AppRouter from '@/router';
@@ -224,7 +224,10 @@ function App() {
       }}
       locale={zhCN}
     >
-      <AppRouter />
+      {/* antd v5：必须用 <App> 包裹，App.useApp() 才能返回可用的 message/notification/modal 实例 */}
+      <AntApp>
+        <AppRouter />
+      </AntApp>
     </ConfigProvider>
   );
 }
