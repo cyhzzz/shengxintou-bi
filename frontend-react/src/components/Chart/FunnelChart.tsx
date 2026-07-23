@@ -9,7 +9,7 @@
  * - antd-charts v2.6.7 + antv g2 v5 修复了旧版的 conversionTag.style 抛错
  * - 但即便偶发报错（数据缺字段 / props 类型不兼容），用户感知到的是 CSS 横条，不会白屏
  */
-import React, { Component, useEffect, useRef, useState } from 'react';
+import React, { Component, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Card, Empty, Tag, Tooltip } from 'antd';
 import { ArrowDownOutlined } from '@ant-design/icons';
@@ -113,32 +113,14 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
   showOverall = true,
   useLogScale = false,
 }) => {
-  // v3.2.5：漏斗图容器级动效 — IntersectionObserver 触发后给 chartWrap 加 visible 类
-  // 用 CSS 动画让漏斗图整体淡入 + 上浮，不依赖 @ant-design/plots 内置 animate（v5 API 与 plots 透传链路不稳定）
-  // prefers-reduced-motion 用户在 lazy initializer 中直接设为 visible，避免 effect 中同步 setState
+  // v3.5.4：去掉 v3.2.5 引入的 IntersectionObserver + visible 状态机。
+  // 根因：原版用 IO 等用户滚动到漏斗进入视口 0.15 才加 visible 类触发淡入；
+  //       但漏斗常常在用户没主动滚动时就已经在视口下方，opacity 永远 0，
+  //       用户感知"漏斗图出不来"（AppMarket/Funnel.tsx 与 ConversionFunnel Tab
+  //       在窄屏/mobile-scaled zoom 0.67 下尤其明显，结论已被 web 端实测证实）。
+  //       改成纯 CSS 入场动画（@keyframes），挂载即播、不依赖滚动。
+  //       prefers-reduced-motion 走 SCSS 分支直接隐藏动画（详见 FunnelChart.module.scss）。
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(() =>
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-
-  useEffect(() => {
-    const node = wrapRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setVisible(true);
-            observer.disconnect();
-          }
-        });
-      },
-      { threshold: 0.15 }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   if (!data || data.length === 0) {
     return (
@@ -172,7 +154,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
 
   return (
     <div className={styles.funnelChart} style={{ minHeight: height }}>
-      <div ref={wrapRef} className={`${styles.chartWrap} ${visible ? styles.chartWrapVisible : ''}`}>
+      <div ref={wrapRef} className={styles.chartWrap}>
         <ChartErrorBoundary data={clean} palette={colors} height={chartHeight} useLogScale={useLogScale}>
           <FunnelChartAntd
             data={chartData}
@@ -220,7 +202,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
       </div>
 
       {/* 阶段明细 + 阶段转化率 */}
-      <div className={`${styles.stageList} ${visible ? styles.stageListVisible : ''}`}>
+      <div className={styles.stageList}>
         {clean.map((stage, idx) => {
           const prev = idx > 0 ? clean[idx - 1] : null;
           const stepRate = prev && prev.count > 0 ? (stage.count / prev.count) * 100 : null;
@@ -244,7 +226,7 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
       </div>
 
       {showOverall && firstCount > 0 && (
-        <div className={`${styles.overall} ${visible ? styles.overallVisible : ''}`}>
+        <div className={styles.overall}>
           <span className={styles.overallLabel}>整体转化</span>
           <Tag color={overallRate > 20 ? 'green' : overallRate > 3 ? 'gold' : 'default'}>
             {clean[0].name} → {clean[clean.length - 1].name}：{overallRate.toFixed(2)}%

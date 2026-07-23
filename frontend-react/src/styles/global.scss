@@ -322,6 +322,16 @@ body.mobile-scaled #root {
 
 // antd v5 <App> 组件会渲染 <section class="ant-app">，
 // 必须设 height:100% 否则高度链断裂 → 菜单塌缩
+// v3.5.4：补 web 版（非 mobile-scaled）的 .ant-app 高度链，原先只有 mobile-scaled 分支
+// 导致 web 版 .ant-app 没 height 约束，被 layout 内容撑开，把整个布局顶成
+// 1299px（远超 viewport 564px），侧栏被压扁成 112px、菜单只显示一栏
+.ant-app {
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
 body.mobile-scaled .ant-app {
   height: 100% !important;
   overflow: hidden !important;

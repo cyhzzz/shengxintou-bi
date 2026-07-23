@@ -18,22 +18,28 @@
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
-  // v3.2.5：容器级 CSS 动画（IntersectionObserver 触发），不依赖 antd-plots 内置 animate
-  opacity: 0;
-  transform: translateY(20px) scale(0.96);
-  transition:
-    opacity 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-    transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  // v3.5.4：纯 CSS 入场动画（@keyframes），挂载即播不依赖滚动观察器；
+  //         原 v3.2.5 的 IntersectionObserver + visible 类在漏斗位于视口下方时
+  //         opacity 永远 0，用户感知"漏斗图出不来"，Web/Android 端均能复现。
+  //         改为挂载即播、结束态恒为 opacity:1，动画结束后永远可见。
+  animation: funnelChartEnter 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+  animation-delay: 0s;
   will-change: transform, opacity;
 }
 
-.chartWrapVisible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+@keyframes funnelChartEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.stageListVisible {
-  // 阶段标签随容器淡入，但延迟 0.4s 让漏斗图先开始
+.stageList {
+  // 阶段标签随容器淡入，但延迟 0.4s 让漏斗图先开始（v3.2.5 行为保留）
   animation: stageTagEnter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
   animation-delay: 0.4s;
 }
@@ -49,19 +55,19 @@
   }
 }
 
-.overallVisible {
+.overall {
   animation: stageTagEnter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) both;
   animation-delay: 0.6s;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chartWrap {
+    animation: none;
     opacity: 1;
     transform: none;
-    transition: none;
   }
-  .stageListVisible,
-  .overallVisible {
+  .stageList,
+  .overall {
     animation: none;
     opacity: 1;
   }
