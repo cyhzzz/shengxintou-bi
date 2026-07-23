@@ -176,3 +176,25 @@ adb logcat *:E
 - versionCode：`major * 1000 + minor * 10 + patch`（从 `version.json` 计算）
 - 签名方式：debug keystore（自动签名，可直接安装；未配置 release signingConfig）
 
+### Capacitor bridge 初始化时序约束（关键）
+
+**背景**：Capacitor native bridge 在 WebView 启动早期可能还没注入 `window.Capacitor`，JS 顶层同步代码此时读取 `window.Capacitor.isNative()` 会得到 undefined。这会导致：
+- `isMobileClient()` 返回 false → 走 `createBrowserRouter`（非 HashRouter）→ 在 `file://`/`https://localhost` 下路由找不到
+- 条件注册的错误捕获器被跳过 → 错误无人捕获 → 显示在 RouteErrorBoundary
+- minified 后报 `me.some is not a function` 等 minified 变量名错误，无法定位
+
+**约束**：
+1. **错误捕获器无条件注册**：`main.tsx` 的 `window.addEventListener('error'/'unhandledrejection')` 不能用 `if (isMobile)` 包裹。桌面端 Chrome DevTools 也能看到，无害。
+2. **`isMobileClient()` 多重兜底**：必须按顺序检查
+   - `Capacitor.isNativePlatform()` / `Capacitor.getPlatform() === 'android'`（Capacitor 官方 API）
+   - `window.androidBridge`（Capacitor Android bridge 注入的早期标志，比 `window.Capacitor` 完整初始化更早）
+   - `window.Capacitor?.isNative?.()`（旧逻辑保留）
+3. **router 的 `isMobile` 模块加载时求值风险**：`router/index.tsx` 顶层 `const isMobile = isMobileClient()` 在模块加载时一次性求值。若 main.tsx 加载早于 Capacitor 注入，这里也会是 false。需要确保 Capacitor 在 React 首次渲染前已注入（Capacitor 默认在 `DOMContentLoaded` 前注入，React `createRoot().render()` 通常在 Capacitor 之后，但需验证）。
+4. **DB 初始化延迟检查**：`App.tsx` 的 `useEffect` 在渲染后执行，此时 Capacitor bridge 已就绪，`isMobileClient()` 可靠返回 true。不要在模块顶层同步调用 DB 初始化。
+
+**验证方法**：每次 build 后检查入口 chunk 是否包含 `mobile-debug-overlay`、`unhandledrejection`、`androidBridge`、`isNativePlatform`、`getPlatform` 关键字。若缺失说明 tree-shake 错误。
+
+**参考**：
+- [Capacitor Android Troubleshooting](https://capacitorjs.com/docs/android/troubleshooting)（"Plugin Not Implemented" 章节提到 service worker 和 bridge 注入问题）
+- Capacitor core `getPlatformId()` 源码：检查 `win.androidBridge` / `win.webkit.messageHandlers.bridge`
+
