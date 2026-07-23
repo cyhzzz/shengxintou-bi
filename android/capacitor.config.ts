@@ -13,6 +13,11 @@ const config: CapacitorConfig = {
       backgroundColor: '#ffffff',
       showSpinner: false,
     },
+    // 启用原生 HTTP：patch window.fetch，请求经 OkHttp 发出，绕过 WebView CORS
+    // 解决安卓端从 dav.jianguoyun.com fetch .db 时报 "fetch failed"
+    CapacitorHttp: {
+      enabled: true,
+    },
   },
 };
 

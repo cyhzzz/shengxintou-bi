@@ -114,19 +114,37 @@ scripts/build-installer.ps1     三阶段打包脚本（PyInstaller + 前端 bui
 server_entry.py                 桌面版 Flask 入口（frozen 模式路径解析）
 ```
 
-### 双端支持
+### 移动端（Android / Capacitor）
 
-单一代码库支持两种运行模式，仅配置不同，代码完全一致：
+```text
+android/                        Capacitor 根目录（capacitor.config.ts + package.json + scripts/）
+android/android/                Android Studio 原生工程（cap sync 生成，cap sync 会覆盖配置）
+android/scripts/post-sync-patch.ps1  cap sync 后注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名
+android/scripts/generate-icons.ps1   生成 ic_launcher 图标（50% 安全区防切割）
+android/gradle-home/            项目级 Gradle 缓存（避免沙箱拦截 ~/.gradle）
+android/release/                中文名 APK 输出（省心投-vX.Y.Z.apk）
+frontend-react/src/services/mobileSqlite.ts  直接用 CapacitorSQLite 插件（不通过不存在的 SQLiteConnection 类）
+frontend-react/src/services/mobileSync.ts    坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
+frontend-react/src/utils/isDesktop.ts        isMobileClient 三重兜底（isNativePlatform/getPlatform/androidBridge）
+frontend-react/src/main.tsx                  动态 import App 等 Capacitor bridge 就绪再渲染
+```
+
+### 三端支持
+
+单一代码库支持三种运行模式，仅配置不同，代码完全一致：
 
 | 模式 | 数据库 | 鉴权 | 前端构建 | 打包 |
 | --- | --- | --- | --- | --- |
 | 开发版（Web） | SQLite（默认） | `AUTH_ENABLED=false` | `npm run build` | 无 |
 | 桌面版（Electron） | PG/Supabase | `AUTH_ENABLED=true` | `npm run build` + PyInstaller + electron-builder | `scripts/build-installer.ps1` |
+| 移动端（Android） | 本地 SQLite | 跳过鉴权（内置） | `npm run build` + cap sync + assembleDebug | `android/scripts/post-sync-patch.ps1` |
 
 - 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
 - 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
 - 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 功能开关控制菜单显隐与 ProtectedRoute。
 - 桌面版打包：`scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）。
+- 移动端打包：`cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+，详细见 `android/README.md`）。
+- 移动端约束：Capacitor bridge 初始化时序敏感（main.tsx 等待 bridge）；SQLite 用 `CapacitorSQLite` 插件直接调用（非 `SQLiteConnection` 类）；CSS `zoom: 0.67` 缩放需配合 `calc(100vh/0.67)` 高度补偿避免下方空白。
 
 ## 6. 按任务读取规则
 

@@ -440,6 +440,7 @@ async function handleDashboardTrendData(body: any): Promise<any> {
     business_models: body?.business_models || [],
   };
   const where = dashboardWhere(filters);
+  const metric_type = body?.metric_type || 'cost_per_lead';
 
   const sql = `SELECT "日期" as period,
     COALESCE(SUM("花费"), 0) as cost,
@@ -455,6 +456,24 @@ async function handleDashboardTrendData(body: any): Promise<any> {
   GROUP BY "日期" ORDER BY "日期"`;
   const rows = await querySql<Row>(sql, where.params);
 
+  // v3.5.4：按 metric_type 计算 value（对齐后端 dashboard.py 的 _per_metric）
+  const selectValue = (p: Record<string, number>): number => {
+    const mt = metric_type;
+    if (mt === 'cost_per_lead') return p.leads > 0 ? round2(p.cost / p.leads) : 0;
+    if (mt === 'cost_per_wechat_lead') return p.leads > 0 ? round2(p.cost_wechat_w / p.leads) : 0;
+    if (mt === 'cost_per_app_activation') return p.leads_app > 0 ? round2(p.cost_app_w / p.leads_app) : 0;
+    if (mt === 'cost_per_customer' || mt === 'cost_per_account') return p.opened > 0 ? round2(p.cost / p.opened) : 0;
+    if (mt === 'cost_per_valid_account') return p.valid > 0 ? round2(p.cost / p.valid) : 0;
+    if (mt === 'investment') return round2(p.cost);
+    if (mt === 'impressions') return p.impressions;
+    if (mt === 'clicks') return p.clicks;
+    if (mt === 'leads' || mt === 'leads_wechat') return p.leads;
+    if (mt === 'leads_app') return p.leads_app;
+    if (mt === 'new_customers') return p.opened;
+    if (mt === 'valid_customers') return p.valid;
+    return 0; // 双系列等无对应值
+  };
+
   const dates: string[] = [];
   const trend_data: any[] = [];
   for (const r of rows) {
@@ -469,6 +488,7 @@ async function handleDashboardTrendData(body: any): Promise<any> {
     const opened = toInt(r.opened);
     const valid = toInt(r.valid);
 
+    const p = { cost, impressions: impr, clicks: clk, leads, leads_app, cost_wechat_w, cost_app_w, opened, valid };
     dates.push(d);
     trend_data.push({
       date: d,
@@ -487,11 +507,11 @@ async function handleDashboardTrendData(body: any): Promise<any> {
         lead_to_account_rate: leads > 0 ? round4(opened / leads * 100) : 0,
         account_to_valid_rate: opened > 0 ? round4(valid / opened * 100) : 0,
       },
-      value: 0,
+      value: selectValue(p),
     });
   }
 
-  return { dates, trend_data, metric_type: body?.metric_type || 'cost_per_lead' };
+  return { dates, trend_data, metric_type };
 }
 
 // ============================================================================
@@ -555,6 +575,280 @@ async function handleCostAnalysis(body: any): Promise<any> {
 }
 
 // ============================================================================
+// 应用市场总览 (app-market/summary)
+// ============================================================================
+
+/** 应用市场漏斗过滤（强制渠道类型=互联网引流）+ 通用过滤 */
+function appMarketWhere(filters: any, includeChannelTypeFilter = true): { clause: string; params: unknown[] } {
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+  const conditions: ({ sql: string; params: unknown[] } | null)[] = [
+    dateClause('下载日期', sd, ed),
+    inClause('应用市场', filters.app_markets),
+  ];
+  if (includeChannelTypeFilter) {
+    conditions.push({ sql: '"渠道类型" = ?', params: ['互联网引流'] });
+  } else {
+    conditions.push(inClause('渠道类型', filters.channel_types));
+  }
+  return buildWhere(conditions);
+}
+
+const FUNNEL_SUMS = FUNNEL_STAGES.map(
+  ([col, alias]) => `COALESCE(SUM("${col}"), 0) as "${alias}"`
+).join(', ');
+
+function funnelCountsFromRow(r: Row): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const [, alias] of FUNNEL_STAGES) {
+    counts[alias] = toInt(r[alias]);
+  }
+  return counts;
+}
+
+async function handleAppMarketSummary(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const where = appMarketWhere(filters, true);
+
+  // 1. 总计
+  const totalSql = `SELECT ${FUNNEL_SUMS} FROM fact_conv_appmarket ${where.clause}`;
+  const totalRows = await querySql<Row>(totalSql, where.params);
+  const total_counts = funnelCountsFromRow(totalRows[0] || {});
+
+  // 新开户资产（仅 是否新开户=1 的行累加 总资产）
+  const assetSql = `SELECT COALESCE(SUM(CASE WHEN "是否新开户" = 1 THEN "总资产" ELSE 0 END), 0) as v
+    FROM fact_conv_appmarket ${where.clause}`;
+  const assetRows = await querySql<Row>(assetSql, where.params);
+  total_counts['新开户资产'] = round2(toFloat(assetRows[0]?.v));
+
+  // 2. 按月 × 应用市场
+  const monthSql = `SELECT substr("下载日期", 1, 7) as month, "应用市场" as app_market, ${FUNNEL_SUMS}
+    FROM fact_conv_appmarket ${where.clause}
+    GROUP BY month, "应用市场" ORDER BY month`;
+  const monthRows = await querySql<Row>(monthSql, where.params);
+  const by_month_market = monthRows.map(r => {
+    const cnt = funnelCountsFromRow(r);
+    return {
+      month: r.month,
+      app_market: r.app_market || '未归因',
+      counts: cnt,
+      final_open_rate: cnt['激活APP'] > 0 ? round4(cnt['开户成功'] / cnt['激活APP'] * 100) : 0,
+      final_valid_rate: cnt['激活APP'] > 0 ? round4(cnt['有效户'] / cnt['激活APP'] * 100) : 0,
+    };
+  });
+
+  // 3. 按应用市场
+  const marketSql = `SELECT "应用市场" as app_market, ${FUNNEL_SUMS}
+    FROM fact_conv_appmarket ${where.clause}
+    GROUP BY "应用市场"`;
+  const marketRows = await querySql<Row>(marketSql, where.params);
+  const by_market = marketRows.map(r => {
+    const cnt = funnelCountsFromRow(r);
+    return { app_market: r.app_market || '未归因', counts: cnt, funnel: funnelWithRates(cnt) };
+  });
+
+  // 4. 按渠道类型 × 应用市场（不强制互联网引流，含所有类型）
+  const typeWhere = appMarketWhere(filters, false);
+  const typeSql = `SELECT "渠道类型" as channel_type, "应用市场" as app_market, ${FUNNEL_SUMS}
+    FROM fact_conv_appmarket ${typeWhere.clause}
+    GROUP BY "渠道类型", "应用市场"`;
+  const typeRows = await querySql<Row>(typeSql, typeWhere.params);
+  const by_channel_type = typeRows.map(r => {
+    const cnt = funnelCountsFromRow(r);
+    return { channel_type: r.channel_type || '未归因', app_market: r.app_market || '未归因', counts: cnt };
+  });
+
+  return {
+    total_counts,
+    total_funnel: funnelWithRates(total_counts),
+    by_month_market,
+    by_market,
+    by_channel_type,
+  };
+}
+
+/** 应用市场明细（分页） */
+async function handleAppMarketDetail(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const page = Math.max(1, toInt(body?.page));
+  const page_size = Math.max(1, Math.min(200, toInt(body?.page_size) || 20));
+  const offset = (page - 1) * page_size;
+  const where = appMarketWhere(filters, false);
+
+  const totalSql = `SELECT COUNT(*) as c FROM fact_conv_appmarket ${where.clause}`;
+  const totalRows = await querySql<Row>(totalSql, where.params);
+  const total = toInt(totalRows[0]?.c);
+
+  const sql = `SELECT * FROM fact_conv_appmarket ${where.clause}
+    ORDER BY id DESC LIMIT ${page_size} OFFSET ${offset}`;
+  const rows = await querySql<Row>(sql, where.params);
+
+  const detail = rows.map(r => ({
+    id: r.id,
+    '下载日期': String(r['下载日期'] || ''),
+    '应用市场': r['应用市场'] || '',
+    '应用市场名称': r['应用市场名称'] || '',
+    '渠道类型': r['渠道类型'] || '',
+    '设备号': r['设备号'] || '',
+    '资金账号': r['资金账号'] || '',
+    '激活APP': !!r['是否激活APP'],
+    '开户注册': !!r['是否开户注册'],
+    '注册身份证': !!r['是否注册身份证'],
+    '注册银行卡': !!r['是否注册银行卡'],
+    '提交开户': !!r['是否提交开户'],
+    '开户成功': !!r['是否开户成功'],
+    '新开户': !!r['是否新开户'],
+    '入金': !!r['是否入金'],
+    '有效户': !!r['是否有效户'],
+    '总资产': r['总资产'] != null ? toFloat(r['总资产']) : null,
+    '累计创收': r['累计创收'] != null ? toFloat(r['累计创收']) : null,
+  }));
+
+  return { detail, page, page_size, total };
+}
+
+// ============================================================================
+// 代理商分析 (agency-analysis)
+// ============================================================================
+
+/** 从 URL query string 提取参数（GET 请求用） */
+function parseQueryParams(url: string): Record<string, string> {
+  const qIndex = url.indexOf('?');
+  if (qIndex < 0) return {};
+  const params: Record<string, string> = {};
+  for (const pair of url.slice(qIndex + 1).split('&')) {
+    const [k, v] = pair.split('=');
+    if (k) params[decodeURIComponent(k)] = decodeURIComponent(v || '');
+  }
+  return params;
+}
+
+async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
+  // GET 请求参数在 URL query；POST 在 body.filters
+  let sd: string | undefined, ed: string | undefined;
+  let platforms: string[] = [], agencies: string[] = [], business_models: string[] = [];
+
+  if (body?.filters) {
+    const f = body.filters;
+    sd = f.start_date; ed = f.end_date;
+    platforms = f.platforms || []; agencies = f.agencies || []; business_models = f.business_models || [];
+  } else {
+    const q = parseQueryParams(url);
+    sd = q.start_date; ed = q.end_date;
+    platforms = q.platforms ? q.platforms.split(',').filter(Boolean) : [];
+    agencies = q.agencies ? q.agencies.split(',').filter(Boolean) : [];
+    business_models = q.business_models ? q.business_models.split(',').filter(Boolean) : [];
+  }
+
+  const where = buildWhere([
+    dateClause('日期', sd, ed),
+    inClause('平台', platforms),
+    inClause('厂商', agencies),
+    inClause('业务模式', business_models),
+  ]);
+
+  // 1. summary（按 平台/业务模式/厂商 聚合）
+  const sumSql = `SELECT "平台", "业务模式", "厂商",
+    COALESCE(SUM("花费"), 0) as cost,
+    COALESCE(SUM("展示量"), 0) as impressions,
+    COALESCE(SUM("点击量"), 0) as clicks,
+    COALESCE(SUM("线索数"), 0) as leads,
+    COALESCE(SUM("开户人数"), 0) as opened,
+    COALESCE(SUM("有效户人数"), 0) as valid,
+    COALESCE(SUM("客户资产"), 0) as assets,
+    COALESCE(SUM("存量客户资产"), 0) as existing_assets
+  FROM agg_vendor_daily ${where.clause}
+  GROUP BY "平台", "业务模式", "厂商"`;
+  const sumRows = await querySql<Row>(sumSql, where.params);
+
+  const summary: any[] = [];
+  const plat_sub: Record<string, any> = {};
+  const grand = { cost: 0, impressions: 0, clicks: 0, leads: 0, opened: 0, valid: 0, assets: 0, existing_assets: 0 };
+
+  for (const r of sumRows) {
+    const cost = toFloat(r.cost), leads = toInt(r.leads), opened = toInt(r.opened);
+    const valid = toInt(r.valid), assets = toFloat(r.assets), exAssets = toFloat(r.existing_assets);
+    const item = {
+      platform: r['平台'],
+      business_model: r['业务模式'],
+      agency: r['厂商'],
+      metrics: {
+        cost: round2(cost), impressions: toInt(r.impressions), clicks: toInt(r.clicks),
+        lead_users: leads, opened_account_users: opened, valid_customer_users: valid,
+        opened_account_assets: round2(assets), existing_customer_assets: round2(exAssets),
+        lead_cost: leads > 0 ? round2(cost / leads) : 0,
+        account_cost: opened > 0 ? round2(cost / opened) : 0,
+      },
+    };
+    summary.push(item);
+
+    // 平台小计
+    const p = item.platform;
+    if (!plat_sub[p]) {
+      plat_sub[p] = { platform: p, business_model: '', agency: `[${p} 小计]`, is_subtotal: true,
+        metrics: { cost: 0, impressions: 0, clicks: 0, lead_users: 0, opened_account_users: 0, valid_customer_users: 0, opened_account_assets: 0, existing_customer_assets: 0 } };
+    }
+    const sm = plat_sub[p].metrics;
+    sm.cost += cost; sm.impressions += item.metrics.impressions; sm.clicks += item.metrics.clicks;
+    sm.lead_users += leads; sm.opened_account_users += opened; sm.valid_customer_users += valid;
+    sm.opened_account_assets += assets; sm.existing_customer_assets += exAssets;
+
+    // 合计
+    grand.cost += cost; grand.impressions += item.metrics.impressions; grand.clicks += item.metrics.clicks;
+    grand.leads += leads; grand.opened += opened; grand.valid += valid;
+    grand.assets += assets; grand.existing_assets += exAssets;
+  }
+
+  // 小计四舍五入
+  for (const p in plat_sub) {
+    const m = plat_sub[p].metrics;
+    m.cost = round2(m.cost); m.opened_account_assets = round2(m.opened_account_assets);
+    m.existing_customer_assets = round2(m.existing_customer_assets);
+  }
+
+  const grand_row = {
+    platform: '', business_model: '', agency: '[合计]', is_total: true,
+    metrics: {
+      cost: round2(grand.cost), impressions: grand.impressions, clicks: grand.clicks,
+      lead_users: grand.leads, opened_account_users: grand.opened, valid_customer_users: grand.valid,
+      opened_account_assets: round2(grand.assets), existing_customer_assets: round2(grand.existing_assets),
+      lead_cost: grand.leads > 0 ? round2(grand.cost / grand.leads) : 0,
+      account_cost: grand.opened > 0 ? round2(grand.cost / grand.opened) : 0,
+    },
+  };
+
+  const final_summary = summary.concat(Object.values(plat_sub)).concat([grand_row]);
+
+  // 2. trend（按 日期/平台/业务模式/厂商）
+  const trendSql = `SELECT "日期", "平台", "业务模式", "厂商",
+    COALESCE(SUM("花费"), 0) as cost,
+    COALESCE(SUM("展示量"), 0) as impressions,
+    COALESCE(SUM("点击量"), 0) as clicks,
+    COALESCE(SUM("线索数"), 0) as leads,
+    COALESCE(SUM("开户人数"), 0) as opened,
+    COALESCE(SUM("有效户人数"), 0) as valid
+  FROM agg_vendor_daily ${where.clause}
+  GROUP BY "日期", "平台", "业务模式", "厂商" ORDER BY "日期"`;
+  const trendRows = await querySql<Row>(trendSql, where.params);
+  const series = trendRows.map(r => ({
+    date: String(r['日期']),
+    platform: r['平台'],
+    business_model: r['业务模式'],
+    agency: r['厂商'] || '',
+    agency_short: r['厂商'] || '',
+    metrics: {
+      cost: round2(toFloat(r.cost)), impressions: toInt(r.impressions), clicks: toInt(r.clicks),
+      lead_users: toInt(r.leads), opened_account_users: toInt(r.opened), valid_customer_users: toInt(r.valid),
+    },
+  }));
+  const dates = [...new Set(series.map(s => s.date))].sort();
+
+  const agency_count = new Set(sumRows.map(r => r['厂商']).filter(Boolean)).size;
+  const platform_count = new Set(sumRows.map(r => r['平台']).filter(Boolean)).size;
+
+  return { summary: final_summary, meta: { agency_count, platform_count }, trend: { dates, series } };
+}
+
+// ============================================================================
 // 路由分发
 // ============================================================================
 
@@ -588,6 +882,10 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     // 应用市场
     case 'reports/app-market/funnel':
       return handleAppMarketFunnel(body);
+    case 'reports/app-market/summary':
+      return handleAppMarketSummary(body);
+    case 'reports/app-market/detail':
+      return handleAppMarketDetail(body);
     case 'reports/app-market/filter-options':
       return handleAppMarketFilterOptions();
 
@@ -600,6 +898,10 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     // 成本分析
     case 'cost-analysis':
       return handleCostAnalysis(body);
+
+    // 代理商分析（GET 请求，参数在 URL query）
+    case 'agency-analysis':
+      return handleAgencyAnalysis(url, body);
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);

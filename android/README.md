@@ -70,7 +70,10 @@ npm run build:apk
 
 1. 构建前端 React 资源（`frontend-react/dist`）。
 2. `npx cap sync android` 同步 Web 资源与原生插件。
-3. `./gradlew assembleDebug` 编译生成 Debug APK。
+3. 运行 `scripts/post-sync-patch.ps1` 注入镜像、JDK 17、全屏主题、横屏、内置 DB、应用图标等配置（cap sync 会覆盖这些）。
+4. `./gradlew assembleDebug` 编译生成 Debug 签名 APK。
+
+> ⚠️ **JDK 要求**：打包需 JDK 17（项目内置 `tools/jdk17/`），且必须设置 `JAVA_HOME` 和 `GRADLE_USER_HOME`（指向项目内 `android/gradle-home/` 避免用户目录写入被沙箱拦截）。详见 `scripts/post-sync-patch.ps1` 中的镜像和 Kotlin in-process 配置。
 
 ### 分步构建
 
@@ -79,22 +82,30 @@ npm run build:apk
 cd D:\AIproject\省心投BI\frontend-react
 npm run build
 
-# 2. 同步到 Android
+# 2. 同步到 Android（含 post-sync-patch 自动注入配置）
 cd D:\AIproject\省心投BI\android
 npm run sync
 
-# 3. 编译 APK
+# 3. 编译 APK（需先设置 JAVA_HOME 和 GRADLE_USER_HOME）
 cd D:\AIproject\省心投BI\android\android
+$env:JAVA_HOME = "D:\AIproject\省心投BI\tools\jdk17"
+$env:GRADLE_USER_HOME = "D:\AIproject\省心投BI\android\gradle-home"
 .\gradlew.bat assembleDebug
 ```
 
 ### APK 输出路径
 
-构建完成后，Debug APK 位于：
+构建完成后，原始 Debug APK 位于：
 
 ```text
-android\android\app\build\outputs\apk\debug\app-debug.apk
+android\android\app\build\outputs\apk\debug\shengxintou-v<version>.apk
 ```
+
+`<version>` 从仓库根 `version.json` 读取（如 `shengxintou-v3.5.3.apk`）。
+
+中文名 APK 输出到 `android\release\省心投-v<version>.apk`（由 `post-sync-patch.ps1` 中的 `Rename-ApkToChinese` 函数复制重命名）。
+
+> v3.5.3 起统一使用 `assembleDebug`（debug 签名）而非 `assembleRelease`，因为 release buildType 没配 `signingConfig`，输出未签名 APK 会导致安装报"包信息为空"。
 
 ## 在 Android Studio 中打开
 
@@ -122,6 +133,11 @@ android/
 ├── android/                # Android Studio 原生工程（npx cap add android 生成）
 ├── capacitor.config.ts     # Capacitor 配置
 ├── package.json            # 依赖与脚本
+├── release/                # 中文名 APK 输出（省心投-vX.Y.Z.apk）
+├── scripts/
+│   ├── post-sync-patch.ps1  # cap sync 后注入镜像/JDK/全屏/DB/图标/重命名
+│   └── generate-icons.ps1   # 生成 ic_launcher 图标（50% 安全区防止切割）
+├── gradle-home/            # 项目级 Gradle 缓存（避免沙箱拦截 ~/.gradle）
 └── README.md               # 本文档
 ```
 
