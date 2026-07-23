@@ -1,11 +1,14 @@
 /**
  * 移动端 WebDAV 同步（坚果云）
  *
- * v3.5.3 关键修复：
- *   1. 后端上传到坚果云的文件名是 backup_YYYYMMDD_HHMMSS.db（不是 shengxintou.db），
- *      因此同步时必须先 PROPFIND 列出目录中最新的 .db 备份，再下载。
+ * v3.5.4 关键修复：
+ *   1. 后端上传到坚果云的文件名是 backup_YYYYMMDD_HHMMSS.db.gz（gzip 压缩），
+ *      移动端通过 GET latest_backup.txt manifest 获取最新备份文件名（避免 PROPFIND）。
  *   2. 下载的文件写入 cache/shengxintou.db，再由 moveDatabasesAndAddSuffix
  *      原生移动到 databases/shengxintouSQLite.db。
+ *   3. 分块写入：解压后的 SQLite 可能 30+ MB，base64 编码后 50+ MB，
+ *      一次性传给 Filesystem.writeFile 会导致 WebView 内存溢出崩溃。
+ *      改用 1MB 分块 + appendFile 写入，每块都是独立 PostMessage，避免内存峰值。
  *
  * 凭据存储在 @capacitor/preferences 中，首次安装时使用打包时内置的 .env 默认值。
  */
@@ -105,57 +108,89 @@ async function decompressGzip(blob: Blob): Promise<Blob> {
 }
 
 /**
- * PROPFIND 列出坚果云备份目录中最新的 .db.gz 备份文件
+ * 分块写入大文件到 Filesystem
  *
- * 后端上传文件名格式：backup_YYYYMMDD_HHMMSS.db.gz（gzip 压缩）
- * 按文件名降序排序即取到最新备份。
+ * 一次性传 50+ MB base64 给 Filesystem.writeFile 会导致 WebView PostMessage
+ * 内存溢出崩溃（Android WebView 默认堆内存有限）。
  *
- * 注意：坚果云 PROPFIND 不接受 request body（返回 IllegalArgument），
- * 只需 method=PROPFIND + Depth header 即可。
+ * 改用 1MB 二进制分块策略：
+ *   - 每块二进制 1MB → base64 后 ~1.4MB 字符串
+ *   - 第一块用 writeFile（创建新文件）
+ *   - 后续块用 appendFile（追加）
+ *   - 每块都是独立的 PostMessage，避免内存峰值
+ *
+ * @param blob 要写入的 Blob 数据
+ * @param path 目标文件路径
+ * @param directory 目标目录
  */
-async function listLatestRemoteDb(
+const CHUNK_SIZE = 1024 * 1024; // 1MB 二进制块
+
+async function writeFileInChunks(
+  blob: Blob,
+  path: string,
+  directory: Directory
+): Promise<void> {
+  const totalChunks = Math.max(1, Math.ceil(blob.size / CHUNK_SIZE));
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, blob.size);
+    const chunk = blob.slice(start, end);
+    const chunkBase64 = await blobToBase64(chunk);
+
+    if (i === 0) {
+      // 第一块：创建新文件（recursive 创建父目录）
+      await Filesystem.writeFile({
+        path,
+        data: chunkBase64,
+        directory,
+        recursive: true,
+      });
+    } else {
+      // 后续块：追加
+      await Filesystem.appendFile({
+        path,
+        data: chunkBase64,
+        directory,
+      });
+    }
+  }
+}
+
+/**
+ * GET latest_backup.txt 获取坚果云上最新的备份文件名
+ *
+ * 后端在上传 backup_*.db.gz 时，同时上传一个 latest_backup.txt manifest 文件，
+ * 内容为最新备份的文件名。移动端用标准 GET 请求获取此文件即可知道下载哪个备份。
+ *
+ * 使用标准 GET 方法是因为 CapacitorHttp 的 Android 原生层基于
+ * java.net.HttpURLConnection，不支持 PROPFIND 等 WebDAV 扩展方法。
+ */
+async function getLatestRemoteDb(
   baseUrl: string,
   remoteDir: string,
   auth: string
 ): Promise<string | null> {
-  const listUrl = remoteDir
-    ? `${baseUrl}${remoteDir}/`
-    : baseUrl;
+  const manifestUrl = remoteDir
+    ? `${baseUrl}${remoteDir}/latest_backup.txt`
+    : `${baseUrl}latest_backup.txt`;
 
-  // 坚果云 PROPFIND 不需要 body
-  const response = await fetch(listUrl, {
-    method: 'PROPFIND',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      Depth: '1',
-    },
+  const response = await fetch(manifestUrl, {
+    headers: { Authorization: `Basic ${auth}` },
   });
 
+  if (response.status === 404) {
+    return null; // manifest 不存在（旧版后端未上传）
+  }
+
   if (!response.ok) {
-    throw new Error(`列出坚果云目录失败: HTTP ${response.status}`);
+    throw new Error(`获取备份列表失败: HTTP ${response.status}`);
   }
 
-  const xmlText = await response.text();
+  const filename = (await response.text()).trim();
+  if (!filename) return null;
 
-  // 用正则提取所有 <d:href> 或 <D:href> 中的文件路径
-  const hrefRegex = /<(?:D|d):href[^>]*>([^<]+)<\/(?:D|d):href>/g;
-  const filenames: string[] = [];
-  let match;
-  while ((match = hrefRegex.exec(xmlText)) !== null) {
-    const href = match[1].trim();
-    // 提取 URL 末段作为文件名
-    const filename = decodeURIComponent(href.split('/').filter(Boolean).pop() || '');
-    // 只保留 .db.gz 备份文件（排除 .meta.json / .db（无 gz）/ 目录本身）
-    if (filename.endsWith('.db.gz') && !filename.endsWith('.meta.json')) {
-      filenames.push(filename);
-    }
-  }
-
-  if (filenames.length === 0) return null;
-
-  // backup_YYYYMMDD_HHMMSS.db.gz 天然按时间排序，取最新的
-  filenames.sort((a, b) => b.localeCompare(a));
-  return filenames[0];
+  return filename;
 }
 
 export async function syncFromWebDAV(): Promise<SyncResult> {
@@ -168,12 +203,12 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     // 1. 关闭现有连接，避免文件锁
     await closeMobileDatabase();
 
-    // 2. PROPFIND 列出坚果云目录中最新的 .db 备份
+    // 2. GET latest_backup.txt 获取最新备份文件名
     const auth = btoa(`${creds.username}:${creds.password}`);
-    const latestFile = await listLatestRemoteDb(WEBDAV_BASE, creds.remoteDir, auth);
+    const latestFile = await getLatestRemoteDb(WEBDAV_BASE, creds.remoteDir, auth);
 
     if (!latestFile) {
-      return { success: false, message: '坚果云上未找到数据库备份文件，请先在桌面端上传' };
+      return { success: false, message: '坚果云上未找到 latest_backup.txt，请先在桌面端上传备份（需更新桌面版）' };
     }
 
     // 3. 下载最新备份
@@ -193,16 +228,13 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
       return { success: false, message: `下载失败: HTTP ${response.status}` };
     }
 
-    // 4. base64 编码后写到 Cache 目录（/data/data/<pkg>/cache/）
-    //    文件名必须为 shengxintou.db（无 SQLite 后缀），moveDatabasesAndAddSuffix 会自动加后缀
+    // 4. 下载并解压
     let blob = await response.blob();
 
     // 4a. 如果下载的是 .db.gz（gzip 压缩），先解压
     if (latestFile.endsWith('.db.gz')) {
       blob = await decompressGzip(blob);
     }
-
-    const base64 = await blobToBase64(blob);
 
     // 4.1 先删除 cache 中可能残留的同名文件，避免 moveDatabasesAndAddSuffix 重复处理
     try {
@@ -211,12 +243,10 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
       /* file not exists is fine */
     }
 
-    await Filesystem.writeFile({
-      path: 'shengxintou.db',
-      data: base64,
-      directory: Directory.Cache,
-      recursive: true,
-    });
+    // 4.2 分块写入：解压后的 SQLite 可能 30+ MB，base64 后 50+ MB，
+    //      一次性传给 Filesystem.writeFile 会导致 WebView 内存溢出崩溃。
+    //      改用 1MB 二进制分块 → 每块 ~1.4MB base64 → 独立 PostMessage，避免内存峰值。
+    await writeFileInChunks(blob, 'shengxintou.db', Directory.Cache);
 
     // 5. 删除现有 DB（如有），避免 move 时冲突
     await deleteMobileDatabase();
@@ -254,12 +284,12 @@ export async function testWebDAVConnection(
 ): Promise<SyncResult> {
   try {
     const auth = btoa(`${username}:${password}`);
-    const latestFile = await listLatestRemoteDb(WEBDAV_BASE, remoteDir, auth);
+    const latestFile = await getLatestRemoteDb(WEBDAV_BASE, remoteDir, auth);
 
     if (latestFile) {
       return { success: true, message: `连接成功，最新备份: ${latestFile}` };
     } else {
-      return { success: false, message: '连接成功，但未找到 .db 备份文件' };
+      return { success: false, message: '连接成功，但未找到 latest_backup.txt' };
     }
   } catch (error) {
     return {

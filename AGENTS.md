@@ -155,6 +155,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 修改 Flask、模型、导入、API、SQLite、WebDAV | `docs/rules/backend.md` |
 | 修改 React、组件、筛选、类型、样式 | `docs/rules/frontend.md` |
 | 决定测试、CI、Git、发布 | `docs/rules/testing-and-delivery.md` |
+| 打包、工具链、依赖工具位置 | `docs/rules/toolchain.md` |
 | 新需求 | `docs/rules/workflows/feature.md` + `docs/rules/templates/tech-spec.md` |
 | Bug 修复 | `docs/rules/workflows/bugfix.md` |
 
@@ -188,7 +189,12 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | lint 或大范围前端重构 | `npm run lint` |
 | lazy 路由 | `npm run test:smoke` |
 | Bug 修复 | 对应最小回归用例 |
+| 移动端 SQLite 路由 | `python scripts/test_mobile_routes.py` |
 | 发版前 | `scripts/run-full-tests.bat` |
+
+需用户手动触发的验证（AI 适时建议，不自行执行）：Windows 打包 `scripts\build-installer.ps1`（后端/Electron/NSIS 变化时）、Android APK `cd android && npm run build:apk`（`services/mobile*.ts`/`capacitor.config.ts`/移动端 UI 修复时）、Android smoke `python tests\mobile\smoke_test.py`（移动端崩溃/同步/路由修复后）、全链路测试 `scripts\run-full-tests.bat`（跨模块/发版前）。
+
+详细 CI 清单、新报表测试同步清单、规则文档更新判断清单见 `docs/rules/testing-and-delivery.md` 第 11-13 节；工具链位置见 `docs/rules/toolchain.md`。
 
 - 新核心 API 增加 `tests/api/test_smoke.py` smoke。
 - 新 lazy 公开路由增加 `frontend-react/tests/smoke/route-health.spec.ts` 用例。

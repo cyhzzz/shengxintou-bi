@@ -108,19 +108,26 @@
 - 文档提到文件、命令、端点和表时，至少通过当前仓库存在性或代码搜索交叉验证。
 - 不把本地被 `.gitignore` 排除的 spec 当成已交付的版本化文档，除非项目明确选择该目录。
 
+### 9.1 知识收尾与 neat-freak skill
+
+- 跨会话收尾（文档/规则/记忆与代码现状对齐、会话残留清理）调用 `neat-freak` skill：当前用户系统已装，直接 `/neat` 或说"洁癖"触发即可，不要把 skill 文件内置进本项目。
+- 未安装 `neat-freak` 的环境（如他人 fork 或新机器）：引导从 Agent Skills 平台安装，不要在仓库内保留 skill 副本（曾因放在 `tmp/neat-freak-skill/` 被误删）。
+- skill 调用边界服从本仓库 `AGENTS.md` 与 `docs/rules/`：破坏性清理（删分支/worktree/临时库）必须先列清单等用户确认，未确认前不删。
+
 ## 10. 移动端（Android）测试与调试
 
 ### 测试能力现状
 
-Android 端目前**没有**自动化 UI 测试框架（Appium / Detox / WDIO 均未接入），也没有 Android Studio / Emulator / adb 工具链。移动端验证依赖真机安装 + 人工操作。
+| 测试方式 | 状态 | 工具位置 | 说明 |
+| --- | --- | --- | --- |
+| `adb logcat` | ✅ 已配置 | `tools/platform-tools/adb.exe` | 真机日志、安装、CDP 调试 |
+| Android Emulator | ❌ 未配置 | - | 需要 Android Studio + system image（重型，暂不引入） |
+| Appium smoke | ✅ 已接入 | `tests/mobile/smoke_test.py` + `.venv` | NATIVE_APP + logcat 分析，6 个用例 |
+| 真机 + 错误浮层 | ✅ 已内置 | `frontend-react/src/main.tsx` | 全局未捕获错误捕获器，移动端自动启用 |
+| SQLite 路由单元测试 | ✅ 已有 | `scripts/test_mobile_routes.py` | 验证 10 个路由 SQL |
+| Chrome DevTools (CDP) | ✅ 可用 | `adb forward` + Chrome | WebView 远程调试 |
 
-| 测试方式 | 状态 | 说明 |
-| --- | --- | --- |
-| `adb logcat` | 未配置 | 本机无 Android SDK，需要先下载 platform-tools（约 10MB） |
-| Android Emulator | 未配置 | 需要 Android Studio + system image |
-| Appium / WDIO | 未接入 | 重型，需要模拟器或真机先就绪 |
-| 真机 + 错误浮层 | **已内置** | `main.tsx` 全局未捕获错误捕获器，移动端原生环境自动启用 |
-| SQLite 路由单元测试 | 已有 | `scripts/test_mobile_routes.py` 验证 10 个路由 SQL |
+工具链详细位置和安装方式见 [`toolchain.md`](toolchain.md)。
 
 ### 移动端错误捕获器（内置）
 
@@ -137,28 +144,15 @@ Android 端目前**没有**自动化 UI 测试框架（Appium / Detox / WDIO 均
 
 **桌面端不启用**：Chrome DevTools 已足够，避免干扰开发。
 
-### 调试流程（真机无 adb）
+### 调试流程（真机 + adb）
 
-1. 打包新 APK → 真机安装 → 触发错误。
-2. 错误浮层自动弹出 → 点「复制全部」→ 粘贴反馈给开发。
-3. 开发根据 stack trace 定位代码位置，无需反复猜测 minified 变量名。
-
-### 调试流程（有 adb，可选）
-
-若已安装 Android platform-tools：
-
-```powershell
-adb logcat -c
-adb install android\release\省心投-v<版本号>.apk
-adb shell am start -n com.shengxintou.app/.MainActivity
-adb logcat *:E
-```
+`tools/platform-tools/adb.exe` 已就绪。详细命令见 [`toolchain.md`](toolchain.md) 第 3 节。
 
 ### 移动端打包验证清单
 
 每次 `cap sync android` 后、`assembleDebug` 前，必须运行 `android/scripts/post-sync-patch.ps1`：
 
-1. `AndroidManifest.xml`：`screenOrientation=landscape`
+1. `AndroidManifest.xml`：`screenOrientation=landscape` + `largeHeap=true`
 2. `strings.xml`：`app_name = 省心投`（非"省心投 BI"）
 3. `styles.xml`：`windowFullscreen=true`（全屏沉浸式）
 4. 插件 `build.gradle`：JDK 21 → 17
@@ -178,23 +172,117 @@ adb logcat *:E
 
 ### Capacitor bridge 初始化时序约束（关键）
 
-**背景**：Capacitor native bridge 在 WebView 启动早期可能还没注入 `window.Capacitor`，JS 顶层同步代码此时读取 `window.Capacitor.isNative()` 会得到 undefined。这会导致：
-- `isMobileClient()` 返回 false → 走 `createBrowserRouter`（非 HashRouter）→ 在 `file://`/`https://localhost` 下路由找不到
-- 条件注册的错误捕获器被跳过 → 错误无人捕获 → 显示在 RouteErrorBoundary
-- minified 后报 `me.some is not a function` 等 minified 变量名错误，无法定位
+**背景**：Capacitor native bridge 在 WebView 启动早期可能还没注入 `window.Capacitor`，JS 顶层同步代码此时读取 `window.Capacitor.isNative()` 会得到 undefined。
 
 **约束**：
-1. **错误捕获器无条件注册**：`main.tsx` 的 `window.addEventListener('error'/'unhandledrejection')` 不能用 `if (isMobile)` 包裹。桌面端 Chrome DevTools 也能看到，无害。
-2. **`isMobileClient()` 多重兜底**：必须按顺序检查
-   - `Capacitor.isNativePlatform()` / `Capacitor.getPlatform() === 'android'`（Capacitor 官方 API）
-   - `window.androidBridge`（Capacitor Android bridge 注入的早期标志，比 `window.Capacitor` 完整初始化更早）
-   - `window.Capacitor?.isNative?.()`（旧逻辑保留）
-3. **router 的 `isMobile` 模块加载时求值风险**：`router/index.tsx` 顶层 `const isMobile = isMobileClient()` 在模块加载时一次性求值。若 main.tsx 加载早于 Capacitor 注入，这里也会是 false。需要确保 Capacitor 在 React 首次渲染前已注入（Capacitor 默认在 `DOMContentLoaded` 前注入，React `createRoot().render()` 通常在 Capacitor 之后，但需验证）。
-4. **DB 初始化延迟检查**：`App.tsx` 的 `useEffect` 在渲染后执行，此时 Capacitor bridge 已就绪，`isMobileClient()` 可靠返回 true。不要在模块顶层同步调用 DB 初始化。
+1. **错误捕获器无条件注册**：`main.tsx` 的 `window.addEventListener('error'/'unhandledrejection')` 不能用 `if (isMobile)` 包裹。
+2. **`isMobileClient()` 多重兜底**：`Capacitor.isNativePlatform()` → `Capacitor.getPlatform() === 'android'` → `window.androidBridge` → `window.Capacitor?.isNative?.()`。
+3. **router 的 `isMobile` 模块加载时求值风险**：`main.tsx` 动态 import App 等 Capacitor bridge 就绪（最多 500ms）再渲染。
+4. **DB 初始化延迟检查**：`App.tsx` 的 `useEffect` 在渲染后执行，不在模块顶层同步调用。
 
-**验证方法**：每次 build 后检查入口 chunk 是否包含 `mobile-debug-overlay`、`unhandledrejection`、`androidBridge`、`isNativePlatform`、`getPlatform` 关键字。若缺失说明 tree-shake 错误。
+## 11. 功能改造完成后的标准 CI 清单
 
-**参考**：
-- [Capacitor Android Troubleshooting](https://capacitorjs.com/docs/android/troubleshooting)（"Plugin Not Implemented" 章节提到 service worker 和 bridge 注入问题）
-- Capacitor core `getPlatformId()` 源码：检查 `win.androidBridge` / `win.webkit.messageHandlers.bridge`
+每次功能改进或 Bug 修复完成后，AI 必须按以下清单执行验证，并主动建议用户触发手动验证项：
+
+### 11.1 自动验证（AI 自行执行）
+
+| 改动类型 | 必跑验证 | 命令 |
+| --- | --- | --- |
+| Python 后端 | API smoke | `python -m unittest discover -s tests/api -v` |
+| 前端 TS/TSX | typecheck | `cd frontend-react && npm run typecheck` |
+| 前端页面/组件/样式 | build | `cd frontend-react && npm run build` |
+| 规则/文档 | 规则架构检查 | `python scripts/check_rule_architecture.py` |
+| lazy 路由 | 路由 smoke | `cd frontend-react && npm run test:smoke` |
+| Bug 修复 | 最小回归 | 对应 `tests/` 或 `frontend-react/tests/regression/` |
+| lint 或大范围前端重构 | lint | `cd frontend-react && npm run lint` |
+
+### 11.2 需用户手动触发的验证（AI 适时建议）
+
+以下验证开销大或需要特定环境，**只在用户通知时执行**，但 AI 在以下场景应**主动建议**：
+
+| 验证项 | 触发时机 | 命令 | AI 建议场景 |
+| --- | --- | --- | --- |
+| 端到端全链路功能测试 | 发版前 / 跨模块改动 | `scripts\run-full-tests.bat` | 改动涉及 3+ 页面、漏斗口径、数据导入流程 |
+| Windows 桌面版编译打包 | 桌面版相关改动 | `scripts\build-installer.ps1` | 后端路由/模型变化、Electron 配置变化、`server_entry.py` 变化、NSIS 脚本变化 |
+| Android APK 重新编译 | 移动端相关改动 | `cd android && npm run build:apk` | 前端 `services/mobile*.ts` 变化、`capacitor.config.ts` 变化、`post-sync-patch.ps1` 变化、移动端 UI 修复 |
+| Android 真机 smoke | 移动端 Bug 修复后 | `python tests\mobile\smoke_test.py` | 移动端崩溃修复、SQLite 同步修复、路由修复 |
+
+**AI 建议话术**：在交付说明末尾添加"建议触发"段落，例如：
+> 本次改动涉及移动端 SQLite 同步逻辑，建议触发 Android APK 重新编译（`cd android && npm run build:apk`）并在真机验证同步流程。
+
+### 11.3 何时不需要建议
+
+- 纯文档改动 → 只跑规则架构检查
+- 纯样式微调 → 只跑 typecheck + build
+- 单个 bug 修复且无跨端影响 → 只跑对应回归测试
+- 用户已明确表示"只改这一处" → 按最小验证执行，不主动建议打包
+
+## 12. 新报表/新功能的测试同步清单
+
+新增报表页面、新 API 端点或新数据导入类型时，必须**同步更新**以下测试体系。遗漏任一项会导致 CI 盲区。
+
+### 12.1 新增后端 API 端点
+
+| 必做 | 文件 | 说明 |
+| --- | --- | --- |
+| ✅ | `tests/api/test_smoke.py` | 增加该端点的 smoke 测试（成功响应 + 关键结构） |
+| ✅ | `frontend-react/src/types/api.ts` | 通过 `npm run generate:api` 更新（禁止手改） |
+| ✅ | 移动端 `mobileRouteHandler.ts` | 若移动端需要支持，增加 SQLite 翻译 + `scripts/test_mobile_routes.py` 用例 |
+| ⚠️ | `docs/rules/business-invariants.md` | 若涉及漏斗/开户/资产/主播口径，更新不变式 |
+
+### 12.2 新增前端报表页面（lazy 路由）
+
+| 必做 | 文件 | 说明 |
+| --- | --- | --- |
+| ✅ | `frontend-react/src/router/index.tsx` | 注册 lazy 路由 |
+| ✅ | `frontend-react/src/layouts/MainLayout.tsx` | 增加菜单项（受 features.ts 控制） |
+| ✅ | `frontend-react/tests/smoke/route-health.spec.ts` | 增加该路由的健康检查用例 |
+| ✅ | `frontend-react/tests/functional/<page>-functional.spec.ts` | 增加页面级功能测试 |
+| ✅ | `frontend-react/src/config/features.ts` | 确定三端显隐（web/desktop/mobile） |
+| ⚠️ | `mobileRouteHandler.ts` | 若移动端启用，增加对应 SQLite 查询 handler |
+
+### 12.3 新增数据导入类型
+
+| 必做 | 文件 | 说明 |
+| --- | --- | --- |
+| ✅ | `backend/routes/upload.py::DATA_TYPES` | 注册新类型 |
+| ✅ | `backend/processors/v2/raw_import.py` | 增加 import handler |
+| ✅ | `backend/models_v2.py` | 定义目标表（中文列名） |
+| ✅ | `tests/api/test_smoke.py` | 增加导入 smoke |
+| ✅ | 用户导入指南 | 仅含数据源路径，不含技术细节 |
+| ⚠️ | `docs/rules/business-invariants.md` | 若涉及存量剔除/漏斗口径，更新不变式 |
+
+### 12.4 新增移动端功能
+
+| 必做 | 文件 | 说明 |
+| --- | --- | --- |
+| ✅ | `mobileRouteHandler.ts` | 增加对应 SQLite 翻译 |
+| ✅ | `scripts/test_mobile_routes.py` | 增加 SQL 验证用例 |
+| ⚠️ | `android/scripts/post-sync-patch.ps1` | 若需要新插件/权限/配置注入，更新 patch |
+| ⚠️ | `tests/mobile/smoke_test.py` | 若有新的关键交互路径，增加 smoke 用例 |
+
+## 13. 何时需要更新规则文档（判断清单）
+
+功能改造完成后，AI 按以下清单判断是否需要更新 `docs/rules/` 下的规则：
+
+| 改动类型 | 是否更新规则 | 更新哪个文件 |
+| --- | --- | --- |
+| 新增/修改业务口径（漏斗、开户、资产、主播） | ✅ 必须更新 | `business-invariants.md` |
+| 新增数据导入类型 | ✅ 必须更新 | `backend.md` + `business-invariants.md` |
+| 新增三端差异功能 | ✅ 必须更新 | `overview.md` + `features.ts` 注释 |
+| 新增依赖工具或工具位置迁移 | ✅ 必须更新 | `toolchain.md` |
+| 新增/修改打包流程 | ✅ 必须更新 | `toolchain.md` + 对应 README |
+| 新增/修改测试体系入口 | ✅ 必须更新 | `testing-and-delivery.md` |
+| 新增公共组件契约（如 MetricCard、ReportFooter） | ✅ 必须更新 | `frontend.md` |
+| 修改 API 前缀、鉴权、数据库切换等架构契约 | ✅ 必须更新 | `overview.md` |
+| 单个 Bug 修复（无契约变化） | ❌ 不更新 | - |
+| 单个页面 UI 微调 | ❌ 不更新 | - |
+| 单个性能优化 | ❌ 不更新 | - |
+
+**判断原则**：只有**稳定架构、公共契约、高风险不变式或工具链**变化时才更新规则；单次 Bug 的实现细节不自动升级为长期规则。
+
+更新规则后必须：
+1. 同步 `AGENTS.md` / `CLAUDE.md`（若根规则也受影响）
+2. 运行 `python scripts/check_rule_architecture.py`
+3. 确认 `git diff --check` 无空白错误
 

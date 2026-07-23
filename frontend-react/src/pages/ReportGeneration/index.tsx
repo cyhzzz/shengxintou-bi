@@ -23,6 +23,12 @@ import type { EChartsOption } from 'echarts';
 import '@/components/Chart/ECharts'; // 触发 echarts.use 副作用（幂等）
 import { FadeInSection } from '@/components';
 import { http } from '@/services/http'; // feat-local-auth：用 http 客户端自动带 Authorization
+import {
+  CHANNEL_CATEGORY_MAP,
+  sortChannelsByCategory,
+  buildChannelColorMap,
+  CATEGORY_REP_COLORS,
+} from '@/utils/channelColors';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -131,77 +137,6 @@ function fmtWow(n: number | null | undefined): { text: string; positive: boolean
   const sign = n >= 0 ? '+' : '';
   return { text: `${sign}${n.toFixed(2)}%`, positive: n >= 0 };
 }
-
-// 渠道 → 大类映射（与后端 CHANNEL_CATEGORY_MAP 一致）
-const CHANNEL_CATEGORY_MAP: Record<string, string> = {
-  小红书: '内容平台', 腾讯: '内容平台', 抖音: '内容平台',
-  快手: '内容平台', 财联社: '内容平台', yj: '内容平台',
-  云极: '内容平台', 其他: '内容平台',
-  华为: '应用市场', 荣耀: '应用市场', 小米: '应用市场',
-  oppo: '应用市场', vivo: '应用市场', 苹果: '应用市场', 鸿蒙: '应用市场',
-  高德: '本地生活',
-};
-
-// 各大类的色系（同色系内按索引取深浅，越深 = 越靠前（开户数越大））
-const CONTENT_REDS = [
-  '#8b0000', '#a52a2a', '#c0392b', '#d63031',
-  '#e74c3c', '#e57373', '#ef9a9a', '#ffcdd2',
-];
-const APPMARKET_BLUES = [
-  '#0d47a1', '#1565c0', '#1976d2', '#1e88e5',
-  '#2196f3', '#42a5f5', '#64b5f6', '#90caf9',
-];
-const LOCAL_GREEN = '#27ae60';
-
-// 渠道索引缓存（按同色系内的排序分配深浅）
-function buildChannelColorMap(channels: string[]): Record<string, string> {
-  const map: Record<string, string> = {};
-  const contentChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '内容平台');
-  const appChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '应用市场');
-  const localChs = channels.filter((c) => CHANNEL_CATEGORY_MAP[c] === '本地生活');
-
-  contentChs.forEach((ch, i) => {
-    map[ch] = CONTENT_REDS[Math.min(i, CONTENT_REDS.length - 1)];
-  });
-  appChs.forEach((ch, i) => {
-    map[ch] = APPMARKET_BLUES[Math.min(i, APPMARKET_BLUES.length - 1)];
-  });
-  localChs.forEach((ch) => {
-    map[ch] = LOCAL_GREEN;
-  });
-  return map;
-}
-
-// 大类排序顺序（视觉堆叠顺序：应用市场(蓝) → 内容平台(红) → 本地生活(绿)）
-const CHANNEL_CATEGORY_ORDER: Record<string, number> = {
-  应用市场: 0,
-  内容平台: 1,
-  本地生活: 2,
-};
-
-/**
- * 按大类分组的渠道排序（防御性排序 — 即使后端 channels 未排序也能保证分组）。
- * 配合 buildChannelColorMap 使用：
- * - 第一优先级：大类顺序（应用市场(蓝) → 内容平台(红) → 本地生活(绿)）
- * - 第二优先级：组内稳定保留入参原顺序
- *
- * 入参若来自后端（已按 (cat_idx, -count) 排序），组内顺序即为大数→小数；
- * 结合 buildChannelColorMap 的 i=0→最深色，视觉上呈现「同一大类挨在一起、组内深→浅向上堆叠」。
- */
-function sortChannelsByCategory(
-  channels: string[],
-  categoryMap: Record<string, string>,
-): string[] {
-  const rank = (c: string): number => CHANNEL_CATEGORY_ORDER[categoryMap[c]] ?? 99;
-  return [...channels].sort((a, b) => rank(a) - rank(b));
-}
-
-// 3 大类的代表色（用于自定义图例）
-const CATEGORY_REP_COLORS: Record<string, string> = {
-  内容平台: '#c0392b',
-  应用市场: '#1976d2',
-  本地生活: '#27ae60',
-};
 
 // v3.1.35 微型 KPI 环形图（SVG，尺寸 ~44x32，与原 layerTag 灰字占用空间相近）
 function KpiRing({ label, rate }: { label: string; rate: number }) {

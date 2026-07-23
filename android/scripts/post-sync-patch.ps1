@@ -2,6 +2,7 @@
 # 用法：npx cap sync android 后运行此脚本
 # 作用：
 #   1. AndroidManifest.xml 加 screenOrientation=landscape
+#   1b. AndroidManifest.xml 加 largeHeap=true（v3.5.4：移动端同步需要大内存）
 #   2. 从 icon/LOGO.png 生成各尺寸 ic_launcher 图标
 #   3. patch 插件 build.gradle 的 JDK 21 → 17
 #   4. 确认 strings.xml 中 app_name 为"省心投"（非"省心投 BI"）
@@ -40,6 +41,30 @@ if (Test-Path $manifestPath) {
         Write-Output "[patch] AndroidManifest.xml: added screenOrientation=landscape"
     } else {
         Write-Output "[skip] AndroidManifest.xml: screenOrientation already set"
+    }
+}
+
+# ========== 1b. AndroidManifest.xml 加 largeHeap ==========
+# v3.5.4：移动端同步下载 30+ MB SQLite 备份 → base64 后 50+ MB，
+#         WebView 默认堆内存不足会 OOM 崩溃，必须启用 largeHeap
+if (Test-Path $manifestPath) {
+    $manifest = Read-FileNoBom $manifestPath
+    if ($manifest -notmatch 'android:largeHeap') {
+        # 在 android:theme="@style/AppTheme" 后插入 android:largeHeap="true"
+        # 用字符串操作避免 PowerShell -replace 中的引号/反引号转义问题
+        $marker = 'android:theme="@style/AppTheme"'
+        $insertText = "`n        android:largeHeap=`"true`""
+        $idx = $manifest.IndexOf($marker)
+        if ($idx -ge 0) {
+            $insertPos = $idx + $marker.Length
+            $manifest = $manifest.Substring(0, $insertPos) + $insertText + $manifest.Substring($insertPos)
+            Write-FileNoBom $manifestPath $manifest
+            Write-Output "[patch] AndroidManifest.xml: added largeHeap=true"
+        } else {
+            Write-Output "[warn] AndroidManifest.xml: marker 'android:theme' not found, cannot inject largeHeap"
+        }
+    } else {
+        Write-Output "[skip] AndroidManifest.xml: largeHeap already set"
     }
 }
 

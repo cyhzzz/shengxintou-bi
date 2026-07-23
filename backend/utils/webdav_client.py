@@ -186,6 +186,15 @@ class WebDAVBackupClient:
             if use_compression and file_to_upload != local_db_path and os.path.exists(file_to_upload):
                 os.remove(file_to_upload)
 
+        # 上传 latest_backup.txt manifest（供移动端 GET 获取最新备份文件名）
+        # 移动端 CapacitorHttp 不支持 PROPFIND，只能用标准 GET 请求
+        try:
+            manifest_url = self._get_remote_url('latest_backup.txt')
+            requests.put(manifest_url, data=filename.encode('utf-8'),
+                          auth=self.auth, **self._requests_kwargs())
+        except Exception as manifest_err:
+            print(f"Warning: Failed to upload latest_backup.txt: {manifest_err}")
+
         return {
             'filename': filename,
             'size': file_size,

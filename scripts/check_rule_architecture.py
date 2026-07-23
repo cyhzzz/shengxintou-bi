@@ -29,6 +29,7 @@ REQUIRED = (
     RULES / 'backend.md',
     RULES / 'frontend.md',
     RULES / 'testing-and-delivery.md',
+    RULES / 'toolchain.md',
     RULES / 'workflows' / 'feature.md',
     RULES / 'workflows' / 'bugfix.md',
     RULES / 'templates' / 'tech-spec.md',
@@ -42,6 +43,7 @@ ROOT_REFERENCES = (
     'docs/rules/backend.md',
     'docs/rules/frontend.md',
     'docs/rules/testing-and-delivery.md',
+    'docs/rules/toolchain.md',
     'docs/rules/workflows/feature.md',
     'docs/rules/workflows/bugfix.md',
     'docs/rules/templates/tech-spec.md',
@@ -84,6 +86,12 @@ COVERAGE = {
         'frontend-react/tests/smoke/',
         'scripts/pre-commit-check.bat',
         'version.json',
+    ),
+    RULES / 'toolchain.md': (
+        'tools/jdk17/',
+        'tools/platform-tools/',
+        'assembleDebug',
+        'build-installer.ps1',
     ),
 }
 

@@ -80,6 +80,25 @@ spec 文件复制到 `docs/superpowers/specs/`（已 gitignore，不入仓库）
 - 交付说明列出改动、验证、未运行项、基线问题和未提交文件。
 - 未经明确要求，不 commit、push、tag 或 release。
 
+### 是否需要更新规则文档（判断清单）
+
+按 `testing-and-delivery.md` 第 13 节的清单判断：
+
+- 涉及业务口径/导入类型/三端差异/工具链/打包流程/测试体系/公共组件契约/架构契约 → 必须更新对应规则文件。
+- 单个 Bug 修复/UI 微调/性能优化 → 不更新规则。
+- 更新规则后必须运行 `python scripts/check_rule_architecture.py` 并同步 `AGENTS.md` / `CLAUDE.md`。
+
+### 是否需要建议用户手动触发验证
+
+按 `testing-and-delivery.md` 第 11.2 节的清单判断：
+
+- 涉及桌面版打包相关 → 建议触发 `scripts\build-installer.ps1`。
+- 涉及移动端 `services/mobile*.ts` 或 `capacitor.config.ts` → 建议触发 `cd android && npm run build:apk`。
+- 移动端 Bug 修复 → 建议触发 `python tests\mobile\smoke_test.py`。
+- 跨模块或发版前 → 建议触发 `scripts\run-full-tests.bat`。
+
+在交付说明末尾添加"建议触发"段落，明确命令和原因。
+
 ## 完成检查
 
 - [ ] 每个验收项都有实现和直接证据。

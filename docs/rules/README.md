@@ -22,6 +22,7 @@
 | 修改模型、导入、API、SQLite、WebDAV | [`backend.md`](backend.md) | `backend/models_v2.py`、`backend/processors/v2/raw_import.py`、`backend/routes/` |
 | 修改 React 页面、组件、筛选、类型或样式 | [`frontend.md`](frontend.md) | `frontend-react/src/` |
 | 决定测试范围、提交、CI 或发布 | [`testing-and-delivery.md`](testing-and-delivery.md) | `tests/`、`frontend-react/tests/`、`scripts/`、`.github/` |
+| 打包、工具链、依赖工具位置 | [`toolchain.md`](toolchain.md) | `tools/jdk17/`、`tools/platform-tools/`、`tools/android-sdk/`、`scripts/build-installer.ps1`、`android/scripts/post-sync-patch.ps1` |
 | 开发新需求 | [`workflows/feature.md`](workflows/feature.md) | [`templates/tech-spec.md`](templates/tech-spec.md) |
 | 修复 Bug | [`workflows/bugfix.md`](workflows/bugfix.md) | 相关回归测试目录 |
 

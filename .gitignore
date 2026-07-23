@@ -59,6 +59,10 @@ python-3.9-embed/
 # v3.5.3：JDK 17（Android 打包用，不入库）
 tools/jdk17/
 tools/jdk17.zip
+# v3.5.4：Android SDK（Gradle 编译用，不入库；从 tmp/ 迁出避免误删）
+tools/android-sdk/
+tools/platform-tools/
+tools/build-tools/
 
 # ===== IDE 配置 =====
 .vscode/

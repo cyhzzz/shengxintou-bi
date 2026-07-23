@@ -35,21 +35,37 @@ export async function copyDatabaseFromAssets(overwrite = false): Promise<void> {
 }
 
 /**
- * v3.5.3：把 cache 目录中的 .db 文件移动到 SQLite 数据库目录并自动加 SQLite 后缀
+ * v3.5.4：把 cache 目录中的 .db 文件移动到 SQLite 数据库目录并自动加 SQLite 后缀
  *
  * 用于 syncFromWebDAV 流程：
  *   1. fetch 下载 shengxintou.db 到 Blob
- *   2. base64 编码
- *   3. Filesystem.writeFile 写到 Directory.Cache（路径为 /data/data/<pkg>/cache/）
- *   4. 调用本函数 → moveDatabasesAndAddSuffix({ folderPath: 'cache' }) 把 shengxintou.db
- *      移动到 /data/data/<pkg>/databases/shengxintouSQLite.db
+ *   2. 分块 base64 编码 + Filesystem.writeFile/appendFile 写到 Directory.Cache
+ *   3. 调用本函数 → moveDatabasesAndAddSuffix({ folderPath: 'cache', dbNameList: ['shengxintou'] })
+ *      把 cache/shengxintou.db 移动到 databases/shengxintouSQLite.db
+ *
+ * v3.5.4 关键修复：@capacitor-community/sqlite 7.0.3 的 moveDatabasesAndAddSuffix
+ * 要求 dbNameList 参数非空，否则报 "dbNameList not given or empty"。
+ * 之前只传 folderPath 不传 dbNameList 会导致同步失败。
  */
 export async function moveDatabaseFromCache(): Promise<void> {
-  await CapacitorSQLite.moveDatabasesAndAddSuffix({ folderPath: 'cache' });
+  await CapacitorSQLite.moveDatabasesAndAddSuffix({
+    folderPath: 'cache',
+    dbNameList: ['shengxintou'],
+  });
 }
 
 export async function initMobileDatabase(): Promise<void> {
   if (dbOpen) return;
+
+  // v3.5.4：closeMobileDatabase 在 reload/状态错乱后可能没真正关掉原生层连接，
+  // 此时 createConnection 会抛 "Connection shengxintou already exists"。
+  // 先静默 closeConnection 一次（连接不存在时原生层会返回，不抛错），再 create。
+  try {
+    await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+  } catch {
+    /* connection not exist is fine */
+  }
+
   // 建立连接 + 打开数据库
   await CapacitorSQLite.createConnection({
     database: DB_NAME,

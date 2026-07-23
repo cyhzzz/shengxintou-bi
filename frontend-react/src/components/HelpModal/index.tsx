@@ -4,6 +4,7 @@ import { QuestionCircleOutlined, SyncOutlined, CloudDownloadOutlined, CheckCircl
 import { dataService } from "@/services";
 import { DataFreshnessIndicator, type DataFreshnessIndicatorRef } from "@/components/DataFreshness";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { featureFlags } from "@/config/features";
 import styles from "./index.module.scss";
 
 const { Text, Paragraph, Link } = Typography;
@@ -310,16 +311,18 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           ，可用 git pull 拉取最新代码
                         </Text>
                       </div>
-                      <Button
-                        type="primary"
-                        icon={<CloudDownloadOutlined />}
-                        loading={gitBusy}
-                        onClick={() => startSelfUpdate(true)}
-                        className={styles.updateBtn}
-                        block
-                      >
-                        {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
-                      </Button>
+                      {featureFlags.showGithubSyncButton && (
+                        <Button
+                          type="primary"
+                          icon={<CloudDownloadOutlined />}
+                          loading={gitBusy}
+                          onClick={() => startSelfUpdate(true)}
+                          className={styles.updateBtn}
+                          block
+                        >
+                          {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
+                        </Button>
+                      )}
                     </div>
 
                   </div>

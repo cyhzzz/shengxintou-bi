@@ -35,16 +35,19 @@
   sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35"
   ```
 
-- 设置环境变量 `ANDROID_HOME` 指向 SDK 根目录，例如：
+- 设置环境变量 `ANDROID_HOME` 指向 SDK 根目录。**推荐使用项目内置 SDK**（`tools/android-sdk/`，避免 `tmp/` 误删导致编译失败）：
 
   ```powershell
-  # PowerShell（当前会话临时生效）
-  $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+  # PowerShell（当前会话临时生效）—— 项目内置 SDK（推荐）
+  $env:ANDROID_HOME = "D:\AIproject\省心投BI\tools\android-sdk"
+  # 或使用 Android Studio 默认安装路径
+  # $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
   # 永久生效（用户级）
   [System.Environment]::SetEnvironmentVariable("ANDROID_HOME", $env:ANDROID_HOME, "User")
   ```
 
 - 建议将 `%ANDROID_HOME%\platform-tools` 与 `%ANDROID_HOME%\cmdline-tools\latest\bin` 追加到 `PATH`。
+- 项目内置 SDK 位置和恢复方式见仓库根 `docs/rules/toolchain.md` 第 1.1 节与第 4 节。
 
 ### 3. Node.js 与依赖
 

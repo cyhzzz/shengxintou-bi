@@ -21,6 +21,11 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
 import { pickEChartsColor } from '@/utils/echartsColors';
+import {
+  CHANNEL_CATEGORY_MAP,
+  sortChannelsByCategory,
+  buildChannelColorMap,
+} from '@/utils/channelColors';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
@@ -191,13 +196,16 @@ const AgencyAnalysisPage: React.FC = () => {
     });
     const platforms = Array.from(new Set(trend.series.map((s) => s.platform))).filter(Boolean);
     // 堆叠柱状图（按平台分色堆叠，按日期累加）
-    // ⚠️ ECharts 不能解析 CSS var()，用真实 hex（ECHARTS_COLORS）循环取色
-    const seriesData = platforms.map((p, idx) => ({
+    // v3.5.4：参照报告生成的同色系策略 —— 同大类平台使用同色系深浅，
+    //          避免随平台增多颜色杂乱；堆叠顺序按大类聚合（应用市场 → 内容平台 → 本地生活）
+    const sortedPlatforms = sortChannelsByCategory(platforms, CHANNEL_CATEGORY_MAP);
+    const platformColorMap = buildChannelColorMap(sortedPlatforms);
+    const seriesData = sortedPlatforms.map((p) => ({
       name: p,
       type: 'bar' as const,
       stack: '总量',
       barMaxWidth: 36,
-      itemStyle: { color: pickEChartsColor(idx) },
+      itemStyle: { color: platformColorMap[p] || pickEChartsColor(sortedPlatforms.indexOf(p)) },
       emphasis: { focus: 'series' as const },
       data: trend.dates.map((d) => byPlatform.get(d)?.get(p) || 0),
     }));
@@ -207,7 +215,7 @@ const AgencyAnalysisPage: React.FC = () => {
         axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
         valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
       },
-      legend: { data: platforms, bottom: 0, type: 'scroll' },
+      legend: { data: sortedPlatforms, bottom: 0, type: 'scroll' },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
       xAxis: {
         type: 'category',

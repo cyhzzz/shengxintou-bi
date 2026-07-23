@@ -81,6 +81,7 @@ const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'
 const isMobile = isMobileClient();
 
 // 主布局子路由（移动端和桌面端共享）
+// v3.5.4：被 features 开关禁用的功能路由也不注册，避免移动端通过 URL 直访触发未实现的 API
 const mainChildren = [
   { index: true, element: <Navigate to="/omni-channel" replace /> },
   { path: 'dashboard', element: withSuspense(DashboardPage) },
@@ -134,7 +135,10 @@ const mainChildren = [
       { path: 'analyst', element: withSuspense(LiveDirectSalesPage, { liveType: '分析师' }) },
     ],
   },
-  { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
+  // v3.5.4：报告生成路由仅在有 showReportGeneration 的环境注册（移动端禁用）
+  ...(featureFlags.showReportGeneration
+    ? [{ path: 'report-generation', element: withSuspense(ReportGenerationPage) }]
+    : []),
   { path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) },
   // v3.3.10: 投放评审（内容平台二级菜单）
   { path: 'investment-review', element: withSuspense(InvestmentReviewPage) },
@@ -146,10 +150,17 @@ const mainChildren = [
   {
     path: 'system',
     children: [
-      { path: 'data-import', element: withSuspense(DataImportPage) },
-      { path: 'account-management', element: withSuspense(AccountManagementPage) },
+      // v3.5.4：系统子菜单按 features 开关条件注册，移动端禁用数据导入/账号管理
+      ...(featureFlags.showDataImport
+        ? [{ path: 'data-import', element: withSuspense(DataImportPage) }]
+        : []),
+      ...(featureFlags.showAccountManagement
+        ? [{ path: 'account-management', element: withSuspense(AccountManagementPage) }]
+        : []),
       // v3.5.3：移动端走简化版同步页（避免触发未实现的 /webdav/list 等 API）
-      { path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) },
+      ...(featureFlags.showDatabaseBackup
+        ? [{ path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) }]
+        : []),
     ],
   },
 ];
