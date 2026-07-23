@@ -4,6 +4,9 @@
  * 仅支持从坚果云下载最新数据库，不支持上传/双向同步/备份列表等桌面端功能。
  * 替代桌面端 DatabaseBackup 页面在移动端的渲染，避免调用未实现的 /webdav/list
  * 和 /data-sync/* 等 API 触发 "me.some is not a function" 等错误。
+ *
+ * v3.5.3 修复：所有 Hooks 必须在 `if (!isMobileClient()) return null` 之前调用，
+ * 否则违反 Rules of Hooks → React 严格模式崩溃 → 白屏。
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Space, Spin, Tag, Typography, App as AntApp } from 'antd';
@@ -13,9 +16,7 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import {
-  syncFromWebDAV,
-} from '@/services/mobileSync';
+import { syncFromWebDAV } from '@/services/mobileSync';
 import { databaseExists, copyDatabaseFromAssets, closeMobileDatabase, initMobileDatabase } from '@/services/mobileSqlite';
 import { isMobileClient } from '@/utils/isDesktop';
 
@@ -30,9 +31,7 @@ interface SyncState {
 }
 
 export default function MobileDatabaseSync() {
-  // 桌面端不应渲染此页面（路由层已做拦截，这里做兜底）
-  if (!isMobileClient()) return null;
-
+  // 所有 Hooks 必须在条件 return 之前调用（Rules of Hooks）
   const { message } = AntApp.useApp();
   const [state, setState] = useState<SyncState>({
     loading: false,
@@ -51,7 +50,7 @@ export default function MobileDatabaseSync() {
         ...s,
         loading: false,
         hasDb,
-        hasCreds: true, // v3.5.3：内置默认凭据，恒为 true
+        hasCreds: true, // 内置默认凭据，恒为 true
       }));
     } catch (err) {
       console.error('[MobileSync] refresh status failed:', err);
@@ -63,10 +62,9 @@ export default function MobileDatabaseSync() {
     refreshStatus();
   }, [refreshStatus]);
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      // 先关闭现有连接，避免覆盖时文件锁
       try { await closeMobileDatabase(); } catch { /* ignore */ }
       const result = await syncFromWebDAV();
       if (result.success) {
@@ -77,20 +75,17 @@ export default function MobileDatabaseSync() {
           lastSyncAt: result.timestamp || new Date().toISOString(),
           lastSize: result.size ?? null,
         }));
-        // 同步成功后延迟刷新整页，让新数据库生效
         setTimeout(() => window.location.reload(), 1200);
       } else {
         message.error(result.message);
-        // 失败时重新打开连接
         try { await initMobileDatabase(); } catch { /* ignore */ }
       }
     } finally {
       setSyncing(false);
     }
-  };
+  }, [message]);
 
-  // v3.5.3：从 APK 内置 DB 重新初始化（离线场景，无需联网）
-  const handleRestoreFromAssets = async () => {
+  const handleRestoreFromAssets = useCallback(async () => {
     setSyncing(true);
     try {
       try { await closeMobileDatabase(); } catch { /* ignore */ }
@@ -104,16 +99,16 @@ export default function MobileDatabaseSync() {
     } finally {
       setSyncing(false);
     }
-  };
+  }, [message]);
 
-  const formatSize = (bytes: number | null): string => {
+  const formatSize = useCallback((bytes: number | null): string => {
     if (!bytes) return '-';
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-  };
+  }, []);
 
-  const formatTime = (iso: string | null): string => {
+  const formatTime = useCallback((iso: string | null): string => {
     if (!iso) return '从未同步';
     try {
       const d = new Date(iso);
@@ -121,7 +116,11 @@ export default function MobileDatabaseSync() {
     } catch {
       return iso;
     }
-  };
+  }, []);
+
+  // 桌面端不应渲染此页面（路由层已做拦截，这里做兜底）
+  // 必须在所有 Hooks 之后 return
+  if (!isMobileClient()) return null;
 
   return (
     <div style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>

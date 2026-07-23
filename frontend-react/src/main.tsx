@@ -1,7 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
+// 注意：App 不再静态 import，改为在 waitForCapacitorAndRender 中动态 import，
+// 确保 router 模块（含 isMobile 判断）在 Capacitor bridge 就绪后才加载。
 
 // 移动端调试 — 全局未捕获错误捕获器
 //
@@ -89,11 +90,47 @@ window.addEventListener('unhandledrejection', (e) => {
   }
 });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// v3.5.3 关键修复：在 Capacitor 环境下，先等 native bridge 注入完成再渲染。
+//
+// 根因：router/index.tsx 的 `const isMobile = isMobileClient()` 在模块加载时
+// 一次性求值。如果 main.tsx 在 Capacitor bridge 注入 window.Capacitor 之前
+// 就 import router，isMobile 永远是 false → 走 createBrowserRouter（非
+// HashRouter）→ file:// 下路由找不到 → 各种 undefined → "me.some is not a
+// function"。
+//
+// Capacitor 官方做法：bridge 在 DOMContentLoaded 前注入，但 Vite 打包后
+// main.tsx 的同步 import 链可能在 bridge 注入前就开始执行。这里用一个微
+// 延迟 + 显式等待，确保 bridge 就绪后再渲染 React 树。
+const waitForCapacitorAndRender = async () => {
+  // 检测是否在 Capacitor WebView 中（用多种早期标志，任一命中即等待）
+  const looksLikeCapacitor =
+    !!(window as any).Capacitor ||
+    !!(window as any).androidBridge ||
+    navigator.userAgent.includes('Android') && location.protocol === 'file:';
+
+  if (looksLikeCapacitor) {
+    // 最多等 500ms 让 bridge 完全注入
+    const start = Date.now();
+    while (
+      !(window as any).Capacitor?.isNativePlatform?.() &&
+      !(window as any).Capacitor?.getPlatform?.() &&
+      Date.now() - start < 500
+    ) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  }
+
+  // 动态 import App，确保 router 模块在 bridge 就绪后才加载
+  // （静态 import 会在 main.tsx 解析时立即加载 router，可能早于 bridge 注入）
+  const { default: App } = await import('./App.tsx');
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+};
+
+void waitForCapacitorAndRender();
 
 // v3.2.5：本地服务器+本地浏览器模式下，HTTP 延迟极低（<5ms），
 // 但 V8 解析 JS 仍是 CPU 阻塞操作，大 chunk（~1MB）解析 50-100ms。
