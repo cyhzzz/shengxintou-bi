@@ -73,8 +73,12 @@ else:
 SUPABASE_URL = os.getenv('SUPABASE_URL', '').strip() or None
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '').strip() or None
 SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip() or None
-# 鉴权总开关：true 时全局中间件强制 /api/v1/* 鉴权；false 时回退旧行为（本期开发期可临时 false 调试）
-AUTH_ENABLED = os.getenv('AUTH_ENABLED', 'true').lower() in ('1', 'true', 'yes', 'on')
+# v3.5.8：Supabase / 鉴权 / 双向同步 全部封存为默认关闭。
+#   - AUTH_ENABLED：true 时全局中间件强制 /api/v1/* 鉴权；false 时回退无鉴权模式
+#   - CLOUD_SYNC_ENABLED：true 时注册 SQLite ↔ PG 双向同步蓝图（/api/v1/data-sync/*）
+#   - 两者默认 false，对应 .env 不设置；需要启用时在 .env 中显式设为 true
+AUTH_ENABLED = os.getenv('AUTH_ENABLED', 'false').lower() in ('1', 'true', 'yes', 'on')
+CLOUD_SYNC_ENABLED = os.getenv('CLOUD_SYNC_ENABLED', 'false').lower() in ('1', 'true', 'yes', 'on')
 
 # feat-local-auth 方案 A：JWT 本地鉴权配置
 # - 不依赖 Supabase Auth API，完全本地签发/验证

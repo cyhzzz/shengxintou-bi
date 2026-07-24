@@ -16,7 +16,7 @@
 #>
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Resolve-Path "$PSScriptRoot\.."
+$repoRoot = Resolve-Path "$PSScriptRoot\..\.."
 $androidRoot = Join-Path $repoRoot 'android'
 $frontendRoot = Join-Path $repoRoot 'frontend-react'
 $gradleRoot = Join-Path $androidRoot 'android'

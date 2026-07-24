@@ -12,7 +12,7 @@ import {
   type WeeklyRankingItem,
   type YearBreakdownItem,
 } from '../weeklyRanking';
-import { saveBlobFile, buildMobileSaveMessage, withZoomReset } from '@/utils/saveBlob';
+import { saveBlobFile, buildMobileSaveMessage, captureElement } from '@/utils/saveBlob';
 import styles from './PosterModal.module.scss';
 
 interface PosterModalProps {
@@ -238,12 +238,6 @@ const PosterModal: React.FC<PosterModalProps> = ({
   const posterRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<'image' | 'pdf' | null>(null);
 
-  // 动态加载 html2canvas
-  const loadHtml2Canvas = async (): Promise<typeof import('html2canvas').default> => {
-    const html2canvas = (await import('html2canvas')).default;
-    return html2canvas;
-  };
-
   // 动态加载 jspdf
   const loadJsPdf = async (): Promise<typeof import('jspdf').jsPDF> => {
     const { jsPDF } = await import('jspdf');
@@ -259,17 +253,14 @@ const PosterModal: React.FC<PosterModalProps> = ({
 
     setExporting('image');
     try {
-      const html2canvas = await loadHtml2Canvas();
-
-      // v3.5.7：安卓 body.mobile-scaled zoom:0.67 下 html2canvas 会元素重叠，
-      // 导出前临时重置 zoom=1 触发 echarts 重绘，拍完恢复。
-      const canvas = await withZoomReset(() => html2canvas(posterRef.current!, {
+      // v3.5.8：改用 modern-screenshot 替代 html2canvas
+      //   html2canvas 在 Android WebView 下对 inline-flex / flex gap 支持不完善，
+      //   导致海报表格列与文字重叠；modern-screenshot 基于 SVG foreignObject，
+      //   使用浏览器原生渲染，对现代 CSS 完整支持。
+      const canvas = await captureElement(posterRef.current!, {
         scale: 2,
-        useCORS: true,
-        allowTaint: true,
         backgroundColor: '#ffffff',
-        logging: false,
-      }));
+      });
 
       const imageUrl = canvas.toDataURL('image/png');
 
@@ -303,18 +294,13 @@ const PosterModal: React.FC<PosterModalProps> = ({
 
     setExporting('pdf');
     try {
-      const html2canvas = await loadHtml2Canvas();
       const jsPDF = await loadJsPdf();
 
-      // v3.5.7：安卓 body.mobile-scaled zoom:0.67 下 html2canvas 会元素重叠，
-      // 导出前临时重置 zoom=1 触发 echarts 重绘，拍完恢复。
-      const canvas = await withZoomReset(() => html2canvas(posterRef.current!, {
+      // v3.5.8：改用 modern-screenshot 替代 html2canvas（同 handleExportImage）
+      const canvas = await captureElement(posterRef.current!, {
         scale: 2,
-        useCORS: true,
-        allowTaint: true,
         backgroundColor: null,
-        logging: false,
-      }));
+      });
 
       const imgData = canvas.toDataURL('image/png');
       const imgWidth = canvas.width;

@@ -198,9 +198,11 @@ export default function MainLayout() {
   const { message: antdMessage } = AntApp.useApp();
 
   // feat-cloud-supabase：右上角"当前账号 + 退出"
+  // v3.5.8：仅在 showAccountEntry=true 时拉用户元数据，避免鉴权关闭时无谓的 401
   const email = useAuthStore((s) => s.email);
   const profile = useAuthStore((s) => s.profile);
   useEffect(() => {
+    if (!featureFlags.showAccountEntry) return;
     // 进入布局时拉一次当前用户元数据
     fetchMe().catch(() => {/* 静默失败 */});
   }, []);

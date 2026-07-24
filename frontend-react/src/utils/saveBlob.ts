@@ -4,23 +4,26 @@
  * - Web/Desktop：走浏览器 <a download> 触发下载
  * - 移动端（Capacitor Android）：Android WebView 默认拦截 <a download>，
  *   改用 @capacitor/filesystem 写入 Documents 目录，避免「提示成功但未真正保存」
+ *
+ * v3.5.8：截图库从 html2canvas 切到 modern-screenshot
+ *   - html2canvas 用 JS 模拟 DOM 渲染，对 inline-flex / flex gap / CSS variables
+ *     支持不完善，在 Android WebView 下会出现子元素重叠、列宽塌缩
+ *   - modern-screenshot 基于 SVG foreignObject，使用浏览器原生渲染，
+ *     对现代 CSS 完整支持，0 依赖、MIT、活跃维护
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { domToCanvas } from 'modern-screenshot';
 import { isMobileClient } from './isDesktop';
 
 /**
- * html2canvas 对 CSS zoom 支持不佳（body.mobile-scaled 下 zoom:0.67 !important），
- * 导出时会因为元素尺寸与实际渲染尺寸不一致导致文字/图表重叠。
- *
- * 根因：
- *   1. CSS 用了 !important，内联 style 无法覆盖，必须移除 mobile-scaled class
- *   2. echarts canvas 是在 zoom=0.67 下 init 的，单纯移除 class 触发 resize
- *      只会改变 canvas DOM 尺寸，但 canvas 像素内容不会重绘 → 截图仍是旧尺寸
+ * body.mobile-scaled 下 zoom:0.67 !important，任何截图库（包括 modern-screenshot）
+ * 在 zoom 下都会按缩放后尺寸渲染，导致截图分辨率被压缩、ECharts canvas 错位。
  *
  * 修复：
- *   移除 mobile-scaled class 后，主动遍历 DOM 找到所有 echarts 实例
- *   调用 resize() 让 echarts 在 1:1 尺寸下重新绘制 canvas，
- *   等待足够时间确保绘制完成，再执行 html2canvas。
+ *   1. 截图前临时移除 mobile-scaled class
+ *   2. 主动调用所有 echarts 实例 resize() 在 1:1 尺寸下重绘
+ *   3. 等待重排 + canvas 重绘完成
+ *   4. 截图完成后恢复 mobile-scaled + echarts 尺寸
  */
 export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
   if (!isMobileClient()) return fn();
@@ -82,6 +85,26 @@ export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
     scrollEl.scrollTop = scrollTop;
     scrollEl.scrollLeft = scrollLeft;
   }
+}
+
+/**
+ * 截图封装：基于 modern-screenshot 替代 html2canvas
+ *
+ * @param element  目标 DOM 节点
+ * @param options  scale=缩放倍率；backgroundColor=背景色（null=透明）
+ * @returns        HTMLCanvasElement
+ */
+export async function captureElement(
+  element: HTMLElement,
+  options: { scale?: number; backgroundColor?: string | null } = {}
+): Promise<HTMLCanvasElement> {
+  const { scale = 2, backgroundColor = '#ffffff' } = options;
+  return withZoomReset(() =>
+    domToCanvas(element, {
+      scale,
+      backgroundColor: backgroundColor ?? undefined,
+    })
+  );
 }
 
 interface SaveOptions {

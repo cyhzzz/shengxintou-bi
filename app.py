@@ -577,6 +577,11 @@ from backend.routes.system import data_sync
 # feat-cloud-supabase：鉴权蓝图（必须在所有 app.register_blueprint 之前 import）
 from backend.auth import bp as auth_bp, init_auth
 
+# v3.5.8：鉴权与数据同步功能封存，通过 .env 开关控制
+#   - AUTH_ENABLED=true：注册鉴权中间件（默认 false）
+#   - CLOUD_SYNC_ENABLED=true：注册 SQLite ↔ PG 双向同步蓝图（默认 false）
+#   开启时只需在 .env 中将对应项设为 true，无需改代码
+
 # Import weekly_reports module
 from backend.routes import weekly_reports
 from backend.routes.reports import app_market as app_market_report_blueprint
@@ -607,6 +612,7 @@ from backend.routes.data import (
 
 app.register_blueprint(metadata.bp, url_prefix=API_PREFIX)
 # feat-cloud-supabase：注册鉴权蓝图，挂在 /api/v1 前缀下
+# v3.5.8：蓝图始终注册（端点存在无害），中间件在 init_auth 内根据 AUTH_ENABLED 决定是否拦截
 app.register_blueprint(auth_bp, url_prefix=API_PREFIX)
 
 # 注册所有拆分后的数据模块Blueprint
@@ -627,7 +633,12 @@ app.register_blueprint(investment_review.bp, url_prefix=API_PREFIX)
 app.register_blueprint(upload.bp, url_prefix=API_PREFIX)
 app.register_blueprint(webdav_backup.bp, url_prefix='/api/v1/webdav')
 app.register_blueprint(version.bp, url_prefix='/api/v1/version')
-app.register_blueprint(data_sync.bp, url_prefix='/api/v1/data-sync')
+# v3.5.8：SQLite ↔ PG 双向同步蓝图按开关条件注册（封存期默认不注册）
+if top_config.CLOUD_SYNC_ENABLED:
+    app.register_blueprint(data_sync.bp, url_prefix='/api/v1/data-sync')
+    logger.info("✓ 数据同步蓝图已注册：CLOUD_SYNC_ENABLED=true")
+else:
+    logger.info("∘ 数据同步蓝图未注册（CLOUD_SYNC_ENABLED=false，需启用时在 .env 中设为 true）")
 app.register_blueprint(system.bp)
 app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in blueprint
 app.register_blueprint(app_market_report_blueprint.bp)
@@ -638,10 +649,14 @@ app.register_blueprint(xhs_plan_analysis_report_blueprint.bp)
 # ============================================================================
 # 鉴权中间件注册（feat-cloud-supabase）
 # 必须放在所有蓝图 register 之后，before_request 才不会漏端点
+# v3.5.8：AUTH_ENABLED=false 时中间件内部直接 return，不拦截任何请求
 # ============================================================================
 try:
     init_auth(app)
-    logger.info("✓ 鉴权中间件已注册：所有 /api/v1/* 需 Bearer token（/auth/login 白名单）")
+    if top_config.AUTH_ENABLED:
+        logger.info("✓ 鉴权中间件已启用：所有 /api/v1/* 需 Bearer token（/auth/login 白名单）")
+    else:
+        logger.info("∘ 鉴权中间件已禁用（AUTH_ENABLED=false，无鉴权模式；需启用时在 .env 中设为 true）")
 except Exception as e:
     logger.error(f"鉴权中间件注册失败：{e}")
 
@@ -653,35 +668,38 @@ with app.app_context():
     ensure_database_exists()
 
     # feat-local-auth 方案 A：首次启动创建默认 admin 账号
-    # 如果 app_users 表为空，自动创建 admin@shengxintou.local / shengxintou2026
-    try:
-        from backend.models_v2 import AppUser
-        from backend.auth.jwt_utils import hash_password
-        from datetime import datetime
-        if AppUser.query.count() == 0:
-            admin_email = top_config.DEFAULT_ADMIN_EMAIL
-            admin_password = top_config.DEFAULT_ADMIN_PASSWORD
-            admin = AppUser(
-                email=admin_email,
-                password_hash=hash_password(admin_password),
-                display_name='管理员',
-                department='',
-                role='admin',
-                is_active=1,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            db.session.add(admin)
-            db.session.commit()
-            logger.info(f"✓ 默认 admin 账号已创建：{admin_email}（请尽快修改密码）")
-        else:
-            logger.debug("app_users 表已有用户，跳过默认 admin 创建")
-    except Exception as e:
-        logger.warning(f"创建默认 admin 账号失败（忽略）：{e}")
+    # v3.5.8：仅在 AUTH_ENABLED=true 时创建（封存期无需建用户）
+    if top_config.AUTH_ENABLED:
         try:
-            db.session.rollback()
-        except Exception:
-            pass
+            from backend.models_v2 import AppUser
+            from backend.auth.jwt_utils import hash_password
+            from datetime import datetime
+            if AppUser.query.count() == 0:
+                admin_email = top_config.DEFAULT_ADMIN_EMAIL
+                admin_password = top_config.DEFAULT_ADMIN_PASSWORD
+                admin = AppUser(
+                    email=admin_email,
+                    password_hash=hash_password(admin_password),
+                    display_name='管理员',
+                    department='',
+                    role='admin',
+                    is_active=1,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                db.session.add(admin)
+                db.session.commit()
+                logger.info(f"✓ 默认 admin 账号已创建：{admin_email}（请尽快修改密码）")
+            else:
+                logger.debug("app_users 表已有用户，跳过默认 admin 创建")
+        except Exception as e:
+            logger.warning(f"创建默认 admin 账号失败（忽略）：{e}")
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+    else:
+        logger.info("∘ 跳过默认 admin 账号创建（AUTH_ENABLED=false）")
 
 # ============================================================================
 # Swagger/OpenAPI 文档初始化

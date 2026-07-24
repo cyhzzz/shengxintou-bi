@@ -38,6 +38,7 @@
     "framer-motion": "^12.42.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
+    "modern-screenshot": "^4.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
