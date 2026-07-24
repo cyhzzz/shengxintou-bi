@@ -29,7 +29,7 @@ import {
   buildChannelColorMap,
   CATEGORY_REP_COLORS,
 } from '@/utils/channelColors';
-import { saveBlobFile, buildMobileSaveMessage } from '@/utils/saveBlob';
+import { saveBlobFile, buildMobileSaveMessage, withZoomReset } from '@/utils/saveBlob';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -363,13 +363,15 @@ const ReportGeneration: React.FC = () => {
     setExporting('png');
     try {
       const html2canvas = await loadHtml2Canvas();
-      const canvas = await html2canvas(posterRef.current, {
+      // v3.5.7：安卓 body.mobile-scaled zoom:0.67 下 html2canvas 会元素重叠，
+      // 导出前临时重置 zoom=1 触发 echarts 重绘，拍完恢复。
+      const canvas = await withZoomReset(() => html2canvas(posterRef.current!, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-      });
+      }));
       if (canvas.width === 0) {
         throw new Error('画布尺寸异常，请检查浏览器窗口是否过窄');
       }
@@ -396,13 +398,13 @@ const ReportGeneration: React.FC = () => {
     try {
       const html2canvas = await loadHtml2Canvas();
       const jsPDF = await loadJsPdf();
-      const canvas = await html2canvas(posterRef.current, {
+      const canvas = await withZoomReset(() => html2canvas(posterRef.current!, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-      });
+      }));
       if (canvas.width === 0) {
         throw new Error('画布尺寸异常');
       }

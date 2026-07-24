@@ -8,6 +8,50 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { isMobileClient } from './isDesktop';
 
+/**
+ * html2canvas 对 CSS zoom 支持不佳（body.mobile-scaled 下 zoom:0.67），
+ * 导出时会因为元素尺寸与实际渲染尺寸不一致导致文字/图表重叠。
+ * 本函数临时把 body 的 zoom 重置为 1，执行回调生成 canvas/图片，
+ * 完成后恢复原始状态。调用方在 zoom=1 状态下对原节点调用 html2canvas。
+ */
+export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
+  if (!isMobileClient()) return fn();
+
+  const body = document.body;
+  const originalZoom = body.style.zoom;
+  const originalTransform = body.style.transform;
+  const originalWidth = body.style.width;
+
+  // 先记录滚动位置，后续恢复
+  const scrollEl = document.documentElement;
+  const scrollTop = scrollEl.scrollTop;
+  const scrollLeft = scrollEl.scrollLeft;
+
+  body.style.zoom = '1';
+  body.style.transform = 'none';
+  // body zoom 从 0.67 恢复到 1 后，内容会撑出视口；
+  // 限制 body 宽度为视口宽度，避免横向撑开导致 html2canvas 截断
+  body.style.width = `${window.innerWidth}px`;
+
+  // 触发 echarts / antd 等依赖 resize 的组件重排
+  window.dispatchEvent(new Event('resize'));
+
+  // 给浏览器一帧时间完成重排
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  try {
+    return await fn();
+  } finally {
+    body.style.zoom = originalZoom;
+    body.style.transform = originalTransform;
+    body.style.width = originalWidth;
+    window.dispatchEvent(new Event('resize'));
+    scrollEl.scrollTop = scrollTop;
+    scrollEl.scrollLeft = scrollLeft;
+  }
+}
+
 interface SaveOptions {
   /** 文件名（含扩展名），如 `周报.png` */
   filename: string;
