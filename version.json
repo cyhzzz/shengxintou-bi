@@ -1,9 +1,10 @@
 {
-    "version": "3.5.4",
-    "release_date": "2026-07-23",
+    "version": "3.5.5",
+    "release_date": "2026-07-24",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.5.5 修复安卓端应用市场-获客漏斗空白（mobileRouteHandler 辅助查询异常隔离，total_funnel 核心数据不受影响）+ 漏斗图移除 IntersectionObserver 改纯 CSS 动画 + Web 端左侧菜单遮挡修复",
         "v3.5.4 移动端同步 OOM 修复（largeHeap + 1MB 分块写入 + latest_backup.txt manifest 链路）+ features 路由条件注册（移动端禁用未实现功能）+ channelColors 公共 util 抽取 + 工具链迁移（Android SDK 移出 tmp 防误删）+ 规则补 neat-freak 调用指引 + test_mobile_routes 迁入 scripts/",
         "v3.5.3 安卓端修复：内置 DB 兜底 + 数据同步页简化（仅下载）+ Capacitor bridge 时序与 isMobileClient 多重兜底 + MobileDatabaseSync Hooks 顺序修复 + zoom 0.67 缩放 + 全屏沉浸式 + APK 中文名/版本号/应用图标对齐",
         "v3.5.2 安卓端修复：LOGO 图标切割 + 应用启动时初始化 SQLite + 移动端 CSS zoom 0.67 缩放",

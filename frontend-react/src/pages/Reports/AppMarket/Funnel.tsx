@@ -46,6 +46,8 @@ const AppMarketFunnelPage: React.FC = () => {
     try {
       const res: any = await dataServiceReports.getAppMarketSummary(filters);
       if (res?.success) setData(res.data);
+    } catch (e) {
+      console.error('[AppMarket/Funnel] load() exception:', e);
     } finally {
       setLoading(false);
     }
@@ -120,7 +122,10 @@ const AppMarketFunnelPage: React.FC = () => {
           <Row className={styles.funnelSplitRow}>
             <Col span={12} className={styles.funnelSplitCol}>
               <Card title='9 阶段转化漏斗' size='small' className={styles.h100Card}>
-                <FunnelChart data={funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }))} height={520} useLogScale />
+                {(() => {
+                  const chartData = funnel.map((s: any) => ({ name: s.step, count: Number(s.count || 0), rate: Number(s.step_rate || 0) }));
+                  return <FunnelChart data={chartData} height={520} useLogScale />;
+                })()}
               </Card>
             </Col>
             <Col span={12} className={styles.funnelSplitCol}>

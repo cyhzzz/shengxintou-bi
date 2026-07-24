@@ -609,7 +609,7 @@ async function handleAppMarketSummary(body: any): Promise<any> {
   const filters = getFilters(body);
   const where = appMarketWhere(filters, true);
 
-  // 1. 总计
+  // 1. 总计 + 资产（核心数据：漏斗图依赖此结果，必须成功）
   const totalSql = `SELECT ${FUNNEL_SUMS} FROM fact_conv_appmarket ${where.clause}`;
   const totalRows = await querySql<Row>(totalSql, where.params);
   const total_counts = funnelCountsFromRow(totalRows[0] || {});
@@ -620,42 +620,58 @@ async function handleAppMarketSummary(body: any): Promise<any> {
   const assetRows = await querySql<Row>(assetSql, where.params);
   total_counts['新开户资产'] = round2(toFloat(assetRows[0]?.v));
 
-  // 2. 按月 × 应用市场
-  const monthSql = `SELECT substr("下载日期", 1, 7) as month, "应用市场" as app_market, ${FUNNEL_SUMS}
-    FROM fact_conv_appmarket ${where.clause}
-    GROUP BY month, "应用市场" ORDER BY month`;
-  const monthRows = await querySql<Row>(monthSql, where.params);
-  const by_month_market = monthRows.map(r => {
-    const cnt = funnelCountsFromRow(r);
-    return {
-      month: r.month,
-      app_market: r.app_market || '未归因',
-      counts: cnt,
-      final_open_rate: cnt['激活APP'] > 0 ? round4(cnt['开户成功'] / cnt['激活APP'] * 100) : 0,
-      final_valid_rate: cnt['激活APP'] > 0 ? round4(cnt['有效户'] / cnt['激活APP'] * 100) : 0,
-    };
-  });
+  // 2~4. 辅助查询（非核心：失败不影响 total_funnel 渲染，仅降级辅助图表）
+  //   根因排查：移动端 SQLite 表结构与 PG 略有差异时，辅助查询可能抛异常，
+  //   若不隔离会整体返回 success:false，导致 9 阶段漏斗空白。
+  let by_month_market: any[] = [];
+  let by_market: any[] = [];
+  let by_channel_type: any[] = [];
 
-  // 3. 按应用市场
-  const marketSql = `SELECT "应用市场" as app_market, ${FUNNEL_SUMS}
-    FROM fact_conv_appmarket ${where.clause}
-    GROUP BY "应用市场"`;
-  const marketRows = await querySql<Row>(marketSql, where.params);
-  const by_market = marketRows.map(r => {
-    const cnt = funnelCountsFromRow(r);
-    return { app_market: r.app_market || '未归因', counts: cnt, funnel: funnelWithRates(cnt) };
-  });
+  try {
+    const monthSql = `SELECT substr("下载日期", 1, 7) as month, "应用市场" as app_market, ${FUNNEL_SUMS}
+      FROM fact_conv_appmarket ${where.clause}
+      GROUP BY month, "应用市场" ORDER BY month`;
+    const monthRows = await querySql<Row>(monthSql, where.params);
+    by_month_market = monthRows.map(r => {
+      const cnt = funnelCountsFromRow(r);
+      return {
+        month: r.month,
+        app_market: r.app_market || '未归因',
+        counts: cnt,
+        final_open_rate: cnt['激活APP'] > 0 ? round4(cnt['开户成功'] / cnt['激活APP'] * 100) : 0,
+        final_valid_rate: cnt['激活APP'] > 0 ? round4(cnt['有效户'] / cnt['激活APP'] * 100) : 0,
+      };
+    });
+  } catch (e) {
+    console.warn('[mobileRouteHandler] by_month_market query failed:', e);
+  }
 
-  // 4. 按渠道类型 × 应用市场（不强制互联网引流，含所有类型）
-  const typeWhere = appMarketWhere(filters, false);
-  const typeSql = `SELECT "渠道类型" as channel_type, "应用市场" as app_market, ${FUNNEL_SUMS}
-    FROM fact_conv_appmarket ${typeWhere.clause}
-    GROUP BY "渠道类型", "应用市场"`;
-  const typeRows = await querySql<Row>(typeSql, typeWhere.params);
-  const by_channel_type = typeRows.map(r => {
-    const cnt = funnelCountsFromRow(r);
-    return { channel_type: r.channel_type || '未归因', app_market: r.app_market || '未归因', counts: cnt };
-  });
+  try {
+    const marketSql = `SELECT "应用市场" as app_market, ${FUNNEL_SUMS}
+      FROM fact_conv_appmarket ${where.clause}
+      GROUP BY "应用市场"`;
+    const marketRows = await querySql<Row>(marketSql, where.params);
+    by_market = marketRows.map(r => {
+      const cnt = funnelCountsFromRow(r);
+      return { app_market: r.app_market || '未归因', counts: cnt, funnel: funnelWithRates(cnt) };
+    });
+  } catch (e) {
+    console.warn('[mobileRouteHandler] by_market query failed:', e);
+  }
+
+  try {
+    const typeWhere = appMarketWhere(filters, false);
+    const typeSql = `SELECT "渠道类型" as channel_type, "应用市场" as app_market, ${FUNNEL_SUMS}
+      FROM fact_conv_appmarket ${typeWhere.clause}
+      GROUP BY "渠道类型", "应用市场"`;
+    const typeRows = await querySql<Row>(typeSql, typeWhere.params);
+    by_channel_type = typeRows.map(r => {
+      const cnt = funnelCountsFromRow(r);
+      return { channel_type: r.channel_type || '未归因', app_market: r.app_market || '未归因', counts: cnt };
+    });
+  } catch (e) {
+    console.warn('[mobileRouteHandler] by_channel_type query failed:', e);
+  }
 
   return {
     total_counts,
