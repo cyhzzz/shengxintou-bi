@@ -6,7 +6,7 @@
   "scripts": {
     "post-sync-patch": "powershell -ExecutionPolicy Bypass -File scripts/post-sync-patch.ps1",
     "build": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && npm run post-sync-patch",
-    "build:apk": "cd ../frontend-react && npm run build && cd ../android && npx cap sync android && npm run post-sync-patch && cd android && ./gradlew assembleDebug",
+    "build:apk": "powershell -ExecutionPolicy Bypass -File scripts/build-apk.ps1",
     "sync": "npx cap sync android && npm run post-sync-patch",
     "open": "npx cap open android"
   },
