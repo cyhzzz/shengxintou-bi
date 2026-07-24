@@ -11,10 +11,16 @@ import { isMobileClient } from './isDesktop';
 /**
  * html2canvas 对 CSS zoom 支持不佳（body.mobile-scaled 下 zoom:0.67 !important），
  * 导出时会因为元素尺寸与实际渲染尺寸不一致导致文字/图表重叠。
- * 由于 CSS 用了 !important，内联 style 无法覆盖，必须移除 mobile-scaled class。
- * 本函数临时移除 class 触发 echarts 等组件 resize 重绘，
- * 等待足够时间确保 canvas 重新绘制完成，再执行回调生成图片，
- * 完成后恢复原始状态。
+ *
+ * 根因：
+ *   1. CSS 用了 !important，内联 style 无法覆盖，必须移除 mobile-scaled class
+ *   2. echarts canvas 是在 zoom=0.67 下 init 的，单纯移除 class 触发 resize
+ *      只会改变 canvas DOM 尺寸，但 canvas 像素内容不会重绘 → 截图仍是旧尺寸
+ *
+ * 修复：
+ *   移除 mobile-scaled class 后，主动遍历 DOM 找到所有 echarts 实例
+ *   调用 resize() 让 echarts 在 1:1 尺寸下重新绘制 canvas，
+ *   等待足够时间确保绘制完成，再执行 html2canvas。
  */
 export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
   if (!isMobileClient()) return fn();
@@ -34,8 +40,23 @@ export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
   // 触发 echarts / antd 等依赖 resize 的组件重排
   window.dispatchEvent(new Event('resize'));
 
-  // 等待浏览器重排 + echarts resize 回调执行 + canvas 重绘
-  // echarts resize 是同步的，但 setOption 后的 canvas 绘制可能需要一帧
+  // 主动 resize 所有 echarts 实例
+  // echarts 全局 API：echarts.getInstanceByDom(dom) 拿到该 DOM 上的实例
+  try {
+    const echarts = await import('echarts');
+    const chartContainers = document.querySelectorAll('[_echarts_instance_]');
+    chartContainers.forEach((dom) => {
+      const inst = (echarts as any).getInstanceByDom(dom);
+      if (inst) {
+        inst.resize();
+      }
+    });
+  } catch (e) {
+    // echarts 动态 import 失败时降级到纯 resize 事件
+    console.warn('[withZoomReset] echarts resize failed', e);
+  }
+
+  // 等待浏览器重排 + echarts canvas 重绘
   await new Promise((resolve) => requestAnimationFrame(resolve));
   await new Promise((resolve) => requestAnimationFrame(resolve));
   await new Promise((resolve) => setTimeout(resolve, 300));
@@ -47,6 +68,17 @@ export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
       body.classList.add('mobile-scaled');
     }
     window.dispatchEvent(new Event('resize'));
+    // 恢复 echarts 尺寸
+    try {
+      const echarts = await import('echarts');
+      const chartContainers = document.querySelectorAll('[_echarts_instance_]');
+      chartContainers.forEach((dom) => {
+        const inst = (echarts as any).getInstanceByDom(dom);
+        if (inst) {
+          inst.resize();
+        }
+      });
+    } catch { /* ignore */ }
     scrollEl.scrollTop = scrollTop;
     scrollEl.scrollLeft = scrollLeft;
   }
