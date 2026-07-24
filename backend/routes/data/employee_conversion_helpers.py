@@ -155,8 +155,8 @@ def get_employee_conversion_ranking(platforms, start_date=None, end_date=None, l
         q = q.filter(or_(*pfs))
     if lead_type == 'existing':
         q = q.filter(FactConvContent.是否为存量客户 == 1)
-    elif lead_type == 'new':
-        q = q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    # v3.5.6: 新增线索榜口径修正 — 「存量线索」≠「存量客户」
+    # 存量线索（老线索）由 existing_new_open 分支单独统计；新增线索榜统计本周全部新进线索（含存量客户）
     rows = q.group_by(FactConvContent.添加员工姓名, FactConvContent.平台来源).all()
     ranking = []
     for r in rows:
