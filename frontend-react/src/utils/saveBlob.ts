@@ -9,43 +9,43 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { isMobileClient } from './isDesktop';
 
 /**
- * html2canvas 对 CSS zoom 支持不佳（body.mobile-scaled 下 zoom:0.67），
+ * html2canvas 对 CSS zoom 支持不佳（body.mobile-scaled 下 zoom:0.67 !important），
  * 导出时会因为元素尺寸与实际渲染尺寸不一致导致文字/图表重叠。
- * 本函数临时把 body 的 zoom 重置为 1，执行回调生成 canvas/图片，
- * 完成后恢复原始状态。调用方在 zoom=1 状态下对原节点调用 html2canvas。
+ * 由于 CSS 用了 !important，内联 style 无法覆盖，必须移除 mobile-scaled class。
+ * 本函数临时移除 class 触发 echarts 等组件 resize 重绘，
+ * 等待足够时间确保 canvas 重新绘制完成，再执行回调生成图片，
+ * 完成后恢复原始状态。
  */
 export async function withZoomReset<T>(fn: () => Promise<T>): Promise<T> {
   if (!isMobileClient()) return fn();
 
   const body = document.body;
-  const originalZoom = body.style.zoom;
-  const originalTransform = body.style.transform;
-  const originalWidth = body.style.width;
+  const hadMobileScaled = body.classList.contains('mobile-scaled');
 
   // 先记录滚动位置，后续恢复
   const scrollEl = document.documentElement;
   const scrollTop = scrollEl.scrollTop;
   const scrollLeft = scrollEl.scrollLeft;
 
-  body.style.zoom = '1';
-  body.style.transform = 'none';
-  // body zoom 从 0.67 恢复到 1 后，内容会撑出视口；
-  // 限制 body 宽度为视口宽度，避免横向撑开导致 html2canvas 截断
-  body.style.width = `${window.innerWidth}px`;
+  if (hadMobileScaled) {
+    body.classList.remove('mobile-scaled');
+  }
 
   // 触发 echarts / antd 等依赖 resize 的组件重排
   window.dispatchEvent(new Event('resize'));
 
-  // 给浏览器一帧时间完成重排
+  // 等待浏览器重排 + echarts resize 回调执行 + canvas 重绘
+  // echarts resize 是同步的，但 setOption 后的 canvas 绘制可能需要一帧
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   try {
     return await fn();
   } finally {
-    body.style.zoom = originalZoom;
-    body.style.transform = originalTransform;
-    body.style.width = originalWidth;
+    if (hadMobileScaled) {
+      body.classList.add('mobile-scaled');
+    }
     window.dispatchEvent(new Event('resize'));
     scrollEl.scrollTop = scrollTop;
     scrollEl.scrollLeft = scrollLeft;
