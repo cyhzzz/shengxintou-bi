@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 海报模态框组件
  * 参照旧版前端的海报模板实现
  * 在弹窗中展示海报，支持导出图片和PDF
@@ -12,6 +12,7 @@ import {
   type WeeklyRankingItem,
   type YearBreakdownItem,
 } from '../weeklyRanking';
+import { saveBlobFile, buildMobileSaveMessage } from '@/utils/saveBlob';
 import styles from './PosterModal.module.scss';
 
 interface PosterModalProps {
@@ -279,14 +280,10 @@ const PosterModal: React.FC<PosterModalProps> = ({
         );
       }
 
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = `${platform}开户榜_${startDate}_${endDate}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      message.success(`${platform}海报导出成功`);
+      // v3.5.5：统一走 saveBlobFile，移动端写 Documents 目录避免 WebView 拦截 <a download>
+      const fileName = `${platform}开户榜_${startDate}_${endDate}.png`;
+      const savedUri = await saveBlobFile({ filename: fileName, data: imageUrl });
+      message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : `${platform}海报导出成功`);
     } catch (error) {
       console.error('导出海报失败:', error);
       message.error(`导出海报失败：${error instanceof Error ? error.message : String(error)}`);
@@ -329,9 +326,12 @@ const PosterModal: React.FC<PosterModalProps> = ({
       });
 
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${platform}开户榜_${startDate}_${endDate}.pdf`);
 
-      message.success(`${platform} PDF 导出成功`);
+      // v3.5.5：移动端 pdf.save() 也走 <a download> 会被 WebView 拦截，改用 datauristring + saveBlobFile
+      const fileName = `${platform}开户榜_${startDate}_${endDate}.pdf`;
+      const pdfDataUrl = pdf.output('datauristring');
+      const savedUri = await saveBlobFile({ filename: fileName, data: pdfDataUrl });
+      message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : `${platform} PDF 导出成功`);
     } catch (error) {
       console.error('导出PDF失败:', error);
       message.error('导出PDF失败，请重试');

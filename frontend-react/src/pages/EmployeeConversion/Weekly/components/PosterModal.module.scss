@@ -68,6 +68,16 @@
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--ink-100);
 
+  /* v3.5.5：移动端 WebView zoom 0.67 下 sticky 视口计算偏差，
+     导致工具栏"悬浮在海报上方"出现空隙；移动端改 static 跟随海报一起滚动 */
+  :global(body.mobile-scaled) & {
+    position: static;
+    top: auto;
+    z-index: auto;
+    backdrop-filter: none;
+    background: var(--paper);
+  }
+
   .toolbarBtn {
     display: inline-flex;
     align-items: center;

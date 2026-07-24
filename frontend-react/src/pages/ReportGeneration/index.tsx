@@ -29,6 +29,7 @@ import {
   buildChannelColorMap,
   CATEGORY_REP_COLORS,
 } from '@/utils/channelColors';
+import { saveBlobFile, buildMobileSaveMessage } from '@/utils/saveBlob';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -373,13 +374,10 @@ const ReportGeneration: React.FC = () => {
         throw new Error('画布尺寸异常，请检查浏览器窗口是否过窄');
       }
       const imageUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = `互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      message.success('PNG 导出成功');
+      // v3.5.5：统一走 saveBlobFile，移动端写 Documents 目录避免 WebView 拦截 <a download>
+      const fileName = `互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.png`;
+      const savedUri = await saveBlobFile({ filename: fileName, data: imageUrl });
+      message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : 'PNG 导出成功');
     } catch (error) {
       console.error('导出 PNG 失败:', error);
       message.error(`导出 PNG 失败：${error instanceof Error ? error.message : String(error)}`);
@@ -419,8 +417,11 @@ const ReportGeneration: React.FC = () => {
         format: [pdfWidth, pdfHeight],
       });
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.pdf`);
-      message.success('PDF 导出成功');
+      // v3.5.5：移动端 pdf.save() 走 <a download> 会被 WebView 拦截，改用 datauristring + saveBlobFile
+      const fileName = `互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.pdf`;
+      const pdfDataUrl = pdf.output('datauristring');
+      const savedUri = await saveBlobFile({ filename: fileName, data: pdfDataUrl });
+      message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : 'PDF 导出成功');
     } catch (error) {
       console.error('导出 PDF 失败:', error);
       message.error(`导出 PDF 失败：${error instanceof Error ? error.message : String(error)}`);
