@@ -6,19 +6,14 @@ name: Release
 # v3.6.0 修复 trigger 误触发：
 #   - push.tags 用 glob pattern（v*.*.*）而非正则（旧版 v[0-9]+... 当字符类处理）
 #   - "on" 加引号避免 YAML 1.1 把 on 解析为 boolean True
-#   - 同时显式排除 branch push（branches-ignore: ["**"]），
-#     防止 GitHub 把 commit push 也当成 push 事件并触发空 workflow（Jobs: 0 即空跑）
+#   - 只保留 tags filter，不加 branches（避免显式匹配 default branch）
 #   - tag_refs（v*.*.*）确保只有形如 v3.6.0 的 tag push 才触发
-# 流程：
-#   1. push tag 到 main
-#   2. workflow_dispatch 允许手动触发（带 inputs.version / inputs.dry_run）
+#   - workflow_dispatch 允许手动触发（带 inputs.version / inputs.dry_run）
 
 "on":
   push:
     tags:
       - "v*.*.*"
-    branches-ignore:
-      - "**"
   workflow_dispatch:
     inputs:
       version:
@@ -44,6 +39,10 @@ jobs:
     name: Build Windows portable release
     runs-on: windows-latest
     timeout-minutes: 30
+    # v3.6.0 兜底：只有 push tag 或手动触发才跑，避免 commit push 触发空 workflow 失败 run
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Checkout
