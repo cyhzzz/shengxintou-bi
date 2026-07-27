@@ -1,0 +1,127 @@
+name: Release
+
+# 监听形如 v3.3.5 的 tag；push tag 后自动构建 exe + 打 zip + 上传 GitHub Release。
+# 触发方式：开发者本地跑 scripts/release.bat（或手打 `git tag v3.3.5 && git push --tags`）。
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write   # 用于创建 GitHub Release
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build Windows portable release
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 需要 changelog 等历史
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend-react/package-lock.json
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles("requirements.txt") }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.*
+
+      - name: Install frontend deps + build
+        working-directory: frontend-react
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Verify dist exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "frontend-react/dist/index.html")) {
+            Write-Error "frontend-react/dist/index.html 未生成，build 可能失败"
+            exit 1
+          }
+
+      - name: Build Windows exe (PyInstaller)
+        run: |
+          pyinstaller --noconfirm --clean 省心投启动器.spec
+
+      - name: Read version from version.json
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Content version.json -Raw | ConvertFrom-Json).version
+          $tag = "${{ github.ref_name }}"
+          Write-Host "version=$v tag=$tag"
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Prepare portable release directory
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.value }}"
+          $stage = "release-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          # 运行时必需文件
+          Copy-Item -Path app.py, config.py, launcher.py, requirements.txt, version.json, AGENTS.md, CLAUDE.md, LICENSE, README.md, .env.example, 省心投启动器.spec, 省心投-开发版.spec, build.bat -Destination $stage -Force
+          Copy-Item -Path backend -Destination $stage -Recurse -Force
+          New-Item -ItemType Directory -Force -Path $stage/docs | Out-Null
+          Copy-Item -Path docs/rules -Destination $stage/docs/rules -Recurse -Force
+          Copy-Item -Path frontend-react/dist -Destination $stage/frontend-react/dist -Recurse -Force
+          if (Test-Path icon) { Copy-Item -Path icon -Destination $stage -Recurse -Force }
+          if (Test-Path frontend-react/public) { Copy-Item -Path frontend-react/public -Destination $stage/frontend-react/public -Recurse -Force }
+          # PyInstaller 产物
+          Copy-Item -Path "dist/省心投启动器.exe" -Destination $stage -Force
+          # 一键安装脚本（让最终用户也能 `npm run setup` 装运行时依赖）
+          New-Item -ItemType Directory -Force -Path $stage/scripts | Out-Null
+          Copy-Item -Path scripts/setup.bat, scripts/setup.sh, scripts/setup.py, scripts/setup.mjs, scripts/check_rule_architecture.py -Destination $stage/scripts -Force
+          # 打包
+          $zipPath = "shengxintou-bi-$v-windows.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zipPath -CompressionLevel Optimal
+          Write-Host "Created $zipPath ($([math]::Round((Get-Item $zipPath).Length / 1MB, 1)) MB)"
+
+      - name: Generate changelog excerpt
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.value }}"
+          $raw = Get-Content version.json -Raw | ConvertFrom-Json
+          $entry = $raw.changelog | Where-Object { $_.StartsWith("v$v ") } | Select-Object -First 1
+          if (-not $entry) { $entry = "v$v release" }
+          $entry | Out-File -FilePath release-notes.md -Encoding utf8 -NoNewline
+          Write-Host "Changelog: $entry"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            shengxintou-bi-${{ steps.version.outputs.value }}-windows.zip
+            dist/省心投启动器.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
