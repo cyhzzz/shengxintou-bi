@@ -18,8 +18,11 @@ extraResources:
     to: backend
   - from: ../frontend-react/dist
     to: frontend-react/dist
-  - from: ../.env.desktop
-    to: .env
+  # v3.5.8 安全修复：不再打包含真实凭据的 .env.desktop
+  # 安装后 .env 不存在，后端按 config.py 默认值启动（SQLite / 无鉴权 / 无 WebDAV）
+  # 用户要启用坚果云备份/Supabase 时，复制 .env.example 为 .env 并填写自己的凭据
+  - from: ../.env.example
+    to: .env.example
   - from: ../version.json
     to: version.json
   - from: ../icon/LOGO.ico
