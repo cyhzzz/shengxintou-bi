@@ -40,7 +40,8 @@ def capture(page, route: str, filename: str):
     url = f"{BASE_URL}/{route}" if route else BASE_URL + "/"
     print(f"  → {url}")
     page.goto(url, wait_until="networkidle")
-    time.sleep(2.5)
+    # 等 5 秒确保 API 请求返回 + 图表动画完成
+    time.sleep(5)
     out = OUT_DIR / filename
     page.screenshot(path=str(out), full_page=False)
     soft_blur(out)
