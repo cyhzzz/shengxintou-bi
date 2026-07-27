@@ -1,21 +1,14 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
-  // 读取项目根 .env（含坚果云 WebDAV 配置），注入到前端用于移动端内置默认凭据
-  const rootEnv = loadEnv(mode, path.resolve(__dirname, '..'), '')
-  const webdavDefaults = {
-    'import.meta.env.VITE_WEBDAV_URL': JSON.stringify(rootEnv.WEBDAV_URL || ''),
-    'import.meta.env.VITE_WEBDAV_USERNAME': JSON.stringify(rootEnv.WEBDAV_USERNAME || ''),
-    'import.meta.env.VITE_WEBDAV_PASSWORD': JSON.stringify(rootEnv.WEBDAV_PASSWORD || ''),
-    'import.meta.env.VITE_WEBDAV_BASE_PATH': JSON.stringify(rootEnv.WEBDAV_BASE_PATH || ''),
-  }
-
-  return {
+// v3.6.0：移除 vite 构建期对根 .env WEBDAV_* 的注入。
+//   原实现把开发环境坚果云凭据字符串字面量烤进 dist JS bundle，会随 APK 打包泄露。
+//   现在移动端凭据完全由用户在前端「数据同步」页面填写，
+//   通过 @capacitor/preferences 持久化，不再有任何打包时内置默认值。
+export default defineConfig({
   plugins: [react()],
-  define: webdavDefaults,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -89,5 +82,4 @@ export default defineConfig(({ mode }) => {
       'zustand', 'dayjs',
     ],
   },
-  }
 })

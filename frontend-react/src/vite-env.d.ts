@@ -7,11 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_APP_TITLE: string;
   // 环境
   readonly VITE_ENV: 'development' | 'production';
-  // WebDAV 坚果云配置（从项目根 .env 注入，用于移动端内置默认凭据）
-  readonly VITE_WEBDAV_URL: string;
-  readonly VITE_WEBDAV_USERNAME: string;
-  readonly VITE_WEBDAV_PASSWORD: string;
-  readonly VITE_WEBDAV_BASE_PATH: string;
+  // v3.6.0：VITE_WEBDAV_* 已移除——移动端凭据由用户在前端填写，
+  //   通过 @capacitor/preferences 持久化，不再打包时注入
 }
 
 interface ImportMeta {

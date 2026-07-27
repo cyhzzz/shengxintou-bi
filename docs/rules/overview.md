@@ -110,5 +110,5 @@
 - 克隆或首次进入仓库时按根规则执行一键 setup；脚本负责 `.venv`、Python/npm 依赖、前端构建和 `.env` 初始化。
 - 开发模式可使用 `scripts/start-dev.bat` / `scripts/stop-dev.bat`，PID 位于 `logs/dev-pids/`，日志位于 `logs/`。
 - 前端生产代码修改后必须重新构建 `frontend-react/dist/`；Flask 直接读取新产物。
-- 完整命令和部署排障参见 `README.md` 与 `docs/部署指南.md`。
+- 完整命令和部署排障参见 `README.md` 与 `docs/rules/toolchain.md`。历史 v1 部署指南（Gunicorn + Nginx + Docker 方案）已归档至 `docs/_archive/部署指南.md`，与当前 SQLite 单文件部署脱节，仅供追溯。
 

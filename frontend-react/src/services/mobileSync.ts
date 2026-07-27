@@ -10,7 +10,11 @@
  *      一次性传给 Filesystem.writeFile 会导致 WebView 内存溢出崩溃。
  *      改用 1MB 分块 + appendFile 写入，每块都是独立 PostMessage，避免内存峰值。
  *
- * 凭据存储在 @capacitor/preferences 中，首次安装时使用打包时内置的 .env 默认值。
+ * v3.6.0 安全修复：
+ *   - 移除 vite 构建期对根 .env WEBDAV_* 的注入（原实现会把开发凭据烤进 dist bundle，随 APK 泄露）
+ *   - 凭据完全由用户在前端「数据同步」页面填写，通过 @capacitor/preferences 持久化
+ *   - WebDAV 服务器地址（url）也由用户配置，默认坚果云 https://dav.jianguoyun.com/dav/
+ *   - 未配置时所有同步/测试连接调用返回友好错误，由 UI 引导用户去配置
  */
 import { Preferences } from '@capacitor/preferences';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -21,13 +25,8 @@ import {
   deleteMobileDatabase,
 } from './mobileSqlite';
 
-// 打包时从项目根 .env 注入的内置默认值（v3.5.1）
-const BUILTIN_WEBDAV_URL = import.meta.env.VITE_WEBDAV_URL || '';
-const BUILTIN_WEBDAV_USERNAME = import.meta.env.VITE_WEBDAV_USERNAME || '';
-const BUILTIN_WEBDAV_PASSWORD = import.meta.env.VITE_WEBDAV_PASSWORD || '';
-const BUILTIN_WEBDAV_BASE_PATH = import.meta.env.VITE_WEBDAV_BASE_PATH || '';
-
-const WEBDAV_BASE = BUILTIN_WEBDAV_URL || 'https://dav.jianguoyun.com/dav/';
+// 坚果云固定 WebDAV 入口（非凭据，可作为默认值）
+const DEFAULT_WEBDAV_BASE = 'https://dav.jianguoyun.com/dav/';
 
 export interface SyncResult {
   success: boolean;
@@ -39,33 +38,33 @@ export interface SyncResult {
 export async function saveWebDAVCredentials(
   username: string,
   password: string,
-  remoteDir: string
+  remoteDir: string,
+  url?: string
 ): Promise<void> {
   await Preferences.set({ key: 'webdav_username', value: username });
   await Preferences.set({ key: 'webdav_password', value: password });
   await Preferences.set({ key: 'webdav_remote_dir', value: remoteDir });
+  // v3.6.0：url 也持久化，允许用户配置非坚果云的 WebDAV 服务器
+  await Preferences.set({ key: 'webdav_url', value: url || '' });
 }
 
 export async function getWebDAVCredentials(): Promise<{
+  url: string;
   username: string;
   password: string;
   remoteDir: string;
 } | null> {
+  const { value: url } = await Preferences.get({ key: 'webdav_url' });
   const { value: username } = await Preferences.get({ key: 'webdav_username' });
   const { value: password } = await Preferences.get({ key: 'webdav_password' });
   const { value: remoteDir } = await Preferences.get({ key: 'webdav_remote_dir' });
-  // 用户已手动配置 → 优先用用户的
+  // v3.6.0：必须用户已配置 username + password 才算有效；不再回退任何打包默认值
   if (username && password) {
-    return { username, password, remoteDir: remoteDir || '' };
-  }
-  // 未手动配置 → 回退到打包时内置的 .env 默认值
-  if (BUILTIN_WEBDAV_USERNAME && BUILTIN_WEBDAV_PASSWORD) {
-    // WEBDAV_BASE_PATH 形如 /shengxintou-backup/，去掉首尾斜杠作为 remoteDir
-    const dir = BUILTIN_WEBDAV_BASE_PATH.replace(/^\/+|\/+$/g, '');
     return {
-      username: BUILTIN_WEBDAV_USERNAME,
-      password: BUILTIN_WEBDAV_PASSWORD,
-      remoteDir: dir,
+      url: url || DEFAULT_WEBDAV_BASE,
+      username,
+      password,
+      remoteDir: remoteDir || '',
     };
   }
   return null;
@@ -196,7 +195,7 @@ async function getLatestRemoteDb(
 export async function syncFromWebDAV(): Promise<SyncResult> {
   const creds = await getWebDAVCredentials();
   if (!creds) {
-    return { success: false, message: '请先配置坚果云账号' };
+    return { success: false, message: '尚未配置 WebDAV 凭据，请点击「WebDAV 配置」按钮填入坚果云账号和应用密码' };
   }
 
   try {
@@ -205,7 +204,8 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 
     // 2. GET latest_backup.txt 获取最新备份文件名
     const auth = btoa(`${creds.username}:${creds.password}`);
-    const latestFile = await getLatestRemoteDb(WEBDAV_BASE, creds.remoteDir, auth);
+    const baseUrl = creds.url;
+    const latestFile = await getLatestRemoteDb(baseUrl, creds.remoteDir, auth);
 
     if (!latestFile) {
       return { success: false, message: '坚果云上未找到 latest_backup.txt，请先在桌面端上传备份（需更新桌面版）' };
@@ -215,7 +215,7 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     const remotePath = creds.remoteDir
       ? `${creds.remoteDir}/${latestFile}`
       : latestFile;
-    const fullUrl = `${WEBDAV_BASE}${remotePath}`;
+    const fullUrl = `${baseUrl}${remotePath}`;
 
     const response = await fetch(fullUrl, {
       headers: { Authorization: `Basic ${auth}` },
@@ -280,11 +280,13 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 export async function testWebDAVConnection(
   username: string,
   password: string,
-  remoteDir: string
+  remoteDir: string,
+  url?: string
 ): Promise<SyncResult> {
   try {
     const auth = btoa(`${username}:${password}`);
-    const latestFile = await getLatestRemoteDb(WEBDAV_BASE, remoteDir, auth);
+    const baseUrl = url || DEFAULT_WEBDAV_BASE;
+    const latestFile = await getLatestRemoteDb(baseUrl, remoteDir, auth);
 
     if (latestFile) {
       return { success: true, message: `连接成功，最新备份: ${latestFile}` };

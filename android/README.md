@@ -144,6 +144,27 @@ android/
 └── README.md               # 本文档
 ```
 
+## WebDAV 凭据安全（v3.6.0+）
+
+> v3.6.0 起，APK 不再内置任何 WebDAV 凭据。开发环境根 `.env` 的 `WEBDAV_*` 不会被打包进 APK——`frontend-react/vite.config.ts` 已移除构建期 `define` 注入。
+
+- **用户首次使用**：在 App 内「数据同步」页面点击「WebDAV 配置」按钮，填入坚果云服务器地址、账号和应用密码。
+- **凭据持久化**：通过 `@capacitor/preferences` 存储于设备本地（应用沙箱内），卸载即清除。
+- **未配置时**：同步按钮禁用并显示友好引导 Alert，不弹错误。
+- **测试连接**：保存前先调用 `testWebDAVConnection` 验证服务器可达。
+- **桌面端差异**：桌面版仍由后端 `backend/routes/webdav_backup.py` + `/api/v1/webdav/config` 端点管理 `.env`，前端 UI 写入；Android 不复用此端点（移动端无后端 Flask）。
+
+凭据字段（持久化 key）：
+
+| Preferences key | 说明 |
+| --- | --- |
+| `webdav_url` | WebDAV 服务器地址（默认 `https://dav.jianguoyun.com/dav/`） |
+| `webdav_username` | 坚果云账号邮箱 |
+| `webdav_password` | 应用密码（非登录密码） |
+| `webdav_remote_dir` | 备份目录（可选，如 `shengxintou-backup`） |
+
+实现入口：`frontend-react/src/services/mobileSync.ts` + `frontend-react/src/components/MobileSyncButton.tsx`。
+
 ## 说明
 
 - 本目录仅负责将 `frontend-react` 构建产物封装为 Android 应用，不包含后端服务。

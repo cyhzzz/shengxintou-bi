@@ -7,18 +7,22 @@
  *
  * v3.5.3 修复：所有 Hooks 必须在 `if (!isMobileClient()) return null` 之前调用，
  * 否则违反 Rules of Hooks → React 严格模式崩溃 → 白屏。
+ *
+ * v3.6.0：移除打包时内置凭据，改为用户在前端可视化配置 WebDAV（与桌面版一致体验）
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Button, Space, Spin, Tag, Typography, App as AntApp } from 'antd';
+import { Card, Button, Space, Spin, Tag, Typography, Alert, App as AntApp } from 'antd';
 import {
   CloudDownloadOutlined,
   ReloadOutlined,
   CheckCircleOutlined,
   WarningOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
-import { syncFromWebDAV } from '@/services/mobileSync';
+import { syncFromWebDAV, hasWebDAVCredentials } from '@/services/mobileSync';
 import { databaseExists, copyDatabaseFromAssets, closeMobileDatabase, initMobileDatabase } from '@/services/mobileSqlite';
 import { isMobileClient } from '@/utils/isDesktop';
+import MobileSyncButton from '@/components/MobileSyncButton';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -45,12 +49,15 @@ export default function MobileDatabaseSync() {
   const refreshStatus = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
-      const hasDb = await databaseExists();
+      const [hasDb, hasCreds] = await Promise.all([
+        databaseExists(),
+        hasWebDAVCredentials(),
+      ]);
       setState((s) => ({
         ...s,
         loading: false,
         hasDb,
-        hasCreds: true, // 内置默认凭据，恒为 true
+        hasCreds,
       }));
     } catch (err) {
       console.error('[MobileSync] refresh status failed:', err);
@@ -72,6 +79,7 @@ export default function MobileDatabaseSync() {
         setState((s) => ({
           ...s,
           hasDb: true,
+          hasCreds: true,
           lastSyncAt: result.timestamp || new Date().toISOString(),
           lastSize: result.size ?? null,
         }));
@@ -126,15 +134,29 @@ export default function MobileDatabaseSync() {
     <div style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>
       <Card loading={state.loading}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Title level={4} style={{ margin: 0 }}>
-            <CloudDownloadOutlined style={{ marginRight: 8, color: 'var(--color-primary)' }} />
-            数据同步
-          </Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <Title level={4} style={{ margin: 0 }}>
+              <CloudDownloadOutlined style={{ marginRight: 8, color: 'var(--color-primary)' }} />
+              数据同步
+            </Title>
+            <MobileSyncButton />
+          </div>
 
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
             从坚果云下载最新的本地数据库快照，覆盖本地数据后即可离线查看报表。
             仅支持下载，不支持上传。
           </Paragraph>
+
+          {/* v3.6.0：未配置时友好引导，不报错 */}
+          {!state.hasCreds && !state.loading && (
+            <Alert
+              type="info"
+              showIcon
+              icon={<SettingOutlined />}
+              message="尚未配置 WebDAV 服务器"
+              description="点击右上角「WebDAV 配置」按钮，填入坚果云服务器地址、账号和应用密码即可启用云同步。配置仅保存在本机，不会随安装包分发。"
+            />
+          )}
 
           {/* 状态卡片 */}
           <Card size="small" type="inner">
@@ -148,11 +170,11 @@ export default function MobileDatabaseSync() {
                 )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">坚果云凭据：</Text>
+                <Text type="secondary">WebDAV 凭据：</Text>
                 {state.hasCreds ? (
                   <Tag color="success">已配置</Tag>
                 ) : (
-                  <Tag color="default">使用内置默认</Tag>
+                  <Tag color="orange">未配置</Tag>
                 )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -174,6 +196,7 @@ export default function MobileDatabaseSync() {
               loading={syncing}
               onClick={handleSync}
               size="large"
+              disabled={!state.hasCreds}
             >
               {state.hasDb ? '从坚果云同步' : '立即同步'}
             </Button>
