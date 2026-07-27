@@ -2,15 +2,37 @@ name: Release
 
 # 监听形如 v3.6.0 的 tag；push tag 后自动构建 exe + 打 zip + 上传 GitHub Release。
 # 触发方式：开发者本地跑 scripts/release.bat（或手打 `git tag v3.6.0 && git push --tags`）。
-# 注意：GitHub Actions 的 push.tags filter 用 glob 语法（不是正则），
-#       旧版用 `v[0-9]+.[0-9]+.[0-9]+` 会被当成字符类 + 字面 `+`，匹配不到真实 tag；
-#       改成 `v*.*.*` 后才能正确匹配 v3.6.0 这样的 tag。
-#       commit push 到 main 不应触发本 workflow（仅 tag push 触发）。
+#
+# v3.6.0 修复 trigger 误触发：
+#   - push.tags 用 glob pattern（v*.*.*）而非正则（旧版 v[0-9]+... 当字符类处理）
+#   - "on" 加引号避免 YAML 1.1 把 on 解析为 boolean True
+#   - 同时显式排除 branch push（branches-ignore: ["**"]），
+#     防止 GitHub 把 commit push 也当成 push 事件并触发空 workflow（Jobs: 0 即空跑）
+#   - tag_refs（v*.*.*）确保只有形如 v3.6.0 的 tag push 才触发
+# 流程：
+#   1. push tag 到 main
+#   2. workflow_dispatch 允许手动触发（带 inputs.version / inputs.dry_run）
 
 "on":
   push:
     tags:
       - "v*.*.*"
+    branches-ignore:
+      - "**"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（形如 v3.6.1）'
+        required: true
+        type: string
+      dry_run:
+        description: '只构建产物不上传 Release'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write   # 用于创建 GitHub Release
