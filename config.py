@@ -8,6 +8,16 @@ import sys
 import shutil
 from dotenv import load_dotenv
 
+# v3.6.0：CI（Windows + Python 3.13）默认 stdout 是 cp1252，
+#   打印中文会抛 UnicodeEncodeError，导致 unittest discover 扫到 test_auth.py
+#   时 import app → import config → print() 整链炸掉。
+#   启动期把 stdout/stderr reconfigure 成 UTF-8，让 print 中文对 cp1252 控制台也安全。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='backslashreplace')  # type: ignore[attr-defined]
+    except (AttributeError, OSError):
+        pass  # Python 3.6 或已关闭的流
+
 # v3.5.8：桌面版用户数据目录
 #   - 桌面版（frozen）：=%APPDATA%\省心投 BI\（升级/卸载不丢失 .env 和数据库）
 #   - 开发模式：=项目根目录（保持原行为）
