@@ -11,9 +11,12 @@ name: Release
 #   - workflow_dispatch 允许手动触发（带 inputs.version / inputs.dry_run）
 
 "on":
-  push:
-    tags:
-      - "v*.*.*"
+  # v3.6.0 彻底关闭 push 触发器：当前项目发版走本地 scripts/build-installer.ps1 +
+  # gh release upload 手动发布流程，CI release.yml 长期未使用且 commit push 会触发
+  # Jobs count=0 的失败 run（GitHub Actions 在 on.push.tags 不匹配时仍记录一条
+  # status=failure 的"空"workflow run）。
+  # 发版如需 CI 自动构建可改用 workflow_dispatch 手动触发，或 push 时打 tag
+  # 但当前 release.yml 没有真正可用的构建逻辑，先整体关闭避免误触发。
   workflow_dispatch:
     inputs:
       version:
