@@ -5,24 +5,72 @@
 
 import os
 import sys
+import shutil
 from dotenv import load_dotenv
 
-# 加载 .env 文件
-load_dotenv()
+# v3.5.8：桌面版用户数据目录
+#   - 桌面版（frozen）：=%APPDATA%\省心投 BI\（升级/卸载不丢失 .env 和数据库）
+#   - 开发模式：=项目根目录（保持原行为）
+#   - 优先级：环境变量 SHENGXINTOU_USER_DATA_DIR > 默认推导
+if getattr(sys, 'frozen', False):
+    _default_user_data = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), '省心投 BI')
+    USER_DATA_DIR = os.environ.get('SHENXINTOU_USER_DATA_DIR', _default_user_data)
+else:
+    USER_DATA_DIR = os.environ.get('SHENXINTOU_USER_DATA_DIR', os.path.abspath(os.path.dirname(__file__)))
 
 # 获取应用基础目录（兼容开发环境和PyInstaller打包环境）
 if getattr(sys, 'frozen', False):
-    # PyInstaller 打包后的环境
+    # PyInstaller 打包后的环境：BASE_DIR 指向 server.exe 所在目录（resources/server/）
+    # 代码与资源在 resources/ 下（只读），用户数据放 USER_DATA_DIR
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     # 开发环境
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+# v3.5.8：桌面版首次启动时，把安装包自带的 .env.example 复制到用户数据目录作为模板
+#   - 如果 USER_DATA_DIR/.env 已存在，跳过（保留用户已有配置）
+#   - 如果没有 .env 也没有 .env.example，继续启动（走 config.py 默认值）
+_env_in_user_data = os.path.join(USER_DATA_DIR, '.env')
+# .env.example 在 resources/ 下（与 app.py 同级），server.exe 在 resources/server/ 下，
+# frozen 模式下 BASE_DIR 指向 resources/server/，模板在上一级，需要兜底查找。
+_env_template_in_app = os.path.join(BASE_DIR, '.env.example')
+if not os.path.exists(_env_template_in_app) and getattr(sys, 'frozen', False):
+    # 兜底：尝试 resources/ 上一级（server_entry.py 会把 cwd 设为 resources/，BASE_DIR 应为 resources/）
+    _parent = os.path.dirname(BASE_DIR)
+    if os.path.exists(os.path.join(_parent, '.env.example')):
+        _env_template_in_app = os.path.join(_parent, '.env.example')
+if not os.path.exists(_env_in_user_data) and os.path.exists(_env_template_in_app):
+    try:
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+        shutil.copy(_env_template_in_app, _env_in_user_data)
+        # 仅首次复制时打日志（load_dotenv 之前无法用 logger）
+        print(f"[config] 首次启动：已从 .env.example 复制模板到 {_env_in_user_data}", flush=True)
+    except Exception as e:
+        print(f"[config] 复制 .env.example 失败（将走默认配置）: {e}", flush=True)
+
+# 加载 .env 文件
+#   - 桌面版：从 USER_DATA_DIR/.env 加载（用户配置）
+#   - 开发模式：从项目根 .env 加载（原有行为）
+load_dotenv(_env_in_user_data, override=False)
+
 # 数据库配置
 # feat-cloud-supabase：DATABASE_URL 优先于 DATABASE_PATH。
 #   - 设置 DATABASE_URL（postgresql+psycopg://...）→ 走 Postgres（默认连 Supabase）
 #   - 未设置 → 走 SQLite，路径由 DATABASE_PATH 控制
-DATABASE_PATH = os.path.join(BASE_DIR, os.getenv('DATABASE_PATH', 'database/shengxintou.db'))
+# v3.5.8：桌面版 DATABASE_PATH 默认指向 USER_DATA_DIR/database/shengxintou.db
+#   （升级时数据库文件保留；.env 里显式配置 DATABASE_PATH 仍可覆盖）
+_default_db_rel = 'database/shengxintou.db'
+_db_path_env = os.getenv('DATABASE_PATH', '')
+if _db_path_env:
+    # 用户显式配置了 DATABASE_PATH：按原逻辑判断
+    #   - 绝对路径：直接用
+    #   - 相对路径：相对 USER_DATA_DIR（桌面版）或 BASE_DIR（开发版）
+    if os.path.isabs(_db_path_env):
+        DATABASE_PATH = _db_path_env
+    else:
+        DATABASE_PATH = os.path.join(USER_DATA_DIR, _db_path_env)
+else:
+    DATABASE_PATH = os.path.join(USER_DATA_DIR, _default_db_rel)
 # feat-desktop-supabase：归一化 DATABASE_URL 前缀。
 # Supabase Dashboard 复制的连接串默认是 postgres://，SQLAlchemy 不认（只认 postgresql）。
 # 统一改为 postgresql+psycopg://，确保用 psycopg 驱动。
@@ -94,7 +142,8 @@ DEFAULT_ADMIN_EMAIL = os.getenv('DEFAULT_ADMIN_EMAIL', 'admin@shengxintou.local'
 DEFAULT_ADMIN_PASSWORD = os.getenv('DEFAULT_ADMIN_PASSWORD', 'shengxintou2026')
 
 # 文件上传配置
-UPLOAD_FOLDER = os.path.join(BASE_DIR, os.getenv('UPLOAD_FOLDER', 'uploads'))
+# v3.5.8：桌面版上传目录也放 USER_DATA_DIR（升级不丢失临时上传文件）
+UPLOAD_FOLDER = os.path.join(USER_DATA_DIR, os.getenv('UPLOAD_FOLDER', 'uploads'))
 MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', '50')) * 1024 * 1024  # MB -> bytes
 ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'csv,xlsx,xls').split(','))
 
@@ -103,9 +152,14 @@ API_VERSION = 'v1'
 API_PREFIX = f'/api/{API_VERSION}'
 
 # 日志配置
-LOG_FOLDER = os.path.join(BASE_DIR, os.getenv('LOG_FOLDER', 'logs'))
+# v3.5.8：桌面版日志目录放 USER_DATA_DIR（升级不丢失日志，便于排查问题）
+LOG_FOLDER = os.path.join(USER_DATA_DIR, os.getenv('LOG_FOLDER', 'logs'))
 LOG_FILE = os.path.join(LOG_FOLDER, 'app.log')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+
+# v3.5.8：确保 USER_DATA_DIR 及其子目录存在（日志/数据库/上传在各自使用点会再创建子目录）
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+os.makedirs(LOG_FOLDER, exist_ok=True)
 
 # 服务器配置
 HOST = os.getenv('HOST', 'localhost')
