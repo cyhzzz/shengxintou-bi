@@ -225,26 +225,32 @@ npm run test:report
 
 ## 📦 发布流程
 
-> 开发者只需更新版本号 + push tag，CI 自动构建 + 上传 GitHub Release。
+> **当前版本起**：发布走「本地打 tag + 本地构建 + `gh release upload`」手动流程，**不再依赖 CI 自动构建**。
+> 仓库内的 `.github/workflows/release.yml` 文件**保留**（历史占位），trigger 语法有 bug 实际不工作，不要期望 push tag 后看到自动产物。
 
 ```powershell
-# 本地（X.Y.Z 替换为目标版本号，具体见 version.json）
-scripts\release.bat X.Y.Z          # 交互：先确认版本号 → 自动改 version.json → commit → tag → push
+# 1) 改版本号 + tag + push（scripts/release.bat X.Y.Z 交互）
+scripts\release.bat X.Y.Z
 ```
 
 ```bash
 bash scripts/release.sh X.Y.Z
+# 等价流程：更新 version.json、commit、git tag vX.Y.Z、git push origin main --tags
 ```
 
-push tag `vX.Y.Z` 后，`.github/workflows/release.yml` 自动：
+脚本只负责**改版本号 → commit → tag → push** 三件事。push tag 后，开发者需要**本地手动**继续：
 
-1. 安装 Python 3.13 + Node 20
-2. `pip install -r requirements.txt` + PyInstaller
-3. `npm ci && npm run build` 生成 `frontend-react/dist/`
-4. `pyinstaller 省心投启动器.spec` 产出 `省心投启动器.exe`
-5. 把 `exe` + `app.py` + `backend/` + `dist/` + 启动脚本 + `.env.example` 打成 `shengxintou-bi-X.Y.Z-windows.zip`
-6. 从 `version.json` 提取 changelog 作为 Release notes
-7. 创建 GitHub Release，上传 exe + zip
+1. **Windows 安装包**：在本机跑 `scripts\build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS + VC++ 运行时），产物 `dist/`。
+2. **Android APK**：在本机跑 `cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+），产物 `android/release/省心投-vX.Y.Z.apk`。
+3. **上传到 Release**：
+   ```bash
+   # Windows + Android 一键上传示例
+   gh release upload vX.Y.Z \
+       ".\dist\setup-*.exe" \
+       "android/release/省心投-vX.Y.Z.apk" \
+       --repo cyhzzz/shengxintou-bi
+   ```
+   在 [Releases 页](https://github.com/cyhzzz/shengxintou-bi/releases/tag/vX.Y.Z) 用 Web 界面编辑 release notes（从 `version.json.changelog` 提取）。
 
 **最终用户的使用方式**：
 

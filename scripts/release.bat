@@ -1,20 +1,25 @@
-﻿@echo off
+@echo off
 REM ============================================================
-REM 省心投 BI - 一键发布（本地打 tag + push，触发 GitHub Actions Release）
+REM 省心投 BI - 一键发布（本地打 tag + push + 等待本地构建上传）
 REM
 REM 用法：
 REM   scripts\release.bat              交互式询问版本号
 REM   scripts\release.bat 3.3.6        直接指定版本号（PATCH 段）
 REM   scripts\release.bat 3.4.0        直接指定版本号（MINOR 段）
 REM
-REM 流程：
+REM 流程（自当前版本起，release.bat 只负责变更提交，发版构建由开发者本地手动完成）：
 REM   1. 读取 version.json 当前版本
 REM   2. 提示/解析新版本号
 REM   3. 更新 version.json（version / release_date / changelog 占位）
 REM   4. git commit -am "release: vX.Y.Z"
 REM   5. git tag vX.Y.Z
 REM   6. git push origin main --tags
-REM   7. GitHub Actions 自动构建 exe + zip + 创建 Release
+REM   7. [开发者本地手动] scripts\build-installer.ps1（Windows）
+REM      + cd android ^&^& npm run build:apk（Android）
+REM      + gh release upload vX.Y.Z 上传产物
+REM
+REM 仓库内 .github/workflows/release.yml 是历史占位（trigger 语法 bug），
+REM   CI 不再自动构建发布。这是有意保留的冗余文档，不是缺失功能。
 REM ============================================================
 
 setlocal EnableDelayedExpansion
@@ -53,7 +58,8 @@ echo 即将发布 v%NEW_VER%，流程：
 echo   1. 更新 version.json
 echo   2. git commit + tag v%NEW_VER%
 echo   3. git push origin main --tags
-echo   4. GitHub Actions 自动构建 + 发布
+echo   4. [本地手动] scripts\build-installer.ps1（Windows） + cd android ^&^& npm run build:apk（Android）
+echo   5. gh release upload v%NEW_VER% 上传产物到 https://github.com/cyhzzz/shengxintou-bi/releases/tag/v%NEW_VER%
 echo.
 set /p "CONFIRM=确认？(y/N) "
 if /i not "%CONFIRM%"=="y" (
@@ -90,8 +96,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [4/4] GitHub Actions 已触发
-echo 等待 Release 构建完成：https://github.com/^<owner^>/^<repo^>/actions
+echo [4/4] tag pushed; 等待开发者本地构建 + 上传
+echo 下一步：
+echo   - Windows:  scripts\build-installer.ps1
+echo   - Android:  cd android ^&^& npm run build:apk
+echo   - 上传：     gh release upload v%NEW_VER% ".\*shengxintou-bi-setup-*.exe" "android\release\*.apk"
 echo.
 
 popd

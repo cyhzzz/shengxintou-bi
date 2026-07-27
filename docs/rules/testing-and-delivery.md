@@ -97,8 +97,8 @@
 - 普通功能开发不在规则文件追加“已落地”章节。
 - 发版脚本 `scripts/release.bat` / `release.sh` 会修改版本、commit、tag 和 push，属于高副作用操作；只有用户明确要求发版时运行。
 - 发布前先让用户补全 changelog，不接受脚本生成的“待补”占位条目作为正式发布说明。
-- GitHub Actions release 负责前端构建、PyInstaller、便携包和 GitHub Release；不要并行手工制作另一套发布产物。
-- Release 失败时先查看 Actions job 和产物阶段，不用本地临时 zip 掩盖流水线问题。
+- **发布走本地手动流程**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push。push tag 后开发者在本机跑 `scripts\build-installer.ps1`（Windows） + `cd android && npm run build:apk`（Android）+ `gh release upload vX.Y.Z ...`。仓库内的 `.github/workflows/release.yml` 是历史占位（trigger 语法 `v[0-9]+...` 被 GitHub 当字符类处理，从未触发过自动构建），不要期望 CI 自动构建；不要并行手工制作另一套发布产物。
+- Release 失败 / 找不到产物时，直接回头查本地 `logs/build-installer-vX.Y.Z.log` 和 `logs/build-apk-vX.Y.Z.log`，不再依赖 Actions 流水线。
 
 ## 9. 文档交付
 

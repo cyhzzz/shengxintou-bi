@@ -6,7 +6,16 @@
 #   bash scripts/release.sh              交互式询问版本号
 #   bash scripts/release.sh 3.3.6        直接指定版本号
 #
-# 流程同 release.bat：更新 version.json → commit → tag → push → GitHub Actions
+# 流程（自当前版本起，release.sh 只负责变更提交，发版构建由开发者本地手动完成）：
+#   1. 更新 version.json
+#   2. git commit + tag vX.Y.Z
+#   3. git push origin main --tags
+#   4. [开发者本地手动] scripts/build-installer.ps1（Windows）
+#      + cd android && npm run build:apk（Android）
+#      + gh release upload vX.Y.Z 上传产物
+#
+# 仓库内 .github/workflows/release.yml 是历史占位（trigger 语法 bug），
+#   CI 不再自动构建发布。这是有意保留的冗余文档，不是缺失功能。
 
 set -e
 
@@ -38,7 +47,8 @@ echo "即将发布 v$NEW_VER，流程："
 echo "  1. 更新 version.json"
 echo "  2. git commit + tag v$NEW_VER"
 echo "  3. git push origin main --tags"
-echo "  4. GitHub Actions 自动构建 + 发布"
+echo "  4. [本地手动] scripts/build-installer.ps1（Windows） + cd android && npm run build:apk（Android）"
+echo "  5. gh release upload v$NEW_VER ... --repo cyhzzz/shengxintou-bi"
 echo
 read -p "确认？(y/N) " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
@@ -74,5 +84,8 @@ echo "[3/4] git push origin main --tags"
 git push origin main --tags
 
 echo
-echo "[4/4] GitHub Actions 已触发"
-echo "等待 Release 构建完成：https://github.com/<owner>/<repo>/actions"
+echo "[4/4] tag pushed; 等待开发者本地构建 + 上传"
+echo "下一步："
+echo "  - Windows:  ./scripts/build-installer.ps1  (在 Windows 上跑)"
+echo "  - Android:  cd android && npm run build:apk"
+echo "  - 上传:      gh release upload v$NEW_VER \"./dist/*setup*.exe\" \"android/release/*.apk\" --repo cyhzzz/shengxintou-bi"
