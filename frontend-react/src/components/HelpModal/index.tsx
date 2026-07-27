@@ -5,7 +5,12 @@ import { dataService } from "@/services";
 import { DataFreshnessIndicator, type DataFreshnessIndicatorRef } from "@/components/DataFreshness";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { featureFlags } from "@/config/features";
+import { isDesktopClient } from "@/utils/isDesktop";
 import styles from "./index.module.scss";
+
+// v3.5.8：桌面版（Electron 打包后）无 git 仓库，git pull 会失败。
+// 桌面版改为直接跳转 GitHub Release 页面让用户下载新安装包。
+const RELEASE_URL = "https://github.com/cyhzzz/shengxintou-bi/releases/latest";
 
 const { Text, Paragraph, Link } = Typography;
 
@@ -308,20 +313,32 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           >
                             cyhzzz/shengxintou-bi
                           </Link>
-                          ，可用 git pull 拉取最新代码
+                          {isDesktopClient() ? "，新版安装包见 Release 页面" : "，可用 git pull 拉取最新代码"}
                         </Text>
                       </div>
                       {featureFlags.showGithubSyncButton && (
-                        <Button
-                          type="primary"
-                          icon={<CloudDownloadOutlined />}
-                          loading={gitBusy}
-                          onClick={() => startSelfUpdate(true)}
-                          className={styles.updateBtn}
-                          block
-                        >
-                          {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
-                        </Button>
+                        isDesktopClient() ? (
+                          <Button
+                            type="primary"
+                            icon={<CloudDownloadOutlined />}
+                            onClick={() => window.open(RELEASE_URL, "_blank", "noopener,noreferrer")}
+                            className={styles.updateBtn}
+                            block
+                          >
+                            前往 GitHub 下载新版安装包
+                          </Button>
+                        ) : (
+                          <Button
+                            type="primary"
+                            icon={<CloudDownloadOutlined />}
+                            loading={gitBusy}
+                            onClick={() => startSelfUpdate(true)}
+                            className={styles.updateBtn}
+                            block
+                          >
+                            {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
+                          </Button>
+                        )
                       )}
                     </div>
 
