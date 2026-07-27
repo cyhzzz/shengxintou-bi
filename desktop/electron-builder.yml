@@ -4,6 +4,11 @@ copyright: Copyright © 2026 省心投 BI
 directories:
   output: release
   buildResources: resources
+# v3.5.8：关闭 electron-updater 自动更新
+#   - 桌面版关于页已改为跳转 GitHub Release 手动下载
+#   - 不注入 app-update.yml，避免 NSIS 走差异更新流程
+#   - 双击新安装包时直接覆盖安装，不触发更新检查
+publish: null
 files:
   - dist/**/*
   - resources/**/*
