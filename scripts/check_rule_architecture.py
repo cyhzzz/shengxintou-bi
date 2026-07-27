@@ -113,7 +113,6 @@ INTEGRATIONS = {
     ROOT / 'scripts' / 'pre-commit-check.bat': 'python scripts\\check_rule_architecture.py',
     ROOT / '.github' / 'workflows' / 'ci.yml': 'python scripts/check_rule_architecture.py',
     ROOT / '.github' / 'PULL_REQUEST_TEMPLATE.md': 'python scripts/check_rule_architecture.py',
-    ROOT / '.github' / 'workflows' / 'release.yml': 'scripts/check_rule_architecture.py',
 }
 
 HISTORY_RE = re.compile(

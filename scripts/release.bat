@@ -17,9 +17,6 @@ REM   6. git push origin main --tags
 REM   7. [开发者本地手动] scripts\build-installer.ps1（Windows）
 REM      + cd android ^&^& npm run build:apk（Android）
 REM      + gh release upload vX.Y.Z 上传产物
-REM
-REM 仓库内 .github/workflows/release.yml 是历史占位（trigger 语法 bug），
-REM   CI 不再自动构建发布。这是有意保留的冗余文档，不是缺失功能。
 REM ============================================================
 
 setlocal EnableDelayedExpansion

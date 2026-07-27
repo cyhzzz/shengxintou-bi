@@ -226,7 +226,6 @@ npm run test:report
 ## 📦 发布流程
 
 > **当前版本起**：发布走「本地打 tag + 本地构建 + `gh release upload`」手动流程，**不再依赖 CI 自动构建**。
-> 仓库内的 `.github/workflows/release.yml` 文件**保留**（历史占位），trigger 语法有 bug 实际不工作，不要期望 push tag 后看到自动产物。
 
 ```powershell
 # 1) 改版本号 + tag + push（scripts/release.bat X.Y.Z 交互）

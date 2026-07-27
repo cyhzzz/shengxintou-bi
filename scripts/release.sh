@@ -13,9 +13,6 @@
 #   4. [开发者本地手动] scripts/build-installer.ps1（Windows）
 #      + cd android && npm run build:apk（Android）
 #      + gh release upload vX.Y.Z 上传产物
-#
-# 仓库内 .github/workflows/release.yml 是历史占位（trigger 语法 bug），
-#   CI 不再自动构建发布。这是有意保留的冗余文档，不是缺失功能。
 
 set -e
 
