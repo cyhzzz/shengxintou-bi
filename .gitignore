@@ -84,6 +84,8 @@ desktop.ini
 
 # 截图(调试临时产物，不入库)
 screenshots/
+# 例外：官网截图目录需要入库
+!website/assets/screenshots/
 
 # ===== 测试和覆盖率 =====
 .pytest_cache/
