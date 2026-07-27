@@ -246,6 +246,7 @@ export interface AppMarketSummary {
 
 // v3.4.1: 坚果云同步检测（启动时自动跑一次 + 前端一键同步按钮共用）
 //   返回 success=true + data.cloud_available=false 表示坚果云不可达（前端静默显示）
+//   v3.5.10: not_configured=true 表示尚未配置 WebDAV，前端显示友好引导而非报错
 export interface WebdavSyncStatus {
   cloud_available: boolean;
   cloud_latest: string | null;
@@ -257,6 +258,7 @@ export interface WebdavSyncStatus {
   need_sync: boolean;
   diff_hours: number;
   local_sources: Record<string, string>;
+  not_configured?: boolean;
 }
 export const dataServiceWebdav = {
   checkSyncStatus: async (): Promise<{ success: boolean; data: WebdavSyncStatus }> => {

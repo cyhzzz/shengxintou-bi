@@ -57,6 +57,8 @@ const DatabaseBackupPage: React.FC = () => {
       const response = await http.get<WebdavBackupFile[]>('/webdav/list');
       if (response.success) {
         setBackupList(response.data || []);
+        // v3.5.10：后端在未配置时返回 not_configured=true + data=[]
+        // 这里静默不弹错，由顶部 Alert + 未配置提示卡片统一引导用户去配置
       } else {
         // 透出后端 error code，便于定位是 LIST_FAILED / 配置 / 凭据问题
         const errCode = (response as any)?.error || 'UNKNOWN';
@@ -523,22 +525,29 @@ const DatabaseBackupPage: React.FC = () => {
             className={styles.syncAlert}
             style={{ marginBottom: 16 }}
             type={
-              !syncStatus.cloud_available ? 'info'
+              syncStatus.not_configured ? 'info'
+              : !syncStatus.cloud_available ? 'warning'
               : syncStatus.need_sync ? 'warning'
               : 'success'
             }
             showIcon
-            icon={!syncStatus.cloud_available ? <WifiOutlined /> : <CloudDownloadOutlined />}
+            icon={
+              syncStatus.not_configured ? <SettingOutlined />
+              : !syncStatus.cloud_available ? <WifiOutlined />
+              : <CloudDownloadOutlined />
+            }
             message={
               <Space size="small" wrap>
                 <span>
-                  {!syncStatus.cloud_available
-                    ? '坚果云未连接（同步检测不可用，请检查网络或配置）'
-                    : syncStatus.need_sync
-                      ? syncStatus.needs_meta_rebuild
-                        ? `云端备份新于本地但缺 meta，请先做一次本地备份补齐 meta（差异 ${syncStatus.diff_hours} 小时）`
-                        : `检测到云端数据新于本地（差异 ${syncStatus.diff_hours} 小时）`
-                      : '云端与本地数据日期一致，无需同步'}
+                  {syncStatus.not_configured
+                    ? '尚未配置 WebDAV 服务器，请点击右上角「WebDAV 配置」按钮填入坚果云地址、账号和应用密码'
+                    : !syncStatus.cloud_available
+                      ? '坚果云未连接（已配置但无法连通，请检查网络或使用「测试连接」自检）'
+                      : syncStatus.need_sync
+                        ? syncStatus.needs_meta_rebuild
+                          ? `云端备份新于本地但缺 meta，请先做一次本地备份补齐 meta（差异 ${syncStatus.diff_hours} 小时）`
+                          : `检测到云端数据新于本地（差异 ${syncStatus.diff_hours} 小时）`
+                        : '云端与本地数据日期一致，无需同步'}
                 </span>
                 <Spin spinning={syncChecking} size="small" />
                 {syncStatus.cloud_available && (
@@ -553,7 +562,27 @@ const DatabaseBackupPage: React.FC = () => {
               </Space>
             }
             description={
-              syncStatus.cloud_available ? (
+              syncStatus.not_configured ? (
+                <Space size="small" wrap style={{ marginTop: 4 }}>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<SettingOutlined />}
+                    onClick={openConfigForm}
+                    disabled={webdavConfigLoading}
+                  >
+                    立即配置 WebDAV
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={loadSyncStatus}
+                    disabled={syncChecking || progressVisible}
+                  >
+                    重新检测
+                  </Button>
+                </Space>
+              ) : syncStatus.cloud_available ? (
                 <Space size="small" wrap style={{ marginTop: 4 }}>
                   {syncStatus.need_sync ? (
                     <Button
@@ -575,7 +604,34 @@ const DatabaseBackupPage: React.FC = () => {
                     重新检测
                   </Button>
                 </Space>
-              ) : null
+              ) : (
+                <Space size="small" wrap style={{ marginTop: 4 }}>
+                  <Button
+                    size="small"
+                    icon={<ApiOutlined />}
+                    onClick={handleTestWebdav}
+                    loading={webdavTesting}
+                  >
+                    测试连接
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<SettingOutlined />}
+                    onClick={openConfigForm}
+                    disabled={webdavConfigLoading}
+                  >
+                    修改配置
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={loadSyncStatus}
+                    disabled={syncChecking || progressVisible}
+                  >
+                    重新检测
+                  </Button>
+                </Space>
+              )
             }
           />
         )}

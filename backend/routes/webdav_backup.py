@@ -17,6 +17,19 @@ bp = Blueprint('webdav_backup', __name__)
 backup_tasks = {}
 
 
+def _is_webdav_configured() -> bool:
+    """检测 WebDAV 必需配置是否齐全（URL/USERNAME/PASSWORD）。
+
+    v3.5.10：未配置时所有 WebDAV 端点统一返回 not_configured=true，
+    前端显示「尚未配置 WebDAV 服务器」友好引导，而不是报错。
+    """
+    try:
+        import config
+        return bool(config.WEBDAV_URL and config.WEBDAV_USERNAME and config.WEBDAV_PASSWORD)
+    except Exception:
+        return False
+
+
 @bp.route('/backup', methods=['POST'])
 @handle_exceptions
 def create_backup():
@@ -304,7 +317,15 @@ def _check_sync_status():
         'needs_meta_rebuild': False,
         'meta_source': None,           # 'meta' / 'file_mtime' / None
         'cloud_data_latest': None,      # 云端备份里真正的"业务数据日期"
+        'not_configured': False,         # v3.5.10：未配置时前端友好引导
     }
+
+    # v3.5.10：未配置时直接返回，不进入 try 链路（避免日志噪声）
+    if not _is_webdav_configured():
+        return {
+            'success': True,
+            'data': {**empty_data, 'not_configured': True},
+        }
 
     try:
         # 1. 本地最新日期：5 张业务表 MAX(日期字段) 取并集
@@ -434,6 +455,15 @@ def list_backups():
             ]
         }
     """
+    # v3.5.10：未配置时返回空列表 + not_configured=true，前端友好引导
+    if not _is_webdav_configured():
+        return jsonify({
+            'success': True,
+            'data': [],
+            'not_configured': True,
+            'message': '尚未配置 WebDAV 服务器，请点击右上角「WebDAV 配置」按钮填入凭证',
+        })
+
     try:
         from backend.utils.webdav_client import WebDAVBackupClient
         import config

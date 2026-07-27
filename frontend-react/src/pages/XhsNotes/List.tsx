@@ -722,7 +722,7 @@ const XhsNotesListPage: React.FC = () => {
             />
           </div>
 
-          {/* 创作者 */}
+          {/* 创作者：固定 width 避免 maxTagCount responsive 与父级 Space wrap 共振闪烁 */}
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>创作者:</span>
             <Select
@@ -732,7 +732,7 @@ const XhsNotesListPage: React.FC = () => {
               options={creatorOptions}
               placeholder="全部"
               allowClear
-              style={{ minWidth: 150 }}
+              style={{ width: 200 }}
               maxTagCount="responsive"
               showSearch
               filterOption={(input, option) =>
@@ -751,7 +751,7 @@ const XhsNotesListPage: React.FC = () => {
               options={contentTypeOptions}
               placeholder="全部"
               allowClear
-              style={{ minWidth: 120 }}
+              style={{ width: 160 }}
               maxTagCount="responsive"
             />
           </div>
@@ -766,7 +766,7 @@ const XhsNotesListPage: React.FC = () => {
               options={adStrategyOptions}
               placeholder="全部"
               allowClear
-              style={{ minWidth: 150 }}
+              style={{ width: 200 }}
               maxTagCount="responsive"
             />
           </div>
@@ -780,7 +780,7 @@ const XhsNotesListPage: React.FC = () => {
               options={[{ label: '全部', value: '' }, ...accountOptions]}
               placeholder="全部"
               allowClear
-              style={{ minWidth: 150 }}
+              style={{ width: 180 }}
               showSearch
               filterOption={(input, option) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
