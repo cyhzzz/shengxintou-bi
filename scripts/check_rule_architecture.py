@@ -113,7 +113,9 @@ INTEGRATIONS = {
     ROOT / 'scripts' / 'pre-commit-check.bat': 'python scripts\\check_rule_architecture.py',
     ROOT / '.github' / 'workflows' / 'ci.yml': 'python scripts/check_rule_architecture.py',
     ROOT / '.github' / 'PULL_REQUEST_TEMPLATE.md': 'python scripts/check_rule_architecture.py',
-    ROOT / '.github' / 'workflows' / 'release.yml': 'scripts/check_rule_architecture.py',
+    # v3.6.0：release.yml 已删除（commit push 误触发 0 jobs failure run，
+    #        且发版走本地手动流程，不再依赖 CI 自动构建）。
+    #        不再校验 release.yml 的规则检查集成。
 }
 
 HISTORY_RE = re.compile(
