@@ -350,8 +350,9 @@ async function handleAppMarketFilterOptions(): Promise<any> {
     `SELECT DISTINCT "渠道类型" as v FROM fact_conv_appmarket WHERE "渠道类型" IS NOT NULL`
   );
   const markets = marketRows.map(r => r.v).sort((a: string, b: string) => {
-    const ka = (/^[\x00-\x7F]/.test(a) ? 'a' : 'z') + a;
-    const kb = (/^[\x00-\x7F]/.test(b) ? 'a' : 'z') + b;
+    // ASCII 字符（codePoint < 0x80）排在前，非 ASCII 排在后；用 codePointAt 替代 [\x00-\x7F] 正则避免 no-control-regex
+    const ka = (a.codePointAt(0)! <= 0x7f ? 'a' : 'z') + a;
+    const kb = (b.codePointAt(0)! <= 0x7f ? 'a' : 'z') + b;
     return ka.localeCompare(kb);
   });
   return {
@@ -2304,7 +2305,7 @@ async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
 
   // ---- core_metrics ----
   let total_cost = 0, total_impressions = 0, total_clicks = 0, total_interactions = 0;
-  let total_pmsg = 0, total_lead_users = 0, total_mouth_users = 0, total_opened = 0;
+  let total_pmsg = 0, total_lead_users = 0, _total_mouth_users = 0, total_opened = 0;
   const note_id_set = new Set<string>();
   for (const n of notes) {
     total_cost += toFloat(n['消费金额']);
@@ -2313,7 +2314,7 @@ async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
     total_interactions += toInt(n['总互动量']);
     total_pmsg += toInt(n['私信进线人数']);
     total_lead_users += toInt(n['添加企微人数']);
-    total_mouth_users += toInt(n['企微成功添加人数']);
+    _total_mouth_users += toInt(n['企微成功添加人数']);
     total_opened += toInt(n['开户人数']);
     if (n['笔记ID']) note_id_set.add(String(n['笔记ID']));
   }
@@ -2573,7 +2574,7 @@ async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
   GROUP BY "添加员工姓名"`;
   const empRows = await querySql<Row>(empSql, empWhere.params);
   const xhs_set = new Set(XHS_ASSISTANTS);
-  let emp_ranking = empRows
+  const emp_ranking = empRows
     .filter(r => xhs_set.has(r['添加员工姓名']))
     .map(r => {
       const leads = toInt(r.leads); const opened = toInt(r.opened); const valid = toInt(r.valid);

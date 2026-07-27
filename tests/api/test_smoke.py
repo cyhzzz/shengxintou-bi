@@ -385,7 +385,8 @@ class ApiSmokeTest(unittest.TestCase):
             self.assertIn('secondary_live_types', item)
 
     def test_63_anchor_clusters_live_type_filter(self):
-        # 仅看「带货直播」：应只剩 3 位带货主播
+        # 仅看「带货直播」：返回的每位主播都必须包含「带货直播」标签
+        # 不再断言具体数量——主播映射数据会随时间变化，硬编码数字会让测试随数据漂移失稳
         payload = {
             'filters': {
                 'start_date': '2026-01-01',
@@ -398,7 +399,12 @@ class ApiSmokeTest(unittest.TestCase):
             self._post('/api/v1/leads-detail/anchor-clusters', payload),
             '/leads-detail/anchor-clusters (live_types=带货直播)')
         items = data.get('items', [])
-        self.assertLessEqual(len(items), 3, '带货直播主播应≤3位')
+        for item in items:
+            live_types = item.get('live_types') or []
+            self.assertIn(
+                '带货直播', live_types,
+                f"筛选 live_types=['带货直播'] 后，主播 {item.get('anchor_name')} 的 live_types={live_types} 应包含「带货直播」"
+            )
 
     def test_64_direct_sales_trend_with_live_type(self):
         # v3.3.1: 直播带货报表页走势图端点（live_types=['带货直播'] + daily）
