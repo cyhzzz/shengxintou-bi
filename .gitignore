@@ -151,3 +151,6 @@ android/release/
 # v3.5.3：Gradle 缓存目录（TRAE Sandbox 引导到项目内，避免用户目录写入）
 android/gradle-home/
 tools/gradle-home/
+
+# Windows reserved name leftover from PowerShell redirection
+NUL

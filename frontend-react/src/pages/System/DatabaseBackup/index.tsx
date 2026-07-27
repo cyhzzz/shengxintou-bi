@@ -3,12 +3,12 @@
  * 实现坚果云数据库备份/恢复功能
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Button, Space, Table, Modal, message, Alert, Spin, Tag } from 'antd';
-import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined, SyncOutlined } from '@ant-design/icons';
+import { Card, Button, Space, Table, Modal, message, Alert, Spin, Tag, Form, Input, InputNumber, Switch } from 'antd';
+import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined, SyncOutlined, SettingOutlined, ApiOutlined } from '@ant-design/icons';
 import BackupProgress from './components/BackupProgress';
 import VersionUpdateModal from './components/VersionUpdateModal';
 import { http } from '@/services/http';
-import { dataServiceWebdav, dataServiceSync, type WebdavSyncStatus, type SyncStatus, type SyncResult } from '@/services/dataService';
+import { dataServiceWebdav, dataServiceSync, type WebdavSyncStatus, type SyncStatus, type SyncResult, type WebdavConfig } from '@/services/dataService';
 import type {
   WebdavBackupFile,
   WebdavProgressResponse,
@@ -39,6 +39,14 @@ const DatabaseBackupPage: React.FC = () => {
   const [dbSyncOperating, setDbSyncOperating] = useState<null | 'upload' | 'download'>(null);
   const [dbSyncResult, setDbSyncResult] = useState<SyncResult | null>(null);
   const [dbSyncConfirm, setDbSyncConfirm] = useState<{ visible: boolean; direction: 'upload' | 'download' }>({ visible: false, direction: 'upload' });
+
+  // v3.5.8: WebDAV 配置可视化编辑
+  const [webdavConfig, setWebdavConfig] = useState<WebdavConfig | null>(null);
+  const [webdavConfigLoading, setWebdavConfigLoading] = useState(false);
+  const [webdavConfigSaving, setWebdavConfigSaving] = useState(false);
+  const [webdavTesting, setWebdavTesting] = useState(false);
+  const [configFormVisible, setConfigFormVisible] = useState(false);
+  const [configForm] = Form.useForm();
 
   const taskIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -150,12 +158,99 @@ const DatabaseBackupPage: React.FC = () => {
     }
   }, []);
 
+  // v3.5.8: 加载 WebDAV 配置
+  const loadWebdavConfig = useCallback(async () => {
+    setWebdavConfigLoading(true);
+    try {
+      const res = await dataServiceWebdav.getConfig();
+      if (res?.success && res.data) {
+        setWebdavConfig(res.data);
+      }
+    } catch (err) {
+      // 静默失败：后端未配置时不应弹错
+      console.error('加载 WebDAV 配置失败:', err);
+    } finally {
+      setWebdavConfigLoading(false);
+    }
+  }, []);
+
+  // 保存 WebDAV 配置
+  const handleSaveWebdavConfig = useCallback(async (values: any) => {
+    setWebdavConfigSaving(true);
+    try {
+      // 密码字段：若仍是掩码（••••••），不传给后端，保留原值
+      const payload: Partial<WebdavConfig> = {
+        url: values.url,
+        username: values.username,
+        backup_dir: values.backup_dir,
+        max_backups: values.max_backups,
+        use_compression: values.use_compression,
+        verify_ssl: values.verify_ssl,
+      };
+      // 密码：仅在用户输入了新值（非掩码）时传
+      if (values.password && !values.password.startsWith('••')) {
+        payload.password = values.password;
+      }
+      const res = await dataServiceWebdav.saveConfig(payload);
+      if (res?.success) {
+        message.success('配置已保存到 .env');
+        if (res.data) {
+          setWebdavConfig(res.data);
+        }
+        setConfigFormVisible(false);
+        // 保存后刷新备份列表和同步状态（新配置可能改变连接）
+        loadBackupList();
+        loadSyncStatus();
+      } else {
+        message.error(res?.message || '保存失败');
+      }
+    } catch (err: any) {
+      message.error('保存配置失败: ' + (err?.message || '未知错误'));
+    } finally {
+      setWebdavConfigSaving(false);
+    }
+  }, [loadBackupList, loadSyncStatus]);
+
+  // 测试连接（用当前已保存的配置）
+  const handleTestWebdav = useCallback(async () => {
+    setWebdavTesting(true);
+    try {
+      const res = await dataServiceWebdav.testConnection();
+      if (res?.success && res.data?.success) {
+        message.success(`连接正常（HTTP ${res.data.status_code ?? ''}）`);
+      } else {
+        message.error('连接异常：' + (res?.data?.message || res?.message || '未知错误'));
+      }
+    } catch (err: any) {
+      message.error('连接测试失败: ' + (err?.message || '未知错误'));
+    } finally {
+      setWebdavTesting(false);
+    }
+  }, []);
+
+  // 打开配置表单：把当前配置回填到表单
+  const openConfigForm = useCallback(() => {
+    if (webdavConfig) {
+      configForm.setFieldsValue({
+        url: webdavConfig.url,
+        username: webdavConfig.username,
+        password: webdavConfig.password,  // 掩码（••••••1234）
+        backup_dir: webdavConfig.backup_dir,
+        max_backups: webdavConfig.max_backups,
+        use_compression: webdavConfig.use_compression,
+        verify_ssl: webdavConfig.verify_ssl,
+      });
+    }
+    setConfigFormVisible(true);
+  }, [webdavConfig, configForm]);
+
   useEffect(() => {
     loadBackupList();
     checkVersion();
     loadSyncStatus();
     loadDbSyncStatus();
-  }, [loadBackupList, checkVersion, loadSyncStatus, loadDbSyncStatus]);
+    loadWebdavConfig();
+  }, [loadBackupList, checkVersion, loadSyncStatus, loadDbSyncStatus, loadWebdavConfig]);
 
   // 清理轮询
   useEffect(() => {
@@ -222,19 +317,6 @@ const DatabaseBackupPage: React.FC = () => {
       }
     } catch {
       message.error('备份失败');
-    }
-  };
-
-  const handleTest = async () => {
-    try {
-      const response = await http.get<{ success: boolean; status_code?: number; message?: string }>('/webdav/test');
-      if (response.success && response.data?.success) {
-        message.success(`连接正常（HTTP ${response.data.status_code ?? ''}）`);
-      } else {
-        message.error('连接异常：' + (response.data?.message || response.message || '未知错误'));
-      }
-    } catch {
-      message.error('连接测试失败');
     }
   };
 
@@ -372,6 +454,28 @@ const DatabaseBackupPage: React.FC = () => {
       <Card>
         <div className={styles.header}>
           <h3>坚果云数据库备份</h3>
+          <Space size="small">
+            <Tag color={webdavConfig?.password_configured ? 'green' : 'orange'}>
+              {webdavConfig?.password_configured ? '已配置' : '未配置'}
+            </Tag>
+            <Button
+              size="small"
+              icon={<SettingOutlined />}
+              onClick={openConfigForm}
+              loading={webdavConfigLoading}
+            >
+              WebDAV 配置
+            </Button>
+            <Button
+              size="small"
+              icon={<ApiOutlined />}
+              onClick={handleTestWebdav}
+              loading={webdavTesting}
+              disabled={!webdavConfig?.password_configured}
+            >
+              测试连接
+            </Button>
+          </Space>
         </div>
 
         {/* 操作按钮 */}
@@ -380,7 +484,7 @@ const DatabaseBackupPage: React.FC = () => {
             type="primary"
             icon={<CloudUploadOutlined />}
             onClick={handleBackup}
-            disabled={progressVisible}
+            disabled={progressVisible || !webdavConfig?.password_configured}
           >
             备份数据库到坚果云
           </Button>
@@ -391,12 +495,6 @@ const DatabaseBackupPage: React.FC = () => {
           >
             刷新备份列表
           </Button>
-          <Button
-            onClick={handleTest}
-            disabled={progressVisible}
-          >
-            测试连接
-          </Button>
         </Space>
 
         {/* 进度显示 */}
@@ -405,6 +503,17 @@ const DatabaseBackupPage: React.FC = () => {
             status={progress.status}
             progress={progress.progress}
             message={progress.message}
+          />
+        )}
+
+        {/* 未配置提示 */}
+        {!webdavConfig?.password_configured && !webdavConfigLoading && (
+          <Alert
+            type="info"
+            showIcon
+            message="尚未配置 WebDAV 凭据"
+            description="点击右上角「WebDAV 配置」按钮，填入坚果云服务器地址、账号和应用密码即可启用云备份功能。配置保存在本地 .env 文件，不会随安装包分发。"
+            style={{ marginBottom: 16 }}
           />
         )}
 
@@ -677,6 +786,90 @@ const DatabaseBackupPage: React.FC = () => {
         <p style={{ color: 'var(--color-warning)' }}>
           ⚠️ 此操作会先删除目标库同名表全部数据再写入，<strong>不可撤销</strong>。请确认方向后再继续。
         </p>
+      </Modal>
+
+      {/* v3.5.8: WebDAV 配置编辑弹窗 */}
+      <Modal
+        title="WebDAV 配置"
+        open={configFormVisible}
+        onCancel={() => setConfigFormVisible(false)}
+        onOk={() => configForm.submit()}
+        confirmLoading={webdavConfigSaving}
+        width={560}
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="配置保存到本地 .env 文件"
+          description={
+            <div>
+              <div>· 坚果云用户请使用「应用密码」，非账号登录密码</div>
+              <div>· 应用密码在坚果云网页「安全选项」中生成</div>
+              <div>· 配置文件路径：{webdavConfig?.env_path || '%APPDATA%\\省心投 BI\\.env'}</div>
+              <div>· 密码留空或保持掩码（••••••）表示不修改原值</div>
+            </div>
+          }
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={configForm} layout="vertical" onFinish={handleSaveWebdavConfig}>
+          <Form.Item
+            name="url"
+            label="WebDAV 服务器地址"
+            rules={[{ required: true, message: '请输入服务器地址' }]}
+            tooltip="坚果云：https://dav.jianguoyun.com/dav/"
+          >
+            <Input placeholder="https://dav.jianguoyun.com/dav/" />
+          </Form.Item>
+          <Form.Item
+            name="username"
+            label="账号"
+            rules={[{ required: true, message: '请输入账号' }]}
+            tooltip="坚果云账号邮箱（如 yourname@example.com）"
+          >
+            <Input placeholder="yourname@example.com" autoComplete="off" />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="应用密码"
+            tooltip="坚果云「安全选项」生成的应用密码，非登录密码"
+          >
+            <Input.Password
+              placeholder="留空表示保留原密码"
+              autoComplete="new-password"
+            />
+          </Form.Item>
+          <Form.Item
+            name="backup_dir"
+            label="备份目录"
+            tooltip="WebDAV 服务器上的备份目录路径"
+          >
+            <Input placeholder="/shengxintou-backup/" />
+          </Form.Item>
+          <Form.Item
+            name="max_backups"
+            label="最大备份保留数"
+            tooltip="超过此数量后自动清理最旧的备份"
+          >
+            <InputNumber min={1} max={100} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="use_compression"
+            label="启用压缩（.db.gz）"
+            valuePropName="checked"
+            tooltip="压缩备份文件以节省空间"
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            name="verify_ssl"
+            label="验证 SSL 证书"
+            valuePropName="checked"
+            tooltip="生产环境建议开启，自签名证书可临时关闭"
+          >
+            <Switch />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

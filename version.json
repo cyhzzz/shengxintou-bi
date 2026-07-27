@@ -1,9 +1,10 @@
 {
-    "version": "3.5.8",
-    "release_date": "2026-07-24",
+    "version": "3.5.9",
+    "release_date": "2026-07-27",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.5.9 WebDAV 配置可视化编辑（数据同步页新增配置按钮，前端表单填入后原子写入 .env + 运行时重载，密码掩码防回填，含未配置阻断与测试连接）",
         "v3.5.8 封存 Supabase / 鉴权 / SQLite↔PG 双向同步功能（三端统一走本地 SQLite 无登录，AUTH_ENABLED 与 CLOUD_SYNC_ENABLED 默认 false，启用只需改 .env）+ 安卓导出图片重叠修复（html2canvas 替换为 modern-screenshot）",
         "v3.5.7 修复安卓端报告生成与员工转化周报导出图片元素重叠（导出前临时重置 body zoom 触发 echarts 重绘）+ 移动端报告生成页入口开放与数据路由支持",
         "v3.5.6 员工转化周报-新增线索开户周榜口径修正（去除存量客户过滤，统计本周全部新进线索）+ 直播获客主播平台「视频号」归一化为「腾讯」+ 转化漏斗平台筛选项「腾讯高类平台」更正为「腾讯」+ 数据同步结果 toast 提示增强（6s + 跳过表数 + 失败警示）",

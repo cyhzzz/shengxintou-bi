@@ -499,6 +499,231 @@ def test_webdav_connection():
         }), 500
 
 
+# v3.5.8：WebDAV 配置可视化读写（前端「数据同步」页可编辑 .env）
+#   - GET：返回当前 .env 里的 WebDAV 配置，密码掩码（•••••• 末 4 位）
+#   - PUT：原子写入 .env，未传的字段保留原值
+#   - 配套运行时重载：写入后 importlib.reload(config) 让后续 /webdav/* 立即生效
+_WEBDAV_CONFIG_KEYS = [
+    ('WEBDAV_URL', 'url'),
+    ('WEBDAV_USERNAME', 'username'),
+    ('WEBDAV_PASSWORD', 'password'),
+    ('WEBDAV_BASE_PATH', 'backup_dir'),
+    ('WEBDAV_MAX_BACKUPS', 'max_backups'),
+    ('WEBDAV_USE_COMPRESSION', 'use_compression'),
+    ('WEBDAV_VERIFY_SSL', 'verify_ssl'),
+]
+
+
+def _mask_password(pwd: str) -> str:
+    """密码掩码：保留末 4 位，前缀 ••••••"""
+    if not pwd:
+        return ''
+    if len(pwd) <= 4:
+        return '••••'
+    return '••••••' + pwd[-4:]
+
+
+def _read_env_file(env_path: str) -> dict:
+    """读取 .env 文件为 dict（KEY=value），忽略注释和空行"""
+    result = {}
+    if not os.path.exists(env_path):
+        return result
+    with open(env_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if '=' in line:
+                k, _, v = line.partition('=')
+                result[k.strip()] = v.strip()
+    return result
+
+
+def _write_env_file(env_path: str, updates: dict) -> None:
+    """原子写入 .env：保留注释和结构，仅更新指定 KEY
+
+    实现策略：
+    1. 读取原文件所有行
+    2. 对每行 KEY=VALUE：若 KEY 在 updates 里，替换 VALUE
+    3. updates 里未被原文件覆盖的 KEY：追加到末尾
+    4. 写入临时文件，os.replace 原子替换
+    """
+    os.makedirs(os.path.dirname(env_path), exist_ok=True)
+
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+    seen_keys = set()
+    new_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            new_lines.append(line)
+            continue
+        if '=' in stripped:
+            key, _, _ = stripped.partition('=')
+            key = key.strip()
+            if key in updates:
+                seen_keys.add(key)
+                new_lines.append(f"{key}={updates[key]}\n")
+            else:
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    # 追加未被原文件覆盖的 KEY
+    for key, value in updates.items():
+        if key not in seen_keys:
+            new_lines.append(f"{key}={value}\n")
+
+    tmp_path = env_path + '.tmp'
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        f.writelines(new_lines)
+    os.replace(tmp_path, env_path)
+
+
+def _reload_config_module():
+    """写入 .env 后重载 config 模块，让后续请求读到新值"""
+    try:
+        import importlib
+        import config
+        # 重新加载 dotenv
+        from dotenv import load_dotenv
+        env_path = os.path.join(config.USER_DATA_DIR, '.env')
+        load_dotenv(env_path, override=True)
+        importlib.reload(config)
+        # 同步到 app.config
+        from flask import current_app
+        current_app.config.from_object('config')
+        current_app.config['AUTH_ENABLED'] = bool(getattr(config, 'AUTH_ENABLED', True))
+        # 同步 top_config 别名（app.py 用 top_config 访问数据库 dialect）
+        import sys
+        sys.modules['config'] = config
+    except Exception as e:
+        import traceback
+        print(f"[webdav_config] 重载 config 失败: {e}\n{traceback.format_exc()}")
+
+
+@bp.route('/config', methods=['GET'])
+@handle_exceptions
+def get_webdav_config():
+    """读取当前 .env 里的 WebDAV 配置（密码掩码）"""
+    try:
+        import config
+        return jsonify({
+            'success': True,
+            'data': {
+                'url': config.WEBDAV_URL,
+                'username': config.WEBDAV_USERNAME,
+                'password': _mask_password(config.WEBDAV_PASSWORD),
+                'password_configured': bool(config.WEBDAV_PASSWORD),
+                'backup_dir': config.WEBDAV_BACKUP_DIR,
+                'max_backups': config.WEBDAV_MAX_BACKUPS,
+                'use_compression': config.WEBDAV_USE_COMPRESSION,
+                'verify_ssl': config.WEBDAV_VERIFY_SSL,
+                'env_path': os.path.join(config.USER_DATA_DIR, '.env'),
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'CONFIG_READ_FAILED',
+            'message': f'读取配置失败: {str(e)}'
+        }), 500
+
+
+@bp.route('/config', methods=['PUT'])
+@handle_exceptions
+def update_webdav_config():
+    """更新 .env 里的 WebDAV 配置（原子写入 + 运行时重载）
+
+    请求体（所有字段可选，未传则保留原值）：
+    {
+        "url": "https://dav.jianguoyun.com/dav/",
+        "username": "your@email.com",
+        "password": "app_password",          # 不传或空字符串时保留原密码
+        "backup_dir": "/shengxintou-backup/",
+        "max_backups": 3,
+        "use_compression": true,
+        "verify_ssl": true
+    }
+    """
+    try:
+        import config
+        data = request.get_json() or {}
+
+        env_path = os.path.join(config.USER_DATA_DIR, '.env')
+
+        # 读取当前 .env 内容（用于保留未传入的字段）
+        env_dict = _read_env_file(env_path)
+
+        updates = {}
+
+        if 'url' in data:
+            updates['WEBDAV_URL'] = str(data['url'])
+
+        if 'username' in data:
+            updates['WEBDAV_USERNAME'] = str(data['username'])
+
+        # 密码特殊处理：空字符串或未传 → 保留原值；非空 → 更新
+        if 'password' in data and data['password']:
+            # 拒绝掩码回填（防止前端误传 ••••••1234 当作密码）
+            if not str(data['password']).startswith('••'):
+                updates['WEBDAV_PASSWORD'] = str(data['password'])
+
+        if 'backup_dir' in data:
+            # 统一用 WEBDAV_BASE_PATH 作为权威配置项
+            updates['WEBDAV_BASE_PATH'] = str(data['backup_dir'])
+
+        if 'max_backups' in data:
+            try:
+                updates['WEBDAV_MAX_BACKUPS'] = str(int(data['max_backups']))
+            except (ValueError, TypeError):
+                pass
+
+        if 'use_compression' in data:
+            updates['WEBDAV_USE_COMPRESSION'] = 'true' if data['use_compression'] else 'false'
+
+        if 'verify_ssl' in data:
+            updates['WEBDAV_VERIFY_SSL'] = 'true' if data['verify_ssl'] else 'false'
+
+        if not updates:
+            return jsonify({'success': True, 'message': '无更新字段'})
+
+        _write_env_file(env_path, updates)
+        _reload_config_module()
+
+        # 重新读取返回新值（密码仍掩码）
+        import importlib
+        import config as new_config
+        importlib.reload(new_config)
+
+        return jsonify({
+            'success': True,
+            'message': '配置已保存',
+            'data': {
+                'url': new_config.WEBDAV_URL,
+                'username': new_config.WEBDAV_USERNAME,
+                'password': _mask_password(new_config.WEBDAV_PASSWORD),
+                'password_configured': bool(new_config.WEBDAV_PASSWORD),
+                'backup_dir': new_config.WEBDAV_BACKUP_DIR,
+                'max_backups': new_config.WEBDAV_MAX_BACKUPS,
+                'use_compression': new_config.WEBDAV_USE_COMPRESSION,
+                'verify_ssl': new_config.WEBDAV_VERIFY_SSL,
+            }
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': 'CONFIG_WRITE_FAILED',
+            'message': f'保存配置失败: {str(e)}',
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 @bp.route('/delete', methods=['POST'])
 @handle_exceptions
 def delete_backup():

@@ -268,7 +268,30 @@ export const dataServiceWebdav = {
   getProgress: async (taskId: string): Promise<{ success: boolean; data?: { status: string; progress: number; message: string; pre_restore_backup?: string } }> => {
     return http.get(`/webdav/progress/${taskId}`) as unknown as { success: boolean; data?: { status: string; progress: number; message: string; pre_restore_backup?: string } };
   },
+  // v3.5.8：WebDAV 配置可视化读写
+  getConfig: async (): Promise<{ success: boolean; data?: WebdavConfig; message?: string }> => {
+    return http.get('/webdav/config') as unknown as { success: boolean; data?: WebdavConfig; message?: string };
+  },
+  saveConfig: async (config: Partial<WebdavConfig>): Promise<{ success: boolean; data?: WebdavConfig; message?: string }> => {
+    return http.put('/webdav/config', config) as unknown as { success: boolean; data?: WebdavConfig; message?: string };
+  },
+  testConnection: async (): Promise<{ success: boolean; data?: { success: boolean; status_code?: number; message?: string }; message?: string }> => {
+    return http.get('/webdav/test') as unknown as { success: boolean; data?: { success: boolean; status_code?: number; message?: string }; message?: string };
+  },
 };
+
+// v3.5.8：WebDAV 配置（与后端 /webdav/config 响应一致）
+export interface WebdavConfig {
+  url: string;
+  username: string;
+  password: string;           // 掩码（••••••1234），写入时清空表示保留原值
+  password_configured: boolean;
+  backup_dir: string;
+  max_backups: number;
+  use_compression: boolean;
+  verify_ssl: boolean;
+  env_path?: string;
+}
 
 // v3.4.3：双向数据同步（SQLite ↔ Supabase PG）
 export interface SyncStatus {
