@@ -1,5 +1,5 @@
 /**
- * 移动端 WebDAV 同步（坚果云）
+ * 移动端 + PWA 端 WebDAV 同步（坚果云）
  *
  * v3.5.4 关键修复：
  *   1. 后端上传到坚果云的文件名是 backup_YYYYMMDD_HHMMSS.db.gz（gzip 压缩），
@@ -15,6 +15,12 @@
  *   - 凭据完全由用户在前端「数据同步」页面填写，通过 @capacitor/preferences 持久化
  *   - WebDAV 服务器地址（url）也由用户配置，默认坚果云 https://dav.jianguoyun.com/dav/
  *   - 未配置时所有同步/测试连接调用返回友好错误，由 UI 引导用户去配置
+ *
+ * v3.7.0 PWA 支持：
+ *   - PWA 端无 Capacitor 插件，凭据存 localStorage（同源隔离，HTTPS 才可访问）
+ *   - 坚果云 WebDAV 不支持 CORS，PWA 必须走 Cloudflare Worker 代理
+ *   - Worker URL 由用户配置（localStorage key: webdav_proxy_url），未配置时给出引导
+ *   - 下载的 DB 直接加载到 sql.js（IndexedDB 持久化），不走 Filesystem
  */
 import { Preferences } from '@capacitor/preferences';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -24,6 +30,7 @@ import {
   moveDatabaseFromCache,
   deleteMobileDatabase,
 } from './mobileSqlite';
+import { isPwaClient } from '@/utils/isDesktop';
 
 // 坚果云固定 WebDAV 入口（非凭据，可作为默认值）
 const DEFAULT_WEBDAV_BASE = 'https://dav.jianguoyun.com/dav/';
@@ -41,6 +48,14 @@ export async function saveWebDAVCredentials(
   remoteDir: string,
   url?: string
 ): Promise<void> {
+  // v3.7.0：PWA 端用 localStorage，安卓端用 @capacitor/preferences
+  if (isPwaClient()) {
+    localStorage.setItem('webdav_username', username);
+    localStorage.setItem('webdav_password', password);
+    localStorage.setItem('webdav_remote_dir', remoteDir);
+    localStorage.setItem('webdav_url', url || '');
+    return;
+  }
   await Preferences.set({ key: 'webdav_username', value: username });
   await Preferences.set({ key: 'webdav_password', value: password });
   await Preferences.set({ key: 'webdav_remote_dir', value: remoteDir });
@@ -53,7 +68,21 @@ export async function getWebDAVCredentials(): Promise<{
   username: string;
   password: string;
   remoteDir: string;
+  proxyUrl?: string;  // v3.7.0：PWA 专用，Cloudflare Worker 代理地址
 } | null> {
+  // v3.7.0：PWA 端从 localStorage 读
+  if (isPwaClient()) {
+    const username = localStorage.getItem('webdav_username');
+    const password = localStorage.getItem('webdav_password');
+    const remoteDir = localStorage.getItem('webdav_remote_dir') || '';
+    const url = localStorage.getItem('webdav_url') || DEFAULT_WEBDAV_BASE;
+    const proxyUrl = localStorage.getItem('webdav_proxy_url') || '';
+    if (username && password) {
+      return { url, username, password, remoteDir, proxyUrl };
+    }
+    return null;
+  }
+
   const { value: url } = await Preferences.get({ key: 'webdav_url' });
   const { value: username } = await Preferences.get({ key: 'webdav_username' });
   const { value: password } = await Preferences.get({ key: 'webdav_password' });
@@ -68,6 +97,18 @@ export async function getWebDAVCredentials(): Promise<{
     };
   }
   return null;
+}
+
+/**
+ * v3.7.0：保存 PWA 的 Cloudflare Worker 代理 URL
+ *
+ * PWA 端因坚果云 WebDAV 不支持 CORS，必须走 Worker 代理。
+ * 此函数仅 PWA 模式有效，安卓端调用为空操作。
+ */
+export async function saveWebDAVProxyUrl(proxyUrl: string): Promise<void> {
+  if (isPwaClient()) {
+    localStorage.setItem('webdav_proxy_url', proxyUrl);
+  }
 }
 
 export async function hasWebDAVCredentials(): Promise<boolean> {
@@ -198,6 +239,11 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     return { success: false, message: '尚未配置 WebDAV 凭据，请点击「WebDAV 配置」按钮填入坚果云账号和应用密码' };
   }
 
+  // v3.7.0：PWA 端走 sql.js + IndexedDB，不走 Capacitor Filesystem
+  if (isPwaClient()) {
+    return syncFromWebDAVPwa(creds);
+  }
+
   const log: string[] = [];
   const step = (msg: string) => {
     log.push(msg);
@@ -317,12 +363,171 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
   }
 }
 
+/**
+ * v3.7.0：PWA 端 WebDAV 同步实现
+ *
+ * 与安卓端的核心差异：
+ *   1. fetch 走 Cloudflare Worker 代理（坚果云不支持 CORS）
+ *   2. 下载的 DB ArrayBuffer 直接喂给 sql.js，不走 Filesystem
+ *   3. 持久化到 IndexedDB，而非应用沙箱文件系统
+ *
+ * Worker 代理 URL 由用户配置（localStorage key: webdav_proxy_url）。
+ * 代理协议：GET https://<worker>/?url=<encoded webdav url>&auth=<basic auth>
+ *           Worker 转发到坚果云并加 CORS 头。
+ */
+async function syncFromWebDAVPwa(creds: {
+  url: string;
+  username: string;
+  password: string;
+  remoteDir: string;
+  proxyUrl?: string;
+}): Promise<SyncResult> {
+  const log: string[] = [];
+  const step = (msg: string) => {
+    log.push(msg);
+    console.log(`[pwaSync] ${msg}`);
+  };
+
+  try {
+    if (!creds.proxyUrl) {
+      return {
+        success: false,
+        message: 'PWA 同步需要 Cloudflare Worker 代理地址，请在「WebDAV 配置」中填入代理 URL',
+      };
+    }
+
+    // 1. 通过代理获取 latest_backup.txt
+    step('1/5 获取最新备份元数据');
+    const auth = btoa(`${creds.username}:${creds.password}`);
+    const manifestUrl = creds.remoteDir
+      ? `${creds.url}${creds.remoteDir}/latest_backup.txt`
+      : `${creds.url}latest_backup.txt`;
+    const proxyManifest = `${creds.proxyUrl}?url=${encodeURIComponent(manifestUrl)}&auth=${auth}`;
+
+    const manifestResp = await fetch(proxyManifest);
+    if (manifestResp.status === 404) {
+      return { success: false, message: '坚果云上未找到 latest_backup.txt，请先在桌面端上传备份' };
+    }
+    if (!manifestResp.ok) {
+      return { success: false, message: `获取备份列表失败: HTTP ${manifestResp.status}` };
+    }
+    const latestFile = (await manifestResp.text()).trim();
+    if (!latestFile) {
+      return { success: false, message: 'latest_backup.txt 为空' };
+    }
+    step(`  最新备份: ${latestFile}`);
+
+    // 2. 通过代理下载 .db.gz
+    step('2/5 下载备份文件');
+    const remotePath = creds.remoteDir ? `${creds.remoteDir}/${latestFile}` : latestFile;
+    const fullUrl = `${creds.url}${remotePath}`;
+    const proxyDownload = `${creds.proxyUrl}?url=${encodeURIComponent(fullUrl)}&auth=${auth}`;
+
+    const dlResp = await fetch(proxyDownload);
+    if (!dlResp.ok) {
+      if (dlResp.status === 404) {
+        return { success: false, message: `坚果云上未找到 ${latestFile}` };
+      }
+      return { success: false, message: `下载失败: HTTP ${dlResp.status}` };
+    }
+
+    let blob = await dlResp.blob();
+    step(`  下载完成: ${blob.size} bytes`);
+
+    // 3. 解压（如果是 .db.gz）
+    if (latestFile.endsWith('.db.gz')) {
+      step('3/5 解压 gzip');
+      blob = await decompressGzip(blob);
+      step(`  解压完成: ${blob.size} bytes`);
+    } else {
+      step('3/5 无需解压');
+    }
+
+    // 4. 加载到 sql.js + 持久化到 IndexedDB
+    step('4/5 加载到 sql.js');
+    const { loadNewDb } = await import('./sqlJsAdapter');
+    const arrayBuffer = await blob.arrayBuffer();
+    await loadNewDb(arrayBuffer);
+
+    // 5. Sanity check
+    step('5/5 数据 sanity check');
+    try {
+      const { querySql } = await import('./sqlJsAdapter');
+      const rows = await querySql<{ CNT?: number }>('SELECT COUNT(*) AS CNT FROM sqlite_master WHERE type="table"');
+      step(`  sanity check 通过: 共 ${rows[0]?.CNT ?? 0} 张表`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`sanity check 失败，新库可能未正确加载: ${msg}`);
+    }
+
+    return {
+      success: true,
+      message: `同步成功（${latestFile}）`,
+      size: blob.size,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[pwaSync] 同步失败:', errMsg, '\n步骤:', log.join('\n  '));
+    return {
+      success: false,
+      message: `同步失败: ${errMsg}`,
+    };
+  }
+}
+
+/**
+ * v3.7.0：PWA 端测试 WebDAV 连接（通过 Worker 代理）
+ */
+async function testWebDAVConnectionPwa(
+  username: string,
+  password: string,
+  remoteDir: string,
+  url?: string,
+  proxyUrl?: string
+): Promise<SyncResult> {
+  if (!proxyUrl) {
+    return { success: false, message: '请先填入 Cloudflare Worker 代理地址' };
+  }
+  try {
+    const auth = btoa(`${username}:${password}`);
+    const baseUrl = url || DEFAULT_WEBDAV_BASE;
+    const manifestUrl = remoteDir
+      ? `${baseUrl}${remoteDir}/latest_backup.txt`
+      : `${baseUrl}latest_backup.txt`;
+    const proxyManifest = `${proxyUrl}?url=${encodeURIComponent(manifestUrl)}&auth=${auth}`;
+
+    const resp = await fetch(proxyManifest);
+    if (resp.status === 404) {
+      return { success: false, message: '连接成功，但未找到 latest_backup.txt' };
+    }
+    if (!resp.ok) {
+      return { success: false, message: `连接失败: HTTP ${resp.status}` };
+    }
+    const filename = (await resp.text()).trim();
+    return {
+      success: true,
+      message: filename ? `连接成功，最新备份: ${filename}` : '连接成功',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `连接失败: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
 export async function testWebDAVConnection(
   username: string,
   password: string,
   remoteDir: string,
   url?: string
 ): Promise<SyncResult> {
+  // v3.7.0：PWA 端走 Worker 代理
+  if (isPwaClient()) {
+    const proxyUrl = localStorage.getItem('webdav_proxy_url') || '';
+    return testWebDAVConnectionPwa(username, password, remoteDir, url, proxyUrl);
+  }
   try {
     const auth = btoa(`${username}:${password}`);
     const baseUrl = url || DEFAULT_WEBDAV_BASE;

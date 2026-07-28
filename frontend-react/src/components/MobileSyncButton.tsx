@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Button, Modal, Input, Form, message, Space } from 'antd';
+import { Button, Modal, Input, Form, message, Space, Alert } from 'antd';
 import { CloudSyncOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   syncFromWebDAV,
   saveWebDAVCredentials,
+  saveWebDAVProxyUrl,
   testWebDAVConnection,
   hasWebDAVCredentials,
   getWebDAVCredentials,
 } from '@/services/mobileSync';
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
 export default function MobileSyncButton() {
   const [loading, setLoading] = useState(false);
@@ -16,12 +17,15 @@ export default function MobileSyncButton() {
   const [form] = Form.useForm();
   const [hasCreds, setHasCreds] = useState(false);
 
-  // 挂载时检查是否已配置凭据（仅在移动端）
+  const pwaMode = isPwaClient();
+  const showComponent = isMobileClient() || pwaMode;
+
+  // 挂载时检查是否已配置凭据（仅在移动端 / PWA 端）
   useEffect(() => {
-    if (isMobileClient()) {
+    if (showComponent) {
       hasWebDAVCredentials().then(setHasCreds);
     }
-  }, []);
+  }, [showComponent]);
 
   // 打开配置 Modal 时把已存配置回填
   const openSettings = useCallback(async () => {
@@ -31,12 +35,14 @@ export default function MobileSyncButton() {
       username: creds?.username || '',
       password: creds?.password || '',
       remoteDir: creds?.remoteDir || '',
+      // v3.7.0：PWA 端 Cloudflare Worker 代理 URL
+      proxyUrl: creds?.proxyUrl || '',
     });
     setSettingsOpen(true);
   }, [form]);
 
-  // 仅在移动端渲染
-  if (!isMobileClient()) return null;
+  // 仅在移动端 / PWA 端渲染
+  if (!showComponent) return null;
 
   const handleSync = async () => {
     setLoading(true);
@@ -61,6 +67,10 @@ export default function MobileSyncButton() {
 
   const handleSaveSettings = async () => {
     const values = await form.validateFields();
+    // v3.7.0：PWA 端先保存代理 URL，再测试连接（testWebDAVConnection 会读取 localStorage）
+    if (pwaMode && values.proxyUrl) {
+      await saveWebDAVProxyUrl(values.proxyUrl);
+    }
     const testResult = await testWebDAVConnection(
       values.username,
       values.password,
@@ -74,6 +84,9 @@ export default function MobileSyncButton() {
         values.remoteDir || '',
         values.url || ''
       );
+      if (pwaMode && values.proxyUrl) {
+        await saveWebDAVProxyUrl(values.proxyUrl);
+      }
       message.success('保存成功');
       setSettingsOpen(false);
       setHasCreds(true);
@@ -142,6 +155,31 @@ export default function MobileSyncButton() {
           >
             <Input placeholder="如：shengxintou-backup" />
           </Form.Item>
+          {pwaMode && (
+            <>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="iOS PWA 需要配置 Cloudflare Worker 代理"
+                description={
+                  <>
+                    坚果云 WebDAV 不支持浏览器 CORS，PWA 端必须通过 Cloudflare Worker 代理转发。
+                    请按 <code>scripts/cloudflare-worker-webdav-proxy.js</code> 文件头部说明部署 Worker，
+                    然后把 Worker URL（形如 <code>https://xxx.workers.dev</code>）填入下方。
+                  </>
+                }
+              />
+              <Form.Item
+                name="proxyUrl"
+                label="Cloudflare Worker 代理 URL（PWA 专用）"
+                rules={[{ required: true, message: 'PWA 模式必须填入 Worker 代理 URL' }]}
+                extra="代理仅做 CORS 转发，不存储凭据；凭据通过 HTTPS 直传 Worker → 坚果云"
+              >
+                <Input placeholder="https://your-worker-name.your-subdomain.workers.dev" />
+              </Form.Item>
+            </>
+          )}
         </Form>
       </Modal>
     </>

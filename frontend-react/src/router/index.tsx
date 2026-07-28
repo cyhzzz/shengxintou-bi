@@ -6,7 +6,7 @@ import MainLayout from '@/layouts/MainLayout';
 import LoginPage from '@/pages/Login';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { featureFlags } from '@/config/features';
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
 // v3.2.5：所有页面改 React.lazy 按需加载，主包只保留 MainLayout，
 // 首屏只拉当前路由对应的 chunk，避免一次加载全部 21 个页面 + 重型依赖（echarts/plots/framer-motion）。
@@ -78,7 +78,9 @@ const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
 
 // v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
-const isMobile = isMobileClient();
+// v3.7.0：PWA 端也使用 HashRouter（部署在 /app/ 子路径，BrowserRouter 需 basename，
+//   且 GitHub Pages 不支持 SPA fallback；HashRouter 无需服务端配置即可工作）
+const isMobile = isMobileClient() || isPwaClient();
 
 // 主布局子路由（移动端和桌面端共享）
 // v3.5.4：被 features 开关禁用的功能路由也不注册，避免移动端通过 URL 直访触发未实现的 API
@@ -160,7 +162,7 @@ const mainChildren = [
       ...(featureFlags.showAccountManagement
         ? [{ path: 'account-management', element: withSuspense(AccountManagementPage) }]
         : []),
-      // v3.5.3：移动端走简化版同步页（避免触发未实现的 /webdav/list 等 API）
+      // v3.5.3：移动端/PWA 端走简化版同步页（避免触发未实现的 /webdav/list 等 API）
       ...(featureFlags.showDatabaseBackup
         ? [{ path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) }]
         : []),

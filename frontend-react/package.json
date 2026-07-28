@@ -9,6 +9,7 @@
     "setup:unix": "bash ../scripts/setup.sh",
     "dev": "vite",
     "build": "vite build",
+    "build:pwa": "vite build --mode pwa",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "playwright test --config playwright.config.ts",
@@ -46,6 +47,7 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "rollup": "^4.62.2",
+    "sql.js": "^1.14.1",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -55,6 +57,7 @@
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

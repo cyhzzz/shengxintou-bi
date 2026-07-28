@@ -1,7 +1,14 @@
 /**
- * Capacitor SQLite 移动端本地数据库封装
+ * 本地数据库封装（Capacitor SQLite + sql.js PWA 双适配器）
  *
- * v3.5.3 关键修复：
+ * v3.7.0：新增 PWA 端 sql.js 适配器，让 iOS Safari 能直接在浏览器里读 SQLite。
+ *   - 安卓端（isMobileClient）：走 CapacitorSQLite 原生插件，DB 文件在应用沙箱
+ *   - PWA 端（isPwaClient）：走 sql.js (WASM)，DB 文件在 IndexedDB
+ *   - Web/桌面端：不调用本模块（走 Flask API）
+ *
+ *   对 mobileRouteHandler.ts 完全透明：只导出 querySql 等同名函数，内部按运行时分发。
+ *
+ * v3.5.3 关键修复（安卓端）：
  *   @capacitor-community/sqlite 7.x 不再导出 SQLiteConnection / SQLiteDBConnection 类，
  *   必须直接用 CapacitorSQLite 插件对象调用原生方法。
  *   旧版 `new SQLiteConnection(CapacitorSQLite)` 在运行时返回 undefined →
@@ -20,6 +27,7 @@
  *   （由 context.getDatabasePath() 决定，非 Filesystem.Directory.Data）。
  */
 import { CapacitorSQLite } from '@capacitor-community/sqlite';
+import { isPwaClient } from '@/utils/isDesktop';
 
 const DB_NAME = 'shengxintou';
 let dbOpen = false;
@@ -83,6 +91,12 @@ export async function initMobileDatabase(): Promise<void> {
 }
 
 export async function querySql<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+  // v3.7.0：PWA 端走 sql.js，与安卓端逻辑分离
+  if (isPwaClient()) {
+    const { querySql: pwaQuerySql } = await import('./sqlJsAdapter');
+    return pwaQuerySql<T>(sql, params);
+  }
+
   if (!dbOpen) await initMobileDatabase();
   const result = await CapacitorSQLite.query({
     database: DB_NAME,

@@ -129,15 +129,15 @@ frontend-react/src/utils/isDesktop.ts        isMobileClient 三重兜底（isNat
 frontend-react/src/main.tsx                  动态 import App 等 Capacitor bridge 就绪再渲染
 ```
 
-### 三端支持
+### 四端支持
 
-单一代码库支持三种运行模式，仅配置不同，代码完全一致：
-
+单一代码库支持四种运行模式，仅配置不同，代码完全一致：
 | 模式 | 数据库 | 鉴权 | 前端构建 | 打包 |
 | --- | --- | --- | --- | --- |
 | 开发版（Web） | SQLite（默认） | `AUTH_ENABLED=false` | `npm run build` | 无 |
 | 桌面版（Electron） | PG/Supabase | `AUTH_ENABLED=true` | `npm run build` + PyInstaller + electron-builder | `scripts/build-installer.ps1` |
 | 移动端（Android） | 本地 SQLite | 跳过鉴权（内置） | `npm run build` + cap sync + assembleDebug | `android/scripts/post-sync-patch.ps1` |
+| PWA 端（iOS Safari） | IndexedDB + sql.js | 跳过鉴权 | `npm run build:pwa`（base=`/app/`） | GitHub Pages 自动部署（`.github/workflows/pages.yml`） |
 
 - 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
 - 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
@@ -145,6 +145,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 - 桌面版打包：`scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）。
 - 移动端打包：`cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+，详细见 `android/README.md`）。
 - 移动端约束：Capacitor bridge 初始化时序敏感（main.tsx 等待 bridge）；SQLite 用 `CapacitorSQLite` 插件直接调用（非 `SQLiteConnection` 类）；CSS `zoom: 0.67` 缩放需配合 `calc(100vh/0.67)` 高度补偿避免下方空白。
+- PWA 端约束：用 `sql.js`（WASM）+ IndexedDB 替代 Capacitor SQLite，复用 `mobileRouteHandler` 全部 SQL；坚果云 WebDAV 不支持 CORS，必须走 `scripts/cloudflare-worker-webdav-proxy.js` 部署的 Worker 代理（凭据 HTTPS 直传，不存 Worker）；router 用 HashRouter（部署在 `/app/` 子路径）；PWA 检测靠 `display-mode: standalone` + `navigator.standalone`，详见 `isDesktop.ts::isPwaClient`。
 
 ## 6. 按任务读取规则
 

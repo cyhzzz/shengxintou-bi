@@ -21,7 +21,7 @@ import {
 } from '@ant-design/icons';
 import { syncFromWebDAV, hasWebDAVCredentials } from '@/services/mobileSync';
 import { databaseExists, copyDatabaseFromAssets, closeMobileDatabase, initMobileDatabase } from '@/services/mobileSqlite';
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 import MobileSyncButton from '@/components/MobileSyncButton';
 
 const { Title, Paragraph, Text } = Typography;
@@ -49,10 +49,11 @@ export default function MobileDatabaseSync() {
   const refreshStatus = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
-      const [hasDb, hasCreds] = await Promise.all([
-        databaseExists(),
-        hasWebDAVCredentials(),
-      ]);
+      // v3.7.0：PWA 端用 sql.js 的 IndexedDB 检查，安卓端用 Capacitor 原生检查
+      const dbCheck = isPwaClient()
+        ? (await import('@/services/sqlJsAdapter')).hasLocalDb()
+        : databaseExists();
+      const [hasDb, hasCreds] = await Promise.all([dbCheck, hasWebDAVCredentials()]);
       setState((s) => ({
         ...s,
         loading: false,
@@ -72,7 +73,10 @@ export default function MobileDatabaseSync() {
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      try { await closeMobileDatabase(); } catch { /* ignore */ }
+      // v3.7.0：PWA 端 sql.js 自动管理 DB 生命周期，无需 closeMobileDatabase
+      if (!isPwaClient()) {
+        try { await closeMobileDatabase(); } catch { /* ignore */ }
+      }
       const result = await syncFromWebDAV();
       if (result.success) {
         message.success(result.message);
@@ -86,14 +90,18 @@ export default function MobileDatabaseSync() {
         setTimeout(() => window.location.reload(), 1200);
       } else {
         message.error(result.message);
-        try { await initMobileDatabase(); } catch { /* ignore */ }
+        if (!isPwaClient()) {
+          try { await initMobileDatabase(); } catch { /* ignore */ }
+        }
       }
     } finally {
       setSyncing(false);
     }
   }, [message]);
 
+  // v3.7.0：PWA 端没有内置 DB，此函数仅在安卓端有效
   const handleRestoreFromAssets = useCallback(async () => {
+    if (isPwaClient()) return;
     setSyncing(true);
     try {
       try { await closeMobileDatabase(); } catch { /* ignore */ }
@@ -127,8 +135,10 @@ export default function MobileDatabaseSync() {
   }, []);
 
   // 桌面端不应渲染此页面（路由层已做拦截，这里做兜底）
+  // v3.7.0：PWA 端也渲染此页面（无 Flask 后端，必须从坚果云同步本地 DB）
   // 必须在所有 Hooks 之后 return
-  if (!isMobileClient()) return null;
+  if (!isMobileClient() && !isPwaClient()) return null;
+  const pwaMode = isPwaClient();
 
   return (
     <div style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>
@@ -200,13 +210,16 @@ export default function MobileDatabaseSync() {
             >
               {state.hasDb ? '从坚果云同步' : '立即同步'}
             </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={handleRestoreFromAssets}
-              disabled={syncing}
-            >
-              恢复内置数据
-            </Button>
+            {/* v3.7.0：PWA 端无内置 DB，不显示「恢复内置数据」按钮 */}
+            {!pwaMode && (
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={handleRestoreFromAssets}
+                disabled={syncing}
+              >
+                恢复内置数据
+              </Button>
+            )}
             <Button
               onClick={refreshStatus}
               disabled={syncing}

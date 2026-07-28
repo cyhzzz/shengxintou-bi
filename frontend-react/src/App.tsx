@@ -4,7 +4,7 @@ import zhCN from 'antd/locale/zh_CN';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import AppRouter from '@/router';
 import { useAppStore } from '@/stores/useAppStore';
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 import { initMobileDatabase, databaseExists, copyDatabaseFromAssets } from '@/services/mobileSqlite';
 import { syncFromWebDAV } from '@/services/mobileSync';
 import './styles/global.scss';
@@ -209,6 +209,31 @@ function App() {
         }
       } catch (err) {
         console.error('[mobile] 数据库初始化失败:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // v3.7.0：PWA 端启动时尝试从 IndexedDB 加载 sql.js DB
+  //   - 已有 DB：直接加载，应用立即可用
+  //   - 无 DB：不报错，等用户去「数据同步」页面手动同步
+  //   - 不调用 StatusBar / copyDatabaseFromAssets（PWA 无 Capacitor、无内置 DB）
+  useEffect(() => {
+    if (!isPwaClient()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { hasLocalDb, initSqlJsDatabase } = await import('@/services/sqlJsAdapter');
+        const exists = await hasLocalDb();
+        if (cancelled) return;
+        if (exists) {
+          await initSqlJsDatabase();
+          console.log('[pwa] sql.js 数据库已从 IndexedDB 加载');
+        } else {
+          console.warn('[pwa] IndexedDB 无 DB，请到「数据同步」页面配置 WebDAV 后同步');
+        }
+      } catch (err) {
+        console.error('[pwa] 数据库初始化失败:', err);
       }
     })();
     return () => { cancelled = true; };

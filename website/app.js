@@ -158,4 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
       );
     }
   }
+
+  // —— v3.7.0：iOS 用户访问官网时高亮 PWA 入口 + 显示引导提示 ——
+  const iosBtn = document.getElementById('iosPwaBtn');
+  const iosHint = document.getElementById('iosHint');
+  if (iosBtn && iosHint) {
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/i.test(ua);
+    if (isIOS) {
+      // iOS 用户：显示 PWA 引导提示，按钮高亮
+      iosHint.style.display = 'block';
+      iosBtn.style.background = 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)';
+      iosBtn.style.boxShadow = '0 8px 24px rgba(22, 119, 255, 0.4)';
+    } else if (isAndroid) {
+      // Android 用户：把 iOS 按钮换成 Android APK 下载提示
+      iosBtn.textContent = 'Android 用户请点上方 APK 下载';
+      iosBtn.style.opacity = '0.5';
+      iosBtn.href = 'https://github.com/cyhzzz/shengxintou-bi/releases/latest';
+    }
+  }
 });

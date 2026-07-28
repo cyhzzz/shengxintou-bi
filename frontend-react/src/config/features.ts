@@ -16,7 +16,7 @@
  *   - 移动版（Capacitor）：window.Capacitor.isNative → isMobileClient()=true
  *   - Web 开发版：无 preload 注入 → isDesktopClient()=false
  */
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
 export interface FeatureFlags {
   /** 右上角账号入口（Dropdown：邮箱/修改密码/退出） */
@@ -84,10 +84,13 @@ const mobileFlags: FeatureFlags = {
 /**
  * 当前运行环境的功能配置
  *
+ * v3.7.0：PWA 端（iOS Safari 添加到主屏）与移动端共用 mobileFlags，
+ *   都没有 Flask 后端，都依赖本地 SQLite（PWA 用 sql.js，安卓用 Capacitor）。
+ *
  * 用法：
  *   import { featureFlags } from '@/config/features';
  *   {featureFlags.showAccountEntry && <AccountDropdown />}
  */
-export const featureFlags: FeatureFlags = isMobileClient()
+export const featureFlags: FeatureFlags = (isMobileClient() || isPwaClient())
   ? mobileFlags
   : desktopAndWebFlags;

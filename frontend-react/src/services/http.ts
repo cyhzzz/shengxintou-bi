@@ -5,7 +5,7 @@
 import { API_URL, API_TIMEOUT } from './config';
 import type { ApiResponse } from '@/types';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { isMobileClient } from '@/utils/isDesktop';
+import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 import { mobileRouteHandler } from './mobileRouteHandler';
 
 // 路由跳转函数（避免循环依赖，由调用方注入）
@@ -81,8 +81,8 @@ class HttpClient {
 
   // 通用请求方法（接收已构建好的完整 URL）
   async request<T>(fullUrl: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
-    // 移动端拦截：将 API 请求路由到本地 SQLite 查询
-    if (isMobileClient() && fullUrl.includes('/api/v1/')) {
+    // v3.7.0：移动端（Capacitor）+ PWA 端（sql.js）都拦截 API 请求，路由到本地 SQLite 查询
+    if ((isMobileClient() || isPwaClient()) && fullUrl.includes('/api/v1/')) {
       try {
         const body = config.body ? JSON.parse(config.body as string) : {};
         const data = await mobileRouteHandler(fullUrl, body);
@@ -94,7 +94,7 @@ class HttpClient {
           ? '数据库表结构不匹配，请重新同步数据'
           : msg.includes('not implemented')
             ? '该报表暂不支持移动端查看'
-            : msg.includes('database') || msg.includes('connection')
+            : msg.includes('database') || msg.includes('connection') || msg.includes('PWA_LOCAL_DB_NOT_INITIALIZED')
               ? '数据库未就绪，请先同步数据'
               : msg;
         return {
