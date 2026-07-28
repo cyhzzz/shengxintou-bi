@@ -62,14 +62,21 @@ export const isMobileClient = (): boolean => {
  * v3.7.0：检测 PWA 运行时（iOS Safari 添加到主屏模式）
  *
  * PWA 模式特征：
+ *   - 构建时模式为 'pwa'（npm run build:pwa 产物，永久 true，不依赖运行时检测）
  *   - display-mode: standalone（manifest 配置 display: standalone 后生效）
  *   - navigator.standalone === true（iOS Safari 专属，仅添加到主屏后为 true）
  *   - 无 Capacitor 原生层（避免与 isMobileClient 冲突）
  *
- * 注意：普通浏览器访问 PWA URL（未添加到主屏）不算 PWA 模式，
- *       此时走标准 Web 流程（需 Flask 后端）。
+ * v3.7.0 修复：初版只在 display-mode=standalone 时返回 true，导致用户在 Safari
+ * 直接打开 PWA URL 但还没"添加到主屏"时，isPwaClient()=false → 走 BrowserRouter
+ * → 把 /shengxintou-bi/app/ 当路由匹配 → 404 空白页。
+ * 现在用构建时模式 import.meta.env.MODE==='pwa' 作为主判据，PWA 产物无条件走 PWA 路径。
  */
 export const isPwaClient = (): boolean => {
+  // v3.7.0：构建时模式为 'pwa' 时无条件返回 true（PWA 产物永远走 PWA 路径）
+  // import.meta.env.MODE 在 vite 构建时静态替换，无运行时开销
+  if (import.meta.env.MODE === 'pwa') return true;
+
   if (typeof window === 'undefined') return false;
   // Capacitor 环境优先级更高，避免安卓 WebView 误判
   if (isMobileClient() || isDesktopClient()) return false;
