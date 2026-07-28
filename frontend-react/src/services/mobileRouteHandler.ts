@@ -3726,7 +3726,7 @@ async function handleMetadata(): Promise<any> {
   }
 
   // 日期范围（agg_vendor_daily.日期）
-  let date_range: { start: string | null; end: string | null } = { start: null, end: null };
+  const date_range: { start: string | null; end: string | null } = { start: null, end: null };
   try {
     const rows = await querySql<Row>(
       `SELECT MIN("日期") as min, MAX("日期") as max FROM agg_vendor_daily`
@@ -3739,7 +3739,7 @@ async function handleMetadata(): Promise<any> {
   }
 
   // 小红书笔记日期范围（agg_xhs_note.发布时间，截取前 10 位 YYYY-MM-DD）
-  let xhs_notes_date_range: { start: string | null; end: string | null } = { start: null, end: null };
+  const xhs_notes_date_range: { start: string | null; end: string | null } = { start: null, end: null };
   try {
     const rows = await querySql<Row>(
       `SELECT MIN("发布时间") as min, MAX("发布时间") as max FROM agg_xhs_note`
