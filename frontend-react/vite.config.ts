@@ -8,11 +8,15 @@ import path from 'path'
 //   现在移动端凭据完全由用户在前端「数据同步」页面填写，
 //   通过 @capacitor/preferences 持久化，不再有任何打包时内置默认值。
 //
-// v3.7.0：PWA 模式（mode=pwa）构建时 base 设为 '/app/'，部署到 GitHub Pages 的 /app/ 子路径。
+// v3.7.0：PWA 模式（mode=pwa）构建时 base 设为 '/shengxintou-bi/app/'，
+//   匹配 GitHub Pages 实际部署路径（<user>.github.io/<repo>/app/）。
 //   Web/桌面/安卓版默认 base='/'，不影响现有三端。
 //   构建命令：npm run build:pwa（见 package.json）
+//
+// 注意：仓库名硬编码在 base 中。若未来改仓库名，需同步修改此处。
+//   也可以用环境变量 VITE_PWA_BASE 覆盖，但当前场景下硬编码更直观。
 export default defineConfig(({ mode }) => ({
-  base: mode === 'pwa' ? '/app/' : '/',
+  base: mode === 'pwa' ? '/shengxintou-bi/app/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
