@@ -160,19 +160,37 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // —— v3.7.0：iOS 用户访问官网时高亮 PWA 入口 + 显示引导提示 ——
+  // v3.7.1：首屏「下载最新版」和右上角「下载」按钮也自适应 iOS → 指向 PWA
   const iosBtn = document.getElementById('iosPwaBtn');
   const iosHint = document.getElementById('iosHint');
-  if (iosBtn && iosHint) {
-    const ua = navigator.userAgent || '';
-    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isAndroid = /Android/i.test(ua);
-    if (isIOS) {
-      // iOS 用户：显示 PWA 引导提示，按钮高亮
+  const heroBtn = document.getElementById('heroDownloadBtn');
+  const navBtn = document.getElementById('navDownloadBtn');
+
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const PWA_URL = '/shengxintou-bi/app/';
+
+  if (isIOS) {
+    // iOS 用户：所有下载入口统一指向 PWA
+    if (iosBtn && iosHint) {
       iosHint.style.display = 'block';
       iosBtn.style.background = 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)';
       iosBtn.style.boxShadow = '0 8px 24px rgba(22, 119, 255, 0.4)';
-    } else if (isAndroid) {
-      // Android 用户：把 iOS 按钮换成 Android APK 下载提示
+    }
+    if (heroBtn) {
+      heroBtn.href = PWA_URL;
+      heroBtn.removeAttribute('target');
+      heroBtn.innerHTML = heroBtn.innerHTML.replace('下载最新版', '立即使用 iOS 网页版');
+    }
+    if (navBtn) {
+      navBtn.href = PWA_URL;
+      navBtn.removeAttribute('target');
+      navBtn.textContent = '打开 iOS 版';
+    }
+  } else if (isAndroid) {
+    // Android 用户：iOS 按钮换成 APK 下载提示
+    if (iosBtn) {
       iosBtn.textContent = 'Android 用户请点上方 APK 下载';
       iosBtn.style.opacity = '0.5';
       iosBtn.href = 'https://github.com/cyhzzz/shengxintou-bi/releases/latest';

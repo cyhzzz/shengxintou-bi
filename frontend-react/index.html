@@ -2,7 +2,21 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" id="viewport-meta" />
+    <!-- v3.7.1：PWA 模式（部署在 /app/ 子路径）放宽 viewport，允许缩放
+         解决 Android 浏览器输入框无法唤起输入法的问题
+         （user-scalable=no + Antd Modal transform 在 Android Chrome 上有已知 bug：
+          input 在带 transform 的 fixed 容器内 + 禁用缩放 → 键盘不弹出）
+         iOS Safari 早就忽略 user-scalable=no，所以放宽对 iOS 无影响
+         Android APK 原生应用感来自 Capacitor WebView 设置，不依赖 viewport meta -->
+    <script>
+      (function () {
+        if (window.location.pathname.indexOf('/app/') !== -1) {
+          var meta = document.getElementById('viewport-meta');
+          if (meta) meta.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+        }
+      })();
+    </script>
     <!-- 禁用缓存 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
