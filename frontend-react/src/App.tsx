@@ -214,7 +214,7 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // v3.7.0：PWA 端启动时尝试从 IndexedDB 加载 sql.js DB
+  // v3.6.2：PWA 端启动时尝试从 IndexedDB 加载 sql.js DB
   //   - 已有 DB：直接加载，应用立即可用
   //   - 无 DB：不报错，等用户去「数据同步」页面手动同步
   //   - 不调用 StatusBar / copyDatabaseFromAssets（PWA 无 Capacitor、无内置 DB）

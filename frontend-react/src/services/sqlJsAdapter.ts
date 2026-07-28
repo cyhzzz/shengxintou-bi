@@ -11,7 +11,7 @@
  *   2. 同步：fetch 走 Cloudflare Worker 代理下载 .db.gz → 解压 → 写入 IndexedDB → 加载到 sql.js
  *   3. 后续启动：从 IndexedDB 读出 ArrayBuffer → 直接喂给 sql.js（无需重新下载）
  *
- * v3.7.0 新增：iOS PWA 支持
+ * v3.6.2 新增：iOS PWA 支持
  */
 import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from 'sql.js';
 

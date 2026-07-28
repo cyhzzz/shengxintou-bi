@@ -81,7 +81,7 @@ class HttpClient {
 
   // 通用请求方法（接收已构建好的完整 URL）
   async request<T>(fullUrl: string, config: RequestConfig = {}): Promise<ApiResponse<T>> {
-    // v3.7.0：移动端（Capacitor）+ PWA 端（sql.js）都拦截 API 请求，路由到本地 SQLite 查询
+    // v3.6.2：移动端（Capacitor）+ PWA 端（sql.js）都拦截 API 请求，路由到本地 SQLite 查询
     if ((isMobileClient() || isPwaClient()) && fullUrl.includes('/api/v1/')) {
       try {
         const body = config.body ? JSON.parse(config.body as string) : {};

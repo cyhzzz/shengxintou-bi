@@ -159,8 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // —— v3.7.0：iOS 用户访问官网时高亮 PWA 入口 + 显示引导提示 ——
-  // v3.7.1：首屏「下载最新版」和右上角「下载」按钮也自适应 iOS → 指向 PWA
+  // —— v3.6.2：iOS 用户访问官网时高亮 PWA 入口 + 显示引导提示 ——
+  // v3.6.2：首屏「下载最新版」和右上角「下载」按钮也自适应 iOS → 指向 PWA
   const iosBtn = document.getElementById('iosPwaBtn');
   const iosHint = document.getElementById('iosHint');
   const heroBtn = document.getElementById('heroDownloadBtn');

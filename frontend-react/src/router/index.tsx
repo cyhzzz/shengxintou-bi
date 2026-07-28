@@ -78,7 +78,7 @@ const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
 
 // v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
-// v3.7.0：PWA 端也使用 HashRouter（部署在 /app/ 子路径，BrowserRouter 需 basename，
+// v3.6.2：PWA 端也使用 HashRouter（部署在 /app/ 子路径，BrowserRouter 需 basename，
 //   且 GitHub Pages 不支持 SPA fallback；HashRouter 无需服务端配置即可工作）
 const isMobile = isMobileClient() || isPwaClient();
 

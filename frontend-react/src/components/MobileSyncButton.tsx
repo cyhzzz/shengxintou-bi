@@ -36,7 +36,7 @@ export default function MobileSyncButton() {
       username: creds?.username || '',
       password: creds?.password || '',
       remoteDir: creds?.remoteDir || '',
-      // v3.7.0：PWA 端 Cloudflare Worker 代理 URL
+      // v3.6.2：PWA 端 Cloudflare Worker 代理 URL
       proxyUrl: creds?.proxyUrl || '',
     });
     setSettingsOpen(true);
@@ -66,7 +66,7 @@ export default function MobileSyncButton() {
     }
   };
 
-  // v3.7.1：保存逻辑改为「先存凭据，再异步测试连接，测试失败仅警告不阻塞」
+  // v3.6.2：保存逻辑改为「先存凭据，再异步测试连接，测试失败仅警告不阻塞」
   //   原逻辑：测试失败 → 不保存 → 用户看到 Modal 不关 + 顶部 toast 一闪而过 → 以为「没反应」
   //   新逻辑：先保存凭据 → 关 Modal → 后台测试 → 失败用 Modal.alert 明确告知（不阻塞使用）
   //   这样用户即使 Worker 暂时不可达也能保存凭据，方便后续重试

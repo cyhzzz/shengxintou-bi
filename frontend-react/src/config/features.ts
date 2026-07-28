@@ -84,7 +84,7 @@ const mobileFlags: FeatureFlags = {
 /**
  * 当前运行环境的功能配置
  *
- * v3.7.0：PWA 端（iOS Safari 添加到主屏）与移动端共用 mobileFlags，
+ * v3.6.2：PWA 端（iOS Safari 添加到主屏）与移动端共用 mobileFlags，
  *   都没有 Flask 后端，都依赖本地 SQLite（PWA 用 sql.js，安卓用 Capacitor）。
  *
  * 用法：

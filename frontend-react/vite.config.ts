@@ -8,7 +8,7 @@ import path from 'path'
 //   现在移动端凭据完全由用户在前端「数据同步」页面填写，
 //   通过 @capacitor/preferences 持久化，不再有任何打包时内置默认值。
 //
-// v3.7.0：PWA 模式（mode=pwa）构建时 base 设为 '/shengxintou-bi/app/'，
+// v3.6.2：PWA 模式（mode=pwa）构建时 base 设为 '/shengxintou-bi/app/'，
 //   匹配 GitHub Pages 实际部署路径（<user>.github.io/<repo>/app/）。
 //   Web/桌面/安卓版默认 base='/'，不影响现有三端。
 //   构建命令：npm run build:pwa（见 package.json）
@@ -90,7 +90,7 @@ export default defineConfig(({ mode }) => ({
       'framer-motion',
       'zustand', 'dayjs',
     ],
-    // v3.7.0：sql.js 含 WASM，必须 exclude 避免 Vite 预构建破坏
+    // v3.6.2：sql.js 含 WASM，必须 exclude 避免 Vite 预构建破坏
     exclude: ['sql.js'],
   },
 }))

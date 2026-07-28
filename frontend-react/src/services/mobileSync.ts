@@ -16,7 +16,7 @@
  *   - WebDAV 服务器地址（url）也由用户配置，默认坚果云 https://dav.jianguoyun.com/dav/
  *   - 未配置时所有同步/测试连接调用返回友好错误，由 UI 引导用户去配置
  *
- * v3.7.0 PWA 支持：
+ * v3.6.2 PWA 支持：
  *   - PWA 端无 Capacitor 插件，凭据存 localStorage（同源隔离，HTTPS 才可访问）
  *   - 坚果云 WebDAV 不支持 CORS，PWA 必须走 Cloudflare Worker 代理
  *   - Worker URL 由用户配置（localStorage key: webdav_proxy_url），未配置时给出引导
@@ -48,7 +48,7 @@ export async function saveWebDAVCredentials(
   remoteDir: string,
   url?: string
 ): Promise<void> {
-  // v3.7.0：PWA 端用 localStorage，安卓端用 @capacitor/preferences
+  // v3.6.2：PWA 端用 localStorage，安卓端用 @capacitor/preferences
   if (isPwaClient()) {
     localStorage.setItem('webdav_username', username);
     localStorage.setItem('webdav_password', password);
@@ -68,9 +68,9 @@ export async function getWebDAVCredentials(): Promise<{
   username: string;
   password: string;
   remoteDir: string;
-  proxyUrl?: string;  // v3.7.0：PWA 专用，Cloudflare Worker 代理地址
+  proxyUrl?: string;  // v3.6.2：PWA 专用，Cloudflare Worker 代理地址
 } | null> {
-  // v3.7.0：PWA 端从 localStorage 读
+  // v3.6.2：PWA 端从 localStorage 读
   if (isPwaClient()) {
     const username = localStorage.getItem('webdav_username');
     const password = localStorage.getItem('webdav_password');
@@ -100,7 +100,7 @@ export async function getWebDAVCredentials(): Promise<{
 }
 
 /**
- * v3.7.0：保存 PWA 的 Cloudflare Worker 代理 URL
+ * v3.6.2：保存 PWA 的 Cloudflare Worker 代理 URL
  *
  * PWA 端因坚果云 WebDAV 不支持 CORS，必须走 Worker 代理。
  * 此函数仅 PWA 模式有效，安卓端调用为空操作。
@@ -239,7 +239,7 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     return { success: false, message: '尚未配置 WebDAV 凭据，请点击「WebDAV 配置」按钮填入坚果云账号和应用密码' };
   }
 
-  // v3.7.0：PWA 端走 sql.js + IndexedDB，不走 Capacitor Filesystem
+  // v3.6.2：PWA 端走 sql.js + IndexedDB，不走 Capacitor Filesystem
   if (isPwaClient()) {
     return syncFromWebDAVPwa(creds);
   }
@@ -364,7 +364,7 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 }
 
 /**
- * v3.7.0：PWA 端 WebDAV 同步实现
+ * v3.6.2：PWA 端 WebDAV 同步实现
  *
  * 与安卓端的核心差异：
  *   1. fetch 走 Cloudflare Worker 代理（坚果云不支持 CORS）
@@ -477,7 +477,7 @@ async function syncFromWebDAVPwa(creds: {
 }
 
 /**
- * v3.7.0：PWA 端测试 WebDAV 连接（通过 Worker 代理）
+ * v3.6.2：PWA 端测试 WebDAV 连接（通过 Worker 代理）
  */
 async function testWebDAVConnectionPwa(
   username: string,
@@ -523,7 +523,7 @@ export async function testWebDAVConnection(
   remoteDir: string,
   url?: string
 ): Promise<SyncResult> {
-  // v3.7.0：PWA 端走 Worker 代理
+  // v3.6.2：PWA 端走 Worker 代理
   if (isPwaClient()) {
     const proxyUrl = localStorage.getItem('webdav_proxy_url') || '';
     return testWebDAVConnectionPwa(username, password, remoteDir, url, proxyUrl);

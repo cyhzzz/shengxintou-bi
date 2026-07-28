@@ -1,7 +1,7 @@
 /**
  * 本地数据库封装（Capacitor SQLite + sql.js PWA 双适配器）
  *
- * v3.7.0：新增 PWA 端 sql.js 适配器，让 iOS Safari 能直接在浏览器里读 SQLite。
+ * v3.6.2：新增 PWA 端 sql.js 适配器，让 iOS Safari 能直接在浏览器里读 SQLite。
  *   - 安卓端（isMobileClient）：走 CapacitorSQLite 原生插件，DB 文件在应用沙箱
  *   - PWA 端（isPwaClient）：走 sql.js (WASM)，DB 文件在 IndexedDB
  *   - Web/桌面端：不调用本模块（走 Flask API）
@@ -91,7 +91,7 @@ export async function initMobileDatabase(): Promise<void> {
 }
 
 export async function querySql<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-  // v3.7.0：PWA 端走 sql.js，与安卓端逻辑分离
+  // v3.6.2：PWA 端走 sql.js，与安卓端逻辑分离
   if (isPwaClient()) {
     const { querySql: pwaQuerySql } = await import('./sqlJsAdapter');
     return pwaQuerySql<T>(sql, params);
