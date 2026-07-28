@@ -429,7 +429,86 @@ async function handleDashboardCoreMetrics(body: any): Promise<any> {
     cost_per_account: opened > 0 ? round2(cost / opened) : 0,
   };
 
-  return { core_metrics: core, wow_changes: {} };
+  // wow_changes：计算前一周同口径指标的环比变化（对齐后端 dashboard.py:104-164）
+  // 前端 Dashboard/index.tsx 用 wowChanges?.xxx 取每个 MetricCard 的环比箭头，
+  // mobile 端此前直接返回 {} 导致所有环比箭头不显示
+  let wow: Record<string, any> = {};
+  try {
+    if (filters.start_date && filters.end_date) {
+      const sDt = new Date(filters.start_date + 'T00:00:00Z');
+      const eDt = new Date(filters.end_date + 'T00:00:00Z');
+      if (!isNaN(sDt.getTime()) && !isNaN(eDt.getTime())) {
+        const days = Math.floor((eDt.getTime() - sDt.getTime()) / 86400000) + 1;
+        const prevEDt = new Date(sDt.getTime() - 86400000);
+        const prevSDt = new Date(prevEDt.getTime() - (days - 1) * 86400000);
+        const prevSd = prevSDt.toISOString().slice(0, 10);
+        const prevEd = prevEDt.toISOString().slice(0, 10);
+        const prevWhere = dashboardWhere({ ...filters, start_date: prevSd, end_date: prevEd });
+        const prevSql = `SELECT
+          COALESCE(SUM("花费"), 0) as cost,
+          COALESCE(SUM("展示量"), 0) as impressions,
+          COALESCE(SUM("线索数"), 0) as leads_wechat,
+          COALESCE(SUM("APP激活人数"), 0) as leads_app,
+          COALESCE(SUM("线索成本" * "线索数"), 0) as cost_wechat_w,
+          COALESCE(SUM("APP激活成本" * "APP激活人数"), 0) as cost_app_w,
+          COALESCE(SUM("开户人数"), 0) as opened,
+          COALESCE(SUM("有效户人数"), 0) as valid,
+          COALESCE(SUM("客户资产"), 0) as assets,
+          COALESCE(SUM("客户创收"), 0) as contribution,
+          COALESCE(SUM("存量客户资产"), 0) as existing_assets
+        FROM agg_vendor_daily ${prevWhere.clause}`;
+        const prevRows = await querySql<Row>(prevSql, prevWhere.params);
+        const pr = prevRows[0] || {};
+        const prev_cost = toFloat(pr.cost);
+        const prev_impr = toInt(pr.impressions);
+        const prev_leads_wechat = toInt(pr.leads_wechat);
+        const prev_leads_app = toInt(pr.leads_app);
+        const prev_cost_wechat_w = toFloat(pr.cost_wechat_w);
+        const prev_cost_app_w = toFloat(pr.cost_app_w);
+        const prev_opened = toInt(pr.opened);
+        const prev_valid = toInt(pr.valid);
+        const prev_assets = toFloat(pr.assets);
+        const prev_contrib = toFloat(pr.contribution);
+        const prev_exist_assets = toFloat(pr.existing_assets);
+
+        const _pct = (a: number, b: number) => b > 0 ? round2((a - b) / b * 100) : 0;
+        // 中国股市惯例：上升=红 / 下降=绿（与后端 _w 一致，不区分成本/业务量）
+        const _w = (curr: number, prev: number) => {
+          const is_up = curr > prev;
+          return { value: _pct(curr, prev), trend: is_up ? 'up' : 'down', color: is_up ? 'red' : 'green' };
+        };
+
+        const curr_cpwl = leads_wechat > 0 ? round2(cost_wechat_w / leads_wechat) : 0;
+        const curr_cpaa = leads_app > 0 ? round2(cost_app_w / leads_app) : 0;
+        const curr_cpa = opened > 0 ? round2(cost / opened) : 0;
+        const curr_cpva = valid > 0 ? round2(cost / valid) : 0;
+        const prev_cpwl = prev_leads_wechat > 0 ? round2(prev_cost_wechat_w / prev_leads_wechat) : 0;
+        const prev_cpaa = prev_leads_app > 0 ? round2(prev_cost_app_w / prev_leads_app) : 0;
+        const prev_cpa = prev_opened > 0 ? round2(prev_cost / prev_opened) : 0;
+        const prev_cpva = prev_valid > 0 ? round2(prev_cost / prev_valid) : 0;
+
+        wow = {
+          investment: _w(cost, prev_cost),
+          total_impressions: _w(impr, prev_impr),
+          leads_wechat: _w(leads_wechat, prev_leads_wechat),
+          leads_app: _w(leads_app, prev_leads_app),
+          new_customers: _w(opened, prev_opened),
+          new_valid_accounts: _w(valid, prev_valid),
+          customer_assets: _w(assets, prev_assets),
+          customer_contribution: _w(contrib, prev_contrib),
+          existing_customers_assets: _w(exist_assets, prev_exist_assets),
+          cost_per_wechat_lead: _w(curr_cpwl, prev_cpwl),
+          cost_per_app_activation: _w(curr_cpaa, prev_cpaa),
+          cost_per_account: _w(curr_cpa, prev_cpa),
+          cost_per_valid_account: _w(curr_cpva, prev_cpva),
+        };
+      }
+    }
+  } catch {
+    // wow 计算失败时保持空对象，不影响主指标展示
+  }
+
+  return { core_metrics: core, wow_changes: wow };
 }
 
 async function handleDashboardTrendData(body: any): Promise<any> {
@@ -2010,6 +2089,16 @@ async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
     });
   }
 
+  // 补算每个 plan 的 totals 5 个转化率派生（对齐后端 app_market.py:488-490 的 _calc_rates）
+  for (const pk in planMap) {
+    const t = planMap[pk].totals;
+    t.激活_开户率 = t['激活APP'] > 0 ? round2(t['开户成功'] / t['激活APP'] * 100) : 0;
+    t.激活_新开户率 = t['激活APP'] > 0 ? round2(t['新开户'] / t['激活APP'] * 100) : 0;
+    t.激活_有效率 = t['激活APP'] > 0 ? round2(t['有效户'] / t['激活APP'] * 100) : 0;
+    t.开户_新开户率 = t['开户成功'] > 0 ? round2(t['新开户'] / t['开户成功'] * 100) : 0;
+    t.开户_有效率 = t['开户成功'] > 0 ? round2(t['有效户'] / t['开户成功'] * 100) : 0;
+  }
+
   const all_plans = Object.values(planMap);
   // Top N 排序（按 新开户 → 开户成功 → 激活APP 降序）
   all_plans.sort((a, b) =>
@@ -3586,15 +3675,106 @@ async function handleWeeklyData(body: any): Promise<any> {
   };
 }
 
+// ============================================================================
+// 元数据 (metadata) — 全局筛选项数据源
+// ============================================================================
+// 对齐后端 backend/routes/metadata.py 的 /metadata 路由
+// 供 AgencyFilter / PlatformFilter / BusinessModelFilter 三个筛选器使用
+// 移动端无 dim_account 表，代理商直接用 agg_vendor_daily.厂商 全称（无简称归一化）
+
+async function handleMetadata(): Promise<any> {
+  // 平台列表（与后端兜底一致：失败时返回 ['腾讯', '抖音', '小红书']）
+  let platforms: string[] = [];
+  try {
+    const rows = await querySql<Row>(
+      `SELECT DISTINCT "平台" as v FROM agg_vendor_daily
+       WHERE "平台" IS NOT NULL AND "平台" != ''
+       ORDER BY "平台"`
+    );
+    platforms = rows.map(r => String(r.v));
+  } catch {
+    platforms = ['腾讯', '抖音', '小红书'];
+  }
+
+  // 代理商（移动端无 dim_account，直接用 厂商 全称，简称=全称）
+  let agency_names: string[] = [];
+  try {
+    const rows = await querySql<Row>(
+      `SELECT DISTINCT "厂商" as v FROM agg_vendor_daily
+       WHERE "厂商" IS NOT NULL AND "厂商" != ''
+       ORDER BY "厂商"`
+    );
+    agency_names = rows.map(r => String(r.v));
+  } catch {
+    agency_names = [];
+  }
+  const agencies = agency_names.map(a => ({ value: a, label: a, full_names: [a] }));
+  const agency_full_map: Record<string, string[]> = {};
+  for (const a of agency_names) agency_full_map[a] = [a];
+
+  // 业务模式
+  let business_models: string[] = [];
+  try {
+    const rows = await querySql<Row>(
+      `SELECT DISTINCT "业务模式" as v FROM agg_vendor_daily
+       WHERE "业务模式" IS NOT NULL AND "业务模式" != ''
+       ORDER BY "业务模式"`
+    );
+    business_models = rows.map(r => String(r.v));
+  } catch {
+    business_models = [];
+  }
+
+  // 日期范围（agg_vendor_daily.日期）
+  let date_range: { start: string | null; end: string | null } = { start: null, end: null };
+  try {
+    const rows = await querySql<Row>(
+      `SELECT MIN("日期") as min, MAX("日期") as max FROM agg_vendor_daily`
+    );
+    const r = rows[0];
+    if (r?.min) date_range.start = String(r.min).slice(0, 10);
+    if (r?.max) date_range.end = String(r.max).slice(0, 10);
+  } catch {
+    // 保持 null
+  }
+
+  // 小红书笔记日期范围（agg_xhs_note.发布时间，截取前 10 位 YYYY-MM-DD）
+  let xhs_notes_date_range: { start: string | null; end: string | null } = { start: null, end: null };
+  try {
+    const rows = await querySql<Row>(
+      `SELECT MIN("发布时间") as min, MAX("发布时间") as max FROM agg_xhs_note`
+    );
+    const r = rows[0];
+    if (r?.min) xhs_notes_date_range.start = String(r.min).slice(0, 10);
+    if (r?.max) xhs_notes_date_range.end = String(r.max).slice(0, 10);
+  } catch {
+    // 保持 null
+  }
+
+  return {
+    platforms,
+    agencies,
+    agency_full_map,
+    business_models,
+    date_range,
+    xhs_notes_date_range,
+    accounts: [],  // 移动端不提供账号映射列表（features 已禁用相关页面）
+  };
+}
+
 /**
  * 移动端路由处理器入口
  *
- * 将 API 请求 URL + body 映射到本地 SQLite 查询，返回与 Flask 后端一致的 data 结构。
+ * 将前端 API 请求 URL + body 映射到本地 SQLite 查询，返回与 Flask 后端一致的 data 结构。
  */
 export async function mobileRouteHandler(url: string, body: any): Promise<any> {
   const path = extractApiPath(url);
 
   switch (path) {
+    // 元数据（全局筛选项数据源，供 FilterBar 使用）
+    case 'metadata':
+      return handleMetadata();
+
     // 全渠道获客
     case 'reports/omni-channel/summary':
       return handleOmniChannelSummary(body);
