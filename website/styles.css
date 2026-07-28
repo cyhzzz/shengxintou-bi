@@ -351,6 +351,13 @@ body {
 .hero-visual {
   position: relative;
   perspective: 1200px;
+  --mx: 0;
+  --my: 0;
+  --enter: 0;
+}
+
+.hero-visual.entered {
+  --enter: 1;
 }
 
 .screen-stage {
@@ -366,7 +373,8 @@ body {
   background: var(--bg-card);
   box-shadow: var(--shadow-elevated);
   border: 1px solid var(--border-light);
-  transition: transform 0.5s var(--ease-spring), box-shadow 0.5s var(--ease-out);
+  opacity: var(--enter);
+  transition: transform 0.6s var(--ease-spring), box-shadow 0.5s var(--ease-out), opacity 0.7s var(--ease-out);
 }
 
 .screen-card img {
@@ -382,7 +390,12 @@ body {
   top: 40px;
   left: 0;
   z-index: 3;
-  transform: rotateY(-8deg) rotateX(4deg);
+  transform:
+    rotateY(calc(-8deg + var(--mx) * 3deg))
+    rotateX(calc(4deg + var(--my) * -2deg))
+    translateY(calc((1 - var(--enter)) * 40px))
+    scale(calc(0.94 + var(--enter) * 0.06));
+  transition-delay: 0.1s;
 }
 
 .screen-float-1 {
@@ -391,8 +404,14 @@ body {
   top: 0;
   right: 20px;
   z-index: 2;
-  transform: rotateY(8deg) rotateX(-3deg) translateZ(-40px);
+  transform:
+    rotateY(calc(8deg + var(--mx) * -4deg))
+    rotateX(calc(-3deg + var(--my) * 3deg))
+    translateZ(-40px)
+    translateY(calc((1 - var(--enter)) * 60px))
+    scale(calc(0.9 + var(--enter) * 0.1));
   box-shadow: var(--shadow-float);
+  transition-delay: 0.28s;
 }
 
 .screen-float-2 {
@@ -401,20 +420,41 @@ body {
   bottom: 20px;
   right: 60px;
   z-index: 4;
-  transform: rotateY(6deg) rotateX(2deg) translateZ(20px);
+  transform:
+    rotateY(calc(6deg + var(--mx) * -5deg))
+    rotateX(calc(2deg + var(--my) * 2deg))
+    translateZ(20px)
+    translateY(calc((1 - var(--enter)) * 50px))
+    scale(calc(0.92 + var(--enter) * 0.08));
   box-shadow: var(--shadow-float);
+  transition-delay: 0.46s;
 }
 
+/* Hover：进一步聚焦主图，浮动卡片微微后退 */
 .hero-visual:hover .screen-main {
-  transform: rotateY(-4deg) rotateX(2deg) translateY(-6px);
+  transform:
+    rotateY(calc(-4deg + var(--mx) * 3deg))
+    rotateX(calc(2deg + var(--my) * -2deg))
+    translateY(-6px)
+    scale(1);
 }
 
 .hero-visual:hover .screen-float-1 {
-  transform: rotateY(10deg) rotateX(-4deg) translateZ(-20px) translateY(-10px);
+  transform:
+    rotateY(calc(10deg + var(--mx) * -4deg))
+    rotateX(calc(-4deg + var(--my) * 3deg))
+    translateZ(-20px)
+    translateY(-10px)
+    scale(1);
 }
 
 .hero-visual:hover .screen-float-2 {
-  transform: rotateY(8deg) rotateX(3deg) translateZ(40px) translateY(-8px);
+  transform:
+    rotateY(calc(8deg + var(--mx) * -5deg))
+    rotateX(calc(3deg + var(--my) * 2deg))
+    translateZ(40px)
+    translateY(-8px)
+    scale(1);
 }
 
 /* =========================================================
@@ -563,6 +603,43 @@ body {
   transform: scale(1.03);
 }
 
+/* 聚光灯斜光扫过：借鉴 video-shotcraft 的 spotlight-sweep 思路 */
+.frame-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.42) 50%,
+    transparent 65%
+  );
+  transform: translateX(-110%);
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.showcase-card:hover .frame-sheen {
+  animation: sheen-sweep 0.9s var(--ease-out);
+}
+
+@keyframes sheen-sweep {
+  0% {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
 .showcase-card figcaption {
   padding: 18px 8px 10px;
 }
@@ -660,6 +737,18 @@ body {
   height: 360px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(24, 144, 255, 0.22), transparent 70%);
+  animation: cta-glow 6s ease-in-out infinite;
+}
+
+@keyframes cta-glow {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.18) translate(-12px, 8px);
+    opacity: 1;
+  }
 }
 
 .cta-content {
