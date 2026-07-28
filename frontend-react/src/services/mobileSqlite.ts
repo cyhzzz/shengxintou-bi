@@ -40,17 +40,21 @@ export async function copyDatabaseFromAssets(overwrite = false): Promise<void> {
  * 用于 syncFromWebDAV 流程：
  *   1. fetch 下载 shengxintou.db 到 Blob
  *   2. 分块 base64 编码 + Filesystem.writeFile/appendFile 写到 Directory.Cache
- *   3. 调用本函数 → moveDatabasesAndAddSuffix({ folderPath: 'cache', dbNameList: ['shengxintou'] })
+ *   3. 调用本函数 → moveDatabasesAndAddSuffix({ folderPath: 'cache', dbNameList: ['shengxintou.db'] })
  *      把 cache/shengxintou.db 移动到 databases/shengxintouSQLite.db
  *
  * v3.5.4 关键修复：@capacitor-community/sqlite 7.0.3 的 moveDatabasesAndAddSuffix
  * 要求 dbNameList 参数非空，否则报 "dbNameList not given or empty"。
- * 之前只传 folderPath 不传 dbNameList 会导致同步失败。
+ *
+ * v3.6.1 终极根因修复：UtilsMigrate.java 第 159 行 `dbList.contains(file)` 用的是
+ * **完整文件名**做匹配（file = 'shengxintou.db'）。之前传 `['shengxintou']`（不带 .db 后缀），
+ * contains 永远返回 false → rename 永远不会执行 → 同步表面成功但 DB 没被替换。
+ * 改为传 `['shengxintou.db']`（带 .db 后缀）才能匹配。
  */
 export async function moveDatabaseFromCache(): Promise<void> {
   await CapacitorSQLite.moveDatabasesAndAddSuffix({
     folderPath: 'cache',
-    dbNameList: ['shengxintou'],
+    dbNameList: ['shengxintou.db'],
   });
 }
 
@@ -89,19 +93,20 @@ export async function querySql<T>(sql: string, params: unknown[] = []): Promise<
 }
 
 export async function closeMobileDatabase(): Promise<void> {
-  if (dbOpen) {
-    try {
-      await CapacitorSQLite.close({ database: DB_NAME });
-    } catch {
-      /* ignore */
-    }
-    try {
-      await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
-    } catch {
-      /* ignore */
-    }
-    dbOpen = false;
+  // v3.6.1：无条件关闭。reload 后 dbOpen 会被重置为 false，
+  // 但原生层连接可能仍然存在（导致 deleteDatabase 被锁、move 被跳过）。
+  // closeConnection 在连接不存在时原生层会幂等返回，不会抛错。
+  try {
+    await CapacitorSQLite.close({ database: DB_NAME });
+  } catch {
+    /* connection not open is fine */
   }
+  try {
+    await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+  } catch {
+    /* connection not exist is fine */
+  }
+  dbOpen = false;
 }
 
 /**
@@ -123,16 +128,95 @@ export async function databaseExists(): Promise<boolean> {
  * v3.5.3：删除现有 DB 文件（用于同步前清理，避免 move 时冲突）
  *
  * 用 deleteDatabase({ database }) 删除 /data/data/<pkg>/databases/shengxintouSQLite.db
+ *
+ * v3.6.1 历史根因：
+ *   1) 旧版在 dbOpen===false 时跳过 close，原生层连接未断开 → deleteDatabase 被锁失败被静默吞
+ *   2) 第一次修复尝试无条件 closeConnection，但发现 @capacitor-community/sqlite 的
+ *      deleteDatabase 要求 dbDict 里必须有 "RW_<dbName>" 连接对象（见插件 Java 源码
+ *      CapacitorSQLite.java L1074-1091），否则抛
+ *      "No available connection for database shengxintou"
+ *
+ * v3.6.1 正确顺序：
+ *   1) close（关 SQLiteDatabase，避免文件锁）
+ *   2) closeConnection（清理旧连接对象，避免 createConnection 报 already exists）
+ *   3) createConnection（建立新连接对象，但 _isOpen=false）
+ *   4) deleteDatabase（通过连接对象执行 deleteDB，内部会自动 open+close+delete）
+ *   5) closeConnection（清理 dbDict）
+ *
+ * deleteDatabase 的 "DB 不存在" 错误是正常的（首次同步），不抛出；
+ * 其他错误抛真错，让上层 syncFromWebDAV 能感知失败。
+ * 删除后用 isDatabase 校验确实删除；若仍存在则抛错。
  */
 export async function deleteMobileDatabase(): Promise<void> {
+  // 1. 关闭 SQLiteDatabase（避免文件锁）
   try {
-    // 先确保连接已关闭，否则 delete 会失败
-    if (dbOpen) {
-      try { await CapacitorSQLite.close({ database: DB_NAME }); } catch { /* ignore */ }
-      dbOpen = false;
-    }
-    await CapacitorSQLite.deleteDatabase({ database: DB_NAME });
+    await CapacitorSQLite.close({ database: DB_NAME });
   } catch {
-    /* DB 不存在或删除失败，忽略 */
+    /* not open is fine */
+  }
+  dbOpen = false;
+
+  // 2. 清理旧连接对象（避免 createConnection 报 "already exists"）
+  try {
+    await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+  } catch {
+    /* not exist is fine */
+  }
+
+  // 3. 建立新连接对象（不 open）—— deleteDatabase 要求 dbDict 里有连接
+  try {
+    await CapacitorSQLite.createConnection({
+      database: DB_NAME,
+      encrypted: false,
+      mode: 'no-encryption',
+      version: 1,
+      readonly: false,
+    });
+  } catch {
+    /* 可能已存在，忽略 */
+  }
+
+  // 4. 删除 DB 文件（Database.deleteDB 内部会 open + close + delete）
+  let deleteOk = true;
+  try {
+    await CapacitorSQLite.deleteDatabase({ database: DB_NAME });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // "database does not exist" / "No such file" 是正常情况（首次同步），不算错
+    if (/not exist|no such|not found|does not exist/i.test(msg)) {
+      deleteOk = true;
+    } else {
+      // 兜底清理连接对象
+      try {
+        await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`deleteDatabase 失败: ${msg}`);
+    }
+  }
+
+  // 5. 清理 dbDict 里的连接对象
+  try {
+    await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+  } catch {
+    /* ignore */
+  }
+
+  // 6. 校验确实删除（防 deleteDatabase 静默失败）
+  if (deleteOk) {
+    try {
+      const res = await CapacitorSQLite.isDatabase({ database: DB_NAME });
+      if (res?.result) {
+        throw new Error('deleteDatabase 后数据库仍存在，可能文件被锁定，请重启 App 后重试');
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/仍存在|locked|锁定/.test(msg)) {
+        throw e;
+      }
+      // isDatabase 不可靠时只 warn，不阻塞流程（move 后的 verification 会兜底）
+      console.warn('[mobileSqlite] deleteMobileDatabase: isDatabase 校验失败（不阻塞）:', msg);
+    }
   }
 }

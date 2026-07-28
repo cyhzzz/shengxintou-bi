@@ -198,11 +198,19 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     return { success: false, message: '尚未配置 WebDAV 凭据，请点击「WebDAV 配置」按钮填入坚果云账号和应用密码' };
   }
 
+  const log: string[] = [];
+  const step = (msg: string) => {
+    log.push(msg);
+    console.log(`[mobileSync] ${msg}`);
+  };
+
   try {
     // 1. 关闭现有连接，避免文件锁
+    step('1/7 关闭现有连接');
     await closeMobileDatabase();
 
     // 2. GET latest_backup.txt 获取最新备份文件名
+    step('2/7 获取最新备份元数据');
     const auth = btoa(`${creds.username}:${creds.password}`);
     const baseUrl = creds.url;
     const latestFile = await getLatestRemoteDb(baseUrl, creds.remoteDir, auth);
@@ -210,8 +218,10 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     if (!latestFile) {
       return { success: false, message: '坚果云上未找到 latest_backup.txt，请先在桌面端上传备份（需更新桌面版）' };
     }
+    step(`  最新备份: ${latestFile}`);
 
     // 3. 下载最新备份
+    step('3/7 下载备份文件');
     const remotePath = creds.remoteDir
       ? `${creds.remoteDir}/${latestFile}`
       : latestFile;
@@ -230,10 +240,12 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 
     // 4. 下载并解压
     let blob = await response.blob();
+    step(`  下载完成: ${blob.size} bytes`);
 
     // 4a. 如果下载的是 .db.gz（gzip 压缩），先解压
     if (latestFile.endsWith('.db.gz')) {
       blob = await decompressGzip(blob);
+      step(`  解压完成: ${blob.size} bytes`);
     }
 
     // 4.1 先删除 cache 中可能残留的同名文件，避免 moveDatabasesAndAddSuffix 重复处理
@@ -246,16 +258,42 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     // 4.2 分块写入：解压后的 SQLite 可能 30+ MB，base64 后 50+ MB，
     //      一次性传给 Filesystem.writeFile 会导致 WebView 内存溢出崩溃。
     //      改用 1MB 二进制分块 → 每块 ~1.4MB base64 → 独立 PostMessage，避免内存峰值。
+    step('4/7 写入 cache');
     await writeFileInChunks(blob, 'shengxintou.db', Directory.Cache);
 
     // 5. 删除现有 DB（如有），避免 move 时冲突
+    step('5/7 删除旧数据库');
     await deleteMobileDatabase();
+    step('  旧数据库已删除');
 
     // 6. 原生层把 cache/shengxintou.db 移到 databases/shengxintouSQLite.db
+    step('6/7 移动 cache → databases');
     await moveDatabaseFromCache();
 
+    // 6.1 Verification：确认新 DB 已就位（v3.6.1 新增）
+    // 之前 moveDatabasesAndAddSuffix 在目标已存在时会 silently skip，
+    // 导致前端返回 success 但实际 DB 未被替换。
+    step('6.1/7 校验新数据库');
+    const { databaseExists } = await import('./mobileSqlite');
+    const ok = await databaseExists();
+    if (!ok) {
+      throw new Error('移动后 isDatabase 校验失败：新数据库未就位');
+    }
+
     // 7. 重新打开数据库连接
+    step('7/7 重新打开数据库');
     await initMobileDatabase();
+
+    // 7.1 Sanity check：执行一次查询，确认连接可用且数据真的更新了
+    step('7.1/7 数据 sanity check');
+    try {
+      const { querySql } = await import('./mobileSqlite');
+      const rows = await querySql<{ CNT?: number }>('SELECT COUNT(*) AS CNT FROM sqlite_master WHERE type="table"');
+      step(`  sanity check 通过: 共 ${rows[0]?.CNT ?? 0} 张表`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`sanity check 失败，新库可能未正确加载: ${msg}`);
+    }
 
     return {
       success: true,
@@ -270,9 +308,11 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
     } catch {
       /* ignore */
     }
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error('[mobileSync] 同步失败:', errMsg, '\n步骤:', log.join('\n  '));
     return {
       success: false,
-      message: `同步失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: `同步失败: ${errMsg}`,
     };
   }
 }
