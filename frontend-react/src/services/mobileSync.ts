@@ -364,7 +364,44 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 }
 
 /**
- * v3.6.2：PWA 端 WebDAV 同步实现
+ * v3.6.2：规范化 Cloudflare Worker 代理 URL
+ *
+ * 用户在表单中可能填入以下几种格式：
+ *   - https://xxx.workers.dev
+ *   - https://xxx.workers.dev/
+ *   - https://xxx.workers.dev/?
+ *
+ * 统一去掉末尾的 / 和 ?，再由调用方拼 ?url=...&auth=...
+ * 避免拼出 `https://xxx.workers.dev?url=...`（Cloudflare Workers 对裸域名请求
+ * 可能触发重定向到带 / 的版本，重定向后 query string 丢失，导致请求失败）。
+ */
+function normalizeProxyUrl(raw: string): string {
+  let u = raw.trim();
+  while (u.endsWith('/') || u.endsWith('?')) {
+    u = u.slice(0, -1);
+  }
+  return u;
+}
+
+/**
+ * v3.6.2：构造 PWA 代理请求 URL
+ *
+ * 关键修复：
+ *   1. auth（base64）必须 encodeURIComponent —— base64 可能含 +、/、= 字符，
+ *      其中 + 在 URL query string 中会被解析为空格，导致坚果云收到错误的凭据 → 401
+ *   2. proxyUrl 末尾斜杠规范化，避免 Cloudflare Workers 重定向丢 query string
+ */
+function buildProxyRequestUrl(
+  proxyUrl: string,
+  targetUrl: string,
+  authBase64: string
+): string {
+  const proxy = normalizeProxyUrl(proxyUrl);
+  return `${proxy}?url=${encodeURIComponent(targetUrl)}&auth=${encodeURIComponent(authBase64)}`;
+}
+
+/**
+ * v3.7.0：PWA 端 WebDAV 同步实现
  *
  * 与安卓端的核心差异：
  *   1. fetch 走 Cloudflare Worker 代理（坚果云不支持 CORS）
@@ -402,7 +439,7 @@ async function syncFromWebDAVPwa(creds: {
     const manifestUrl = creds.remoteDir
       ? `${creds.url}${creds.remoteDir}/latest_backup.txt`
       : `${creds.url}latest_backup.txt`;
-    const proxyManifest = `${creds.proxyUrl}?url=${encodeURIComponent(manifestUrl)}&auth=${auth}`;
+    const proxyManifest = buildProxyRequestUrl(creds.proxyUrl, manifestUrl, auth);
 
     const manifestResp = await fetch(proxyManifest);
     if (manifestResp.status === 404) {
@@ -421,7 +458,7 @@ async function syncFromWebDAVPwa(creds: {
     step('2/5 下载备份文件');
     const remotePath = creds.remoteDir ? `${creds.remoteDir}/${latestFile}` : latestFile;
     const fullUrl = `${creds.url}${remotePath}`;
-    const proxyDownload = `${creds.proxyUrl}?url=${encodeURIComponent(fullUrl)}&auth=${auth}`;
+    const proxyDownload = buildProxyRequestUrl(creds.proxyUrl, fullUrl, auth);
 
     const dlResp = await fetch(proxyDownload);
     if (!dlResp.ok) {
@@ -495,7 +532,7 @@ async function testWebDAVConnectionPwa(
     const manifestUrl = remoteDir
       ? `${baseUrl}${remoteDir}/latest_backup.txt`
       : `${baseUrl}latest_backup.txt`;
-    const proxyManifest = `${proxyUrl}?url=${encodeURIComponent(manifestUrl)}&auth=${auth}`;
+    const proxyManifest = buildProxyRequestUrl(proxyUrl, manifestUrl, auth);
 
     const resp = await fetch(proxyManifest);
     if (resp.status === 404) {
@@ -510,9 +547,18 @@ async function testWebDAVConnectionPwa(
       message: filename ? `连接成功，最新备份: ${filename}` : '连接成功',
     };
   } catch (error) {
+    // v3.6.2：fetch 抛 TypeError("Failed to fetch) 通常是 CORS / 网络 / URL 错误
+    //   给用户更具体的排查提示，而不是裸 "Failed to fetch"
+    const raw = error instanceof Error ? error.message : String(error);
+    if (raw === 'Failed to fetch') {
+      return {
+        success: false,
+        message: '无法连接代理（Failed to fetch）。请检查：1) Worker URL 是否正确；2) Worker 是否已部署并返回 CORS 头；3) 是否因网络问题无法访问 workers.dev',
+      };
+    }
     return {
       success: false,
-      message: `连接失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: `连接失败: ${raw}`,
     };
   }
 }

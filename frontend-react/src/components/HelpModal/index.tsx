@@ -210,7 +210,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
       >
         <div className={styles.helpContent}>
           <div className={styles.logoSection}>
-            <img src="/icons/logo-横版.png" alt="省心投" className={styles.logoImage} />
+            <img src={`${import.meta.env.BASE_URL}icons/logo-横版.png`} alt="省心投" className={styles.logoImage} />
           </div>
 
           <Row gutter={16}>
@@ -257,7 +257,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                       <Text strong>v{versionInfo.version}</Text>
                     </div>
                     <div className={styles.versionRow}>
-                      <Text type="secondary">发布 时间：</Text>
+                      <Text type="secondary">发布时间：</Text>
                       <Text>{versionInfo.release_date}</Text>
                     </div>
 
@@ -282,7 +282,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                       </div>
                       {reachable && remoteReleaseDate && (
                         <div className={styles.versionRow}>
-                          <Text type="secondary">github 发布 时间：</Text>
+                          <Text type="secondary">github 发布时间：</Text>
                           <Text>{remoteReleaseDate}</Text>
                         </div>
                       )}
@@ -361,7 +361,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
 
               <Card title="创建者" size="small" className={styles.infoCard}>
                 <div className={styles.creatorInfo}>
-                  <img src="/icons/陈元昊肖像.svg" alt="创建者" className={styles.creatorAvatar} />
+                  <img src={`${import.meta.env.BASE_URL}icons/陈元昊肖像.svg`} alt="创建者" className={styles.creatorAvatar} />
                   <div>
                     <Text strong>陈元昊</Text>
                     <br />

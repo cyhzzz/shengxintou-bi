@@ -74,7 +74,7 @@ export default function LoginPage() {
       >
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img
-            src="/icons/login-logo.png"
+            src={`${import.meta.env.BASE_URL}icons/login-logo.png`}
             alt="省心投 BI"
             style={{ height: 48, marginBottom: 12, display: 'inline-block' }}
           />
