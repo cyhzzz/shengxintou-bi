@@ -13,6 +13,7 @@ import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
 export default function MobileSyncButton() {
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [form] = Form.useForm();
   const [hasCreds, setHasCreds] = useState(false);
@@ -65,19 +66,15 @@ export default function MobileSyncButton() {
     }
   };
 
+  // v3.7.1：保存逻辑改为「先存凭据，再异步测试连接，测试失败仅警告不阻塞」
+  //   原逻辑：测试失败 → 不保存 → 用户看到 Modal 不关 + 顶部 toast 一闪而过 → 以为「没反应」
+  //   新逻辑：先保存凭据 → 关 Modal → 后台测试 → 失败用 Modal.alert 明确告知（不阻塞使用）
+  //   这样用户即使 Worker 暂时不可达也能保存凭据，方便后续重试
   const handleSaveSettings = async () => {
     const values = await form.validateFields();
-    // v3.7.0：PWA 端先保存代理 URL，再测试连接（testWebDAVConnection 会读取 localStorage）
-    if (pwaMode && values.proxyUrl) {
-      await saveWebDAVProxyUrl(values.proxyUrl);
-    }
-    const testResult = await testWebDAVConnection(
-      values.username,
-      values.password,
-      values.remoteDir || '',
-      values.url || ''
-    );
-    if (testResult.success) {
+    setSaving(true);
+    try {
+      // 1. 先保存凭据（无论测试是否通过，凭据都先存上）
       await saveWebDAVCredentials(
         values.username,
         values.password,
@@ -87,11 +84,42 @@ export default function MobileSyncButton() {
       if (pwaMode && values.proxyUrl) {
         await saveWebDAVProxyUrl(values.proxyUrl);
       }
-      message.success('保存成功');
+
+      // 2. 后台测试连接（不阻塞 Modal 关闭）
       setSettingsOpen(false);
       setHasCreds(true);
-    } else {
-      message.error(testResult.message);
+      message.loading({ content: '正在测试连接...', key: 'webdav-test', duration: 0 });
+
+      const testResult = await testWebDAVConnection(
+        values.username,
+        values.password,
+        values.remoteDir || '',
+        values.url || ''
+      );
+
+      if (testResult.success) {
+        message.success({
+          content: `保存成功，${testResult.message}`,
+          key: 'webdav-test',
+          duration: 4,
+        });
+      } else {
+        // 测试失败：凭据已保存，但告知用户测试失败原因（用 warning 而非 error）
+        console.warn('[WebDAV] 测试连接失败（凭据已保存）:', testResult.message);
+        message.warning({
+          content: `凭据已保存，但连接测试失败：${testResult.message}。可稍后点「同步数据」重试。`,
+          key: 'webdav-test',
+          duration: 8,
+        });
+      }
+    } catch (err) {
+      message.error({
+        content: `保存失败：${err instanceof Error ? err.message : String(err)}`,
+        key: 'webdav-test',
+        duration: 6,
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -123,6 +151,8 @@ export default function MobileSyncButton() {
         onCancel={() => setSettingsOpen(false)}
         okText="保存"
         cancelText="取消"
+        confirmLoading={saving}
+        maskClosable={!saving}
       >
         <Form form={form} layout="vertical">
           <Form.Item
