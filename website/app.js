@@ -10,6 +10,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const header = document.getElementById('header');
   const reveals = document.querySelectorAll('.reveal');
 
+  // —— 主题切换 ——
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try {
+        localStorage.setItem('sx-theme', next);
+      } catch (e) {
+        // localStorage 不可用时仅本次会话生效
+      }
+    });
+  }
+
   // 导航栏滚动效果
   function updateHeader() {
     if (window.scrollY > 40) {

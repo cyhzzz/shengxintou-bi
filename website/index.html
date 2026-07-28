@@ -11,6 +11,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    // 防止主题切换 FOUC：在 CSS 解析后立即应用主题
+    (function () {
+      try {
+        var t = localStorage.getItem('sx-theme');
+        if (t !== 'light' && t !== 'dark') t = 'dark'; // 默认黑夜
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- 纹理层 -->
@@ -31,6 +43,10 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23a11.49 11.49 0 0 1 3-.405c1.02.015 2.04.135 3 .405 2.28-1.56 3.285-1.23 3.285-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.005 12.005 0 0 0 24 12c0-6.63-5.37-12-12-12Z"/></svg>
           GitHub
         </a>
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换日/夜模式">
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
       </nav>
       <a href="https://github.com/cyhzzz/shengxintou-bi/releases/latest" target="_blank" rel="noopener" class="btn btn-sm btn-primary">下载</a>
     </div>
@@ -106,33 +122,37 @@
         </div>
 
         <div class="feature-grid">
-          <article class="feature-card reveal" data-reveal="1">
-            <div class="feature-icon" style="--icon-bg: rgba(24, 144, 255, 0.08); --icon-color: #1890ff;">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+          <article class="feature-item reveal" data-reveal="1">
+            <div class="feature-meta">
+              <span class="feature-num">01</span>
+              <img class="feature-icon" src="assets/icons/feature-funnel.png" alt="" />
             </div>
             <h3>双漏斗转化分析</h3>
             <p>内容平台 8 阶段与应用市场 9 阶段漏斗独立呈现，定位每一层转化卡点，支持日期与平台多维筛选联动。</p>
           </article>
 
-          <article class="feature-card reveal" data-reveal="2">
-            <div class="feature-icon" style="--icon-bg: rgba(201, 107, 74, 0.08); --icon-color: #c96b4a;">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+          <article class="feature-item reveal" data-reveal="2">
+            <div class="feature-meta">
+              <span class="feature-num">02</span>
+              <img class="feature-icon" src="assets/icons/feature-network.png" alt="" />
             </div>
             <h3>全渠道获客概览</h3>
             <p>跨抖音、腾讯、小红书、快手与六大应用市场聚合，配合 365 天开户日历热力图与年度 KPI 完成率时间折算。</p>
           </article>
 
-          <article class="feature-card reveal" data-reveal="3">
-            <div class="feature-icon" style="--icon-bg: rgba(122, 158, 126, 0.08); --icon-color: #7a9e7e;">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+          <article class="feature-item reveal" data-reveal="3">
+            <div class="feature-meta">
+              <span class="feature-num">03</span>
+              <img class="feature-icon" src="assets/icons/feature-import.png" alt="" />
             </div>
             <h3>标准化数据导入</h3>
             <p>7 类业务数据走统一导入入口原样落库，Excel 脏文本自动清洗，作为可视化数据底座。</p>
           </article>
 
-          <article class="feature-card reveal" data-reveal="4">
-            <div class="feature-icon" style="--icon-bg: rgba(201, 162, 39, 0.08); --icon-color: #c9a227;">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <article class="feature-item reveal" data-reveal="4">
+            <div class="feature-meta">
+              <span class="feature-num">04</span>
+              <img class="feature-icon" src="assets/icons/feature-sync.png" alt="" />
             </div>
             <h3>数据新鲜度与备份</h3>
             <p>数据新鲜度监控实时提醒，坚果云 WebDAV 自动备份，降低单文件数据库的运维风险。</p>
