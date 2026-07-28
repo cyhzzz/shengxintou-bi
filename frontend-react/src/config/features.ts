@@ -35,6 +35,8 @@ export interface FeatureFlags {
   showDatabaseBackup: boolean;
   /** 侧边栏「报告生成」菜单 */
   showReportGeneration: boolean;
+  /** 侧边栏「抖音青鸟对账」菜单（移动端禁用，依赖上传+对账桌面工作流） */
+  showDataReconciliation: boolean;
 }
 
 /**
@@ -60,6 +62,7 @@ const desktopAndWebFlags: FeatureFlags = {
   showAccountManagement: true,
   showDatabaseBackup: true,
   showReportGeneration: true,
+  showDataReconciliation: true,
 };
 
 /** 移动版配置（Capacitor Android） */
@@ -74,6 +77,8 @@ const mobileFlags: FeatureFlags = {
   showDatabaseBackup: true,
   // v3.5.5：移动端开放报告生成菜单（mobileRouteHandler 已支持 /reports/weekly/*）
   showReportGeneration: true,
+  // v3.6.1：移动端禁用抖音青鸟对账（核心是文件上传+对账桌面工作流，mobileRouteHandler 未实现）
+  showDataReconciliation: false,
 };
 
 /**

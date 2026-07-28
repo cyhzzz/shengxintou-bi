@@ -184,6 +184,16 @@ export default function MainLayout() {
         if (filteredChildren.length === 0) return null;
         return { ...it, children: filteredChildren };
       }
+      // v3.6.1：内容平台子菜单按 features 过滤（移动端禁用抖音青鸟对账）
+      if (it.key === 'content-platform' && it.children) {
+        const filteredChildren = it.children.filter((c: any) => {
+          if (!c) return false;
+          if (c.key === '/data-reconciliation/douyin-qingniao' && !featureFlags.showDataReconciliation) return false;
+          return true;
+        });
+        if (filteredChildren.length === 0) return null;
+        return { ...it, children: filteredChildren };
+      }
       return item;
     }).filter(Boolean) as MenuProps['items'];
   }, []);

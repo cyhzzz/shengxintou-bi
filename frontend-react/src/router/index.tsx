@@ -139,7 +139,10 @@ const mainChildren = [
   ...(featureFlags.showReportGeneration
     ? [{ path: 'report-generation', element: withSuspense(ReportGenerationPage) }]
     : []),
-  { path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) },
+  // v3.6.1：抖音青鸟对账路由仅在 showDataReconciliation 环境注册（移动端禁用，避免 URL 直访触发未实现的 mobile API）
+  ...(featureFlags.showDataReconciliation
+    ? [{ path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) }]
+    : []),
   // v3.3.10: 投放评审（内容平台二级菜单）
   { path: 'investment-review', element: withSuspense(InvestmentReviewPage) },
 
