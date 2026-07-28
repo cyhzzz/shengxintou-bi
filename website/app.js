@@ -40,6 +40,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
   reveals.forEach((el) => revealObserver.observe(el));
 
+  // Showcase 卡片单独监听：用于触发入场扫光
+  const showcaseCards = document.querySelectorAll('.showcase-card');
+  const showcaseObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          showcaseObserver.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.25 }
+  );
+  showcaseCards.forEach((el) => showcaseObserver.observe(el));
+
+  // —— Hero 粒子尘埃：随机生成 18 个 dust 点 ——
+  const dustField = document.querySelector('.dust-field');
+  if (dustField) {
+    const colors = ['#1890ff', '#c96b4a', '#c9a227', '#7a9e7e'];
+    for (let i = 0; i < 18; i++) {
+      const d = document.createElement('span');
+      d.className = 'dust';
+      const x = Math.random() * 100;
+      const y = 60 + Math.random() * 40; // 从下方往上飘
+      const tx = (Math.random() - 0.5) * 120;
+      const ty = -80 - Math.random() * 160;
+      const dur = 7 + Math.random() * 6;
+      const delay = Math.random() * 6;
+      const size = 2 + Math.random() * 3;
+      d.style.left = `${x}%`;
+      d.style.top = `${y}%`;
+      d.style.width = `${size}px`;
+      d.style.height = `${size}px`;
+      d.style.color = colors[i % colors.length];
+      d.style.background = colors[i % colors.length];
+      d.style.setProperty('--tx', `${tx}px`);
+      d.style.setProperty('--ty', `${ty}px`);
+      d.style.setProperty('--dur', `${dur}s`);
+      d.style.setProperty('--delay', `${delay}s`);
+      dustField.appendChild(d);
+    }
+  }
+
   // Hero 元素在页面加载后短暂延迟即显示
   const heroReveals = document.querySelectorAll('.hero .reveal');
   heroReveals.forEach((el, index) => {
