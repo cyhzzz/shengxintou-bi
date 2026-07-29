@@ -8,7 +8,7 @@
  *
  * 工作流程：
  *   1. 首次启动：IndexedDB 无 DB → 提示用户去「数据同步」页面同步
- *   2. 同步：fetch 走 Cloudflare Worker 代理下载 .db.gz → 解压 → 写入 IndexedDB → 加载到 sql.js
+ *   2. 同步：fetch 走 Deno Deploy 代理下载 .db.gz → 解压 → 写入 IndexedDB → 加载到 sql.js
  *   3. 后续启动：从 IndexedDB 读出 ArrayBuffer → 直接喂给 sql.js（无需重新下载）
  *
  * v3.6.2 新增：iOS PWA 支持

@@ -18,8 +18,8 @@
  *
  * v3.6.2 PWA 支持：
  *   - PWA 端无 Capacitor 插件，凭据存 localStorage（同源隔离，HTTPS 才可访问）
- *   - 坚果云 WebDAV 不支持 CORS，PWA 必须走 Cloudflare Worker 代理
- *   - Worker URL 由用户配置（localStorage key: webdav_proxy_url），未配置时给出引导
+ *   - 坚果云 WebDAV 不支持 CORS，PWA 必须走 Deno Deploy 代理
+ *   - 代理 URL 由用户配置（localStorage key: webdav_proxy_url），未配置时给出引导
  *   - 下载的 DB 直接加载到 sql.js（IndexedDB 持久化），不走 Filesystem
  */
 import { Preferences } from '@capacitor/preferences';
@@ -68,7 +68,7 @@ export async function getWebDAVCredentials(): Promise<{
   username: string;
   password: string;
   remoteDir: string;
-  proxyUrl?: string;  // v3.6.2：PWA 专用，Cloudflare Worker 代理地址
+  proxyUrl?: string;  // v3.6.2：PWA 专用，Deno Deploy 代理地址
 } | null> {
   // v3.6.2：PWA 端从 localStorage 读
   if (isPwaClient()) {
@@ -100,9 +100,9 @@ export async function getWebDAVCredentials(): Promise<{
 }
 
 /**
- * v3.6.2：保存 PWA 的 Cloudflare Worker 代理 URL
+ * v3.6.2：保存 PWA 的 Deno Deploy 代理 URL
  *
- * PWA 端因坚果云 WebDAV 不支持 CORS，必须走 Worker 代理。
+ * PWA 端因坚果云 WebDAV 不支持 CORS，必须走代理。
  * 此函数仅 PWA 模式有效，安卓端调用为空操作。
  */
 export async function saveWebDAVProxyUrl(proxyUrl: string): Promise<void> {
@@ -364,15 +364,15 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 }
 
 /**
- * v3.6.2：规范化 Cloudflare Worker 代理 URL
+ * v3.6.2：规范化 Deno Deploy 代理 URL
  *
  * 用户在表单中可能填入以下几种格式：
- *   - https://xxx.workers.dev
- *   - https://xxx.workers.dev/
- *   - https://xxx.workers.dev/?
+ *   - https://xxx.deno.dev
+ *   - https://xxx.deno.dev/
+ *   - https://xxx.deno.dev/?
  *
  * 统一去掉末尾的 / 和 ?，再由调用方拼 ?url=...&auth=...
- * 避免拼出 `https://xxx.workers.dev?url=...`（Cloudflare Workers 对裸域名请求
+ * 避免拼出 `https://xxx.deno.dev?url=...`（部分代理对裸域名请求
  * 可能触发重定向到带 / 的版本，重定向后 query string 丢失，导致请求失败）。
  */
 function normalizeProxyUrl(raw: string): string {
@@ -389,7 +389,7 @@ function normalizeProxyUrl(raw: string): string {
  * 关键修复：
  *   1. auth（base64）必须 encodeURIComponent —— base64 可能含 +、/、= 字符，
  *      其中 + 在 URL query string 中会被解析为空格，导致坚果云收到错误的凭据 → 401
- *   2. proxyUrl 末尾斜杠规范化，避免 Cloudflare Workers 重定向丢 query string
+ *   2. proxyUrl 末尾斜杠规范化，避免代理重定向丢 query string
  */
 function buildProxyRequestUrl(
   proxyUrl: string,
@@ -404,13 +404,13 @@ function buildProxyRequestUrl(
  * v3.7.0：PWA 端 WebDAV 同步实现
  *
  * 与安卓端的核心差异：
- *   1. fetch 走 Cloudflare Worker 代理（坚果云不支持 CORS）
+ *   1. fetch 走 Deno Deploy 代理（坚果云不支持 CORS）
  *   2. 下载的 DB ArrayBuffer 直接喂给 sql.js，不走 Filesystem
  *   3. 持久化到 IndexedDB，而非应用沙箱文件系统
  *
- * Worker 代理 URL 由用户配置（localStorage key: webdav_proxy_url）。
- * 代理协议：GET https://<worker>/?url=<encoded webdav url>&auth=<basic auth>
- *           Worker 转发到坚果云并加 CORS 头。
+ * 代理 URL 由用户配置（localStorage key: webdav_proxy_url）。
+ * 代理协议：GET https://<proxy>/?url=<encoded webdav url>&auth=<basic auth>
+ *           代理转发到坚果云并加 CORS 头。
  */
 async function syncFromWebDAVPwa(creds: {
   url: string;
@@ -429,7 +429,7 @@ async function syncFromWebDAVPwa(creds: {
     if (!creds.proxyUrl) {
       return {
         success: false,
-        message: 'PWA 同步需要 Cloudflare Worker 代理地址，请在「WebDAV 配置」中填入代理 URL',
+        message: 'PWA 同步需要 Deno Deploy 代理地址，请在「WebDAV 配置」中填入代理 URL',
       };
     }
 
@@ -514,7 +514,7 @@ async function syncFromWebDAVPwa(creds: {
 }
 
 /**
- * v3.6.2：PWA 端测试 WebDAV 连接（通过 Worker 代理）
+ * v3.6.2：PWA 端测试 WebDAV 连接（通过 Deno Deploy 代理）
  */
 async function testWebDAVConnectionPwa(
   username: string,
@@ -524,7 +524,7 @@ async function testWebDAVConnectionPwa(
   proxyUrl?: string
 ): Promise<SyncResult> {
   if (!proxyUrl) {
-    return { success: false, message: '请先填入 Cloudflare Worker 代理地址' };
+    return { success: false, message: '请先填入 Deno Deploy 代理地址' };
   }
   try {
     const auth = btoa(`${username}:${password}`);
@@ -553,7 +553,7 @@ async function testWebDAVConnectionPwa(
     if (raw === 'Failed to fetch') {
       return {
         success: false,
-        message: '无法连接代理（Failed to fetch）。请检查：1) Worker URL 是否正确；2) Worker 是否已部署并返回 CORS 头；3) 是否因网络问题无法访问 workers.dev',
+        message: '无法连接代理（Failed to fetch）。请检查：1) 代理 URL 是否正确；2) Deno Deploy 是否已部署并返回 CORS 头；3) 是否因网络问题无法访问 deno.dev',
       };
     }
     return {
@@ -569,7 +569,7 @@ export async function testWebDAVConnection(
   remoteDir: string,
   url?: string
 ): Promise<SyncResult> {
-  // v3.6.2：PWA 端走 Worker 代理
+  // v3.6.2：PWA 端走 Deno Deploy 代理
   if (isPwaClient()) {
     const proxyUrl = localStorage.getItem('webdav_proxy_url') || '';
     return testWebDAVConnectionPwa(username, password, remoteDir, url, proxyUrl);

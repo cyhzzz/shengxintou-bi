@@ -36,7 +36,7 @@ export default function MobileSyncButton() {
       username: creds?.username || '',
       password: creds?.password || '',
       remoteDir: creds?.remoteDir || '',
-      // v3.6.2：PWA 端 Cloudflare Worker 代理 URL
+      // v3.6.2：PWA 端 Deno Deploy 代理 URL
       proxyUrl: creds?.proxyUrl || '',
     });
     setSettingsOpen(true);
@@ -191,22 +191,22 @@ export default function MobileSyncButton() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message="iOS PWA 需要配置 Cloudflare Worker 代理"
+                message="iOS PWA 需要配置 Deno Deploy 代理"
                 description={
                   <>
-                    坚果云 WebDAV 不支持浏览器 CORS，PWA 端必须通过 Cloudflare Worker 代理转发。
-                    请按 <code>scripts/cloudflare-worker-webdav-proxy.js</code> 文件头部说明部署 Worker，
-                    然后把 Worker URL（形如 <code>https://xxx.workers.dev</code>）填入下方。
+                    坚果云 WebDAV 不支持浏览器 CORS，PWA 端必须通过 Deno Deploy 代理转发。
+                    请按 <code>scripts/deno-webdav-proxy.js</code> 文件头部说明部署到 Deno Deploy，
+                    然后把代理 URL（形如 <code>https://xxx.deno.dev</code>）填入下方。
                   </>
                 }
               />
               <Form.Item
                 name="proxyUrl"
-                label="Cloudflare Worker 代理 URL（PWA 专用）"
-                rules={[{ required: true, message: 'PWA 模式必须填入 Worker 代理 URL' }]}
-                extra="代理仅做 CORS 转发，不存储凭据；凭据通过 HTTPS 直传 Worker → 坚果云"
+                label="Deno Deploy 代理 URL（PWA 专用）"
+                rules={[{ required: true, message: 'PWA 模式必须填入代理 URL' }]}
+                extra="代理仅做 CORS 转发，不存储凭据；凭据通过 HTTPS 直传代理 → 坚果云"
               >
-                <Input placeholder="https://your-worker-name.your-subdomain.workers.dev" />
+                <Input placeholder="https://your-project.deno.dev" />
               </Form.Item>
             </>
           )}
