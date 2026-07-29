@@ -83,6 +83,29 @@ window.addEventListener('error', (e) => {
 // 2. Promise 异步错误（无条件注册）
 window.addEventListener('unhandledrejection', (e) => {
   const reason = e.reason;
+
+  // v3.6.4：chunk 加载失败自动重试
+  // 原因：GitHub Pages 对 HTML 有缓存，新部署后旧 index.html 引用的 chunk hash
+  //       已被覆盖删除，导致 "Failed to fetch dynamically imported module"。
+  // 处理：检测到此错误时自动 reload 一次（带 ?v=timestamp 强制跳过缓存），
+  //      并用 sessionStorage 标记避免无限重试。
+  if (reason instanceof Error && reason.message?.includes('Failed to fetch dynamically imported module')) {
+    const RETRY_KEY = '__chunk_reload_retried';
+    const retried = sessionStorage.getItem(RETRY_KEY);
+    if (!retried) {
+      sessionStorage.setItem(RETRY_KEY, '1');
+      console.warn('[main] chunk 加载失败，自动 reload 跳过缓存');
+      location.href = location.pathname + '?v=' + Date.now() + location.hash;
+      return;
+    }
+    // 已重试过仍失败，提示用户手动刷新
+    captureError('promise', {
+      message: '页面资源加载失败（可能是缓存问题），请手动清除浏览器缓存后重试',
+      stack: reason.stack,
+    });
+    return;
+  }
+
   if (reason instanceof Error) {
     captureError('promise', { message: reason.message, stack: reason.stack });
   } else {
