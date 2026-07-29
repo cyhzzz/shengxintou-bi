@@ -436,9 +436,9 @@ async function syncFromWebDAVPwa(creds: {
     // 1. 通过代理获取 latest_backup.txt
     step('1/5 获取最新备份元数据');
     const auth = btoa(`${creds.username}:${creds.password}`);
-    const manifestUrl = creds.remoteDir
+    const manifestUrl = (creds.remoteDir
       ? `${creds.url}${creds.remoteDir}/latest_backup.txt`
-      : `${creds.url}latest_backup.txt`;
+      : `${creds.url}latest_backup.txt`).replace(/([^:])\/{2,}/g, '$1/');
     const proxyManifest = buildProxyRequestUrl(creds.proxyUrl, manifestUrl, auth);
 
     const manifestResp = await fetch(proxyManifest);
@@ -457,7 +457,7 @@ async function syncFromWebDAVPwa(creds: {
     // 2. 通过代理下载 .db.gz
     step('2/5 下载备份文件');
     const remotePath = creds.remoteDir ? `${creds.remoteDir}/${latestFile}` : latestFile;
-    const fullUrl = `${creds.url}${remotePath}`;
+    const fullUrl = `${creds.url}${remotePath}`.replace(/([^:])\/{2,}/g, '$1/');
     const proxyDownload = buildProxyRequestUrl(creds.proxyUrl, fullUrl, auth);
 
     const dlResp = await fetch(proxyDownload);
@@ -529,9 +529,9 @@ async function testWebDAVConnectionPwa(
   try {
     const auth = btoa(`${username}:${password}`);
     const baseUrl = url || DEFAULT_WEBDAV_BASE;
-    const manifestUrl = remoteDir
+    const manifestUrl = (remoteDir
       ? `${baseUrl}${remoteDir}/latest_backup.txt`
-      : `${baseUrl}latest_backup.txt`;
+      : `${baseUrl}latest_backup.txt`).replace(/([^:])\/{2,}/g, '$1/');
     const proxyManifest = buildProxyRequestUrl(proxyUrl, manifestUrl, auth);
 
     const resp = await fetch(proxyManifest);
