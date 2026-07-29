@@ -54,11 +54,23 @@ export default function MobileDatabaseSync() {
         ? (await import('@/services/sqlJsAdapter')).hasLocalDb()
         : databaseExists();
       const [hasDb, hasCreds] = await Promise.all([dbCheck, hasWebDAVCredentials()]);
+
+      // v3.6.4：从 localStorage 读取持久化的同步时间戳和大小（页面重载后仍能显示）
+      let lastSyncAt: string | null = null;
+      let lastSize: number | null = null;
+      if (isPwaClient()) {
+        lastSyncAt = localStorage.getItem('pwa_last_sync_at');
+        const sizeStr = localStorage.getItem('pwa_last_sync_size');
+        lastSize = sizeStr ? parseInt(sizeStr, 10) : null;
+      }
+
       setState((s) => ({
         ...s,
         loading: false,
         hasDb,
         hasCreds,
+        lastSyncAt,
+        lastSize,
       }));
     } catch (err) {
       console.error('[MobileSync] refresh status failed:', err);

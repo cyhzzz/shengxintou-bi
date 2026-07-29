@@ -12,12 +12,44 @@
  *   3. 后续启动：从 IndexedDB 读出 ArrayBuffer → 直接喂给 sql.js（无需重新下载）
  *
  * v3.6.2 新增：iOS PWA 支持
+ * v3.6.4 关键修复：保存 DB 前主动调用 navigator.storage.persist()，
+ *   避免安卓 Chrome / iOS Safari 在存储压力下清理 IndexedDB（否则同步成功后下次启动 DB 丢失）
  */
 import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from 'sql.js';
 
 const DB_KEY = 'shengxintou-db';
 const STORE_NAME = 'databases';
 const DB_NAME = 'shengxintou-pwa';
+
+/**
+ * v3.6.4：请求浏览器持久化存储
+ *
+ * 不调用 persist() 的后果：
+ *   - iOS Safari：PWA 数据 7 天未使用会被清理（即使添加到主屏幕）
+ *   - 安卓 Chrome：存储压力下可能清理（虽然配额通常够）
+ *   - PC Chrome：默认配额大，但建议调用
+ *
+ * persist() 需要用户主动操作（点击按钮等）才能被浏览器授予，
+ * 所以在 syncFromWebDAV 入口调用（用户已点击同步按钮）。
+ *
+ * 幂等：已持久化时再调用无副作用。
+ * @returns true 表示存储已持久化，false 表示浏览器拒绝（仍可继续同步，只是数据可能被清理）
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persist) return false;
+    // 先检查是否已持久化
+    const alreadyPersisted = await navigator.storage.persisted();
+    if (alreadyPersisted) return true;
+    // 请求持久化（需要用户手势上下文，syncFromWebDAV 由按钮点击触发，满足条件）
+    const granted = await navigator.storage.persist();
+    console.log('[sqlJsAdapter] navigator.storage.persist() =>', granted);
+    return granted;
+  } catch (e) {
+    console.warn('[sqlJsAdapter] persist() failed:', e);
+    return false;
+  }
+}
 
 let SQL: SqlJsStatic | null = null;
 let db: Database | null = null;

@@ -198,6 +198,42 @@ async function writeFileInChunks(
 }
 
 /**
+ * v3.6.4：带超时的 fetch（PWA 端专用）
+ *
+ * 原问题：fetch 无超时，移动网络下下载 12MB .db.gz 文件可能挂起数分钟，
+ * 用户以为「卡死」。安卓 Chrome 默认无请求超时。
+ *
+ * 实现：用 AbortController，超时后 abort，抛出 TimeoutError。
+ *   - manifest 请求：30 秒（小文件，应该很快）
+ *   - 下载请求：120 秒（12MB 在 3G 网络下约需 60-90 秒）
+ *
+ * 注意：Capacitor 环境下 fetch 被 patch 为 CapacitorHttp，不支持 AbortSignal，
+ * 所以只在 PWA 端使用此函数（安卓端走原生 HTTP，有自己的超时）。
+ */
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  init?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error(`请求超时（${(timeoutMs / 1000).toFixed(0)}秒）`);
+    }
+    // v3.6.4：Failed to fetch 通常是 CORS / DNS / 网络不可达
+    if (e instanceof TypeError && e.message === 'Failed to fetch') {
+      throw new Error('网络请求失败（Failed to fetch）。可能原因：1) 代理 URL 不可达或 DNS 解析失败；2) CORS 被拦截；3) 网络断开');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * GET latest_backup.txt 获取坚果云上最新的备份文件名
  *
  * 后端在上传 backup_*.db.gz 时，同时上传一个 latest_backup.txt manifest 文件，
@@ -433,7 +469,18 @@ async function syncFromWebDAVPwa(creds: {
       };
     }
 
-    // 1. 通过代理获取 latest_backup.txt
+    // v3.6.4：0/5 请求浏览器持久化存储（必须在用户手势上下文中调用）
+    // 不调用的话：iOS Safari 7 天清理 PWA 数据；安卓 Chrome 存储压力下清理
+    step('0/5 请求持久化存储');
+    try {
+      const { requestPersistentStorage } = await import('./sqlJsAdapter');
+      const persisted = await requestPersistentStorage();
+      step(`  persist() => ${persisted ? '已持久化' : '浏览器拒绝（数据可能被清理）'}`);
+    } catch (e) {
+      step(`  persist() 跳过: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 1. 通过代理获取 latest_backup.txt（30 秒超时，小文件应该很快）
     step('1/5 获取最新备份元数据');
     const auth = btoa(`${creds.username}:${creds.password}`);
     const manifestUrl = (creds.remoteDir
@@ -441,7 +488,7 @@ async function syncFromWebDAVPwa(creds: {
       : `${creds.url}latest_backup.txt`).replace(/([^:])\/{2,}/g, '$1/');
     const proxyManifest = buildProxyRequestUrl(creds.proxyUrl, manifestUrl, auth);
 
-    const manifestResp = await fetch(proxyManifest);
+    const manifestResp = await fetchWithTimeout(proxyManifest, 30000);
     if (manifestResp.status === 404) {
       return { success: false, message: '坚果云上未找到 latest_backup.txt，请先在桌面端上传备份' };
     }
@@ -454,13 +501,13 @@ async function syncFromWebDAVPwa(creds: {
     }
     step(`  最新备份: ${latestFile}`);
 
-    // 2. 通过代理下载 .db.gz
+    // 2. 通过代理下载 .db.gz（120 秒超时，12MB 在 3G 网络下约需 60-90 秒）
     step('2/5 下载备份文件');
     const remotePath = creds.remoteDir ? `${creds.remoteDir}/${latestFile}` : latestFile;
     const fullUrl = `${creds.url}${remotePath}`.replace(/([^:])\/{2,}/g, '$1/');
     const proxyDownload = buildProxyRequestUrl(creds.proxyUrl, fullUrl, auth);
 
-    const dlResp = await fetch(proxyDownload);
+    const dlResp = await fetchWithTimeout(proxyDownload, 120000);
     if (!dlResp.ok) {
       if (dlResp.status === 404) {
         return { success: false, message: `坚果云上未找到 ${latestFile}` };
@@ -484,7 +531,16 @@ async function syncFromWebDAVPwa(creds: {
     step('4/5 加载到 sql.js');
     const { loadNewDb } = await import('./sqlJsAdapter');
     const arrayBuffer = await blob.arrayBuffer();
-    await loadNewDb(arrayBuffer);
+    try {
+      await loadNewDb(arrayBuffer);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // v3.6.4：配额超限错误特殊处理
+      if (msg.includes('QuotaExceeded') || msg.includes('quota')) {
+        throw new Error(`IndexedDB 配额超限（${(blob.size / 1024 / 1024).toFixed(1)}MB）。请清理浏览器存储空间或使用支持持久化的 PWA 模式（添加到主屏幕）`);
+      }
+      throw new Error(`数据库加载失败: ${msg}`);
+    }
 
     // 5. Sanity check
     step('5/5 数据 sanity check');
@@ -497,11 +553,18 @@ async function syncFromWebDAVPwa(creds: {
       throw new Error(`sanity check 失败，新库可能未正确加载: ${msg}`);
     }
 
+    // v3.6.4：持久化同步时间戳到 localStorage（页面重载后仍能显示）
+    const syncTimestamp = new Date().toISOString();
+    try {
+      localStorage.setItem('pwa_last_sync_at', syncTimestamp);
+      localStorage.setItem('pwa_last_sync_size', String(blob.size));
+    } catch { /* ignore */ }
+
     return {
       success: true,
       message: `同步成功（${latestFile}）`,
       size: blob.size,
-      timestamp: new Date().toISOString(),
+      timestamp: syncTimestamp,
     };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
