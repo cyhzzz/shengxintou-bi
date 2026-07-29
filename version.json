@@ -1,9 +1,10 @@
 {
-    "version": "3.6.2",
-    "release_date": "2026-07-28",
+    "version": "3.6.3",
+    "release_date": "2026-07-29",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.6.3 应用市场获客漏斗「开户成功」阶段口径修正（SUM(是否开户成功) → SUM(是否创建完资金账号)，消除 476 行倒挂数据导致的新开户 > 开户成功现象，与「新开户」阶段业务实质对齐）",
         "v3.6.2 iOS PWA 端支持（Safari 打开 → 添加到主屏即用，替代原生 iOS App）+ WebDAV 配置保存交互优化",
         "v3.6.1 安卓端筛选器 / 环比箭头 / 计划分析转化率修复 + 禁用未实现的抖音青鸟对账入口",
         "v3.6.0 安卓端 WebDAV 凭据安全改造（App 内可视化配置，APK 不再内置凭据）",

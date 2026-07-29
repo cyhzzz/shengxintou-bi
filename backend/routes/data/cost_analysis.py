@@ -330,7 +330,10 @@ def get_conversion_funnel_split():
         ('注册身份证', FactConvAppmarket.是否注册身份证),
         ('注册银行卡', FactConvAppmarket.是否注册银行卡),
         ('提交开户', FactConvAppmarket.是否提交开户),
-        ('开户成功', FactConvAppmarket.是否开户成功),
+        # v3.5.7: 漏斗「开户成功」阶段口径修正
+        # 旧: SUM(是否开户成功) — 上游存在 476 行「开户成功=0 但 创建完资金账号=1 且 新开户=1」的倒挂数据
+        # 新: SUM(是否创建完资金账号) — 与「新开户」阶段业务实质对齐（新开户=完资金账号 且 非存量）
+        ('开户成功', FactConvAppmarket.是否创建完资金账号),
         ('入金', FactConvAppmarket.是否入金),
         ('有效户', FactConvAppmarket.是否有效户),
     ]
