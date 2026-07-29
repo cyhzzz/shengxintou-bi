@@ -83,8 +83,9 @@
 
 - 新 lazy 页面同时更新 router 和 MainLayout 菜单/面包屑（若对用户可见）。
 - 保持旧路由重定向时，明确迁移目标，不让旧链接进入空白页面。
-- 路由新增或修改后更新 `frontend-react/tests/smoke/route-health.spec.ts`。
+- 路由新增或修改后更新 `frontend-react/tests/smoke/route-health.spec.ts`，并跑 `python scripts/check_route_drift.py` 对账。
 - `withSuspense` 负责统一 Suspense 和错误边界；通用页面通过 props 复用时避免重复 lazy import。
+- 路由条件注册（`featureFlags.showXxx ? [...] : []`）只用于桌面端 vs 移动端/PWA 端的功能差异，不能用来 gate 单端 bug；修改 `features.ts` 后跑 `python scripts/check_feature_flags.py`，详见 `cross-platform.md` 第 4.2 与 4.3 节。
 
 ## 9. 业务数据展示
 

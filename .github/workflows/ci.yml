@@ -22,6 +22,24 @@ jobs:
       - name: Validate AI rule architecture
         run: python scripts/check_rule_architecture.py
 
+  cross-platform-contract:
+    name: Cross-platform contract drift
+    runs-on: windows-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+      - name: Backend API vs mobileRouteHandler
+        run: python scripts/check_api_contract.py
+      - name: Router vs smoke spec
+        run: python scripts/check_route_drift.py
+      - name: featureFlags declaration vs usage
+        run: python scripts/check_feature_flags.py
+      - name: mobileRouteHandler case vs tests
+        run: python scripts/check_mobile_routes_coverage.py
+
   backend-smoke:
     name: Backend API smoke
     runs-on: windows-latest

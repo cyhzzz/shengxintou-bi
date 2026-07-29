@@ -192,9 +192,15 @@
 | 前端 TS/TSX | typecheck | `cd frontend-react && npm run typecheck` |
 | 前端页面/组件/样式 | build | `cd frontend-react && npm run build` |
 | 规则/文档 | 规则架构检查 | `python scripts/check_rule_architecture.py` |
+| 后端新增/修改 API | API 契约对账 | `python scripts/check_api_contract.py` |
+| 前端新增/修改路由 | 路由 drift 对账 | `python scripts/check_route_drift.py` |
+| 修改 featureFlags | featureFlag 对账 | `python scripts/check_feature_flags.py` |
+| 新增 mobileRouteHandler case | case 覆盖对账 | `python scripts/check_mobile_routes_coverage.py` |
 | lazy 路由 | 路由 smoke | `cd frontend-react && npm run test:smoke` |
 | Bug 修复 | 最小回归 | 对应 `tests/` 或 `frontend-react/tests/regression/` |
 | lint 或大范围前端重构 | lint | `cd frontend-react && npm run lint` |
+
+跨端对账脚本的详细触发条件见 [`cross-platform.md`](cross-platform.md) 第 2 节。
 
 ### 11.2 需用户手动触发的验证（AI 适时建议）
 
@@ -228,6 +234,7 @@
 | ✅ | `tests/api/test_smoke.py` | 增加该端点的 smoke 测试（成功响应 + 关键结构） |
 | ✅ | `frontend-react/src/types/api.ts` | 通过 `npm run generate:api` 更新（禁止手改） |
 | ✅ | 移动端 `mobileRouteHandler.ts` | 若移动端需要支持，增加 SQLite 翻译 + `scripts/test_mobile_routes.py` 用例 |
+| ✅ | `python scripts/check_api_contract.py` | 跑对账脚本确认无新 drift（详见 `cross-platform.md` 第 4.1 节） |
 | ⚠️ | `docs/rules/business-invariants.md` | 若涉及漏斗/开户/资产/主播口径，更新不变式 |
 
 ### 12.2 新增前端报表页面（lazy 路由）
@@ -237,6 +244,8 @@
 | ✅ | `frontend-react/src/router/index.tsx` | 注册 lazy 路由 |
 | ✅ | `frontend-react/src/layouts/MainLayout.tsx` | 增加菜单项（受 features.ts 控制） |
 | ✅ | `frontend-react/tests/smoke/route-health.spec.ts` | 增加该路由的健康检查用例 |
+| ✅ | `python scripts/check_route_drift.py` | 跑对账脚本确认路由与 smoke 用例对齐 |
+| ✅ | `python scripts/check_feature_flags.py` | 若动了 `features.ts`，跑对账脚本确认声明与使用对齐 |
 | ✅ | `frontend-react/tests/functional/<page>-functional.spec.ts` | 增加页面级功能测试 |
 | ✅ | `frontend-react/src/config/features.ts` | 确定三端显隐（web/desktop/mobile） |
 | ⚠️ | `mobileRouteHandler.ts` | 若移动端启用，增加对应 SQLite 查询 handler |
@@ -269,7 +278,9 @@
 | --- | --- | --- |
 | 新增/修改业务口径（漏斗、开户、资产、主播） | ✅ 必须更新 | `business-invariants.md` |
 | 新增数据导入类型 | ✅ 必须更新 | `backend.md` + `business-invariants.md` |
-| 新增三端差异功能 | ✅ 必须更新 | `overview.md` + `features.ts` 注释 |
+| 新增三端差异功能（featureFlag、移动端独有 SQL、PWA 专属约束） | ✅ 必须更新 | `cross-platform.md` + `features.ts` 注释 |
+| 新增/修改后端 API（`@bp.route`）或 mobileRouteHandler case | ✅ 必须更新 | `cross-platform.md` 第 4.1/4.4 节，必要时更新 `backend.md` 第 4 节 |
+| 新增/修改路由（`router/index.tsx`）或 `features.ts` 字段 | ✅ 必须更新 | `cross-platform.md` 第 4.2/4.3 节，必要时更新 `frontend.md` 第 8 节 |
 | 新增依赖工具或工具位置迁移 | ✅ 必须更新 | `toolchain.md` |
 | 新增/修改打包流程 | ✅ 必须更新 | `toolchain.md` + 对应 README |
 | 新增/修改测试体系入口 | ✅ 必须更新 | `testing-and-delivery.md` |

@@ -142,10 +142,8 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 - 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
 - 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
 - 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 功能开关控制菜单显隐与 ProtectedRoute。
-- 桌面版打包：`scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）。
-- 移动端打包：`cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+，详细见 `android/README.md`）。
-- 移动端约束：Capacitor bridge 初始化时序敏感（main.tsx 等待 bridge）；SQLite 用 `CapacitorSQLite` 插件直接调用（非 `SQLiteConnection` 类）；CSS `zoom: 0.67` 缩放需配合 `calc(100vh/0.67)` 高度补偿避免下方空白。
-- PWA 端约束：用 `sql.js`（WASM）+ IndexedDB 替代 Capacitor SQLite，复用 `mobileRouteHandler` 全部 SQL；坚果云 WebDAV 不支持 CORS，必须走 `scripts/cloudflare-worker-webdav-proxy.js` 部署的 Worker 代理（凭据 HTTPS 直传，不存 Worker）；router 用 HashRouter（部署在 `/app/` 子路径）；PWA 检测靠 `display-mode: standalone` + `navigator.standalone`，详见 `isDesktop.ts::isPwaClient`。
+- 打包脚本：桌面版 `scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）；移动端 `cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+）。
+- 移动端/PWA 详细约束（Capacitor SQLite 操作顺序、HashRouter、sql.js、WebDAV 代理、IndexedDB persist）见 `docs/rules/cross-platform.md` 第 4 节。
 
 ## 6. 按任务读取规则
 
@@ -155,6 +153,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 修改漏斗、开户、资产、主播、对账 | `docs/rules/business-invariants.md` |
 | 修改 Flask、模型、导入、API、SQLite、WebDAV | `docs/rules/backend.md` |
 | 修改 React、组件、筛选、类型、样式 | `docs/rules/frontend.md` |
+| 跨端兼容（API/路由/featureFlag/SQL 同步） | `docs/rules/cross-platform.md` |
 | 决定测试、CI、Git、发布 | `docs/rules/testing-and-delivery.md` |
 | 打包、工具链、依赖工具位置 | `docs/rules/toolchain.md` |
 | 新需求 | `docs/rules/workflows/feature.md` + `docs/rules/templates/tech-spec.md` |
@@ -189,8 +188,9 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 前端页面/组件/样式 | typecheck + `npm run build` |
 | lint 或大范围前端重构 | `npm run lint` |
 | lazy 路由 | `npm run test:smoke` |
-| Bug 修复 | 对应最小回归用例 |
+| 跨端契约（API/路由/flag/case） | `python scripts/check_api_contract.py` + `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节触发条件） |
 | 移动端 SQLite 路由 | `python scripts/test_mobile_routes.py` |
+| Bug 修复 | 对应最小回归用例 |
 | 发版前 | `scripts/run-full-tests.bat` |
 
 需用户手动触发的验证（AI 适时建议，不自行执行）：Windows 打包 `scripts\build-installer.ps1`（后端/Electron/NSIS 变化时）、Android APK `cd android && npm run build:apk`（`services/mobile*.ts`/`capacitor.config.ts`/移动端 UI 修复时）、Android smoke `python tests\mobile\smoke_test.py`（移动端崩溃/同步/路由修复后）、全链路测试 `scripts\run-full-tests.bat`（跨模块/发版前）。

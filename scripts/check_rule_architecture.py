@@ -28,6 +28,7 @@ REQUIRED = (
     RULES / 'business-invariants.md',
     RULES / 'backend.md',
     RULES / 'frontend.md',
+    RULES / 'cross-platform.md',
     RULES / 'testing-and-delivery.md',
     RULES / 'toolchain.md',
     RULES / 'workflows' / 'feature.md',
@@ -42,6 +43,7 @@ ROOT_REFERENCES = (
     'docs/rules/business-invariants.md',
     'docs/rules/backend.md',
     'docs/rules/frontend.md',
+    'docs/rules/cross-platform.md',
     'docs/rules/testing-and-delivery.md',
     'docs/rules/toolchain.md',
     'docs/rules/workflows/feature.md',
@@ -81,6 +83,15 @@ COVERAGE = {
         'dataIndex',
         'api.ts',
     ),
+    RULES / 'cross-platform.md': (
+        'mobileRouteHandler',
+        'featureFlags',
+        'check_api_contract.py',
+        'check_route_drift.py',
+        'check_feature_flags.py',
+        'check_mobile_routes_coverage.py',
+        'KNOWN_DRIFT',
+    ),
     RULES / 'testing-and-delivery.md': (
         'tests/api/test_smoke.py',
         'frontend-react/tests/smoke/',
@@ -114,6 +125,14 @@ INTEGRATIONS = {
     ROOT / '.github' / 'workflows' / 'ci.yml': 'python scripts/check_rule_architecture.py',
     ROOT / '.github' / 'PULL_REQUEST_TEMPLATE.md': 'python scripts/check_rule_architecture.py',
 }
+
+# 跨端对账脚本必须在 CI workflow 中被引用
+CROSS_PLATFORM_SCRIPTS_IN_CI = (
+    'scripts/check_api_contract.py',
+    'scripts/check_route_drift.py',
+    'scripts/check_feature_flags.py',
+    'scripts/check_mobile_routes_coverage.py',
+)
 
 HISTORY_RE = re.compile(
     r'^#{1,6}\s+(?:v?\d+\.\d+\.\d+\b.*|.*(?:版本历史|已落地).*)$',
@@ -254,6 +273,14 @@ def check_content(passes: list[str], errors: list[str]) -> None:
         errors.append('rule checks not fully integrated: ' + '; '.join(integration_missing))
     else:
         passes.append('rule checks integrated into pre-commit, CI, PR, and release')
+
+    # 跨端对账脚本必须被 CI workflow 引用，否则 CI 无法发现跨端 drift
+    ci_text = read_text(ROOT / '.github' / 'workflows' / 'ci.yml', errors)
+    ci_missing = [s for s in CROSS_PLATFORM_SCRIPTS_IN_CI if s not in ci_text]
+    if ci_missing:
+        errors.append('cross-platform scripts not wired into CI: ' + ', '.join(ci_missing))
+    else:
+        passes.append('cross-platform contract scripts wired into CI')
 
     history_files = []
     dynamic_version_files = []

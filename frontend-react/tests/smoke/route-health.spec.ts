@@ -21,17 +21,25 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '厂商分析', path: '/agency-analysis' },
   { name: '小红书-列表', path: '/xhs-notes/list' },
   { name: '小红书-运营', path: '/xhs-notes/operation' },
+  // v3.3.10：小红书计划分析（与菜单 key 对齐）
+  { name: '小红书-计划分析', path: '/xhs-notes/plan-analysis' },
   { name: '员工转化-分析', path: '/employee-conversion/analysis' },
   { name: '员工转化-周报', path: '/employee-conversion/weekly' },
   { name: '应用市场-漏斗', path: '/app-market/funnel' },
   { name: '应用市场-对比', path: '/app-market/comparison' },
   { name: '应用市场-明细', path: '/app-market/detail' },
-  { name: '应用市场-创意', path: '/app-market/creative' },
+  // v3.3.10：creative → plan-analysis（命名统一；旧路径走 Navigate 重定向，保留一项用例验证重定向可用）
+  { name: '应用市场-计划分析', path: '/app-market/plan-analysis' },
+  { name: '应用市场-创意(旧路径重定向)', path: '/app-market/creative' },
   { name: '直播-漏斗', path: '/live/funnel' },
   { name: '直播-带货', path: '/live/direct-sales' },
   { name: '直播-投顾IP', path: '/live/advisor-ip' },
   { name: '直播-分析师', path: '/live/analyst' },
   { name: '报告生成', path: '/report-generation' },
+  // v3.3.10：投放评审（内容平台二级菜单，所有端注册）
+  { name: '投放评审', path: '/investment-review' },
+  // v3.6.1：抖音青鸟对账（featureFlags.showDataReconciliation=true 时注册，桌面/Web 端覆盖）
+  { name: '抖音青鸟对账', path: '/data-reconciliation/douyin-qingniao' },
   { name: '系统-数据导入', path: '/system/data-import' },
   { name: '系统-账号管理', path: '/system/account-management' },
   { name: '系统-数据库备份', path: '/system/database-backup' },

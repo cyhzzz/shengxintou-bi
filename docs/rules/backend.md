@@ -78,6 +78,7 @@
 - 聚合比率必须显式处理分母为 0；金额和计数的 NULL 应通过 `coalesce` 或响应层安全转换。
 - 日期字段在 SQLite 中多为文本时，保持项目现有的可排序格式和过滤方式。
 - 修改应用市场、内容平台、直播或资产查询时必须遵守 `business-invariants.md`。
+- 新增/修改 `@bp.route` 时，移动端/PWA 端的等价实现 `frontend-react/src/services/mobileRouteHandler.ts` 必须同步加 case（SQL 与后端完全一致），并跑 `python scripts/check_api_contract.py` 对账；详见 `cross-platform.md` 第 4.1 与 4.4 节。
 
 ### 兼容层
 

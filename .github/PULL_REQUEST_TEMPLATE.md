@@ -24,6 +24,7 @@
 - [ ] 共享组件（`frontend-react/src/components/`）
 - [ ] 数据服务（`frontend-react/src/services/`）
 - [ ] 类型（`frontend-react/src/types/`，需要重新 `npm run generate:api`）
+- [ ] 跨端契约（`mobileRouteHandler.ts` / `features.ts` / `router/index.tsx`，详见 `docs/rules/cross-platform.md`）
 - [ ] CI / Release（`.github/workflows/`）
 - [ ] 文档（`README.md` / `AGENTS.md` / `CLAUDE.md` / `docs/`）
 
@@ -43,6 +44,12 @@
 - [ ] `cd frontend-react && npm run build` 成功
 - [ ] 改了 page：`tests/smoke/route-health.spec.ts` 加路由
 - [ ] 改 `src/types/api.ts`：通过 `npm run generate:api` 重新生成（不手改）
+
+### 跨端契约（勾选触发条件对应的对账脚本）
+- [ ] 改后端 `@bp.route` 或 `mobileRouteHandler`：`python scripts/check_api_contract.py` 无新 drift
+- [ ] 改 `router/index.tsx` 或 smoke 用例：`python scripts/check_route_drift.py` 无 drift
+- [ ] 改 `features.ts` 或菜单：`python scripts/check_feature_flags.py` 无 ERROR
+- [ ] 新增 `mobileRouteHandler` case：`python scripts/check_mobile_routes_coverage.py` 无新 drift，并在 `scripts/test_mobile_routes.py` 补对应 SQL 用例
 
 ### 文档
 - [ ] `python scripts/check_rule_architecture.py` 通过（自动校验双入口 SHA256、规则链接与版本漂移）

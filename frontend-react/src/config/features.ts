@@ -23,8 +23,6 @@ export interface FeatureFlags {
   showAccountEntry: boolean;
   /** 登录功能（/login 路由 + ProtectedRoute 鉴权拦截） */
   showLoginPage: boolean;
-  /** 侧边栏「数据同步」菜单（WebDAV 备份 + 双向同步） */
-  showDataSyncMenu: boolean;
   /** 关于页 GitHub 代码同步按钮（git pull 自更新） */
   showGithubSyncButton: boolean;
   /** 侧边栏「数据导入」菜单 */
@@ -51,12 +49,11 @@ export interface FeatureFlags {
  *
  * 启用 Supabase / 鉴权时需要：
  *   1. 后端 .env 设 AUTH_ENABLED=true、CLOUD_SYNC_ENABLED=true
- *   2. 在这里把对应字段翻 true（showAccountEntry/showLoginPage/showDataSyncMenu）
+ *   2. 在这里把对应字段翻 true（showAccountEntry/showLoginPage）
  */
 const desktopAndWebFlags: FeatureFlags = {
   showAccountEntry: false,
   showLoginPage: false,
-  showDataSyncMenu: false,
   showGithubSyncButton: true,
   showDataImport: true,
   showAccountManagement: true,
@@ -69,7 +66,6 @@ const desktopAndWebFlags: FeatureFlags = {
 const mobileFlags: FeatureFlags = {
   showAccountEntry: false,
   showLoginPage: false,
-  showDataSyncMenu: false,
   showGithubSyncButton: false,
   showDataImport: false,
   showAccountManagement: false,

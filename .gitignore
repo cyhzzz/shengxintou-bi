@@ -129,6 +129,10 @@ tmp_*.ps1
 
 .tmp_*.py
 
+# 临时目录（下载缓存、调试产物等）
+
+tmp_*/
+
 # prototype artifacts
 
 prototype/
