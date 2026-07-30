@@ -694,6 +694,16 @@ body {
   margin-right: 0.22em;
 }
 
+/* 斜体"成"字字形溢出补偿（合成层裁切修复）：
+   .char 带 transform+filter 被提升为合成层，Chromium 按盒子边界裁切
+   字形溢出，导致斜体"成"字捺笔末端（实测溢出约 10px）被切。
+   给最后一个 .char 加 padding-right 把溢出收进盒子，再用负 margin 抵消
+   布局偏移，后续词位置不变。仅作用于 .title-italic 内末字。 */
+.title-italic .char:last-child {
+  padding-right: 0.2em;
+  margin-right: -0.2em;
+}
+
 /* 拆字字符的渐变变体（保留原 title-flow 流光动效）
    注意：background-clip:text 是元素级，inline-block 子元素拿不到；
    这里每个 .char 单独应用并同步动画，让整体仍然呈现流光效果。 */
