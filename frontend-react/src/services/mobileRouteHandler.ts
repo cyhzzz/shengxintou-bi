@@ -665,6 +665,102 @@ async function handleCostAnalysis(body: any): Promise<any> {
 }
 
 // ============================================================================
+// 应用市场消耗和成本 (app-market/cost-analysis)
+// ============================================================================
+const APP_MARKET_PLATFORMS = ['华为', '小米', '荣耀', 'oppo', 'vivo', '苹果'];
+
+function _weekStart(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return monday.toISOString().slice(0, 10);
+}
+
+async function handleAppMarketCostAnalysis(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const sd = filters.start_date || '2026-01-01';
+  const ed = filters.end_date || '2026-12-31';
+
+  // Part 1 & 2: 总体 + 分市场聚合
+  const marketWhere = buildWhere([
+    dateClause('日期', sd, ed),
+    sql`"花费" > 0`,
+    inClause('平台', APP_MARKET_PLATFORMS),
+  ]);
+
+  const marketSql = `SELECT "平台",
+    COALESCE(SUM("花费"), 0) as total_spend,
+    COALESCE(SUM("开户人数"), 0) as total_open
+    FROM agg_vendor_daily ${marketWhere.clause}
+    GROUP BY "平台" ORDER BY "平台"`;
+  const marketRows = await querySql<Row>(marketSql, marketWhere.params);
+
+  const by_market: any[] = [];
+  let total_spend = 0;
+  let total_open = 0;
+  for (const r of marketRows) {
+    const spend = round2(toFloat(r.total_spend));
+    const openCnt = toInt(r.total_open);
+    total_spend += spend;
+    total_open += openCnt;
+    by_market.push({
+      platform: r['平台'],
+      total_spend: spend,
+      total_open: openCnt,
+      cost_per_open: openCnt > 0 ? round2(spend / openCnt) : 0,
+    });
+  }
+
+  const summary = {
+    total_spend: round2(total_spend),
+    total_open,
+    cost_per_open: total_open > 0 ? round2(total_spend / total_open) : 0,
+  };
+
+  // Part 3: 月度消耗
+  const monthSql = `SELECT substr("日期", 1, 7) as month, "平台",
+    COALESCE(SUM("花费"), 0) as spend
+    FROM agg_vendor_daily ${marketWhere.clause}
+    GROUP BY month, "平台" ORDER BY month, "平台"`;
+  const monthRows = await querySql<Row>(monthSql, marketWhere.params);
+  const by_month = monthRows.map(r => ({
+    month: r.month,
+    platform: r['平台'],
+    spend: round2(toFloat(r.spend)),
+  }));
+
+  // Part 4: 周度消耗（按 Python 侧周起始逻辑，查询日数据后按周聚合）
+  const weekSql = `SELECT "日期", "平台",
+    COALESCE(SUM("花费"), 0) as spend
+    FROM agg_vendor_daily ${marketWhere.clause}
+    GROUP BY "日期", "平台" ORDER BY "日期"`;
+  const weekRows = await querySql<Row>(weekSql, marketWhere.params);
+
+  const weekMap: Record<string, number> = {};
+  const weekPlatforms: Record<string, string> = {};
+  for (const r of weekRows) {
+    const ws = _weekStart(r['日期']);
+    const key = `${ws}|${r['平台']}`;
+    weekMap[key] = (weekMap[key] || 0) + toFloat(r.spend);
+    weekPlatforms[key] = r['平台'];
+  }
+
+  const by_week = Object.entries(weekMap).map(([key, spend]) => {
+    const [ws] = key.split('|');
+    return { week_start: ws, platform: weekPlatforms[key], spend: round2(spend) };
+  }).sort((a, b) => a.week_start.localeCompare(b.week_start));
+
+  return {
+    summary,
+    by_market,
+    by_month,
+    by_week,
+    platforms: APP_MARKET_PLATFORMS,
+  };
+}
+
+// ============================================================================
 // 应用市场总览 (app-market/summary)
 // ============================================================================
 
@@ -3843,11 +3939,13 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     case 'investment-review':
       return handleInvestmentReview(url, body);
 
-    // 应用市场计划分析 + 创意
+    // 应用市场计划分析 + 创意 + 消耗成本
     case 'reports/app-market/plan-analysis':
       return handleAppMarketPlanAnalysis(body);
     case 'reports/app-market/creative':
       return handleAppMarketCreative(body);
+    case 'reports/app-market/cost-analysis':
+      return handleAppMarketCostAnalysis(body);
 
     // 小红书
     case 'xhs-notes-list':
