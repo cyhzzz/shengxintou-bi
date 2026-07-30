@@ -37,6 +37,7 @@ extraResources:
     to: server
     filter: ['**/*']
 win:
+  artifactName: shengxintou-bi-setup-${version}.exe
   target:
     - target: nsis
       arch:
