@@ -687,9 +687,11 @@ body {
   /* 拆字后用单色，避免 background-clip:text 与 inline-block 子元素的渲染冲突。
      高亮通过 brand-blue + accent-terracotta 的两个 span 共同呈现。 */
   color: var(--brand-blue);
-  /* 斜体字符右下"成"字的视觉溢出：用 padding-right 给 inline-block 容器预留空间。
-     不影响布局，只给字符溢出腾位置（box-sizing 默认 content-box）。 */
-  padding-right: 0.18em;
+  /* 斜体字符右下"成"字的视觉溢出：直接给 inline-block 容器加 margin-right，
+     让后面的"开户增长" word 离斜体字符更远，padding-right 在 inline-block
+     上不会撑出 box 实际渲染宽度（与 block 不同），margin 才是 inline-block
+     之间的有效外间距。 */
+  margin-right: 0.22em;
 }
 
 /* 拆字字符的渐变变体（保留原 title-flow 流光动效）
