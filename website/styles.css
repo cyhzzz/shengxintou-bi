@@ -264,6 +264,85 @@ body {
   gap: 6px;
 }
 
+/* 右上角下载下拉菜单 */
+.nav-download {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-download .caret {
+  transition: transform 0.25s var(--ease-out);
+  margin-left: 2px;
+}
+
+.nav-download.open .caret {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elevated);
+  padding: 6px;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+  transform-origin: top right;
+  transition: opacity 0.22s var(--ease-out), transform 0.22s var(--ease-spring);
+  pointer-events: none;
+  z-index: 200;
+}
+
+.dropdown-menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out);
+  text-align: left;
+}
+
+.dropdown-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: color 0.18s var(--ease-out);
+}
+
+.dropdown-item:hover {
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue);
+}
+
+.dropdown-item:hover svg {
+  color: var(--brand-blue);
+}
+
+/* 下载中状态 */
+.btn[data-loading="true"] {
+  pointer-events: none;
+  opacity: 0.78;
+}
+
 /* 主题切换按钮 */
 .theme-toggle {
   width: 36px;
