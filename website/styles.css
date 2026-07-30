@@ -640,11 +640,12 @@ body {
 }
 
 /* 拆字字符：Emil BlurText 思路 —— opacity + translateY + filter
-   默认隐藏，hero-title.split-started 后逐字进场 */
+   默认隐藏，hero-title.split-started 后逐字进场。
+   注意：不要给 .hero-word 加 overflow:hidden，否则 transform: translateY
+   会把字符下半部分裁切，视觉上"少字"。 */
 .hero-word {
   display: inline-block;
-  overflow: hidden;
-  vertical-align: bottom;
+  white-space: pre;
 }
 
 .hero-word .char {
@@ -653,9 +654,9 @@ body {
   transform: translateY(0.4em);
   filter: blur(6px);
   transition:
-    opacity 360ms var(--ease-out),
-    transform 360ms var(--ease-out),
-    filter 360ms var(--ease-out);
+    opacity 720ms var(--ease-out),
+    transform 720ms var(--ease-out),
+    filter 720ms var(--ease-out);
   transition-delay: var(--char-delay, 0ms);
 }
 
@@ -665,10 +666,27 @@ body {
   filter: blur(0);
 }
 
+/* 空格字符：不参与动画，立即显示，保持视觉间距 */
+.hero-word .char-space {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition: none;
+}
+
 .title-italic {
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 400;
+  /* 拆字后用单色，避免 background-clip:text 与 inline-block 子元素的渲染冲突。
+     高亮通过 brand-blue + accent-terracotta 的两个 span 共同呈现。 */
+  color: var(--brand-blue);
+}
+
+/* 拆字字符的渐变变体（保留原 title-flow 流光动效）
+   注意：background-clip:text 是元素级，inline-block 子元素拿不到；
+   这里每个 .char 单独应用并同步动画，让整体仍然呈现流光效果。 */
+.char-gradient {
   background: linear-gradient(
     100deg,
     var(--brand-blue) 0%,

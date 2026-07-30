@@ -108,21 +108,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // —— Hero 标题拆字动效（Emil BlurText 思路，CSS-only + JS 触发 stagger）——
   // 把每个 [data-split-text] 内的字符包成 <span class="char">，
-  // 同时整词加 clip-path 容器；通过 stagger index 设置 --char-delay。
+  // 空格字符不参与 stagger、不显示动画（保持视觉间距即可）。
+  // 0.5 倍速：stagger 28ms → 56ms，持续 360ms → 720ms
+  // 关键：title-italic 内的字符需要单独继承渐变（background-clip: text 是元素级，
+  //       子元素 inline-block 默认拿不到），否则「变成」会变透明。
   function splitHeroText() {
     const words = document.querySelectorAll('[data-split-text]');
     let globalIndex = 0;
     words.forEach((word) => {
+      const isGradient = word.classList.contains('title-italic');
       const original = word.textContent;
       const chars = Array.from(original);
       word.textContent = '';
       chars.forEach((ch) => {
         const span = document.createElement('span');
-        span.className = 'char';
-        span.style.setProperty('--char-delay', `${globalIndex * 28}ms`);
-        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        if (ch === ' ') {
+          span.className = 'char char-space';
+          span.innerHTML = '&nbsp;';
+        } else {
+          span.className = 'char' + (isGradient ? ' char-gradient' : '');
+          span.style.setProperty('--char-delay', `${globalIndex * 56}ms`);
+          span.textContent = ch;
+          globalIndex += 1;
+        }
         word.appendChild(span);
-        globalIndex += 1;
       });
     });
   }
