@@ -106,6 +106,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 120 + index * 120);
   });
 
+  // —— Hero 标题拆字动效（Emil BlurText 思路，CSS-only + JS 触发 stagger）——
+  // 把每个 [data-split-text] 内的字符包成 <span class="char">，
+  // 同时整词加 clip-path 容器；通过 stagger index 设置 --char-delay。
+  function splitHeroText() {
+    const words = document.querySelectorAll('[data-split-text]');
+    let globalIndex = 0;
+    words.forEach((word) => {
+      const original = word.textContent;
+      const chars = Array.from(original);
+      word.textContent = '';
+      chars.forEach((ch) => {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.style.setProperty('--char-delay', `${globalIndex * 28}ms`);
+        span.textContent = ch === ' ' ? '\u00A0' : ch;
+        word.appendChild(span);
+        globalIndex += 1;
+      });
+    });
+  }
+  splitHeroText();
+
+  // 当 hero title reveal 完成后再触发拆字动画（与 hero reveal 时序对齐）
+  const heroTitle = document.querySelector('.hero-title');
+  if (heroTitle) {
+    setTimeout(() => {
+      heroTitle.classList.add('split-started');
+    }, 280);
+  }
+
   // —— Hero 截图卡片入场 + 鼠标视差跟随 ——
   const heroVisual = document.querySelector('.hero-visual');
   if (heroVisual) {

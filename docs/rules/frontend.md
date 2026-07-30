@@ -72,6 +72,43 @@
 - 动效优先修改 `transform` / `opacity`，遵守 `prefers-reduced-motion`，避免触发布局抖动。
 - 不用全局选择器修复单页问题，除非该行为确实是全站规范。
 
+### 6.1 动效评审标准（Emil Kowalski design-engineering）
+
+涉及 UI 动画、hover、按钮反馈、弹层入场等动效时，按以下十条不可妥协标准评审（来源：[emilkowalski/skills](https://github.com/emilkowalski/skills) `emil-design-eng` / `review-animations`）：
+
+1. **动效必须有目的**：spatial consistency / state indication / feedback / explanation / 防突兀；「就为了好看」且高频出现是 block。
+2. **频率匹配**：键盘触发的、每天 100+ 次的交互（如 command palette、tab 切换）不加动画；tens/day 缩短或删；occasional 标准动效；rare/first-time 可加 delight。
+3. **响应式 easing**：入场/出场用 `ease-out` 或强自定义曲线；UI 上禁用 `ease-in`；内置 `ease`/`linear` 太弱，必须用自定义 `cubic-bezier(0.23, 1, 0.32, 1)` 等强曲线。
+4. **UI 动画 < 300ms**：按钮按压 100-160ms，tooltip 125-200ms，下拉 150-250ms，弹层 200-500ms；marketing/explanatory 例外。
+5. **原点与物理性**：popover/dropdown/tooltip 从触发器 origin 缩放（不是 center）；永远不要从 `scale(0)` 起始，改用 `scale(0.9-0.97)` + opacity（modal 例外）。
+6. **可中断**：高频触发动效用 CSS transition 或 spring，不要用 keyframes（restart from zero 会导致抖动）。
+7. **只动 `transform` / `opacity`**：禁止动画 `width`/`height`/`margin`/`padding`/`top`/`left`/`right`/`bottom`；`will-change` 仅在动效期间使用。
+8. **无障碍**：`prefers-reduced-motion: reduce` 必须降级（保留 opacity/color，去 transform）；hover 动效用 `@media (hover: hover) and (pointer: fine)` 门控，触屏不应响应 hover。
+9. **非对称时序**：按下/释放类交互慢进快出；系统响应快速；不要进出对称。
+10. **整体一致**：动效风格匹配组件人格（dashboard crisp、consumer playful），不一致即视为「unseen detail」短板。
+
+**硬性修复对照（部分）**：
+
+| Before | After | Why |
+| --- | --- | --- |
+| `transition: all 300ms` | `transition: transform 200ms var(--ease-out)` | `all` 会动画意料外属性且 off-GPU |
+| `transform: scale(0)` 入场 | `transform: scale(0.95); opacity: 0` | 现实世界没有从无到有 |
+| UI 用 `ease-in` | `ease-out` + 自定义 curve | `ease-in` 延迟用户最关注的第一帧 |
+| 按钮无 `:active` | `:active { transform: scale(0.97) }` 160ms ease-out | 按钮必须有按下反馈 |
+| `transform-origin: center` popover | `var(--transform-origin)` 或触发器位置 | popover 应从触发器缩放 |
+| 用 keyframe 做 toast | 改用 CSS transition | keyframe 不可中断 |
+| hover transform 裸写 | 包在 `@media (hover: hover) and (pointer: fine)` 内 | 触屏不应响应 hover |
+
+**token 推荐**（项目未现成 token 时，可直接拷到 CSS 顶部）：
+
+```css
+--ease-out: cubic-bezier(0.23, 1, 0.32, 1);    /* 入场/出场 */
+--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* 屏幕内移动 */
+--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);  /* iOS-like drawer */
+```
+
+详细评审流程与硬规则见 `review-animations` skill；改造清单与优先级见 `improve-animations` skill。本节作为该项目动效评审的硬约束来源（不替代实际代码评审）。
+
 ## 7. 指南与静态内容
 
 - 当前 `GuideModal` 使用内置 `GUIDE_CONTENTS`，不是运行时 fetch Markdown；修改前先读当前组件，不套用旧版 fetch 规则。
