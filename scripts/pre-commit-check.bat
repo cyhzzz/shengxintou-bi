@@ -31,7 +31,7 @@ if %RULE_EXIT%==0 (
 echo.
 
 REM ---- Step 2: cross-platform contract drift ----
-echo [2/7] Cross-platform contract: API vs mobileRouteHandler...
+echo [2/8] Cross-platform contract: API vs mobileRouteHandler...
 python scripts\check_api_contract.py
 set CONTRACT_EXIT=%ERRORLEVEL%
 if %CONTRACT_EXIT%==0 (
@@ -42,7 +42,7 @@ if %CONTRACT_EXIT%==0 (
 )
 echo.
 
-echo [3/7] Cross-platform contract: router vs smoke spec...
+echo [3/8] Cross-platform contract: router vs smoke spec...
 python scripts\check_route_drift.py
 set ROUTE_EXIT=%ERRORLEVEL%
 if %ROUTE_EXIT%==0 (

@@ -34,6 +34,9 @@ REQUIRED = (
     RULES / 'workflows' / 'feature.md',
     RULES / 'workflows' / 'bugfix.md',
     RULES / 'templates' / 'tech-spec.md',
+    ROOT / 'website' / 'index.html',
+    ROOT / 'website' / 'app.js',
+    ROOT / 'website' / 'styles.css',
 )
 
 ROOT_REFERENCES = (
@@ -52,6 +55,8 @@ ROOT_REFERENCES = (
     'backend/config/anchor_live_types.json',
     'backend/processors/v2/raw_import.py',
     'frontend-react/src/types/api.ts',
+    'website/',
+    'scripts/check_filter_bar_usage.py',
 )
 
 COVERAGE = {
@@ -79,9 +84,11 @@ COVERAGE = {
     RULES / 'frontend.md': (
         'MetricCard',
         'ReportFooter',
+        'FilterBar',
         'sanitizeText',
         'dataIndex',
         'api.ts',
+        'check_filter_bar_usage.py',
     ),
     RULES / 'cross-platform.md': (
         'mobileRouteHandler',

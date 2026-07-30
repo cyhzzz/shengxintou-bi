@@ -94,12 +94,14 @@
 | --- | --- |
 | `MetricCard` / `MetricSection` | 报表头部统一指标卡与响应式卡组 |
 | `ReportFooter` | 数据源、端点、口径和备注的统一弱化脚注 |
+| `FilterBar` | 报表筛选器统一入口（内置查询/重置按钮 + `DateRangeFilter` 近 7/14/30/90/180 天快速选择） |
 | `FunnelChart` | Ant Design Plots 漏斗及 CSS 横条错误降级 |
 | `CalendarHeatmap` | Dashboard 开户日历热力图 |
 | `sanitizeText` | 清理 Excel 导入字段中的 BOM、NUL、控制字符、替换符和零宽字符 |
 
 ## 外部集成
 
+- 官网（GitHub Pages）：`website/` 静态页面，通过 `.github/workflows/pages.yml` 自动部署到 GitHub Pages 根路径，含三端下载入口（`website/app.js` 调 GitHub API 直接触发最新 release 资产下载）与产品介绍；PWA 部署在 `/app/` 子路径。
 - 飞书同步路由已下线；环境变量只作为预留，不能根据旧文档假设存在可用路由。
 - 坚果云 WebDAV 由 `backend/routes/webdav_backup.py` 和 `backend/utils/webdav_client.py` 处理。
 - WebDAV 网络层错误返回 `502 + UPSTREAM_UNAVAILABLE`；其他列表/业务错误返回 `500 + LIST_FAILED`。

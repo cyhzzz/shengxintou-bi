@@ -95,12 +95,10 @@ backend/utils/                 异常、代理商、WebDAV、周报工具、方�
 frontend-react/src/router/      lazy 路由与旧路径重定向（ProtectedRoute 仅桌面版启用）
 frontend-react/src/layouts/     主布局、菜单与滚动容器（featureFlags 控制菜单显隐）
 frontend-react/src/pages/       报表与系统页面（含 Login 页面）
-frontend-react/src/components/  共享组件
+frontend-react/src/components/  共享组件（MetricCard / ReportFooter / FilterBar / Chart 等）
 frontend-react/src/config/      功能开关（features.ts：Web 版 vs 桌面版显隐配置）
 frontend-react/src/services/    HTTP（自动注入 Bearer token）、数据、上传、元数据、版本、auth
-frontend-react/src/stores/      Zustand 状态（含 useAuthStore）
-frontend-react/src/types/       业务类型与生成类型
-frontend-react/src/styles/      token、变量和全局样式
+frontend-react/src/stores/      Zustand 状态（含 useAuthStore）；types/ 业务与生成类型；styles/ 维护 token
 frontend-react/src/utils/       筛选、文本清洗、图表工具、环境判断（isDesktop）
 ```
 
@@ -109,9 +107,8 @@ frontend-react/src/utils/       筛选、文本清洗、图表工具、环境判
 ```text
 desktop/                        Electron 客户端（main.ts + preload.ts + flask-manager.ts）
 desktop/electron-builder.yml    electron-builder 配置
-省心投-server.spec              PyInstaller 打包 server.exe
+省心投-server.spec + server_entry.py  PyInstaller 打包 server.exe（frozen 模式路径解析）
 scripts/build-installer.ps1     三阶段打包脚本（PyInstaller + 前端 build + NSIS）
-server_entry.py                 桌面版 Flask 入口（frozen 模式路径解析）
 ```
 
 ### 移动端（Android / Capacitor）
@@ -123,11 +120,14 @@ android/scripts/post-sync-patch.ps1  cap sync 后注入镜像/JDK17/全屏/横�
 android/scripts/generate-icons.ps1   生成 ic_launcher 图标（50% 安全区防切割）
 android/gradle-home/            项目级 Gradle 缓存（避免沙箱拦截 ~/.gradle）
 android/release/                中文名 APK 输出（省心投-vX.Y.Z.apk）
-frontend-react/src/services/mobileSqlite.ts  直接用 CapacitorSQLite 插件（不通过不存在的 SQLiteConnection 类）
-frontend-react/src/services/mobileSync.ts    坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
+frontend-react/src/services/mobileSqlite.ts / mobileSync.ts  CapacitorSQLite 直连 + 坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
 frontend-react/src/utils/isDesktop.ts        isMobileClient 三重兜底（isNativePlatform/getPlatform/androidBridge）
 frontend-react/src/main.tsx                  动态 import App 等 Capacitor bridge 就绪再渲染
 ```
+
+### 官网（GitHub Pages）
+
+`website/` 静态页面（含三端下载入口）；`website/app.js` 调 GitHub API 直接触发最新 release 资产下载；`.github/workflows/pages.yml` 自动部署 website/ + frontend-react/dist/ 到 GitHub Pages（根路径官网，`/app/` 子路径 PWA）。
 
 ### 四端支持
 
@@ -139,11 +139,10 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 移动端（Android） | 本地 SQLite | 跳过鉴权（内置） | `npm run build` + cap sync + assembleDebug | `android/scripts/post-sync-patch.ps1` |
 | PWA 端（iOS Safari） | IndexedDB + sql.js | 跳过鉴权 | `npm run build:pwa`（base=`/app/`） | GitHub Pages 自动部署（`.github/workflows/pages.yml`） |
 
-- 数据库切换：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG，不设走 SQLite。
-- 鉴权开关：`.env` 设 `AUTH_ENABLED=true/false`。
-- 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 功能开关控制菜单显隐与 ProtectedRoute。
-- 打包脚本：桌面版 `scripts/build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS）；移动端 `cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+）。
-- 移动端/PWA 详细约束（Capacitor SQLite 操作顺序、HashRouter、sql.js、WebDAV 代理、IndexedDB persist）见 `docs/rules/cross-platform.md` 第 4 节。
+- 数据库切换与鉴权：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG、`AUTH_ENABLED=true/false` 控制鉴权。
+- 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 控制菜单显隐与 ProtectedRoute。
+- 打包脚本：桌面版 `scripts/build-installer.ps1`（Node.js 20+ + Python 3.9+ + NSIS）；移动端 `cd android && npm run build:apk`（JDK 17 + Android SDK + Node.js 20+）。
+- 移动端/PWA 详细约束（Capacitor SQLite 顺序、HashRouter、sql.js、WebDAV 代理、IndexedDB persist）见 `docs/rules/cross-platform.md` 第 4 节。
 
 ## 6. 按任务读取规则
 
@@ -168,7 +167,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 - 不改 `models_v2.py` 中文列名来迎合前端。
 - 不新增下游 mapping / 归一化 processor。
 - 不手改生成文件；API 类型通过 `npm run generate:api` 更新。
-- 报表头部指标统一使用 `MetricCard + MetricSection`；既有特殊报表例外见前端规则。
+- 报表头部指标统一使用 `MetricCard + MetricSection`；筛选器统一使用 `FilterBar`；既有特殊报表例外见前端规则。
 - 数据源、端点和口径说明统一放 `ReportFooter`。
 - Excel 脏文本展示前使用 `sanitizeText()`。
 - 行级设备/线索明细提供 `Modal + Descriptions column={2}` 详情模式。
@@ -189,6 +188,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | lint 或大范围前端重构 | `npm run lint` |
 | lazy 路由 | `npm run test:smoke` |
 | 跨端契约（API/路由/flag/case） | `python scripts/check_api_contract.py` + `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节触发条件） |
+| 报表筛选器 | `python scripts/check_filter_bar_usage.py`（禁止手写 `<RangePicker>` + 自定义按钮；详见 `docs/rules/frontend.md` 第 9 节） |
 | 移动端 SQLite 路由 | `python scripts/test_mobile_routes.py` |
 | Bug 修复 | 对应最小回归用例 |
 | 发版前 | `scripts/run-full-tests.bat` |
