@@ -4,18 +4,16 @@
  * 4 部分: 总览指标卡 → 分市场表格 → 月度柱状图 → 周度柱状图
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, DatePicker, Space, Spin, Table, Tag } from 'antd';
-import { ReloadOutlined, MoneyCollectOutlined, TeamOutlined, AimOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { Card, Spin, Table, Tag } from 'antd';
+import { MoneyCollectOutlined, TeamOutlined, AimOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
+import { useFilterStore } from '@/stores';
 import styles from './index.module.scss';
-
-const { RangePicker } = DatePicker;
 
 const PLATFORM_COLORS: Record<string, string> = {
   '华为': '#B5A084', // 莫兰迪土棕
@@ -27,16 +25,16 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 const CostAnalysisPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+  const { dateRange } = useFilterStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  const loadData = async (sd: string, ed: string) => {
+  const loadData = async () => {
     setLoading(true);
     try {
       const res = await dataServiceReports.getAppMarketCostAnalysis({
-        start_date: sd,
-        end_date: ed,
+        start_date: dateRange.startDate,
+        end_date: dateRange.endDate,
       });
       if (res?.success) setData(res.data);
     } catch {
@@ -47,8 +45,9 @@ const CostAnalysisPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData(dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD'));
-  }, []);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.startDate, dateRange.endDate]);
 
   // ---- Part 3: 月度柱状图 ----
   const monthChartOption: EChartsOption = useMemo(() => {
@@ -224,10 +223,6 @@ const CostAnalysisPage: React.FC = () => {
     };
   }, [data]);
 
-  const handleSearch = () => {
-    loadData(dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD'));
-  };
-
   // Part 2 表格列
   const marketColumns = [
     { title: '应用市场', dataIndex: 'platform', key: 'platform', render: (v: string) => <Tag color={PLATFORM_COLORS[v] || '#ccc'} style={{ border: 'none' }}>{v}</Tag> },
@@ -238,19 +233,14 @@ const CostAnalysisPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      <Card className={styles.filterCard} size="small">
-        <Space wrap>
-          <RangePicker
-            value={dateRange}
-            onChange={(dates) => {
-              if (dates && dates[0] && dates[1]) setDateRange([dates[0], dates[1]]);
-            }}
-            allowClear={false}
-            format="YYYY-MM-DD"
-          />
-          <ReloadOutlined onClick={handleSearch} style={{ cursor: 'pointer', fontSize: 18 }} />
-        </Space>
-      </Card>
+      <FadeInSection>
+        <FilterBar
+          showPlatform={false}
+          showAgency={false}
+          onSearch={() => loadData()}
+          onReset={() => loadData()}
+        />
+      </FadeInSection>
 
       <Spin spinning={loading}>
         {/* Part 1: 总览指标卡 */}
