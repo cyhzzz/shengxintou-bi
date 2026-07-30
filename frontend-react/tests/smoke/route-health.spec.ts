@@ -28,6 +28,8 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '应用市场-漏斗', path: '/app-market/funnel' },
   { name: '应用市场-对比', path: '/app-market/comparison' },
   { name: '应用市场-明细', path: '/app-market/detail' },
+  // v3.6.3：消耗和成本子报表
+  { name: '应用市场-消耗成本', path: '/app-market/cost-analysis' },
   // v3.3.10：creative → plan-analysis（命名统一；旧路径走 Navigate 重定向，保留一项用例验证重定向可用）
   { name: '应用市场-计划分析', path: '/app-market/plan-analysis' },
   { name: '应用市场-创意(旧路径重定向)', path: '/app-market/creative' },

@@ -685,7 +685,7 @@ async function handleAppMarketCostAnalysis(body: any): Promise<any> {
   // Part 1 & 2: 总体 + 分市场聚合
   const marketWhere = buildWhere([
     dateClause('日期', sd, ed),
-    sql`"花费" > 0`,
+    { sql: '"花费" > 0', params: [] },
     inClause('平台', APP_MARKET_PLATFORMS),
   ]);
 

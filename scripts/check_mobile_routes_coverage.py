@@ -67,6 +67,8 @@ KNOWN_UNTESTED: Dict[str, str] = {
     'reports/weekly/periods': 'low',
     'reports/weekly/data': 'medium',
     'metadata': 'low',
+    # v3.6.4：返回构建时注入的 __APP_VERSION_INFO__，不走 SQL 查询，无需/无法在 SQL 测试框架中覆盖
+    'version/local': 'low',
 }
 
 
@@ -113,6 +115,8 @@ def case_matches_test(case: str, test_names: Set[str]) -> bool:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     print('=' * 72)
     print('check_mobile_routes_coverage.py — mobileRouteHandler case 测试覆盖对账')
     print('=' * 72)

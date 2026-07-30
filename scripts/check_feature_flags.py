@@ -112,6 +112,8 @@ def extract_config_objects() -> Dict[str, Set[str]]:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     print('=' * 72)
     print('check_feature_flags.py — features.ts 声明 vs 实际使用对账')
     print('=' * 72)

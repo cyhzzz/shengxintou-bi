@@ -4,11 +4,13 @@
  * 4 部分: 总览指标卡 → 分市场表格 → 月度柱状图 → 周度柱状图
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, DatePicker, Space, Spin, Table, Tag } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Card, DatePicker, Space, Spin, Table, Tag } from 'antd';
+import { ReloadOutlined, MoneyCollectOutlined, TeamOutlined, AimOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection } from '@/components';
+import { MetricCard, MetricSection } from '@/components/MetricCard';
+import { ReportFooter } from '@/components/ReportFooter';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
 import styles from './index.module.scss';
@@ -51,8 +53,9 @@ const CostAnalysisPage: React.FC = () => {
   // ---- Part 3: 月度柱状图 ----
   const monthChartOption: EChartsOption = useMemo(() => {
     if (!data?.by_month) return {};
-    const months = [...new Set(data.by_month.map((d: any) => d.month))].sort();
-    const platforms = data.platforms || [];
+    const months = [...new Set(data.by_month.map((d: any) => d.month))] as string[];
+    months.sort();
+    const platforms: string[] = data.platforms || [];
 
     // 计算每月合计
     const monthTotals = months.map((m: string) => {
@@ -64,9 +67,9 @@ const CostAnalysisPage: React.FC = () => {
       return { month: m, total: Math.round(total) };
     });
 
-    const series = platforms.map((p: string) => ({
+    const series: any[] = platforms.map((p: string) => ({
       name: p,
-      type: 'bar' as const,
+      type: 'bar',
       stack: 'total',
       barMaxWidth: 48,
       itemStyle: { color: PLATFORM_COLORS[p] || '#ccc' },
@@ -93,9 +96,7 @@ const CostAnalysisPage: React.FC = () => {
     // 总计折线（展示在柱状图上方）
     series.push({
       name: '合计',
-      type: 'line' as const,
-      stack: undefined,
-      barMaxWidth: undefined,
+      type: 'line',
       data: monthTotals.map((t) => t.total),
       itemStyle: { color: '#666' },
       lineStyle: { type: 'dashed', width: 1, color: '#999' },
@@ -109,8 +110,7 @@ const CostAnalysisPage: React.FC = () => {
         color: '#333',
         fontWeight: 'bold',
       },
-      // 占位用，不占堆叠
-    }) as any;
+    });
 
     return {
       tooltip: {
@@ -138,8 +138,9 @@ const CostAnalysisPage: React.FC = () => {
   // ---- Part 4: 周度柱状图 ----
   const weekChartOption: EChartsOption = useMemo(() => {
     if (!data?.by_week) return {};
-    const weeks = [...new Set(data.by_week.map((d: any) => d.week_start))].sort();
-    const platforms = data.platforms || [];
+    const weeks = [...new Set(data.by_week.map((d: any) => d.week_start))] as string[];
+    weeks.sort();
+    const platforms: string[] = data.platforms || [];
 
     // 计算每周合计
     const weekTotals = weeks.map((w: string) => {
@@ -151,9 +152,9 @@ const CostAnalysisPage: React.FC = () => {
       return { week: w, total: Math.round(total) };
     });
 
-    const series = platforms.map((p: string) => ({
+    const series: any[] = platforms.map((p: string) => ({
       name: p,
-      type: 'bar' as const,
+      type: 'bar',
       stack: 'total',
       barMaxWidth: 36,
       itemStyle: { color: PLATFORM_COLORS[p] || '#ccc' },
@@ -180,9 +181,7 @@ const CostAnalysisPage: React.FC = () => {
     // 总计线
     series.push({
       name: '合计',
-      type: 'line' as const,
-      stack: undefined,
-      barMaxWidth: undefined,
+      type: 'line',
       data: weekTotals.map((t) => t.total),
       itemStyle: { color: '#666' },
       lineStyle: { type: 'dashed', width: 1, color: '#999' },
@@ -196,7 +195,7 @@ const CostAnalysisPage: React.FC = () => {
         color: '#333',
         fontWeight: 'bold',
       },
-    }) as any;
+    });
 
     return {
       tooltip: {
@@ -256,32 +255,37 @@ const CostAnalysisPage: React.FC = () => {
       <Spin spinning={loading}>
         {/* Part 1: 总览指标卡 */}
         <FadeInSection>
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            <Col xs={24} sm={8}>
-              <Card size="small" className={styles.metricCard}>
-                <div className={styles.metricLabel}>总消耗</div>
-                <div className={styles.metricValue} style={{ color: '#cf1322' }}>
-                  ¥{data ? (data.summary.total_spend / 10000).toFixed(2) : '--'}万
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Card size="small" className={styles.metricCard}>
-                <div className={styles.metricLabel}>总开户</div>
-                <div className={styles.metricValue} style={{ color: '#1890ff' }}>
-                  {data ? data.summary.total_open.toLocaleString() : '--'}户
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Card size="small" className={styles.metricCard}>
-                <div className={styles.metricLabel}>平均开户成本</div>
-                <div className={styles.metricValue} style={{ color: '#52c41a' }}>
-                  ¥{data ? data.summary.cost_per_open.toFixed(2) : '--'}/户
-                </div>
-              </Card>
-            </Col>
-          </Row>
+          <MetricSection title="消耗和成本概览" description="总消耗 / 总开户 / 平均开户成本（agg_vendor_daily 聚合）">
+            <MetricCard
+              title="总消耗"
+              value={data?.summary.total_spend}
+              formatter="currency"
+              prefix="¥"
+              valueColor="var(--color-error)"
+              icon={<MoneyCollectOutlined style={{ color: 'var(--color-error)' }} />}
+              description="区间内各应用市场累计广告消耗"
+              showWowChange={false}
+            />
+            <MetricCard
+              title="总开户"
+              value={data?.summary.total_open}
+              valueColor="var(--color-brand)"
+              icon={<TeamOutlined style={{ color: 'var(--color-brand)' }} />}
+              description="区间内各应用市场累计开户人数"
+              showWowChange={false}
+            />
+            <MetricCard
+              title="平均开户成本"
+              value={data?.summary.cost_per_open}
+              formatter="currency"
+              prefix="¥"
+              suffix="/户"
+              valueColor="var(--color-success)"
+              icon={<AimOutlined style={{ color: 'var(--color-success)' }} />}
+              description="总消耗 ÷ 总开户 · 单位转化成本"
+              showWowChange={false}
+            />
+          </MetricSection>
         </FadeInSection>
 
         {/* Part 2: 分市场表格 */}
@@ -317,6 +321,17 @@ const CostAnalysisPage: React.FC = () => {
               <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无周度数据</div>
             )}
           </Card>
+        </FadeInSection>
+
+        <FadeInSection>
+          <ReportFooter
+            sources={[
+              { label: '数据源', value: 'agg_vendor_daily（按日聚合的厂商投放消耗与开户数据）' },
+              { label: '端点', value: 'POST /api/v1/app-market/cost-analysis（后端 backend/routes/reports/app_market_cost.py）' },
+              { label: '口径', value: '过滤 花费 > 0 且 平台 ∈ {华为, 小米, 荣耀, oppo, vivo, 苹果}；开户成本 = 花费 ÷ 开户人数' },
+              { label: '移动端', value: 'mobileRouteHandler.ts::handleAppMarketCostAnalysis 同口径 SQL（SQLite 本地查询）' },
+            ]}
+          />
         </FadeInSection>
       </Spin>
     </div>

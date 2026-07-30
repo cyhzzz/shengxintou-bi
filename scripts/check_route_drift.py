@@ -157,6 +157,8 @@ def extract_smoke_routes() -> Set[str]:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     print('=' * 72)
     print('check_route_drift.py — router/index.tsx vs route-health.spec.ts 对账')
     print('=' * 72)

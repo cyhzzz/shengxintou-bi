@@ -116,6 +116,17 @@ tests = [
           FROM agg_vendor_daily GROUP BY "日期", "平台", "厂商" LIMIT 5''',
         'params': [],
     },
+    {
+        'name': 'reports/app-market/cost-analysis',
+        'sql': '''SELECT "平台",
+            COALESCE(SUM("花费"), 0) as total_spend,
+            COALESCE(SUM("开户人数"), 0) as total_open
+          FROM agg_vendor_daily
+          WHERE "日期" >= ? AND "日期" <= ? AND "花费" > 0
+            AND "平台" IN ('华为', '小米', '荣耀', 'oppo', 'vivo', '苹果')
+          GROUP BY "平台" ORDER BY "平台"''',
+        'params': ['2026-01-01', '2026-12-31'],
+    },
 ]
 
 if __name__ == '__main__':

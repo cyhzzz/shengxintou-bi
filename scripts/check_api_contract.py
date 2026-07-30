@@ -211,6 +211,8 @@ def normalize_for_compare(path: str) -> str:
 
 
 def main() -> int:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     print('=' * 72)
     print('check_api_contract.py — 后端 API vs mobileRouteHandler 对账')
     print('=' * 72)
