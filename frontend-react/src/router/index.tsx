@@ -65,6 +65,8 @@ const AppMarketComparisonPage = lazy(() => import('@/pages/Reports/AppMarket/Com
 const AppMarketDetailPage = lazy(() => import('@/pages/Reports/AppMarket/Detail'));
 // v3.3.10: Creative.tsx → PlanAnalysis.tsx（统一为"计划分析"命名）
 const AppMarketPlanAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/PlanAnalysis'));
+// v3.6.3: 应用市场 · 消耗和成本
+const AppMarketCostAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/CostAnalysis'));
 
 // 直播 v3.1
 const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
@@ -123,6 +125,8 @@ const mainChildren = [
       { path: 'plan-analysis', element: withSuspense(AppMarketPlanAnalysisPage) },
       // v3.3.10: 旧路径 creative 重定向到 plan-analysis
       { path: 'creative', element: <Navigate to="/app-market/plan-analysis" replace /> },
+      // v3.6.3: 消耗和成本
+      { path: 'cost-analysis', element: withSuspense(AppMarketCostAnalysisPage) },
     ],
   },
   // 直播 v3.1 占位

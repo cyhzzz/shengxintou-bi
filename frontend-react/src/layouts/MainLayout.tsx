@@ -28,6 +28,7 @@ import {
   SunOutlined,
   MoonOutlined,
   AuditOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import MobileSyncButton from '@/components/MobileSyncButton';
@@ -91,6 +92,8 @@ const menuItems: MenuProps['items'] = [
       { key: '/app-market/detail', label: '明细查询', icon: <UnorderedListOutlined /> },
       // v3.3.10: 路由 key 由 /app-market/creative 改为 /app-market/plan-analysis（命名统一）
       { key: '/app-market/plan-analysis', label: '计划分析', icon: <FileTextOutlined /> },
+      // v3.6.3: 消耗和成本
+      { key: '/app-market/cost-analysis', label: '消耗和成本', icon: <DollarOutlined /> },
     ],
   },
   {

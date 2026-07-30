@@ -354,6 +354,10 @@ export const dataServiceReports = {
   getXhsPlanAnalysis: async (params: { filters?: Record<string, unknown>; top_n?: number }) => {
     return http.post('/reports/xhs/plan-analysis', params);
   },
+  // v3.6.3 应用市场 · 消耗和成本
+  getAppMarketCostAnalysis: async (filters: { start_date: string; end_date: string }) => {
+    return http.post('/reports/app-market/cost-analysis', { filters });
+  },
 };
 
 
