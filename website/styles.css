@@ -648,6 +648,12 @@ body {
   white-space: pre;
 }
 
+/* 同一行内多个 hero-word 之间需要视觉间距
+   （「变成」+「开户增长」两段 inline-block 紧贴会看起来重叠） */
+.hero-line .hero-word + .hero-word {
+  margin-left: 0.4em;
+}
+
 .hero-word .char {
   display: inline-block;
   opacity: 0;
@@ -1174,8 +1180,8 @@ body {
 
 .platform-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 28px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
 }
 
 .platform-card {
