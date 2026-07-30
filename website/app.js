@@ -198,12 +198,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // —— v3.6.2：iOS 用户访问官网时高亮 PWA 入口 + 显示引导提示 ——
-  // v3.6.2：首屏「下载最新版」和右上角「下载」按钮也自适应 iOS → 指向 PWA
-  // v3.6.4：Windows/Android 按钮改成直接触发 release 最新 asset 下载，不再跳 release 页面
-  //         右上角改成下拉菜单，三端选项都可用
+  // —— iOS 用户访问官网时高亮 PWA 入口 ——
+  // 首屏「下载最新版」和右上角「下载」按钮也自适应 iOS → 指向 PWA
+  // Windows/Android 按钮直接触发 release 最新 asset 下载，不再跳 release 页面
+  // 右上角改成下拉菜单，三端选项都可用
   const iosBtn = document.getElementById('iosPwaBtn');
-  const iosHint = document.getElementById('iosHint');
   const heroBtn = document.getElementById('heroDownloadBtn');
   const navBtn = document.getElementById('navDownloadBtn');
   const navDropdown = document.getElementById('navDropdown');
@@ -361,10 +360,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // —— iOS 平台自适应：底部 iOS 按钮高亮 + 显示提示 ——
+  // —— iOS 平台自适应：底部 iOS 按钮高亮 ——
   if (isIOS) {
-    if (iosBtn && iosHint) {
-      iosHint.style.display = 'block';
+    if (iosBtn) {
       iosBtn.style.background = 'linear-gradient(135deg, #1677ff 0%, #4096ff 100%)';
       iosBtn.style.boxShadow = '0 8px 24px rgba(22, 119, 255, 0.4)';
     }
