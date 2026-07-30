@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
+
+// v3.6.4：构建时注入 version.json 内容，供 mobileRouteHandler 的 version/local case 使用。
+//   避免移动端/PWA 端因缺少后端 Flask 而无法获取版本信息。
+//   version.json 在仓库根，frontend-react 在子目录，用 fs.readFileSync 跨目录读取。
+const versionJsonPath = path.resolve(__dirname, '../version.json')
+const versionInfo = JSON.parse(fs.readFileSync(versionJsonPath, 'utf-8'))
 
 // https://vite.dev/config/
 // v3.6.0：移除 vite 构建期对根 .env WEBDAV_* 的注入。
@@ -18,6 +25,11 @@ import path from 'path'
 export default defineConfig(({ mode }) => ({
   base: mode === 'pwa' ? '/shengxintou-bi/app/' : '/',
   plugins: [react()],
+  define: {
+    // 构建时把 version.json 内容注入为全局变量 __APP_VERSION_INFO__
+    // mobileRouteHandler 的 version/local case 直接返回此对象
+    __APP_VERSION_INFO__: JSON.stringify(versionInfo),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

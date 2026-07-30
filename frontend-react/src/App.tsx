@@ -7,6 +7,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 import { initMobileDatabase, databaseExists, copyDatabaseFromAssets } from '@/services/mobileSqlite';
 import { syncFromWebDAV } from '@/services/mobileSync';
+import PwaInstallGuide from '@/components/PwaInstallGuide';
 import './styles/global.scss';
 
 // 亮色模式主题 — 显式设定所有颜色 token
@@ -252,6 +253,8 @@ function App() {
       {/* antd v5：必须用 <App> 包裹，App.useApp() 才能返回可用的 message/notification/modal 实例 */}
       <AntApp>
         <AppRouter />
+        {/* v3.6.4：PWA 端首次访问时引导用户添加到主屏幕（非 PWA 环境不渲染） */}
+        {isPwaClient() && <PwaInstallGuide />}
       </AntApp>
     </ConfigProvider>
   );

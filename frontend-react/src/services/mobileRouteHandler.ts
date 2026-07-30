@@ -10,6 +10,16 @@
  */
 import { querySql } from './mobileSqlite';
 
+// v3.6.4：由 vite.config.ts define 注入的 version.json 内容（构建时确定）
+// 移动端/PWA 端关于页的 version/local 端点直接返回此对象
+declare const __APP_VERSION_INFO__: {
+  version: string;
+  release_date: string;
+  changelog?: string[];
+  [key: string]: unknown;
+};
+const APP_VERSION_INFO = __APP_VERSION_INFO__;
+
 // ============================================================================
 // 工具函数
 // ============================================================================
@@ -3865,6 +3875,10 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleWeeklyPeriods();
     case 'reports/weekly/data':
       return handleWeeklyData(body);
+
+    // v3.6.4：版本信息（关于页），由 vite define 在构建时注入，无需数据库查询
+    case 'version/local':
+      return APP_VERSION_INFO;
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);
