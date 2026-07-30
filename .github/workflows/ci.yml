@@ -39,6 +39,8 @@ jobs:
         run: python scripts/check_feature_flags.py
       - name: mobileRouteHandler case vs tests
         run: python scripts/check_mobile_routes_coverage.py
+      - name: FilterBar usage vs hand-written RangePicker
+        run: python scripts/check_filter_bar_usage.py
 
   backend-smoke:
     name: Backend API smoke

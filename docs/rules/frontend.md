@@ -94,6 +94,8 @@
 - 金额、比率和人数的分母为 0 时展示约定值或 `-`，不要产生 `Infinity` / `NaN`。
 - 同名主播跨平台聚合时集合字段去重，数值字段按后端语义求和。
 - ReportFooter 要说明后端源表和口径，但不复制版本 changelog。
+- 报表筛选器统一使用 `FilterBar` 共享组件（内置查询/重置按钮 + `DateRangeFilter` 近 7/14/30/90/180 天与「全部」快速选择）；禁止页面内手写 `<RangePicker>` + 自定义按钮。需要平台/代理商等筛选时通过 `showPlatform`/`showAgency` 等 props 开启，日期范围一律走 `DateRangeFilter`。
+- 既有手写 `<RangePicker>` 的页面属历史债务，记录在 `scripts/check_filter_bar_usage.py` 的 `KNOWN_VIOLATIONS`；新增报表不得手写，新增违规 CI 失败。
 
 ## 10. 最小验证
 

@@ -50,6 +50,7 @@
 - [ ] 改 `router/index.tsx` 或 smoke 用例：`python scripts/check_route_drift.py` 无 drift
 - [ ] 改 `features.ts` 或菜单：`python scripts/check_feature_flags.py` 无 ERROR
 - [ ] 新增 `mobileRouteHandler` case：`python scripts/check_mobile_routes_coverage.py` 无新 drift，并在 `scripts/test_mobile_routes.py` 补对应 SQL 用例
+- [ ] 新增/修改报表筛选器：`python scripts/check_filter_bar_usage.py` 无新 drift（筛选器用 FilterBar，不手写 RangePicker）
 
 ### 文档
 - [ ] `python scripts/check_rule_architecture.py` 通过（自动校验双入口 SHA256、规则链接与版本漂移）

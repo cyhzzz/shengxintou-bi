@@ -196,6 +196,7 @@
 | 前端新增/修改路由 | 路由 drift 对账 | `python scripts/check_route_drift.py` |
 | 修改 featureFlags | featureFlag 对账 | `python scripts/check_feature_flags.py` |
 | 新增 mobileRouteHandler case | case 覆盖对账 | `python scripts/check_mobile_routes_coverage.py` |
+| 前端新增/修改报表筛选器 | FilterBar 使用对账 | `python scripts/check_filter_bar_usage.py` |
 | lazy 路由 | 路由 smoke | `cd frontend-react && npm run test:smoke` |
 | Bug 修复 | 最小回归 | 对应 `tests/` 或 `frontend-react/tests/regression/` |
 | lint 或大范围前端重构 | lint | `cd frontend-react && npm run lint` |
@@ -248,6 +249,7 @@
 | ✅ | `python scripts/check_feature_flags.py` | 若动了 `features.ts`，跑对账脚本确认声明与使用对齐 |
 | ✅ | `frontend-react/tests/functional/<page>-functional.spec.ts` | 增加页面级功能测试 |
 | ✅ | `frontend-react/src/config/features.ts` | 确定三端显隐（web/desktop/mobile） |
+| ✅ | `python scripts/check_filter_bar_usage.py` | 确认筛选器使用 FilterBar 而非手写 RangePicker |
 | ⚠️ | `mobileRouteHandler.ts` | 若移动端启用，增加对应 SQLite 查询 handler |
 
 ### 12.3 新增数据导入类型

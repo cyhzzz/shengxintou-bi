@@ -19,7 +19,7 @@ echo.
 set ALL_PASS=1
 
 REM ---- Step 1: rule architecture ----
-echo [1/7] Rule architecture check...
+echo [1/8] Rule architecture check...
 python scripts\check_rule_architecture.py
 set RULE_EXIT=%ERRORLEVEL%
 if %RULE_EXIT%==0 (
@@ -53,7 +53,7 @@ if %ROUTE_EXIT%==0 (
 )
 echo.
 
-echo [4/7] Cross-platform contract: featureFlags usage...
+echo [4/8] Cross-platform contract: featureFlags usage...
 python scripts\check_feature_flags.py
 set FLAGS_EXIT=%ERRORLEVEL%
 if %FLAGS_EXIT%==0 (
@@ -64,7 +64,7 @@ if %FLAGS_EXIT%==0 (
 )
 echo.
 
-echo [5/7] Cross-platform contract: mobileRouteHandler case coverage...
+echo [5/8] Cross-platform contract: mobileRouteHandler case coverage...
 python scripts\check_mobile_routes_coverage.py
 set COVERAGE_EXIT=%ERRORLEVEL%
 if %COVERAGE_EXIT%==0 (
@@ -75,8 +75,20 @@ if %COVERAGE_EXIT%==0 (
 )
 echo.
 
-REM ---- Step 6: backend API smoke ----
-echo [6/7] Backend API smoke...
+REM ---- Step 6: FilterBar usage ----
+echo [6/8] Frontend FilterBar usage vs hand-written RangePicker...
+python scripts\check_filter_bar_usage.py
+set FILTER_EXIT=%ERRORLEVEL%
+if %FILTER_EXIT%==0 (
+    echo [PASS] FilterBar usage check passed
+) else (
+    echo [FAIL] FilterBar usage check failed ^(exit: %FILTER_EXIT%^)
+    set ALL_PASS=0
+)
+echo.
+
+REM ---- Step 7: backend API smoke ----
+echo [7/8] Backend API smoke...
 python -m unittest discover -s tests/api -q 2>&1
 set API_EXIT=%ERRORLEVEL%
 if %API_EXIT%==0 (
@@ -87,8 +99,8 @@ if %API_EXIT%==0 (
 )
 echo.
 
-REM ---- Step 7: frontend build ----
-echo [7/7] Frontend build ^(vite build^)...
+REM ---- Step 8: frontend build ----
+echo [8/8] Frontend build ^(vite build^)...
 cd frontend-react
 call npm.cmd run build
 set BUILD_EXIT=%ERRORLEVEL%
