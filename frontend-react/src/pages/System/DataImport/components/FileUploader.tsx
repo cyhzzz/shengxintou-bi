@@ -44,7 +44,7 @@ interface TaskStatusResponse {
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }) => {
-  const [overwrite, setOverwrite] = useState(true); // 默认开启覆盖更新模式
+  const [overwrite, setOverwrite] = useState(true); // 默认全量替换
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<UploadResponse | null>(null);
@@ -210,9 +210,13 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
     <div className={styles.uploader}>
       <div className={styles.options}>
         <Space>
-          <span>覆盖模式:</span>
+          <span>全量替换:</span>
           <Switch checked={overwrite} onChange={setOverwrite} />
-          <span className={styles.hint}>开启后同一天数据会覆盖更新</span>
+          <span className={styles.hint}>
+            {dataType === 'conversion_appmarket'
+              ? '开启后清空旧数据再导入；关闭后按设备号+下载日期增量追加'
+              : '仅应用市场转化明细支持增量追加'}
+          </span>
         </Space>
       </div>
 

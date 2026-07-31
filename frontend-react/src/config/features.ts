@@ -66,7 +66,8 @@ const desktopAndWebFlags: FeatureFlags = {
 const mobileFlags: FeatureFlags = {
   showAccountEntry: false,
   showLoginPage: false,
-  showGithubSyncButton: false,
+  // v3.7.0：移动端开放热更新入口（HelpModal 中的「下载更新包」按钮，走 Capacitor Updater）
+  showGithubSyncButton: true,
   showDataImport: false,
   showAccountManagement: false,
   // v3.5.3：移动端开放数据同步菜单，进入简化版同步页（仅下载）

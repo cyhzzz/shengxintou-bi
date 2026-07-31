@@ -92,7 +92,7 @@ def _process_file(task_id: str, filepath: str, data_type: str,
             if data_type == 'qingniao_leads':
                 meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
             else:
-                meta = raw_import.write_to_db(data_type, filepath)
+                meta = raw_import.write_to_db(data_type, filepath, overwrite=overwrite)
             elapsed = time.time() - started
 
             written = meta.get('written', {})

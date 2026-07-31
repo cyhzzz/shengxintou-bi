@@ -196,6 +196,20 @@ export const dataService = {
   }>> => {
     return http.get('/system/self-update/status', { task_id: taskId });
   },
+  // v3.7.0：前端热更新（Windows Electron 用，从 GitHub Release 下载 dist.zip 覆盖本地）
+  frontendUpdateStart: async (): Promise<ApiResponse<{ task_id: string; message: string }>> => {
+    return http.post('/system/frontend-update/start', {});
+  },
+  frontendUpdateStatus: async (taskId: string): Promise<ApiResponse<{
+    task_id: string;
+    status: string;
+    progress?: number;
+    message?: string;
+    error?: string;
+    log?: string[];
+  }>> => {
+    return http.get('/system/frontend-update/status', { task_id: taskId });
+  },
   getVersion: async (): Promise<ApiResponse<{
     version: string;
     release_date: string;

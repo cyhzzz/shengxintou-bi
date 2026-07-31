@@ -30,6 +30,7 @@ MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
     '/webdav',            # WebDAV 管理（仅桌面端）
     '/version',           # 版本检查（仅桌面端）
     '/system/self-update',
+    '/system/frontend-update',  # v3.7.0 前端热更新（仅桌面版 Flask 后端，移动端走 Capacitor Updater）
     '/system/data-sync',  # Supabase 同步（已封存）
     '/data-sync',         # Supabase 同步（蓝图 url_prefix=/api/v1/data-sync）
     '/data-reconciliation',  # 抖音青鸟对账（仅桌面端）

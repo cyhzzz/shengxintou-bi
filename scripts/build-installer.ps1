@@ -112,7 +112,7 @@ if (-not $SkipPyInstaller) {
 }
 
 # ============================================================================
-# 阶段 2：前端 build
+# 阶段 2：前端 build + 产出 frontend-dist.zip（用于热更新 Release asset）
 # ============================================================================
 if (-not $SkipFrontend) {
   Write-Step '阶段 2/3：前端 build（React → dist/）'
@@ -129,6 +129,28 @@ if (-not $SkipFrontend) {
   } else {
     Write-Err '前端 dist/ 未生成'
     exit 1
+  }
+
+  # v3.7.0：产出 frontend-dist.zip 作为 Release asset
+  #   - 给 Windows 桌面版热更新（self_update.py 从 GitHub Release 下载并解压覆盖 dist）
+  #   - 给 Android 移动端热更新（@capacitor/updater 下载并切换 bundle）
+  #   - zip 结构：直接包含 index.html 等文件（无 dist/ 顶层目录），兼容 Capacitor Updater
+  $frontendDistZip = Join-Path $releaseDir 'frontend-dist.zip'
+  if (Test-Path $frontendDistZip) { Remove-Item $frontendDistZip -Force }
+  Write-Info '打包 frontend-dist.zip（Release asset，用于客户端热更新）...'
+  # Compress-Archive -Path 'dist/*' 让 zip 直接包含文件，不包含顶层 dist/ 目录
+  Push-Location $distDir
+  try {
+    Compress-Archive -Path './*' -DestinationPath $frontendDistZip -CompressionLevel Optimal -Force
+    if (Test-Path $frontendDistZip) {
+      $zipSizeKB = [math]::Round((Get-Item $frontendDistZip).Length / 1KB, 1)
+      Write-OK "frontend-dist.zip 生成成功 ($zipSizeKB KB)"
+    } else {
+      Write-Err 'frontend-dist.zip 未生成（Compress-Archive 静默失败）'
+      exit 1
+    }
+  } finally {
+    Pop-Location
   }
 } else {
   Write-Step '阶段 2/3：跳过前端 build（-SkipFrontend）'

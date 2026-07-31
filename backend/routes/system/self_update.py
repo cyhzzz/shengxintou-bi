@@ -273,3 +273,162 @@ def self_update_status():
         return jsonify({"success": False, "error": "TASK_NOT_FOUND", "message": "任务不存在或已过期"}), 404
     with _update_lock:
         return jsonify({"success": True, "data": {"task_id": task_id, **_update_tasks[task_id]}})
+
+
+# ============================================================================
+# 前端热更新（v3.7.0）
+# 从 GitHub Release 下载 frontend-dist.zip，解压覆盖本地 dist 目录。
+# 适用于 Windows Electron（后端不重启）和 Android（配合 capacitor-updater）。
+# ============================================================================
+
+import io
+import zipfile
+import tempfile
+import shutil
+import urllib.request
+
+# GitHub Release latest 的 frontend-dist.zip 下载 URL
+_DIST_ZIP_URL = "https://github.com/cyhzzz/shengxintou-bi/releases/latest/download/frontend-dist.zip"
+
+
+def _dist_dir() -> str:
+    """获取 frontend-react/dist 的绝对路径（兼容 PyInstaller 打包环境）。"""
+    root = _project_root()
+    return os.path.join(root, "frontend-react", "dist")
+
+
+def _do_frontend_update(task_id):
+    """执行前端 dist 热更新（异步线程调用）。"""
+    log_lines = []
+
+    def _log(msg):
+        log_lines.append(msg)
+        logger.info(f"[frontend-update:{task_id}] {msg}")
+
+    try:
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "running",
+                "progress": 10,
+                "message": "正在下载前端资源包...",
+            })
+
+        dist_path = _dist_dir()
+        _log(f"目标目录: {dist_path}")
+
+        # 1. 下载 zip
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "progress": 20,
+                "message": "正在下载 frontend-dist.zip...",
+            })
+
+        req = urllib.request.Request(_DIST_ZIP_URL, headers={
+            "User-Agent": "shengxintou-bi-updater/1.0",
+        })
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            zip_data = resp.read()
+        _log(f"下载完成: {len(zip_data)} bytes")
+
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "progress": 50,
+                "message": "正在解压并替换文件...",
+            })
+
+        # 2. 解压到临时目录
+        tmp_dir = tempfile.mkdtemp(prefix="sxt_update_")
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+                zf.extractall(tmp_dir)
+
+            # 找到 dist 根目录（zip 内可能是 dist/ 根或直接文件）
+            extracted_items = os.listdir(tmp_dir)
+            if len(extracted_items) == 1 and os.path.isdir(os.path.join(tmp_dir, extracted_items[0])):
+                # zip 内有顶层目录（如 dist/），进入它
+                src_dir = os.path.join(tmp_dir, extracted_items[0])
+            else:
+                src_dir = tmp_dir
+
+            # 3. 备份旧 dist
+            backup_dir = dist_path + ".bak"
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir)
+            if os.path.exists(dist_path):
+                os.rename(dist_path, backup_dir)
+                _log("已备份旧 dist 到 dist.bak")
+
+            # 4. 复制新 dist
+            os.makedirs(dist_path, exist_ok=True)
+            for item in os.listdir(src_dir):
+                src_item = os.path.join(src_dir, item)
+                dst_item = os.path.join(dist_path, item)
+                if os.path.isdir(src_item):
+                    shutil.copytree(src_item, dst_item)
+                else:
+                    shutil.copy2(src_item, dst_item)
+            _log("前端资源替换完成")
+
+            # 5. 清理备份
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir)
+
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "completed",
+                "progress": 100,
+                "message": "前端热更新完成，请刷新页面生效。",
+                "log": log_lines,
+            })
+        _log("热更新任务完成")
+
+    except Exception as e:
+        _log(f"热更新失败: {e}")
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "failed",
+                "progress": 0,
+                "message": f"热更新失败: {e}",
+                "log": log_lines,
+            })
+
+
+@bp.route("/frontend-update/start", methods=["POST"])
+@handle_exceptions
+def start_frontend_update():
+    """
+    启动前端热更新（异步任务）。
+    从 GitHub Release 下载 frontend-dist.zip，解压覆盖本地 dist 目录。
+    适用于桌面版（Electron + Flask 托管）和移动端（配合 capacitor-updater）。
+
+    Response:
+        { "success": true, "data": { "task_id": "<uuid>" } }
+    """
+    task_id = str(uuid.uuid4())
+    with _update_lock:
+        _update_tasks[task_id] = {
+            "status": "running",
+            "progress": 5,
+            "message": "排队中...",
+            "log": [],
+            "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        }
+
+    thread = threading.Thread(target=_do_frontend_update, args=(task_id,), daemon=True)
+    thread.start()
+
+    return jsonify({"success": True, "data": {"task_id": task_id, "message": "前端热更新任务已启动"}})
+
+
+@bp.route("/frontend-update/status", methods=["GET"])
+@handle_exceptions
+def frontend_update_status():
+    """查询前端热更新任务状态。前端 1s 轮询。"""
+    task_id = request.args.get("task_id", "").strip()
+    if not task_id or task_id not in _update_tasks:
+        return jsonify({"success": False, "error": "TASK_NOT_FOUND", "message": "任务不存在或已过期"}), 404
+    with _update_lock:
+        return jsonify({"success": True, "data": {"task_id": task_id, **_update_tasks[task_id]}})

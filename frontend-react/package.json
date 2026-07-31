@@ -31,6 +31,7 @@
     "@capacitor/filesystem": "^7.1.8",
     "@capacitor/preferences": "^7.0.4",
     "@capacitor/status-bar": "^7.0.6",
+    "@capgo/capacitor-updater": "^7.50.2",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "antd": "^6.3.2",

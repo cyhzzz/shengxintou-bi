@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { Modal, Button, Card, Row, Col, Typography, Badge, Tag, Space, Tooltip, Progress, App as AntApp } from "antd";
 import { QuestionCircleOutlined, SyncOutlined, CloudDownloadOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { dataService } from "@/services";
+import { startMobileFrontendUpdate } from "@/services/mobileUpdate";
 import { DataFreshnessIndicator, type DataFreshnessIndicatorRef } from "@/components/DataFreshness";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { featureFlags } from "@/config/features";
-import { isDesktopClient } from "@/utils/isDesktop";
+import { isDesktopClient, isMobileClient } from "@/utils/isDesktop";
 import styles from "./index.module.scss";
 
 // v3.5.8：桌面版（Electron 打包后）无 git 仓库，git pull 会失败。
@@ -53,6 +54,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     message?: string;
     error?: string;
   } | null>(null);
+  // v3.7.0：前端热更新（Windows Electron / Android Capacitor 共用）
+  // - 桌面版：调后端 /system/frontend-update/start，1s 轮询 status
+  // - 移动版：同步调用 Capacitor Updater，无轮询（直接 onProgress 推进）
+  const [frontendUpdateBusy, setFrontendUpdateBusy] = useState(false);
+  const [frontendUpdateTaskId, setFrontendUpdateTaskId] = useState<string | null>(null);
 
   const dataFreshnessRef = useRef<DataFreshnessIndicatorRef>(null);
   const {
@@ -106,6 +112,71 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     } catch (e: any) {
       antdMessage.error("启动更新异常：" + (e?.message || e));
       setGitBusy(false);
+    }
+  };
+
+  // v3.7.0：Windows 桌面版前端热更新（后端拉 zip 覆盖 dist）
+  const startFrontendUpdate = async () => {
+    setFrontendUpdateBusy(true);
+    setUpdateProgress(5);
+    setUpdateStage("提交前端热更新任务...");
+    setUpdateLog([]);
+    setUpdateResult(null);
+    try {
+      const r = await dataService.frontendUpdateStart();
+      if (!r.success || !r.data) {
+        antdMessage.error(r.message || "启动前端热更新失败");
+        setFrontendUpdateBusy(false);
+        return;
+      }
+      setFrontendUpdateTaskId(r.data.task_id);
+    } catch (e: any) {
+      antdMessage.error("启动前端热更新异常：" + (e?.message || e));
+      setFrontendUpdateBusy(false);
+    }
+  };
+
+  // v3.7.0：Android 移动端热更新（Capacitor Updater 下载 + set bundle）
+  // 同步阻塞调用，onProgress 直接更新 UI（无后端轮询）
+  const startCapacitorUpdate = async () => {
+    setFrontendUpdateBusy(true);
+    setUpdateProgress(5);
+    setUpdateStage("准备下载更新包...");
+    setUpdateLog([]);
+    setUpdateResult(null);
+    setUpdateModalOpen(true);
+    try {
+      const result = await startMobileFrontendUpdate((p) => {
+        setUpdateProgress(p.progress);
+        setUpdateStage(p.message);
+        if (p.bundleId) {
+          setUpdateLog((prev) => [...prev, `[${p.status}] bundle=${p.bundleId}`]);
+        }
+      });
+      if (result.status === "set") {
+        setUpdateResult({
+          status: "success",
+          message: result.message,
+        });
+        setUpdateProgress(100);
+        antdMessage.success("更新包已就绪，下次启动 App 自动生效");
+      } else {
+        setUpdateResult({
+          status: "failed",
+          message: result.message,
+          error: result.error,
+        });
+        antdMessage.error(result.message);
+      }
+    } catch (e: any) {
+      setUpdateResult({
+        status: "failed",
+        message: "热更新异常：" + (e?.message || e),
+        error: String(e),
+      });
+      antdMessage.error("热更新异常：" + (e?.message || e));
+    } finally {
+      setFrontendUpdateBusy(false);
     }
   };
 
@@ -183,6 +254,55 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   useEffect(() => {
     if (updateTaskId) setUpdateModalOpen(true);
   }, [updateTaskId]);
+
+  // v3.7.0：前端热更新任务状态轮询（仅 Windows 桌面版走这条路径）
+  useEffect(() => {
+    if (!frontendUpdateTaskId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await dataService.frontendUpdateStatus(frontendUpdateTaskId);
+        if (cancelled) return;
+        if (r.success && r.data) {
+          const d = r.data;
+          setUpdateStage(d.message || "");
+          setUpdateLog(d.log || []);
+          setUpdateProgress(d.progress ?? 50);
+          if (d.status === "completed") {
+            setUpdateResult({
+              status: "success",
+              message: d.message,
+            });
+            setUpdateProgress(100);
+            setFrontendUpdateBusy(false);
+            loadVersionInfo();
+            antdMessage.success("前端热更新完成，刷新页面生效");
+            return;
+          } else if (d.status === "failed") {
+            setUpdateResult({
+              status: "failed",
+              message: d.message,
+              error: d.error,
+            });
+            setFrontendUpdateBusy(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("poll frontend-update failed", e);
+      }
+      setTimeout(tick, 1000);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [frontendUpdateTaskId]);
+
+  // 当有 frontendUpdateTaskId 时自动打开进度 Modal
+  useEffect(() => {
+    if (frontendUpdateTaskId) setUpdateModalOpen(true);
+  }, [frontendUpdateTaskId]);
 
   return (
     <>
@@ -313,19 +433,45 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           >
                             cyhzzz/shengxintou-bi
                           </Link>
-                          {isDesktopClient() ? "，新版安装包见 Release 页面" : "，可用 git pull 拉取最新代码"}
+                          {isDesktopClient()
+                            ? "，新版安装包见 Release 页面"
+                            : isMobileClient()
+                            ? "，更新包下次启动生效"
+                            : "，可用 git pull 拉取最新代码"}
                         </Text>
                       </div>
                       {featureFlags.showGithubSyncButton && (
                         isDesktopClient() ? (
+                          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                            <Button
+                              type="primary"
+                              icon={<CloudDownloadOutlined />}
+                              loading={frontendUpdateBusy}
+                              onClick={startFrontendUpdate}
+                              className={styles.updateBtn}
+                              block
+                            >
+                              前端热更新（无需重装）
+                            </Button>
+                            <Button
+                              icon={<CloudDownloadOutlined />}
+                              onClick={() => window.open(RELEASE_URL, "_blank", "noopener,noreferrer")}
+                              className={styles.updateBtn}
+                              block
+                            >
+                              前往 GitHub 下载新版安装包
+                            </Button>
+                          </Space>
+                        ) : isMobileClient() ? (
                           <Button
                             type="primary"
                             icon={<CloudDownloadOutlined />}
-                            onClick={() => window.open(RELEASE_URL, "_blank", "noopener,noreferrer")}
+                            loading={frontendUpdateBusy}
+                            onClick={startCapacitorUpdate}
                             className={styles.updateBtn}
                             block
                           >
-                            前往 GitHub 下载新版安装包
+                            下载更新包（下次启动生效）
                           </Button>
                         ) : (
                           <Button

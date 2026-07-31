@@ -22,8 +22,11 @@ import io
 import re
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect as sqla_inspect
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_db_url() -> str:
@@ -392,6 +395,7 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     result = process(data_type, file_path, **kwargs)
     tables = result["tables"]
     meta = result["meta"]
+    overwrite = kwargs.get("overwrite", True)
 
     if db_url is None:
         # feat-desktop-supabase：优先复用 Flask-SQLAlchemy 的 engine，
@@ -409,8 +413,71 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
 
     with engine.connect() as conn:
         for table_name, df in tables.items():
+            # 动态加列：检测上游新增字段，自动 ALTER TABLE ADD COLUMN
+            # 避免上游 ETL 加字段时导入报错；ORM 模型可后续按需补充
+            insp = sqla_inspect(engine)
+            existing_cols = {col['name'] for col in insp.get_columns(table_name)}
+            df_cols = set(df.columns) - {'id'}
+            missing_cols = df_cols - existing_cols
+            if missing_cols:
+                for col in sorted(missing_cols):
+                    dtype_str = str(df[col].dtype)
+                    if dtype_str in ('int64', 'Int64'):
+                        col_type = 'BIGINT'
+                    elif dtype_str in ('float64', 'Float64'):
+                        col_type = 'FLOAT'
+                    else:
+                        col_type = 'TEXT'
+                    conn.execute(text(
+                        f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" {col_type}'
+                    ))
+                    logger.info(f'自动添加列: {table_name}."{col}" {col_type}')
+                conn.commit()
+
             if data_type == "qingniao_leads":
                 # append 模式：保留历史批次数据，不 DELETE
+                if is_pg:
+                    _pg_copy_insert(df, table_name, engine)
+                else:
+                    df.to_sql(table_name, con=engine, if_exists="append", index=False, chunksize=1000)
+            elif data_type == "conversion_appmarket" and not overwrite:
+                # 增量模式：用临时表批量去重，避免逐条 DELETE
+                if "设备号" in df.columns and "下载日期" in df.columns:
+                    valid = df.dropna(subset=["设备号", "下载日期"])
+                    pairs = valid[["设备号", "下载日期"]].drop_duplicates().astype(str)
+                    if len(pairs) > 0:
+                        # 1. 创建去重表（普通表，跨连接可见）
+                        conn.execute(text(
+                            'CREATE TABLE IF NOT EXISTS _tmp_dedup '
+                            '("设备号" TEXT, "下载日期" TEXT)'
+                        ))
+                        conn.execute(text('DELETE FROM _tmp_dedup'))
+                        conn.commit()
+                        # 2. pandas to_sql 批量写入去重对
+                        pairs.to_sql('_tmp_dedup', con=engine, if_exists='append',
+                                     index=False, chunksize=5000)
+                        # 3. 创建索引（JOIN 优化关键）
+                        conn.execute(text(
+                            'CREATE INDEX IF NOT EXISTS idx_tmp_dedup '
+                            'ON _tmp_dedup ("设备号", "下载日期")'
+                        ))
+                        conn.commit()
+                        # 4. JOIN + rowid 批量 DELETE（利用主表索引，比 EXISTS 快 700 倍）
+                        conn.execute(text(
+                            f'DELETE FROM "{table_name}" '
+                            f'WHERE rowid IN ('
+                            f'SELECT t.rowid FROM "{table_name}" t '
+                            f'INNER JOIN _tmp_dedup d '
+                            f'ON t."设备号" = d."设备号" '
+                            f'AND t."下载日期" = d."下载日期")'
+                        ))
+                        conn.commit()
+                        # 5. 清理
+                        conn.execute(text('DROP TABLE IF EXISTS _tmp_dedup'))
+                        conn.commit()
+                # 丢弃 id 列，让 DB autoincrement 生成（避免主键冲突）
+                if "id" in df.columns:
+                    df = df.drop(columns=["id"])
                 if is_pg:
                     _pg_copy_insert(df, table_name, engine)
                 else:

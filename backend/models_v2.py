@@ -10,7 +10,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, BigInteger, String, Text, Date, DateTime, Numeric, Float
+from sqlalchemy import Column, Integer, BigInteger, String, Text, Date, DateTime, Numeric, Float, Index
 from sqlalchemy.types import Uuid
 from backend.database import db
 
@@ -124,6 +124,9 @@ class FactConvContent(db.Model):
 class FactConvAppmarket(db.Model):
     """应用市场下载链路明细（← 8.1 应用市场归因明细，1 行=1 APP 下载）"""
     __tablename__ = 'fact_conv_appmarket'
+    __table_args__ = (
+        Index('idx_appmarket_dev_date', '设备号', '下载日期'),
+    )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
 
@@ -160,6 +163,8 @@ class FactConvAppmarket(db.Model):
     是否创建完资金账号 = Column(BigInteger)
     资金账号创建完成时间 = Column(Text)
     资金账号 = Column(Text)
+    归属营业部 = Column(Text)
+    归属营业部名称 = Column(Text)
 
 
 # ============================================================================

@@ -61,7 +61,7 @@ AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询�
 - **应用市场真实获客**：获客报表强制 `渠道类型 = 互联网引流`，统一使用 `_funnel_filters`。
 - **禁止漏斗变平**：不能用 `WHERE 是否新开户 == 1` 过滤整条应用市场漏斗；“新开户”是“开户成功”之后的阶段。
 - **主播映射**：JSON 是权威源，数据库表仅作启动同步后的查询缓存；不要直接改库维护。
-- **青鸟导入**：`qingniao_leads` 按批次 append 是明确例外，其他 v2 类型默认 replace。
+- **青鸟导入**：`qingniao_leads` 按批次 append 是明确例外，其他 v2 类型默认 replace。`conversion_appmarket` 增量追加去重键 `设备号 + 下载日期`（详见 `docs/rules/business-invariants.md`）。
 - **代理商映射**：映射来自 `dim_account` 的全称/简称/字母简称；不要恢复已删除的 `dim_vendor`。
 
 ## 5. 架构地图
