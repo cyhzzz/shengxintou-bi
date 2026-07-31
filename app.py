@@ -454,6 +454,25 @@ def ensure_database_exists():
             db.create_all()
             logger.info("✓ 数据库表结构已就绪")
 
+            # v3.7.0：开启 SQLite auto_vacuum=INCREMENTAL（仅对 sqlite dialect 生效）
+            # 必要性：default auto_vacuum=0 让 DELETE/REPLACE 后的死页永远占着空间，
+            #         频繁导入（conversion_appmarket / vendor_daily）会让库快速膨胀。
+            # 选项值是 db header 常量，持久化后无需每次重设。
+            #   0 = NONE        —— 不回收（默认）
+            #   1 = FULL        —— 自动 VACUUM 整库（成本高，禁用）
+            #   2 = INCREMENTAL —— 死页加入 freelist，新写入自动复用，写操作零成本
+            # 局限：SQLite 限制 auto_vacuum 改动必须在空库或 VACUUM 后才生效。
+            #       老库若 auto_vacuum=0，需要手动跑一次 scripts/vacuum_db.py 切到 INCREMENTAL；
+            #       新库（本次 commit 之后首次创建）从一开始就进入 INCREMENTAL 模式。
+            if top_config.DATABASE_DIALECT == 'sqlite':
+                try:
+                    from sqlalchemy import text as _text
+                    db.session.execute(_text("PRAGMA auto_vacuum = INCREMENTAL"))
+                    db.session.commit()
+                    logger.info("✓ SQLite auto_vacuum=INCREMENTAL 已开启")
+                except Exception as _e:
+                    logger.warning(f"auto_vacuum 切换失败（可忽略，老库需手动跑 scripts/vacuum_db.py）: {_e}")
+
             # v3.3.0: 主播直播类型映射同步（JSON 权威源 → DB 缓存，每次启动都 upsert）
             # v3.3.10: 同步失败时记录 ERROR 级别日志 + 二次校验表是否为空，避免静默失败导致
             #          直播获客报表全 0 而用户毫无察觉
