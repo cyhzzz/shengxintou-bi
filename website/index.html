@@ -12,14 +12,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script>
-    // 防止主题切换 FOUC：在 CSS 解析后立即应用主题
+    // 默认白天模式；若用户未手动切换过，则跟随系统 prefers-color-scheme
     (function () {
       try {
-        var t = localStorage.getItem('sx-theme');
-        if (t !== 'light' && t !== 'dark') t = 'dark'; // 默认黑夜
+        var saved = localStorage.getItem('sx-theme');
+        var t;
+        if (saved === 'light' || saved === 'dark') {
+          t = saved; // 用户手动切换过，以其选择为准
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          t = 'dark';
+        } else {
+          t = 'light'; // 默认白天
+        }
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'light');
       }
     })();
   </script>
