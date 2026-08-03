@@ -1,6 +1,6 @@
 {
   "name": "shengxintou-bi-desktop",
-  "version": "3.7.1",
+  "version": "3.7.2",
   "description": "省心投 BI 桌面客户端（Electron 封装）。版本号同步自根目录 version.json。",
   "main": "dist/main.js",
   "author": "省心投 BI",

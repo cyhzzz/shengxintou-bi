@@ -151,15 +151,6 @@ const waitForCapacitorAndRender = async () => {
       <App />
     </StrictMode>,
   );
-
-  // v3.7.0：移动端 Capacitor Updater 协议——必须 notifyAppReady
-  // 否则下次启动会自动回退到上一个可用 bundle。
-  // 静默失败：非移动端调用直接 no-op。
-  if (looksLikeCapacitor) {
-    import('@/services/mobileUpdate')
-      .then(({ notifyAppReady }) => notifyAppReady())
-      .catch(() => { /* 静默 */ });
-  }
 };
 
 void waitForCapacitorAndRender();

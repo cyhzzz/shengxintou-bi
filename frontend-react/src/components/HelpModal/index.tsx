@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Modal, Button, Card, Row, Col, Typography, Badge, Tag, Space, Tooltip, Progress, App as AntApp } from "antd";
 import { QuestionCircleOutlined, SyncOutlined, CloudDownloadOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { dataService } from "@/services";
-import { startMobileFrontendUpdate } from "@/services/mobileUpdate";
 import { DataFreshnessIndicator, type DataFreshnessIndicatorRef } from "@/components/DataFreshness";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { featureFlags } from "@/config/features";
@@ -132,50 +131,6 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
       setFrontendUpdateTaskId(r.data.task_id);
     } catch (e: any) {
       antdMessage.error("启动前端热更新异常：" + (e?.message || e));
-      setFrontendUpdateBusy(false);
-    }
-  };
-
-  // v3.7.0：Android 移动端热更新（Capacitor Updater 下载 + set bundle）
-  // 同步阻塞调用，onProgress 直接更新 UI（无后端轮询）
-  const startCapacitorUpdate = async () => {
-    setFrontendUpdateBusy(true);
-    setUpdateProgress(5);
-    setUpdateStage("准备下载更新包...");
-    setUpdateLog([]);
-    setUpdateResult(null);
-    setUpdateModalOpen(true);
-    try {
-      const result = await startMobileFrontendUpdate((p) => {
-        setUpdateProgress(p.progress);
-        setUpdateStage(p.message);
-        if (p.bundleId) {
-          setUpdateLog((prev) => [...prev, `[${p.status}] bundle=${p.bundleId}`]);
-        }
-      });
-      if (result.status === "set") {
-        setUpdateResult({
-          status: "success",
-          message: result.message,
-        });
-        setUpdateProgress(100);
-        antdMessage.success("更新包已就绪，下次启动 App 自动生效");
-      } else {
-        setUpdateResult({
-          status: "failed",
-          message: result.message,
-          error: result.error,
-        });
-        antdMessage.error(result.message);
-      }
-    } catch (e: any) {
-      setUpdateResult({
-        status: "failed",
-        message: "热更新异常：" + (e?.message || e),
-        error: String(e),
-      });
-      antdMessage.error("热更新异常：" + (e?.message || e));
-    } finally {
       setFrontendUpdateBusy(false);
     }
   };
@@ -436,7 +391,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           {isDesktopClient()
                             ? "，新版安装包见 Release 页面"
                             : isMobileClient()
-                            ? "，更新包下次启动生效"
+                            ? "，新版 APK 见 Release 页面"
                             : "，可用 git pull 拉取最新代码"}
                         </Text>
                       </div>
@@ -466,12 +421,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                           <Button
                             type="primary"
                             icon={<CloudDownloadOutlined />}
-                            loading={frontendUpdateBusy}
-                            onClick={startCapacitorUpdate}
+                            onClick={() => window.open(RELEASE_URL, "_blank", "noopener,noreferrer")}
                             className={styles.updateBtn}
                             block
                           >
-                            下载更新包（下次启动生效）
+                            前往 GitHub 下载新版 APK
                           </Button>
                         ) : (
                           <Button

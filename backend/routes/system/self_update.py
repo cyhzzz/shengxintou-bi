@@ -278,7 +278,8 @@ def self_update_status():
 # ============================================================================
 # 前端热更新（v3.7.0）
 # 从 GitHub Release 下载 frontend-dist.zip，解压覆盖本地 dist 目录。
-# 适用于 Windows Electron（后端不重启）和 Android（配合 capacitor-updater）。
+# 仅适用于 Windows Electron（后端不重启）。Android 端已移除 capacitor-updater，
+# 改为直接重装 APK 更新。
 # ============================================================================
 
 import io
@@ -402,7 +403,7 @@ def start_frontend_update():
     """
     启动前端热更新（异步任务）。
     从 GitHub Release 下载 frontend-dist.zip，解压覆盖本地 dist 目录。
-    适用于桌面版（Electron + Flask 托管）和移动端（配合 capacitor-updater）。
+    仅适用于 Windows 桌面版（Electron + Flask 托管）。Android 端走重装 APK。
 
     Response:
         { "success": true, "data": { "task_id": "<uuid>" } }
