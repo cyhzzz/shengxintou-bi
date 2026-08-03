@@ -68,8 +68,23 @@ def short_to_full(short: str):
 
 
 def full_to_short(full: str):
-    """全称 -> 简称；找不到则返回全称本身"""
-    return _get_map()['full_to_short'].get(full, full)
+    """全称 -> 简称；找不到则做包含匹配兜底，仍找不到返回全称本身
+
+    背景：agg_vendor_daily.厂商 存的是短名（如 "信则"），但 dim_account.agency_name
+    存的是带前缀的长名（如 "申万宏源-信则"）。精确匹配查不到时，尝试用包含匹配
+    （长名包含短名，或短名包含长名）作为兜底，避免前端表格代理商字段为空。
+    """
+    if not full:
+        return ''
+    m = _get_map()
+    # 1. 精确匹配（最快路径）
+    if full in m['full_to_short']:
+        return m['full_to_short'][full]
+    # 2. 包含匹配兜底：长名以 "-短名" 结尾，或短名包含长名
+    for long_name, short in m['full_to_short'].items():
+        if long_name.endswith('-' + full) or long_name == full or full in long_name:
+            return short
+    return full
 
 
 def enrich_item(item: dict, key: str = "agency"):

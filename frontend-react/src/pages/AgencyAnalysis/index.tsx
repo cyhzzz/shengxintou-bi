@@ -30,7 +30,7 @@ import styles from './index.module.scss';
 
 const { Text } = Typography;
 
-type MetricType = 'cost' | 'impressions' | 'clicks' | 'lead_users' | 'opened_account_users' | 'valid_customer_users';
+type MetricType = 'cost' | 'impressions' | 'clicks' | 'lead_users' | 'opened_account_users' | 'valid_customer_users' | 'app_activation_users';
 
 const METRIC_LABELS: Record<MetricType, string> = {
   cost: '花费',
@@ -39,6 +39,7 @@ const METRIC_LABELS: Record<MetricType, string> = {
   lead_users: '线索',
   opened_account_users: '开户',
   valid_customer_users: '有效户',
+  app_activation_users: 'APP激活',
 };
 
 
@@ -59,6 +60,9 @@ interface FlattenedSummaryItem {
   existing_customer_assets: number;
   lead_cost: number;
   account_cost: number;
+  // v3.7.1：APP 下载链路指标
+  app_activation_users?: number;
+  app_activation_cost?: number;
 }
 
 interface TrendSeriesItem {
@@ -73,6 +77,7 @@ interface TrendSeriesItem {
     lead_users: number;
     opened_account_users: number;
     valid_customer_users: number;
+    app_activation_users?: number;
   };
 }
 
@@ -249,18 +254,21 @@ const AgencyAnalysisPage: React.FC = () => {
     { title: '线索', dataIndex: 'lead_users', key: 'lead_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '开户', dataIndex: 'opened_account_users', key: 'opened_account_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '有效户', dataIndex: 'valid_customer_users', key: 'valid_customer_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
+    { title: 'APP激活', dataIndex: 'app_activation_users', key: 'app_activation_users', width: 100, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '开户资产', dataIndex: 'opened_account_assets', key: 'opened_account_assets', width: 120, align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
     { title: '线索成本', dataIndex: 'lead_cost', key: 'lead_cost', width: 100, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
     { title: '开户成本', dataIndex: 'account_cost', key: 'account_cost', width: 100, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
+    { title: 'APP激活成本', dataIndex: 'app_activation_cost', key: 'app_activation_cost', width: 110, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
   ], []);
 
   const exportCsv = () => {
     if (!visibleSummary.length) return;
-    const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', '有效户', '开户资产', '线索成本', '开户成本'];
+    const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', '有效户', 'APP激活', '开户资产', '线索成本', '开户成本', 'APP激活成本'];
     const rows = visibleSummary.map((r) => [
       r.platform, r.business_model, r.agency_short || r.agency, r.cost, r.impressions, r.clicks,
       r.lead_users, r.opened_account_users, r.valid_customer_users,
-      r.opened_account_assets, r.lead_cost, r.account_cost,
+      r.app_activation_users || 0,
+      r.opened_account_assets, r.lead_cost, r.account_cost, r.app_activation_cost || 0,
     ]);
     const csv = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });

@@ -57,6 +57,8 @@ def get_investment_review():
         func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
         func.coalesce(func.sum(AggVendorDaily.开口人数), 0).label('opened_conversation'),
         func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened_account'),
+        # v3.7.1：APP 下载链路指标（kiwi/哇棒/有米 走 APP 下载链路）
+        func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('app_activation'),
     )
     if start_date and end_date:
         q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
@@ -79,6 +81,7 @@ def get_investment_review():
         leads = _i(r.leads)
         opened_conv = _i(r.opened_conversation)
         opened_acc = _i(r.opened_account)
+        app_act = _i(r.app_activation)
         by_agency[agency].append({
             'month': r.month or '',
             'cost': round(cost, 2),
@@ -87,6 +90,9 @@ def get_investment_review():
             'opened_account': opened_acc,
             'lead_cost': round(cost / leads, 2) if leads > 0 else None,
             'account_cost': round(cost / opened_acc, 2) if opened_acc > 0 else None,
+            # v3.7.1：APP 下载链路指标
+            'app_activation': app_act,
+            'app_activation_cost': round(cost / app_act, 2) if app_act > 0 else None,
         })
 
     # 每个厂商追加"总计"行
@@ -97,6 +103,7 @@ def get_investment_review():
         total_leads = sum(it['leads'] for it in items)
         total_conv = sum(it['opened_conversation'] for it in items)
         total_acc = sum(it['opened_account'] for it in items)
+        total_app_act = sum(it['app_activation'] for it in items)
         total_row = {
             'month': '总计',
             'cost': round(total_cost, 2),
@@ -105,6 +112,8 @@ def get_investment_review():
             'opened_account': total_acc,
             'lead_cost': round(total_cost / total_leads, 2) if total_leads > 0 else None,
             'account_cost': round(total_cost / total_acc, 2) if total_acc > 0 else None,
+            'app_activation': total_app_act,
+            'app_activation_cost': round(total_cost / total_app_act, 2) if total_app_act > 0 else None,
             'is_total': True,
         }
         monthly_payload[agency] = items + [total_row]

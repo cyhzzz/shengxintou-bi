@@ -40,6 +40,8 @@ def get_agency_analysis():
         func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
         func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
         func.coalesce(func.sum(AggVendorDaily.存量客户资产), 0).label('existing_assets'),
+        # v3.7.1：APP 下载链路指标（kiwi/哇棒/有米 走 APP 下载链路，不走加微链路）
+        func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('app_act'),
     )
     if start_date and end_date:
         q = q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
@@ -59,6 +61,7 @@ def get_agency_analysis():
     summary = []
     for r in rows:
         cost, leads, opened = f(r.cost), i(r.leads), i(r.opened)
+        app_act = i(r.app_act)
         summary.append({
             'platform': r.平台,
             'business_model': r.业务模式,
@@ -74,6 +77,9 @@ def get_agency_analysis():
                 'existing_customer_assets': round(f(r.existing_assets), 2),
                 'lead_cost': round(cost / leads, 2) if leads > 0 else 0,
                 'account_cost': round(cost / opened, 2) if opened > 0 else 0,
+                # v3.7.1：APP 下载链路指标
+                'app_activation_users': app_act,
+                'app_activation_cost': round(cost / app_act, 2) if app_act > 0 else 0,
             }
         })
 
@@ -84,13 +90,15 @@ def get_agency_analysis():
             plat_sub[p] = {'platform': p, 'business_model': '', 'agency': '[{} 小计]'.format(p),
                             'is_subtotal': True, 'metrics': {'cost': 0, 'impressions': 0, 'clicks': 0,
                             'lead_users': 0, 'opened_account_users': 0, 'valid_customer_users': 0,
-                            'opened_account_assets': 0, 'existing_customer_assets': 0}}
+                            'opened_account_assets': 0, 'existing_customer_assets': 0,
+                            'app_activation_users': 0, 'app_activation_cost': 0}}
         m = plat_sub[p]['metrics']
         for k in ['cost', 'impressions', 'clicks', 'lead_users', 'opened_account_users',
-                  'valid_customer_users', 'opened_account_assets', 'existing_customer_assets']:
+                  'valid_customer_users', 'opened_account_assets', 'existing_customer_assets',
+                  'app_activation_users']:
             m[k] += item['metrics'][k]
 
-    grand = {'cost': 0, 'impressions': 0, 'clicks': 0, 'leads': 0, 'opened': 0, 'valid': 0, 'assets': 0, 'existing_assets': 0}
+    grand = {'cost': 0, 'impressions': 0, 'clicks': 0, 'leads': 0, 'opened': 0, 'valid': 0, 'assets': 0, 'existing_assets': 0, 'app_act': 0}
     for item in summary:
         m = item['metrics']
         grand['cost'] += m['cost']
@@ -99,6 +107,7 @@ def get_agency_analysis():
         grand['leads'] += m['lead_users']
         grand['opened'] += m['opened_account_users']
         grand['valid'] += m['valid_customer_users']
+        grand['app_act'] += m['app_activation_users']
         grand['assets'] += m['opened_account_assets']
         grand['existing_assets'] += m['existing_customer_assets']
 
@@ -116,6 +125,8 @@ def get_agency_analysis():
             'existing_customer_assets': round(grand['existing_assets'], 2),
             'lead_cost': round(grand['cost'] / grand['leads'], 2) if grand['leads'] > 0 else 0,
             'account_cost': round(grand['cost'] / grand['opened'], 2) if grand['opened'] > 0 else 0,
+            'app_activation_users': grand['app_act'],
+            'app_activation_cost': round(grand['cost'] / grand['app_act'], 2) if grand['app_act'] > 0 else 0,
         }
     }
     final_summary = enrich_items(summary) + list(plat_sub.values()) + [grand_row]
@@ -131,6 +142,7 @@ def get_agency_analysis():
         func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads'),
         func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
         func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
+        func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('app_act'),
     )
     if start_date and end_date:
         tq = tq.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
@@ -155,6 +167,7 @@ def get_agency_analysis():
                 'lead_users': i(r.leads),
                 'opened_account_users': i(r.opened),
                 'valid_customer_users': i(r.valid),
+                'app_activation_users': i(r.app_act),
             }
         })
     dates = sorted(set([r['date'] for r in series]))
