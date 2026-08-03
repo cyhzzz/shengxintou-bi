@@ -119,6 +119,7 @@ const AgencyAnalysisPage: React.FC = () => {
             platform: item.platform || '',
             business_model: item.business_model || '',
             agency: item.agency || '',
+            agency_short: item.agency_short || item.agency || '',
             is_subtotal: item.is_subtotal,
             is_total: item.is_total,
             cost: m.cost || 0,
@@ -131,6 +132,8 @@ const AgencyAnalysisPage: React.FC = () => {
             existing_customer_assets: m.existing_customer_assets || 0,
             lead_cost: m.lead_cost || 0,
             account_cost: m.account_cost || 0,
+            app_activation_users: m.app_activation_users || 0,
+            app_activation_cost: m.app_activation_cost || 0,
           };
         });
         setSummary(flattened);
