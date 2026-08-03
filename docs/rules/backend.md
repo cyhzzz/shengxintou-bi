@@ -26,6 +26,7 @@
 - 新模型需要在应用启动路径中注册，确保 `db.create_all()` 能看到 metadata。
 - 默认 SQLite 使用 `journal_mode=DELETE`，不要切换为 WAL。
 - 修改 SQLite 参数前读取 `app.configure_sqlite_optimization()`，保留便携应用和并发导入场景。
+- 新建数据库会自动开启 `auto_vacuum=INCREMENTAL`，防止删除/更新产生的死页累积；已有数据库需手动运行 `python scripts/vacuum_db.py` 启用（一次性脚本，不纳入自动流程）。
 - 数据库路径由 `DATABASE_PATH` 控制；测试不得误写用户默认数据库。
 - 不提交 `database/*.db`、临时压缩库或用户备份。
 

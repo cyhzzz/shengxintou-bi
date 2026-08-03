@@ -5,7 +5,8 @@
 
 数据源：agg_vendor_daily（与厂商分析共用）
 聚合维度：厂商 × 月（YYYY-MM）
-指标：消耗 / 企微 / 开口 / 开户 / 加微成本 / 开户成本
+指标：消耗 / 企微 / 开口 / APP激活 / 开户 / 加微成本 / APP激活成本 / 开户成本
+（APP激活属 APP 下载链路，业务含义近似线索，详见 docs/rules/business-invariants.md §4）
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_

@@ -949,6 +949,7 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
   ]);
 
   // 1. summary（按 平台/业务模式/厂商 聚合）
+  // v3.7.1：APP 下载链路指标（kiwi/哇棒/有米 走 APP 下载链路，不走加微链路）
   const sumSql = `SELECT "平台", "业务模式", "厂商",
     COALESCE(SUM("花费"), 0) as cost,
     COALESCE(SUM("展示量"), 0) as impressions,
@@ -957,18 +958,20 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
     COALESCE(SUM("开户人数"), 0) as opened,
     COALESCE(SUM("有效户人数"), 0) as valid,
     COALESCE(SUM("客户资产"), 0) as assets,
-    COALESCE(SUM("存量客户资产"), 0) as existing_assets
+    COALESCE(SUM("存量客户资产"), 0) as existing_assets,
+    COALESCE(SUM("APP激活人数"), 0) as app_act
   FROM agg_vendor_daily ${where.clause}
   GROUP BY "平台", "业务模式", "厂商"`;
   const sumRows = await querySql<Row>(sumSql, where.params);
 
   const summary: any[] = [];
   const plat_sub: Record<string, any> = {};
-  const grand = { cost: 0, impressions: 0, clicks: 0, leads: 0, opened: 0, valid: 0, assets: 0, existing_assets: 0 };
+  const grand = { cost: 0, impressions: 0, clicks: 0, leads: 0, opened: 0, valid: 0, assets: 0, existing_assets: 0, app_act: 0 };
 
   for (const r of sumRows) {
     const cost = toFloat(r.cost), leads = toInt(r.leads), opened = toInt(r.opened);
     const valid = toInt(r.valid), assets = toFloat(r.assets), exAssets = toFloat(r.existing_assets);
+    const appAct = toInt(r.app_act);
     const item = {
       platform: r['平台'],
       business_model: r['业务模式'],
@@ -979,6 +982,8 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
         opened_account_assets: round2(assets), existing_customer_assets: round2(exAssets),
         lead_cost: leads > 0 ? round2(cost / leads) : 0,
         account_cost: opened > 0 ? round2(cost / opened) : 0,
+        app_activation_users: appAct,
+        app_activation_cost: appAct > 0 ? round2(cost / appAct) : 0,
       },
     };
     summary.push(item);
@@ -987,17 +992,19 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
     const p = item.platform;
     if (!plat_sub[p]) {
       plat_sub[p] = { platform: p, business_model: '', agency: `[${p} 小计]`, is_subtotal: true,
-        metrics: { cost: 0, impressions: 0, clicks: 0, lead_users: 0, opened_account_users: 0, valid_customer_users: 0, opened_account_assets: 0, existing_customer_assets: 0 } };
+        metrics: { cost: 0, impressions: 0, clicks: 0, lead_users: 0, opened_account_users: 0, valid_customer_users: 0, opened_account_assets: 0, existing_customer_assets: 0, app_activation_users: 0 } };
     }
     const sm = plat_sub[p].metrics;
     sm.cost += cost; sm.impressions += item.metrics.impressions; sm.clicks += item.metrics.clicks;
     sm.lead_users += leads; sm.opened_account_users += opened; sm.valid_customer_users += valid;
     sm.opened_account_assets += assets; sm.existing_customer_assets += exAssets;
+    sm.app_activation_users += appAct;
 
     // 合计
     grand.cost += cost; grand.impressions += item.metrics.impressions; grand.clicks += item.metrics.clicks;
     grand.leads += leads; grand.opened += opened; grand.valid += valid;
     grand.assets += assets; grand.existing_assets += exAssets;
+    grand.app_act += appAct;
   }
 
   // 小计四舍五入
@@ -1005,6 +1012,7 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
     const m = plat_sub[p].metrics;
     m.cost = round2(m.cost); m.opened_account_assets = round2(m.opened_account_assets);
     m.existing_customer_assets = round2(m.existing_customer_assets);
+    m.app_activation_cost = m.app_activation_users > 0 ? round2(m.cost / m.app_activation_users) : 0;
   }
 
   const grand_row = {
@@ -1015,6 +1023,8 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
       opened_account_assets: round2(grand.assets), existing_customer_assets: round2(grand.existing_assets),
       lead_cost: grand.leads > 0 ? round2(grand.cost / grand.leads) : 0,
       account_cost: grand.opened > 0 ? round2(grand.cost / grand.opened) : 0,
+      app_activation_users: grand.app_act,
+      app_activation_cost: grand.app_act > 0 ? round2(grand.cost / grand.app_act) : 0,
     },
   };
 
@@ -1027,7 +1037,8 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
     COALESCE(SUM("点击量"), 0) as clicks,
     COALESCE(SUM("线索数"), 0) as leads,
     COALESCE(SUM("开户人数"), 0) as opened,
-    COALESCE(SUM("有效户人数"), 0) as valid
+    COALESCE(SUM("有效户人数"), 0) as valid,
+    COALESCE(SUM("APP激活人数"), 0) as app_act
   FROM agg_vendor_daily ${where.clause}
   GROUP BY "日期", "平台", "业务模式", "厂商" ORDER BY "日期"`;
   const trendRows = await querySql<Row>(trendSql, where.params);
@@ -1040,6 +1051,7 @@ async function handleAgencyAnalysis(url: string, body: any): Promise<any> {
     metrics: {
       cost: round2(toFloat(r.cost)), impressions: toInt(r.impressions), clicks: toInt(r.clicks),
       lead_users: toInt(r.leads), opened_account_users: toInt(r.opened), valid_customer_users: toInt(r.valid),
+      app_activation_users: toInt(r.app_act),
     },
   }));
   const dates = [...new Set(series.map(s => s.date))].sort();
@@ -2038,12 +2050,14 @@ async function handleInvestmentReview(url: string, body: any): Promise<any> {
   ]);
 
   // 按 厂商 × 月(substr(日期,1,7)) 聚合
+  // v3.7.1：APP 下载链路指标（kiwi/哇棒/有米 走 APP 下载链路，不走加微链路）
   const sql = `SELECT "厂商" as agency,
     substr("日期", 1, 7) as month,
     COALESCE(SUM("花费"), 0) as cost,
     COALESCE(SUM("线索数"), 0) as leads,
     COALESCE(SUM("开口人数"), 0) as opened_conversation,
-    COALESCE(SUM("开户人数"), 0) as opened_account
+    COALESCE(SUM("开户人数"), 0) as opened_account,
+    COALESCE(SUM("APP激活人数"), 0) as app_activation
   FROM agg_vendor_daily ${where.clause}
   GROUP BY "厂商", month ORDER BY "厂商", month`;
   const rows = await querySql<Row>(sql, where.params);
@@ -2057,12 +2071,15 @@ async function handleInvestmentReview(url: string, body: any): Promise<any> {
     const leads = toInt(r.leads);
     const opened_conv = toInt(r.opened_conversation);
     const opened_acc = toInt(r.opened_account);
+    const app_act = toInt(r.app_activation);
     byAgency[agency].push({
       month: r.month || '',
       cost: round2(cost),
       leads,
       opened_conversation: opened_conv,
       opened_account: opened_acc,
+      app_activation: app_act,
+      app_activation_cost: app_act > 0 ? round2(cost / app_act) : null,
       lead_cost: leads > 0 ? round2(cost / leads) : null,
       account_cost: opened_acc > 0 ? round2(cost / opened_acc) : null,
     });
@@ -2077,12 +2094,15 @@ async function handleInvestmentReview(url: string, body: any): Promise<any> {
     const total_leads = items.reduce((s, it) => s + it.leads, 0);
     const total_conv = items.reduce((s, it) => s + it.opened_conversation, 0);
     const total_acc = items.reduce((s, it) => s + it.opened_account, 0);
+    const total_app_act = items.reduce((s, it) => s + it.app_activation, 0);
     const total_row = {
       month: '总计',
       cost: round2(total_cost),
       leads: total_leads,
       opened_conversation: total_conv,
       opened_account: total_acc,
+      app_activation: total_app_act,
+      app_activation_cost: total_app_act > 0 ? round2(total_cost / total_app_act) : null,
       lead_cost: total_leads > 0 ? round2(total_cost / total_leads) : null,
       account_cost: total_acc > 0 ? round2(total_cost / total_acc) : null,
       is_total: true,

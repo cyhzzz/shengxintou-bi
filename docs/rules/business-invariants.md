@@ -56,7 +56,39 @@
 - `frontend-react/src/pages/Reports/AppMarket/`
 - `frontend-react/src/pages/ConversionFunnel/`
 
-## 4. 内容平台漏斗
+## 4. 双链路业务区分（APP 下载链路 vs 加微链路）
+
+`agg_vendor_daily` 同时承载两类业务链路，**必须按厂商所属链路解读指标，不能混算**。
+
+| 维度 | 加微链路 | APP 下载链路 |
+|---|---|---|
+| 代表厂商 | 量子、信则、风声等大多数厂商 | kiwi、哇棒、有米 |
+| 主指标 | 线索数（=企微数） | APP激活人数 |
+| 次指标 | 开口人数 / 开户人数 | 开户人数（链路后段共用） |
+| 成本指标 | 线索成本（加微成本） | APP激活成本 |
+| 字段位置 | `agg_vendor_daily.线索数 / 开口人数 / 开户人数` | `agg_vendor_daily.APP激活人数 / 开户人数` |
+
+业务含义近似性：
+
+- **APP激活 ≈ 线索**：APP 下载链路中，用户下载并激活 APP 才算"前端回传激活"，等价于加微链路中用户留下联系方式成为"线索"。
+- **APP激活成本 ≈ 线索成本**：花费 / APP激活人数，与花费 / 线索数口径对齐。
+
+报表列序与指标切换必须反映这种业务链路位置：
+
+- 数量列顺序：曝光 → 点击 → 线索 → **APP激活** → 开户 → 有效户（APP激活紧贴线索后、开户前）
+- 成本列顺序：线索成本 → **APP激活成本** → 开户成本（APP激活成本紧贴线索成本后、开户成本前）
+
+涉及报表：厂商分析（`/api/v1/agency-analysis`）、投放评审（`/api/v1/investment-review`）。
+
+关键实现：
+
+- `backend/routes/data/agency_analysis.py`
+- `backend/routes/data/investment_review.py`
+- `frontend-react/src/pages/AgencyAnalysis/`
+- `frontend-react/src/pages/InvestmentReview/`
+- `frontend-react/src/services/mobileRouteHandler.ts`（`handleAgencyAnalysis` / `handleInvestmentReview`，SQL 必须与后端完全一致）
+
+## 5. 内容平台漏斗
 
 `fact_conv_content` 每行是一条线索，新增客户线索在开口、有效、开户等阶段仍可能为 `0`，因此可以保留递减漏斗。
 
@@ -75,7 +107,7 @@
 - `cq_new` 使用非存量条件，统计剔除存量后的有效线索、成功开户和有效户。
 - 非有效线索也可能实际开户，因此“成功开户”偶尔大于“有效线索（剔除存量）”属于可能的业务现象，不能强制截断。
 
-## 5. 员工、直播与小红书
+## 6. 员工、直播与小红书
 
 - 涉及开户量和资产时，新开户/引进资产为主指标，存量客户/存量资产为辅助指标。
 - 直播和主播分析的非存量条件与内容平台一致。
@@ -126,7 +158,7 @@
 - 不要恢复已删除的 `dim_vendor` 表。
 - SQL 按全称过滤，UI 使用简称时必须通过映射展开/补充。
 
-## 8. 抖音青鸟对账
+## 9. 抖音青鸟对账
 
 - 青鸟导入按 `批次标注` append；默认标注为导入时间格式，页面允许用户指定。
 - 匹配键为青鸟“微信线索昵称 + 日期”与系统“微信昵称 + 线索日期”。

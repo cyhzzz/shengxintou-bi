@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""代理商分析接口（v2 - 查 agg_vendor_daily）"""
+"""代理商分析接口（v2 - 查 agg_vendor_daily）
+
+数据源：agg_vendor_daily（与投放评审共用）
+聚合维度：平台 / 业务模式 / 厂商
+指标：花费 / 曝光 / 点击 / 线索 / APP激活 / 开户 / 有效户 / 线索成本 / APP激活成本 / 开户成本
+（APP激活属 APP 下载链路，业务含义近似线索，详见 docs/rules/business-invariants.md §4）
+"""
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily

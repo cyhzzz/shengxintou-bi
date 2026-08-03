@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, Segmented, Space, Button, Tooltip, Spin, Table, Tag, Typography } from 'antd';
-import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined } from '@ant-design/icons';
+import { DollarOutlined, EyeOutlined, UserOutlined, TeamOutlined, AimOutlined, DownloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { EChartsOption } from 'echarts';
 import { FilterBar, FadeInSection } from '@/components';
@@ -153,13 +153,14 @@ const AgencyAnalysisPage: React.FC = () => {
   }, [fetchData]);
 
   const totals = useMemo(() => {
-    const t = { cost: 0, impressions: 0, clicks: 0, lead_users: 0, opened: 0, valid: 0 };
+    const t = { cost: 0, impressions: 0, clicks: 0, lead_users: 0, app_activation: 0, opened: 0, valid: 0 };
     summary.forEach((item) => {
       if (item.is_total) {
         t.cost = item.cost;
         t.impressions = item.impressions;
         t.clicks = item.clicks;
         t.lead_users = item.lead_users;
+        t.app_activation = item.app_activation_users || 0;
         t.opened = item.opened_account_users;
         t.valid = item.valid_customer_users;
       }
@@ -325,6 +326,14 @@ const AgencyAnalysisPage: React.FC = () => {
             valueColor="var(--chart-color-4)"
             icon={<UserOutlined style={{ color: 'var(--chart-color-4)' }} />}
             description={`投放产生的客户线索总数`}
+            showWowChange={false}
+          />
+          <MetricCard
+            title="APP激活"
+            value={totals.app_activation}
+            valueColor="var(--chart-color-6)"
+            icon={<ThunderboltOutlined style={{ color: 'var(--chart-color-6)' }} />}
+            description={`APP 下载链路激活人数（kiwi/哇棒/有米等）`}
             showWowChange={false}
           />
           <MetricCard
