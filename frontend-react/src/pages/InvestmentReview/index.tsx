@@ -21,17 +21,18 @@ import { http } from '@/services/http';
 import { pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
-type MetricType = 'cost' | 'leads' | 'opened_conversation' | 'opened_account' | 'lead_cost' | 'account_cost' | 'app_activation' | 'app_activation_cost';
+type MetricType = 'cost' | 'leads' | 'opened_conversation' | 'app_activation' | 'opened_account' | 'lead_cost' | 'app_activation_cost' | 'account_cost';
 
 const METRIC_LABELS: Record<MetricType, string> = {
   cost: '消耗',
   leads: '企微',
   opened_conversation: '开口',
+  // APP激活业务含义近似线索（前端回传激活），列序紧贴开口后、开户前
+  app_activation: 'APP激活',
   opened_account: '开户',
   lead_cost: '加微成本',
-  account_cost: '开户成本',
-  app_activation: 'APP激活',
   app_activation_cost: 'APP激活成本',
+  account_cost: '开户成本',
 };
 
 interface MonthRow {
@@ -194,14 +195,7 @@ const InvestmentReviewPage: React.FC = () => {
         align: 'right',
         render: (v: number, r) => (r.is_total ? <strong>{v}</strong> : v),
       },
-      {
-        title: '开户',
-        dataIndex: 'opened_account',
-        key: 'opened_account',
-        width: 80,
-        align: 'right',
-        render: (v: number, r) => (r.is_total ? <strong>{v}</strong> : v),
-      },
+      // APP激活业务含义近似线索（前端回传激活），列序紧贴开口后、开户前
       {
         title: 'APP激活',
         dataIndex: 'app_activation',
@@ -211,10 +205,31 @@ const InvestmentReviewPage: React.FC = () => {
         render: (v: number, r) => (r.is_total ? <strong>{v}</strong> : v),
       },
       {
+        title: '开户',
+        dataIndex: 'opened_account',
+        key: 'opened_account',
+        width: 80,
+        align: 'right',
+        render: (v: number, r) => (r.is_total ? <strong>{v}</strong> : v),
+      },
+      {
         title: '加微成本',
         dataIndex: 'lead_cost',
         key: 'lead_cost',
         width: 110,
+        align: 'right',
+        render: (v: number | null, r) => {
+          if (v == null) return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
+          const text = `¥${Number(v).toFixed(2)}`;
+          return r.is_total ? <strong>{text}</strong> : text;
+        },
+      },
+      // APP激活成本列序紧贴加微成本后、开户成本前
+      {
+        title: 'APP激活成本',
+        dataIndex: 'app_activation_cost',
+        key: 'app_activation_cost',
+        width: 120,
         align: 'right',
         render: (v: number | null, r) => {
           if (v == null) return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
@@ -234,18 +249,6 @@ const InvestmentReviewPage: React.FC = () => {
           return r.is_total ? <strong>{text}</strong> : text;
         },
       },
-      {
-        title: 'APP激活成本',
-        dataIndex: 'app_activation_cost',
-        key: 'app_activation_cost',
-        width: 120,
-        align: 'right',
-        render: (v: number | null, r) => {
-          if (v == null) return <span style={{ color: 'var(--color-text-tertiary)' }}>-</span>;
-          const text = `¥${Number(v).toFixed(2)}`;
-          return r.is_total ? <strong>{text}</strong> : text;
-        },
-      },
     ],
     [],
   );
@@ -253,17 +256,17 @@ const InvestmentReviewPage: React.FC = () => {
   const exportCsv = (agency: string) => {
     const rows = data?.monthly[agency] || [];
     if (!rows.length) return;
-    const headers = ['月份', '消耗', '企微', '开口', '开户', 'APP激活', '加微成本', '开户成本', 'APP激活成本'];
+    const headers = ['月份', '消耗', '企微', '开口', 'APP激活', '开户', '加微成本', 'APP激活成本', '开户成本'];
     const csvRows = rows.map((r) => [
       r.month,
       r.cost,
       r.leads,
       r.opened_conversation,
-      r.opened_account,
       r.app_activation,
+      r.opened_account,
       r.lead_cost ?? '',
-      r.account_cost ?? '',
       r.app_activation_cost ?? '',
+      r.account_cost ?? '',
     ]);
     const csv = '\ufeff' + [headers.join(','), ...csvRows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -282,14 +285,14 @@ const InvestmentReviewPage: React.FC = () => {
 
   const exportAllCsv = () => {
     if (!data) return;
-    const headers = ['月份', '消耗', '企微', '开口', '开户', 'APP激活', '加微成本', '开户成本', 'APP激活成本'];
+    const headers = ['月份', '消耗', '企微', '开口', 'APP激活', '开户', '加微成本', 'APP激活成本', '开户成本'];
     const lines: string[] = [headers.join(',')];
     data.agencies.forEach((agency) => {
       const short = data.agency_short_map[agency] || agency;
       lines.push(`# ${short}`);
       (data.monthly[agency] || []).forEach((r) => {
         lines.push(
-          [r.month, r.cost, r.leads, r.opened_conversation, r.opened_account, r.app_activation, r.lead_cost ?? '', r.account_cost ?? '', r.app_activation_cost ?? ''].join(','),
+          [r.month, r.cost, r.leads, r.opened_conversation, r.app_activation, r.opened_account, r.lead_cost ?? '', r.app_activation_cost ?? '', r.account_cost ?? ''].join(','),
         );
       });
       lines.push('');

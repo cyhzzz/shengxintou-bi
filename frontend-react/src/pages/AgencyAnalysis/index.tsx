@@ -30,16 +30,17 @@ import styles from './index.module.scss';
 
 const { Text } = Typography;
 
-type MetricType = 'cost' | 'impressions' | 'clicks' | 'lead_users' | 'opened_account_users' | 'valid_customer_users' | 'app_activation_users';
+type MetricType = 'cost' | 'impressions' | 'clicks' | 'lead_users' | 'app_activation_users' | 'opened_account_users' | 'valid_customer_users';
 
 const METRIC_LABELS: Record<MetricType, string> = {
   cost: '花费',
   impressions: '曝光',
   clicks: '点击',
   lead_users: '线索',
+  // APP激活业务含义近似线索（前端回传激活），故紧贴线索后、开户前
+  app_activation_users: 'APP激活',
   opened_account_users: '开户',
   valid_customer_users: '有效户',
-  app_activation_users: 'APP激活',
 };
 
 
@@ -255,23 +256,24 @@ const AgencyAnalysisPage: React.FC = () => {
     { title: '曝光', dataIndex: 'impressions', key: 'impressions', width: 100, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '点击', dataIndex: 'clicks', key: 'clicks', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '线索', dataIndex: 'lead_users', key: 'lead_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
+    // APP激活业务含义近似线索（前端回传激活），列序紧贴线索后、开户前
+    { title: 'APP激活', dataIndex: 'app_activation_users', key: 'app_activation_users', width: 100, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '开户', dataIndex: 'opened_account_users', key: 'opened_account_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '有效户', dataIndex: 'valid_customer_users', key: 'valid_customer_users', width: 90, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
-    { title: 'APP激活', dataIndex: 'app_activation_users', key: 'app_activation_users', width: 100, align: 'right', render: (v: number) => v?.toLocaleString() || '-' },
     { title: '开户资产', dataIndex: 'opened_account_assets', key: 'opened_account_assets', width: 120, align: 'right', render: (v: number) => v ? `¥${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '-' },
     { title: '线索成本', dataIndex: 'lead_cost', key: 'lead_cost', width: 100, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
-    { title: '开户成本', dataIndex: 'account_cost', key: 'account_cost', width: 100, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
+    // APP激活成本列序紧贴线索成本后、开户成本前
     { title: 'APP激活成本', dataIndex: 'app_activation_cost', key: 'app_activation_cost', width: 110, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
+    { title: '开户成本', dataIndex: 'account_cost', key: 'account_cost', width: 100, align: 'right', render: (v: number, r) => (r.is_total || r.is_subtotal) ? '-' : (v ? `¥${Number(v).toFixed(2)}` : '-') },
   ], []);
 
   const exportCsv = () => {
     if (!visibleSummary.length) return;
-    const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', '开户', '有效户', 'APP激活', '开户资产', '线索成本', '开户成本', 'APP激活成本'];
+    const headers = ['平台', '业务模式', '代理商', '花费', '曝光', '点击', '线索', 'APP激活', '开户', '有效户', '开户资产', '线索成本', 'APP激活成本', '开户成本'];
     const rows = visibleSummary.map((r) => [
       r.platform, r.business_model, r.agency_short || r.agency, r.cost, r.impressions, r.clicks,
-      r.lead_users, r.opened_account_users, r.valid_customer_users,
-      r.app_activation_users || 0,
-      r.opened_account_assets, r.lead_cost, r.account_cost, r.app_activation_cost || 0,
+      r.lead_users, r.app_activation_users || 0, r.opened_account_users, r.valid_customer_users,
+      r.opened_account_assets, r.lead_cost, r.app_activation_cost || 0, r.account_cost,
     ]);
     const csv = '\ufeff' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
