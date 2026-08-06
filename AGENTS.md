@@ -119,7 +119,7 @@ android/android/                Android Studio 原生工程（cap sync 生成，
 android/scripts/post-sync-patch.ps1  cap sync 后注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名
 android/scripts/generate-icons.ps1   生成 ic_launcher 图标（50% 安全区防切割）
 android/gradle-home/            项目级 Gradle 缓存（避免沙箱拦截 ~/.gradle）
-android/release/                中文名 APK 输出（省心投-vX.Y.Z.apk）
+android/release/                拼音名 APK 输出（shengxintou-vX.Y.Z.apk）
 frontend-react/src/services/mobileSqlite.ts / mobileSync.ts  CapacitorSQLite 直连 + 坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
 frontend-react/src/utils/isDesktop.ts        isMobileClient 三重兜底（isNativePlatform/getPlatform/androidBridge）
 frontend-react/src/main.tsx                  动态 import App 等 Capacitor bridge 就绪再渲染

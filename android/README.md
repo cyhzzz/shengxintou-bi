@@ -106,7 +106,7 @@ android\android\app\build\outputs\apk\debug\shengxintou-v<version>.apk
 
 `<version>` 从仓库根 `version.json` 读取（如 `shengxintou-v3.5.3.apk`）。
 
-中文名 APK 输出到 `android\release\省心投-v<version>.apk`（由 `post-sync-patch.ps1` 中的 `Rename-ApkToChinese` 函数复制重命名）。
+拼音名 APK 输出到 `android\release\shengxintou-v<version>.apk`（由 `build-apk.ps1` 复制重命名，`post-sync-patch.ps1` 中的 `Rename-ApkToChinese` 函数保持 shengxintou 拼音命名）。
 
 > v3.5.3 起统一使用 `assembleDebug`（debug 签名）而非 `assembleRelease`，因为 release buildType 没配 `signingConfig`，输出未签名 APK 会导致安装报"包信息为空"。
 
@@ -136,7 +136,7 @@ android/
 ├── android/                # Android Studio 原生工程（npx cap add android 生成）
 ├── capacitor.config.ts     # Capacitor 配置
 ├── package.json            # 依赖与脚本
-├── release/                # 中文名 APK 输出（省心投-vX.Y.Z.apk）
+├── release/                # 拼音名 APK 输出（shengxintou-vX.Y.Z.apk）
 ├── scripts/
 │   ├── post-sync-patch.ps1  # cap sync 后注入镜像/JDK/全屏/DB/图标/重命名
 │   └── generate-icons.ps1   # 生成 ic_launcher 图标（50% 安全区防止切割）

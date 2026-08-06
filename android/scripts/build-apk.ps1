@@ -8,7 +8,7 @@
     2. cap sync android
     3. post-sync-patch（注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名）
     4. gradlew assembleDebug（自动设置 JAVA_HOME 到 tools/jdk17）
-    5. 把产物复制到 android/release/ 并重命名为 中文名 省心投-v{version}.apk
+    5. 把产物复制到 android/release/ 并重命名为 shengxintou-v{version}.apk
 
 .EXAMPLE
   cd android
@@ -65,7 +65,7 @@ if (-not (Test-Path $apkSrc)) {
     if (-not $apkSrc) { throw "未找到编译产物 APK" }
 }
 if (-not (Test-Path $releaseDir)) { New-Item -ItemType Directory -Path $releaseDir | Out-Null }
-$apkDst = Join-Path $releaseDir "省心投-v$version.apk"
+$apkDst = Join-Path $releaseDir "shengxintou-v$version.apk"
 Copy-Item -Path $apkSrc -Destination $apkDst -Force
 $size = (Get-Item $apkDst).Length / 1MB
 

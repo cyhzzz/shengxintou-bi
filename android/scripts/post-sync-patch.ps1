@@ -11,7 +11,7 @@
 #   6. gradle.properties 加 in-process kotlin + 关闭 daemon（避免 TRAE Sandbox 拦截 ~/.kotlin）
 #   7. gradle-wrapper.properties 改腾讯云镜像（services.gradle.org 超时）
 #   8. 内置 DB 打包进 APK assets（public/assets/databases/shengxintouSQLite.db）
-#   9. APK 打包后重命名为中文名（省心投-vX.Y.Z.apk）
+#   9. APK 打包后复制到 android/release/（shengxintou-vX.Y.Z.apk）
 #
 # 注意：PowerShell 5.1 的 Set-Content -Encoding UTF8 会写 BOM，
 # Gradle 不支持 BOM，必须用 [System.IO.File]::WriteAllText 写无 BOM 的 UTF-8
@@ -272,9 +272,9 @@ if (Test-Path $sourceDb) {
 
 Write-Output "[done] post-sync-patch complete"
 
-# ========== 9. 打包后重命名 APK（中文名） ==========
+# ========== 9. 打包后复制 APK（shengxintou 命名） ==========
 # build.gradle 中 outputFileName 用 ASCII（shengxintou-vX.Y.Z.apk），
-# 打包完成后由本函数重命名为中文（省心投-vX.Y.Z.apk）并复制到 android/release/
+# 打包完成后由本函数复制到 android/release/，保持 shengxintou 拼音命名
 # v3.5.3：改用 assembleDebug（debug keystore 自动签名），默认搜 debug 目录
 # 此函数不在 sync 时调用，而是由 build 脚本在 assembleDebug 后调用
 function Rename-ApkToChinese {
@@ -302,8 +302,7 @@ function Rename-ApkToChinese {
         Write-Output "[skip] Rename-ApkToChinese: shengxintou-v*.apk not found"
         return
     }
-    $newName = $apk.Name -replace '^shengxintou-', '省心投-'
-    $newName = $newName -replace '^app-debug', '省心投-debug'
+    $newName = $apk.Name -replace '^app-debug', 'shengxintou-debug'
     # 复制到 android/release/（项目约定输出位置）
     $releaseOutDir = Join-Path $PSScriptRoot "..\release"
     New-Item -ItemType Directory -Force -Path $releaseOutDir | Out-Null

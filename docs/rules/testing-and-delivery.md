@@ -161,11 +161,11 @@
 7. `gradle-wrapper.properties`：腾讯云 Gradle 镜像
 8. `database/shengxintou.db` → `app/src/main/assets/public/assets/databases/shengxintouSQLite.db`
 9. `assembleDebug`（非 release，debug keystore 自动签名，可直接安装）
-10. `Rename-ApkToChinese` 复制到 `android/release/省心投-v<版本号>.apk`
+10. `Rename-ApkToChinese` 复制到 `android/release/shengxintou-v<版本号>.apk`
 
 ### 版本号与命名
 
-- APK 文件名：`省心投-v<version.json 的 version>.apk`
+- APK 文件名：`shengxintou-v<version.json 的 version>.apk`
 - 应用名：`省心投`（非"省心投 BI"）
 - versionCode：`major * 1000 + minor * 10 + patch`（从 `version.json` 计算）
 - 签名方式：debug keystore（自动签名，可直接安装；未配置 release signingConfig）

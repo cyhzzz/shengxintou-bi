@@ -86,7 +86,7 @@ $env:JAVA_HOME = "D:\AIproject\省心投BI\tools\jdk17"
 cd android && .\gradlew.bat assembleDebug --no-daemon  # 3. Gradle 编译
 ```
 
-**产物**：`android/release/省心投-vX.Y.Z.apk`（debug 签名，可直接安装）
+**产物**：`android/release/shengxintou-vX.Y.Z.apk`（debug 签名，可直接安装）
 
 **何时需要重新打包**：
 - 前端代码变化（任何 `frontend-react/src/` 修改）
@@ -114,7 +114,7 @@ $env:PATH = "D:\AIproject\省心投BI\tools\platform-tools;$env:PATH"
 adb devices
 
 # 安装 APK
-adb install -r "D:\AIproject\省心投BI\android\release\省心投-v3.5.4.apk"
+adb install -r "D:\AIproject\省心投BI\android\release\shengxintou-v3.5.4.apk"
 
 # 启动 App
 adb shell am start -n com.shengxintou.mobile/.MainActivity

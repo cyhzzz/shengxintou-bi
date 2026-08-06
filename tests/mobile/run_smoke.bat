@@ -4,7 +4,7 @@ REM
 REM 用法：双击或命令行执行 tests\mobile\run_smoke.bat
 REM 前置：
 REM   1. 手机开启 USB 调试并连接
-REM   2. APK 已构建（android\release\省心投-vX.Y.Z.apk）
+REM   2. APK 已构建（android\release\shengxintou-vX.Y.Z.apk）
 
 setlocal
 
@@ -32,11 +32,11 @@ echo [OK] 设备已连接
 REM 2. 检查 APK（取最新版本，避免硬编码版本号）
 echo [2/4] 检查 APK...
 set "APK_PATH="
-for /f "delims=" %%i in ('dir /b /o-d "android\release\省心投-v*.apk" 2^>nul') do (
+for /f "delims=" %%i in ('dir /b /o-d "android\release\shengxintou-v*.apk" 2^>nul') do (
     set "APK_PATH=android\release\%%i"
     goto :found_apk
 )
-echo [ERROR] 未找到 APK: android\release\省心投-v*.apk
+echo [ERROR] 未找到 APK: android\release\shengxintou-v*.apk
 echo 请先执行: cd android ^&^& npm run build:apk
 pause
 exit /b 1

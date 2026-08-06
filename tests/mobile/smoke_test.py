@@ -11,7 +11,7 @@
 前置：
   1. 启动 Appium Server:    appium --allow-cors --port 4723
   2. 手机开启 USB 调试并连接电脑
-  3. 手动安装 APK: adb install -r android\release\省心投-vX.Y.Z.apk
+  3. 手动安装 APK: adb install -r android\release\shengxintou-vX.Y.Z.apk
   4. 执行: python tests/mobile/smoke_test.py
 """
 import os
