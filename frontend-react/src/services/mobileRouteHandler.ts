@@ -1537,6 +1537,10 @@ async function handleAnchorClusters(body: any): Promise<any> {
     const sortedMatches = matches.slice().sort((a, b) =>
       `${a.platform}|||${a.anchor}`.localeCompare(`${b.platform}|||${b.anchor}`)
     );
+    // v3.7.3: 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分，
+    // 避免总线索数因重复计算而虚高（与后端 leads.py anchor-clusters 一致）
+    const n = new Set(sortedMatches.map(m => `${m.platform}|||${m.anchor}`)).size;
+    const div = Math.max(n, 1);
     for (const match of sortedMatches) {
       const key = `${match.platform}|||${match.anchor}`;
       if (seen.has(key)) continue;
@@ -1552,19 +1556,19 @@ async function handleAnchorClusters(body: any): Promise<any> {
         };
       }
       const a = aggMap[key];
-      a.leads += toInt(r.leads);
-      a.existing_leads += toInt(r.existing_leads);
-      a.new_leads += toInt(r.new_leads);
-      a.mouth += toInt(r.mouth);
-      a.valid_lead += toInt(r.valid_lead);
-      a.new_valid_lead += toInt(r.new_valid_lead);
-      a.opened += toInt(r.opened);
-      a.new_opened += toInt(r.new_opened);
-      a.valid += toInt(r.valid);
-      a.new_valid += toInt(r.new_valid);
-      a.new_assets += toFloat(r.new_assets);
-      a.existing_assets += toFloat(r.existing_assets);
-      a.assets += toFloat(r.assets);
+      a.leads += Math.round(toInt(r.leads) / div);
+      a.existing_leads += Math.round(toInt(r.existing_leads) / div);
+      a.new_leads += Math.round(toInt(r.new_leads) / div);
+      a.mouth += Math.round(toInt(r.mouth) / div);
+      a.valid_lead += Math.round(toInt(r.valid_lead) / div);
+      a.new_valid_lead += Math.round(toInt(r.new_valid_lead) / div);
+      a.opened += Math.round(toInt(r.opened) / div);
+      a.new_opened += Math.round(toInt(r.new_opened) / div);
+      a.valid += Math.round(toInt(r.valid) / div);
+      a.new_valid += Math.round(toInt(r.new_valid) / div);
+      a.new_assets += toFloat(r.new_assets) / div;
+      a.existing_assets += toFloat(r.existing_assets) / div;
+      a.assets += toFloat(r.assets) / div;
       a.raw_sources.add(match.segment);
       // 累加该 anchor 的直播类型（先查 token 精确匹配，回退到该主播所有 live_type）
       const segLt = ltMap.token_to_live_type[match.segment];
@@ -1908,6 +1912,10 @@ async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
 
     const seen = new Set<string>();
     const sortedMatches = matches.slice().sort((a, b) => a.anchor.localeCompare(b.anchor));
+    // v3.7.3: 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分，
+    // 避免总线索数因重复计算而虚高（与后端 leads.py anchor-weekly-analysis 一致）
+    const n = new Set(sortedMatches.map(m => m.anchor)).size;
+    const div = Math.max(n, 1);
     for (const match of sortedMatches) {
       if (seen.has(match.anchor)) continue;
       seen.add(match.anchor);
@@ -1926,23 +1934,23 @@ async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
       }
 
       const a = anchorMap[match.anchor];
-      a.totals.leads += toInt(r.leads);
-      a.totals.mouth += toInt(r.mouth);
-      a.totals.valid_lead += toInt(r.valid_lead);
-      a.totals.new_valid_lead += toInt(r.new_valid_lead);
-      a.totals.new_opened += toInt(r.new_opened);
-      a.totals.new_valid += toInt(r.new_valid);
+      a.totals.leads += Math.round(toInt(r.leads) / div);
+      a.totals.mouth += Math.round(toInt(r.mouth) / div);
+      a.totals.valid_lead += Math.round(toInt(r.valid_lead) / div);
+      a.totals.new_valid_lead += Math.round(toInt(r.new_valid_lead) / div);
+      a.totals.new_opened += Math.round(toInt(r.new_opened) / div);
+      a.totals.new_valid += Math.round(toInt(r.new_valid) / div);
 
       if (!a.weekly[week]) {
         a.weekly[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
       }
       const w = a.weekly[week];
-      w.leads += toInt(r.leads);
-      w.mouth += toInt(r.mouth);
-      w.valid_lead += toInt(r.valid_lead);
-      w.new_valid_lead += toInt(r.new_valid_lead);
-      w.new_opened += toInt(r.new_opened);
-      w.new_valid += toInt(r.new_valid);
+      w.leads += Math.round(toInt(r.leads) / div);
+      w.mouth += Math.round(toInt(r.mouth) / div);
+      w.valid_lead += Math.round(toInt(r.valid_lead) / div);
+      w.new_valid_lead += Math.round(toInt(r.new_valid_lead) / div);
+      w.new_opened += Math.round(toInt(r.new_opened) / div);
+      w.new_valid += Math.round(toInt(r.new_valid) / div);
 
       if (!weeklyAgg[week]) {
         weeklyAgg[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
