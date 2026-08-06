@@ -141,6 +141,9 @@ prototype/
 
 logs/bug-fix-shots/
 
+# qoder harness analysis artifacts (本地分析产物，不入库)
+.qoder/
+
 frontend-react/logs/
 
 frontend-react/_compare_shots.cjs

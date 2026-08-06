@@ -266,7 +266,11 @@ def get_anchor_clusters():
                 matches.append((anchor_platform, normalized_anchor, segment))
 
         # 同一个原始来源里若重复出现同一主播，只归因一次。
-        for anchor_platform, anchor_name, segment in sorted(set(matches)):
+        # v3.4.x: 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分，
+        # 避免总线索数因重复计算而虚高。
+        unique_matches = sorted(set(matches))
+        n = len(unique_matches)
+        for anchor_platform, anchor_name, segment in unique_matches:
             key = f"{anchor_platform}|||{anchor_name}"
             if key not in agg_map:
                 agg_map[key] = {
@@ -289,19 +293,22 @@ def get_anchor_clusters():
                     'live_types': set(),  # 该 anchor 跨 token 涉及的所有直播类型
                 }
             a = agg_map[key]
-            a['leads'] += int(r.leads or 0)
-            a['existing_leads'] += int(r.existing_leads or 0)
-            a['new_leads'] += int(r.new_leads or 0)
-            a['mouth'] += int(r.mouth or 0)
-            a['valid_lead'] += int(r.valid_lead or 0)
-            a['new_valid_lead'] += int(r.new_valid_lead or 0)
-            a['opened'] += int(r.opened or 0)
-            a['new_opened'] += int(r.new_opened or 0)
-            a['valid'] += int(r.valid or 0)
-            a['new_valid'] += int(r.new_valid or 0)
-            a['new_assets'] += float(r.new_assets or 0)
-            a['existing_assets'] += float(r.existing_assets or 0)
-            a['assets'] += float(r.assets or 0)
+            div = max(n, 1)
+            # r 是 SQL 预聚合结果: (客户来源, 平台来源, leads, existing_leads, new_leads, mouth, ...)
+            # 不要搞错属性名！SQL label 就是 r 的属性，不是原始列名
+            a['leads'] += round(int(r.leads or 0) / div)
+            a['existing_leads'] += round(int(r.existing_leads or 0) / div)
+            a['new_leads'] += round(int(r.new_leads or 0) / div)
+            a['mouth'] += round(int(r.mouth or 0) / div)
+            a['valid_lead'] += round(int(r.valid_lead or 0) / div)
+            a['new_valid_lead'] += round(int(r.new_valid_lead or 0) / div)
+            a['opened'] += round(int(r.opened or 0) / div)
+            a['new_opened'] += round(int(r.new_opened or 0) / div)
+            a['valid'] += round(int(r.valid or 0) / div)
+            a['new_valid'] += round(int(r.new_valid or 0) / div)
+            a['new_assets'] += float(r.new_assets or 0) / div
+            a['existing_assets'] += float(r.existing_assets or 0) / div
+            a['assets'] += float(r.assets or 0) / div
             a['raw_sources'].add(segment)
             # 累加该 anchor 的直播类型
             # 优先用 segment 精确查 token；查不到则用归一化 anchor_name 查该主播所有 live_type 兜底
@@ -713,7 +720,10 @@ def get_anchor_weekly_analysis():
         if not matches:
             continue
 
-        for anchor_name, segment in sorted(set(matches)):
+        # v3.4.x: 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分
+        unique_matches = sorted(set(matches))
+        n = len(unique_matches)
+        for anchor_name, segment in unique_matches:
             if anchor_name not in anchor_map:
                 # 取该主播的 primary live_type
                 anchor_lts = sorted(anchor_to_live_types.get(anchor_name, set()))
@@ -727,15 +737,16 @@ def get_anchor_weekly_analysis():
                 all_anchors.add(anchor_name)
 
             a = anchor_map[anchor_name]
+            div = max(n, 1)
             for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid'):
-                a['totals'][k] += int(getattr(r, k) or 0)
+                a['totals'][k] += round(int(getattr(r, k) or 0) / div)
             w = a['weekly'].setdefault(week, {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0})
-            w['leads'] += int(r.leads or 0)
-            w['mouth'] += int(r.mouth or 0)
-            w['valid_lead'] += int(r.valid_lead or 0)
-            w['new_valid_lead'] += int(r.new_valid_lead or 0)
-            w['new_opened'] += int(r.new_opened or 0)
-            w['new_valid'] += int(r.new_valid or 0)
+            w['leads'] += round(int(r.leads or 0) / div)
+            w['mouth'] += round(int(r.mouth or 0) / div)
+            w['valid_lead'] += round(int(r.valid_lead or 0) / div)
+            w['new_valid_lead'] += round(int(r.new_valid_lead or 0) / div)
+            w['new_opened'] += round(int(r.new_opened or 0) / div)
+            w['new_valid'] += round(int(r.new_valid or 0) / div)
 
             # 整体周度汇总
             if week not in weekly_agg:
