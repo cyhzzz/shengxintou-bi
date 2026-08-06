@@ -99,6 +99,40 @@
 | `CalendarHeatmap` | Dashboard 开户日历热力图 |
 | `sanitizeText` | 清理 Excel 导入字段中的 BOM、NUL、控制字符、替换符和零宽字符 |
 
+## 核心文件清单
+
+以下文件直接影响业务口径、数据导入、全局路由或跨端契约。变更这些文件时必须先阅读 `business-invariants.md`（后端查询）或 `cross-platform.md`（前端路由），并在通用验证基础上按风险扩大检查范围。
+
+### 后端核心文件
+
+| 文件 | 影响范围 | 变更时额外验证 |
+| --- | --- | --- |
+| `app.py` | Flask 启动、蓝图注册、中间件、主播映射同步 | API smoke + 深链接/静态资源验证 |
+| `config.py` | 环境变量、路径、鉴权开关 | 确认 `.env.example` 默认值一致；四端启动不受影响 |
+| `backend/models_v2.py` | 业务 ORM 中文列名、表结构 | 确认上游文件列名一致；`to_sql` 落库结果核对 |
+| `backend/models.py` | 系统表 | 确认 `db.create_all()` 注册路径 |
+| `backend/processors/v2/raw_import.py` | 唯一业务导入处理器 | 使用隔离数据库和最小样例验证目标表、行数、replace/append 语义 |
+| `backend/routes/data/leads.py` | 漏斗、线索、转化查询 | 核对 `business-invariants.md` 中的口径规则 |
+| `backend/routes/data/cost_analysis.py` | 成本分析查询 | 核对 `business-invariants.md` 中的口径规则 |
+| `backend/routes/reports/app_market.py` | 应用市场专题报表 | 核对漏斗不变平、真实获客渠道过滤 |
+
+### 前端核心文件
+
+| 文件 | 影响范围 | 变更时额外验证 |
+| --- | --- | --- |
+| `frontend-react/src/router/index.tsx` | 全局路由、lazy 加载 | `npm run test:smoke` + 跨端契约检查 |
+| `frontend-react/src/layouts/MainLayout.tsx` | 主框架、菜单、功能开关 | typecheck + 四端布局验证 |
+| `frontend-react/src/services/mobileRouteHandler.ts` | 移动端/PWA SQL 翻译 | `python scripts/check_api_contract.py` + `check_route_drift.py` |
+| `frontend-react/src/config/features.ts` | 功能开关（Web/桌面/移动端显隐） | 确认四端菜单和页面行为一致 |
+| `frontend-react/src/services/dataService.ts` | HTTP 请求层、Bearer token 注入 | typecheck + 确认上传/鉴权路径不受影响 |
+
+### 验证升级原则
+
+1. 核心文件变更的最小验证 = 该文件类型的通用验证 + 上表中的额外验证。
+2. 同时变更多个核心文件时，按风险最高的文件确定验证范围。
+3. 涉及业务口径的核心文件（`leads.py`、`cost_analysis.py`、`app_market.py`、`models_v2.py`）必须先读 `business-invariants.md`。
+4. 涉及跨端契约的核心文件（`mobileRouteHandler.ts`、`router/index.tsx`）必须先读 `cross-platform.md`。
+
 ## 外部集成
 
 - 官网（GitHub Pages）：`website/` 静态页面，通过 `.github/workflows/pages.yml` 自动部署到 GitHub Pages 根路径，含三端下载入口（`website/app.js` 调 GitHub API 直接触发最新 release 资产下载）与产品介绍；PWA 部署在 `/app/` 子路径。

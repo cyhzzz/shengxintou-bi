@@ -182,6 +182,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 改动 | 最小验证 |
 | --- | --- |
 | 规则架构 | `python scripts/check_rule_architecture.py` |
+| 核心文件变更 | 通用验证 + `docs/rules/overview.md` 核心文件清单中该文件的额外验证 |
 | Python 后端 | `python -m unittest discover -s tests/api -v` |
 | 前端 TS/TSX | `cd frontend-react && npm run typecheck` |
 | 前端页面/组件/样式 | typecheck + `npm run build` |
