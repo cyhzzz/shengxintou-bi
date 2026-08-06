@@ -127,6 +127,11 @@ tests = [
           GROUP BY "平台" ORDER BY "平台"''',
         'params': ['2026-01-01', '2026-12-31'],
     },
+    {
+        'name': 'data-freshness',
+        'sql': '''SELECT MAX("日期") AS latest FROM "agg_vendor_daily"''',
+        'params': [],
+    },
 ]
 
 if __name__ == '__main__':
