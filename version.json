@@ -1,9 +1,10 @@
 {
-    "version": "3.7.2",
-    "release_date": "2026-08-04",
+    "version": "3.7.3",
+    "release_date": "2026-08-06",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.7.3 直播获客漏斗复合来源线索按主播数均分（修复线索虚增）+ 线索数口径调整为含存量总线索（主播引流总线索数），并补充 anchor-clusters 均分单测",
         "v3.7.2 移除 Android 端 Capacitor Updater 热更新机制（插件未注册导致运行时报错），Android 端改为重装 APK 更新；Windows 端前端热更新保持不变",
         "v3.7.1 厂商分析与投放评审报表新增 APP 激活/APP 激活成本指标（APP 下载链路），并修复 agency_mapper 厂商短名匹配失败问题",
         "v3.7.0 Windows 与 Android 客户端前端热更新（无需重装即拉取最新前端 dist，从 GitHub Release 下载 frontend-dist.zip 覆盖）",
