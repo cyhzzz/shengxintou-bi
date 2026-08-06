@@ -40,6 +40,10 @@
 
 “新开户”是“开户成功”之后的阶段，不是整条数据集的过滤条件。存量客户通过“开户成功 - 新开户”自然体现。
 
+### 开户成功阶段口径
+
+应用市场漏斗的「开户成功」阶段必须使用 `是否创建完资金账号`，而非 `是否开户成功`。上游存在「开户成功=0 但 创建完资金账号=1 且 新开户=1」的倒挂数据，用旧字段会导致新开户人数大于开户成功人数。关键实现：`backend/routes/reports/app_market.py::FUNNEL_STAGES`（v3.5.7 起）。
+
 ### 真实获客渠道
 
 - 应用市场广告真实产出只统计 `渠道类型 = 互联网引流`。
@@ -114,8 +118,9 @@
 - 同名主播需要按归一化 `anchor` 跨平台聚合，平台列表去重展示。
 - 使用后端返回的 `new_assets`、`existing_assets` 和 `assets` 语义；前端只做跨平台求和，不另造开户过滤口径。
 - 主播表保持一页呈现时使用 `pagination={false}`，不要因默认分页隐藏主播。
+- **复合来源线索均分**：线索的 `客户来源` 可能出现多个主播（如 `抖音引流-周乐意,抖音引流-杨毅`）。anchor 聚合（`anchor-clusters`、`anchor-weekly-analysis`）必须按匹配主播数均分线索、开口、开户、资产等所有指标，避免同一线索被累加到每个主播造成总数虚增。关键实现：`backend/routes/data/leads.py` 与 `frontend-react/src/services/mobileRouteHandler.ts`（SQL/算法必须完全一致）。
 
-## 6. 主播直播类型
+## 7. 主播直播类型
 
 ### 权威源与同步
 
@@ -149,7 +154,7 @@
 - `POST /api/v1/leads-detail/anchor-clusters`
 - `POST /api/v1/leads-detail/anchor-clusters-trend`
 
-## 7. 代理商三态字段
+## 8. 代理商三态字段
 
 - `dim_account` 保存 `agency_name`（全称）、`agency_short`（简称/显示名）、`agency_letter`（字母简称）。
 - `agg_vendor_daily.厂商` 和 `fact_conv_content.广告代理商` 保存全称。
