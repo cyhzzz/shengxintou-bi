@@ -23,6 +23,8 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '小红书-运营', path: '/xhs-notes/operation' },
   // v3.3.10：小红书计划分析（与菜单 key 对齐）
   { name: '小红书-计划分析', path: '/xhs-notes/plan-analysis' },
+  // v3.8.0：分支KOS转化周报（featureFlags.showKosWeekly=true 时注册，桌面/Web 端覆盖）
+  { name: '小红书-分支KOS转化周报', path: '/xhs-notes/kos-weekly' },
   { name: '员工转化-分析', path: '/employee-conversion/analysis' },
   { name: '员工转化-周报', path: '/employee-conversion/weekly' },
   { name: '应用市场-漏斗', path: '/app-market/funnel' },

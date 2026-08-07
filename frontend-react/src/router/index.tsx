@@ -78,6 +78,8 @@ const DouyinQingniaoReconciliationPage = lazy(() => import('@/pages/DataReconcil
 const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 // v3.3.10: 小红书计划分析（小红书二级菜单）
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
+// v3.8.0: 分支KOS转化周报（小红书二级菜单，featureFlags.showKosWeekly 控制注册）
+const XhsKosWeeklyPage = lazy(() => import('@/pages/XhsNotes/KosWeekly'));
 
 // v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
 // v3.6.2：PWA 端也使用 HashRouter（部署在 /app/ 子路径，BrowserRouter 需 basename，
@@ -104,6 +106,10 @@ const mainChildren = [
       { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
       // v3.3.10: 小红书计划分析
       { path: 'plan-analysis', element: withSuspense(XhsPlanAnalysisPage) },
+      // v3.8.0: 分支KOS转化周报（移动端禁用，避免 URL 直访触发未实现的 mobile API）
+      ...(featureFlags.showKosWeekly
+        ? [{ path: 'kos-weekly', element: withSuspense(XhsKosWeeklyPage) }]
+        : []),
     ],
   },
   {

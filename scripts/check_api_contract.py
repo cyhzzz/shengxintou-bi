@@ -34,6 +34,7 @@ MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
     '/system/data-sync',  # Supabase 同步（已封存）
     '/data-sync',         # Supabase 同步（蓝图 url_prefix=/api/v1/data-sync）
     '/data-reconciliation',  # 抖音青鸟对账（仅桌面端）
+    '/xhs/kos-weekly',      # 分支KOS转化周报（仅桌面/Web 端，移动端 featureFlag 禁用）
     '/account-mapping',
     '/account-agency-mapping',
     '/config',            # 系统配置（仅桌面端）

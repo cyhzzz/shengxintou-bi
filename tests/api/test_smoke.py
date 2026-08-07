@@ -358,6 +358,41 @@ class ApiSmokeTest(unittest.TestCase):
         # 返回的是带 list/pagination 的 dict 也 OK
         self.assertIsInstance(data, (list, dict))
 
+    def test_55_xhs_kos_weekly(self):
+        # v3.8.0 小红书 · 分支KOS转化周报（fact_conv_content.笔记ID 关联 agg_xhs_note.创作者）
+        payload = {'start_date': SAMPLE_START, 'end_date': SAMPLE_END}
+        data = self._ok(
+            self._post('/api/v1/xhs/kos-weekly', payload),
+            '/xhs/kos-weekly')
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data.get('platform'), '小红书')
+        self.assertEqual(data.get('roster_count'), 10)
+        self.assertEqual(len(data.get('roster', [])), 10)
+        rankings = data.get('rankings', {})
+        self.assertIn('小红书', rankings)
+        for key in ('total', 'existing', 'new', 'existing_new_open'):
+            self.assertIn(key, rankings['小红书'], f'rankings 应包含 {key}')
+            items = rankings['小红书'][key]
+            self.assertEqual(len(items), 10, f'{key} 榜应补齐固定 10 人')
+            for item in items:
+                self.assertIn('kos_name', item)
+                self.assertIn('total_leads', item)
+                self.assertIn('opened_count', item)
+        self.assertIn('year_breakdown', data)
+        self.assertIn('overview', data)
+        self.assertIn('trend', data)
+
+    def test_56_xhs_kos_weekly_filter_options(self):
+        data = self._ok(
+            self.client.get('/api/v1/xhs/kos-weekly/filter-options'),
+            '/xhs/kos-weekly/filter-options')
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data.get('platform'), '小红书')
+        self.assertEqual(data.get('roster_count'), 10)
+        self.assertIn('default_week_start', data)
+        self.assertIn('default_week_end', data)
+        self.assertIn('roster', data)
+
     # ============================================================
     #  v3.3.0: 主播聚类 live_type（映射表由 JSON 同步到 DB，无独立 CRUD API）
     # ============================================================
@@ -479,6 +514,11 @@ class ApiSmokeTest(unittest.TestCase):
 
     def test_92_omni_channel_empty_not_500(self):
         resp = self._post('/api/v1/reports/omni-channel/summary', {})
+        self.assertNotEqual(resp.status_code, 500,
+                            f'空 payload 500: {resp.data[:300]}')
+
+    def test_93_xhs_kos_weekly_empty_not_500(self):
+        resp = self._post('/api/v1/xhs/kos-weekly', {})
         self.assertNotEqual(resp.status_code, 500,
                             f'空 payload 500: {resp.data[:300]}')
 

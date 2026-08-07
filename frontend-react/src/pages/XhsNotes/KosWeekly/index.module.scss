@@ -1,0 +1,24 @@
+/**
+ * 分支KOS转化周报页面样式（v3.8.0）
+ */
+@use '../../../styles/mixins' as *;
+
+.weeklyPage {
+  padding: 0;
+}
+
+.reportCard {
+  margin-top: var(--spacer-20);
+}
+
+.cardHeader {
+  @include card-section-header;
+}
+
+.cardTitle {
+  @include card-section-title;
+}
+
+.cardDesc {
+  @include card-section-desc;
+}

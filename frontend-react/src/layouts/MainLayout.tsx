@@ -105,6 +105,8 @@ const menuItems: MenuProps['items'] = [
       { key: '/xhs-notes/operation', label: '运营分析', icon: <LineChartOutlined /> },
       // v3.3.10: 小红书计划分析（仿应用市场 plan-analysis 报表）
       { key: '/xhs-notes/plan-analysis', label: '计划分析', icon: <FileTextOutlined /> },
+      // v3.8.0: 分支KOS转化周报（笔记ID 关联创作者=分支投顾名单）
+      { key: '/xhs-notes/kos-weekly', label: '分支KOS转化周报', icon: <BarChartOutlined /> },
     ],
   },
   // 直播获客（含主播聚类二级菜单）
@@ -184,6 +186,16 @@ export default function MainLayout() {
           return true;
         });
         // 如果没有子菜单了，隐藏整个系统配置
+        if (filteredChildren.length === 0) return null;
+        return { ...it, children: filteredChildren };
+      }
+      // v3.8.0：小红书子菜单按 features 过滤（移动端禁用分支KOS转化周报）
+      if (it.key === 'xhs-notes' && it.children) {
+        const filteredChildren = it.children.filter((c: any) => {
+          if (!c) return false;
+          if (c.key === '/xhs-notes/kos-weekly' && !featureFlags.showKosWeekly) return false;
+          return true;
+        });
         if (filteredChildren.length === 0) return null;
         return { ...it, children: filteredChildren };
       }

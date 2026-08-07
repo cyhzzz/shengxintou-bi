@@ -449,5 +449,61 @@ export const dataServiceOmniChannel = {
 };
 
 
+// 小红书 · 分支KOS转化周报 v3.8.0
+// 数据源：fact_conv_content.笔记ID 关联 agg_xhs_note.创作者（分支KOS投顾名单）
+export interface XhsKosRankingItem {
+  kos_name: string;
+  platform: string;
+  total_leads: number;
+  mouth_count: number;
+  valid_lead_count: number;
+  opened_count: number;
+  valid_customer_count: number;
+  total_assets: number;
+  opening_rate: number;
+  valid_customer_rate: number;
+}
+
+export interface XhsKosWeeklyData {
+  platform: string;
+  roster_count: number;
+  roster: string[];
+  rankings: Record<string, {
+    total: XhsKosRankingItem[];
+    existing: XhsKosRankingItem[];
+    new: XhsKosRankingItem[];
+    existing_new_open: XhsKosRankingItem[];
+  }>;
+  year_breakdown: Record<string, Record<string, {
+    label: string;
+    total_leads: number;
+    opened_count: number;
+    valid_customer_count: number;
+    total_assets: number;
+    opening_rate: number;
+    valid_customer_rate: number;
+  }>>;
+  overview: Record<string, {
+    total_leads: number;
+    mouth_count: number;
+    valid_lead_count: number;
+    opened_count: number;
+    valid_customer_count: number;
+    total_assets: number;
+    opening_rate: number;
+  }>;
+  trend: { period: string; leads: number; opened: number; valid: number }[];
+}
+
+export const dataServiceXhsKos = {
+  getXhsKosWeekly: async (params: { start_date?: string; end_date?: string } = {}) => {
+    return http.post('/xhs/kos-weekly', params);
+  },
+  getXhsKosWeeklyFilterOptions: async () => {
+    return http.get('/xhs/kos-weekly/filter-options');
+  },
+};
+
+
 
 
