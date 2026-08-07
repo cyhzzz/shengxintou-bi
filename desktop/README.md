@@ -50,7 +50,7 @@ Electron 主进程 (main.ts)
 
 - Node.js 20+（Vite 7 要求）
 - Python 3.9+（PyInstaller 打包用，用户机器不需要）
-- NSIS（electron-builder 自动下载；若失败见下方故障排查）
+- NSIS（electron-builder 自动下载到 `desktop/.eb-cache/`；仓库 `tools/nsis/` 有内置 NSIS 的副本，可手工 `makensis`；若下载失败见下方故障排查）
 - 项目根的 `.env.desktop` 已配置（含 Supabase URL / KEY / DATABASE_URL / AUTH_ENABLED=true）
 - `frontend-react/dist/` 已构建（`cd frontend-react && npm run build`）
 

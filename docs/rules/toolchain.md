@@ -14,7 +14,7 @@
 | Gradle 缓存 | `android/gradle-home/` | 项目级缓存（避免沙箱拦截 `~/.gradle`） | - | `cap sync` 自动初始化 |
 | Python 3.9+ | 系统 PATH 或 `python-3.9-embed/` | 后端运行 + PyInstaller 打包 | 3.9+ | [python.org](https://www.python.org/downloads/) |
 | Node.js 20+ | 系统 PATH | 前端构建 + Capacitor | 20+ | [nodejs.org](https://nodejs.org/) |
-| NSIS | 系统 PATH | Windows 安装包打包（桌面版） | 3.x | [nsis.sourceforge.io](https://nsis.sourceforge.io/Download) |
+| NSIS | `tools/nsis/` | Windows 安装包打包（桌面版） | 3.0.4.1 | 复制自 electron-builder 内置（`desktop/.eb-cache/nsis/nsis-3.0.4.1/`）或 [nsis.sourceforge.io](https://nsis.sourceforge.io/Download) |
 | PyInstaller | `.venv/`（`pip install`） | 打包 `server.exe`（桌面版） | 6.x | `pip install pyinstaller` |
 | Appium | `.venv/` 或系统 | 移动端 smoke 测试（可选） | 2.x | `pip install appium appium-python-client` |
 
@@ -27,14 +27,23 @@
 - 若 `tools/android-sdk/` 丢失，Gradle 编译会失败并提示 "Failed to find target with hash string 'android-35'"。
 - 恢复方式：见本文 [第 4 节 Android SDK 安装](#4-android-sdk-安装可选)。
 
-### 1.2 工具丢失排查清单
+### 1.2 NSIS 位置说明
+
+`tools/nsis/` 存放 NSIS 3.0.4.1 发行版（`makensis.exe`），被 `.gitignore` 排除不入库。
+
+- electron-builder 打 NSIS 安装包时使用其内置 NSIS，首次构建自动下载到 `desktop/.eb-cache/nsis/nsis-3.0.4.1/`，不依赖系统 PATH。
+- `tools/nsis/` 是内置 NSIS 的复制副本：供手工执行 `makensis`、以及离线/缓存丢失时作为本地兜底。
+- 复制来源：`desktop/.eb-cache/nsis/nsis-3.0.4.1/`（electron-builder 下载完成后直接复制到 `tools/nsis/`）。
+- NSIS 依赖从 electron-builder 缓存复制到 `tools/nsis/` 并写入本文档（此前仅依赖 electron-builder 自动下载）。
+
+### 1.3 工具丢失排查清单
 
 AI 在执行打包命令前若遇到 "command not found" 或 "tool not found"：
 
 1. JDK：`Test-Path "tools/jdk17/bin/java.exe"`；不存在则从 [adoptium.net](https://adoptium.net/temurin/releases/?version=17) 下载 zip 版解压到 `tools/jdk17/`。
 2. adb：`Test-Path "tools/platform-tools/adb.exe"`；不存在则从 [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) 下载 zip 解压到 `tools/platform-tools/`。
 3. Android SDK：检查 `tools/android-sdk/platforms/android-35/` 是否存在；不存在则按第 4 节重装。
-4. NSIS：`Get-Command makensis`；不存在则从 [nsis.sourceforge.io](https://nsis.sourceforge.io/Download) 安装并加入 PATH。
+4. NSIS：检查 `tools/nsis/makensis.exe`；不存在则从 `desktop/.eb-cache/nsis/nsis-3.0.4.1/` 复制（electron-builder 首次构建后生成），或从 [nsis.sourceforge.io](https://nsis.sourceforge.io/Download) 下载解压到 `tools/nsis/`。
 
 ## 2. 三端打包命令
 
@@ -50,7 +59,7 @@ cd frontend-react && npm run dev  # 前端
 
 ### 2.2 桌面版（Electron + NSIS 安装包）
 
-**前置**：Node.js 20+、Python 3.9+、NSIS。
+**前置**：Node.js 20+、Python 3.9+、NSIS（`tools/nsis/`；electron-builder 打 NSIS 时使用其内置 NSIS，首次构建自动下载到 `desktop/.eb-cache/`）。
 
 ```powershell
 # 一键打包（PyInstaller + 前端 build + electron-builder NSIS）

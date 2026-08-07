@@ -239,7 +239,7 @@ bash scripts/release.sh X.Y.Z
 
 脚本只负责**改版本号 → commit → tag → push** 三件事。push tag 后，开发者需要**本地手动**继续：
 
-1. **Windows 安装包**：在本机跑 `scripts\build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS + VC++ 运行时），产物 `dist/`。
+1. **Windows 安装包**：在本机跑 `scripts\build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS（`tools/nsis/`）+ VC++ 运行时），产物 `dist/`。
 2. **Android APK**：在本机跑 `cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+），产物 `android/release/shengxintou-vX.Y.Z.apk`。
 3. **上传到 Release**：
    ```bash
