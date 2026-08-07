@@ -17,6 +17,10 @@ v3.3.6 修订：原口径「仅匹配抖音引流」改为「全渠道匹配」�
 而系统 fact_conv_content.客户来源 区分了引流路径，仅匹配「抖音引流」会漏掉
 ~36% 的线索（广告投放、视频号引流等渠道的线索在系统里归在别的客户来源）。
 实测：放宽到全渠道后，匹配率从 49.3% 提升到 85.5%（容差 3 天）。
+
+v3.3.11 修订：全渠道候选会把小红书/腾讯/财联社等同昵称 + 同日期的线索误匹配进来。
+改为多级匹配：优先只取「平台来源=抖音」的候选；抖音候选为空时，才兜底使用其他平台
+候选（防止平台系统自动打标丢失导致漏匹）。存量客户不剔除，仅在结果中标注。
 """
 import re
 import unicodedata
@@ -148,6 +152,19 @@ def _qn_flag_to_str(v):
     return '是' if _qn_flag_to_int(v) == 1 else '否'
 
 
+def _select_match_pool(candidates):
+    """v3.3.11 多级匹配：优先平台来源=抖音的候选；无抖音候选时兜底其他平台候选。
+
+    背景：全渠道候选会把小红书/腾讯/财联社等同昵称 + 同日期的线索误匹配进来；
+    但若硬过滤「仅抖音」，又会漏掉平台系统自动打标丢失的线索。
+    因此：抖音候选存在时只用抖音候选；抖音候选为空时兜底使用全部候选。
+
+    candidates 为已通过日期容差过滤的系统侧索引 dict 列表（含 '平台来源' 字段）。
+    """
+    douyin_candidates = [c for c in candidates if (c['平台来源'] or '') == '抖音']
+    return douyin_candidates if douyin_candidates else candidates
+
+
 # ============================================================================
 # 端点
 # ============================================================================
@@ -234,8 +251,10 @@ def douyin_qingniao_match():
         FactConvContent.是否有效线索,
         FactConvContent.是否开户,
         FactConvContent.客户来源,
+        FactConvContent.平台来源,
         FactConvContent.添加员工姓名,
         FactConvContent.是否删除企微,
+        FactConvContent.是否为存量客户,
         FactConvContent.互动次数,
         FactConvContent.营销人员互动次数,
     ).filter(FactConvContent.微信昵称.isnot(None)).all()
@@ -258,8 +277,10 @@ def douyin_qingniao_match():
             '是否有效线索': int(r.是否有效线索 or 0),
             '是否开户': int(r.是否开户 or 0),
             '客户来源': r.客户来源,
+            '平台来源': r.平台来源,
             '添加员工姓名': r.添加员工姓名,
             '是否删除企微': int(r.是否删除企微 or 0),
+            '是否为存量客户': int(r.是否为存量客户 or 0),
             '互动次数': int(r.互动次数) if r.互动次数 is not None else None,
             '营销人员互动次数': (
                 int(r.营销人员互动次数) if r.营销人员互动次数 is not None else None
@@ -318,6 +339,8 @@ def douyin_qingniao_match():
                 '差异详情': None,
                 '青鸟线索ID': qn.id,
                 '客户来源': None,
+                '平台来源': None,
+                '是否存量客户': None,
                 '添加员工姓名': None,
                 '是否删除企微': None,
                 '互动次数': None,
@@ -326,14 +349,18 @@ def douyin_qingniao_match():
             summary['missed_count'] += 1
             continue
 
+        # v3.3.11 多级匹配：优先平台来源=抖音的候选；无抖音候选时兜底其他平台候选。
+        # 详见 _select_match_pool（防止平台系统自动打标丢失导致漏匹）。
+        match_pool = _select_match_pool(candidates)
+
         # v3.3.10：候选排序优先未删除的，再按日期接近度
         # 业务规则：已删除的企微不再需要补打标/改标，所以匹配时优先选未删除的候选；
         # 只有当所有候选都已删除时，才取已删除的（状态会标为「已删除」）。
-        candidates.sort(key=lambda c: (
+        match_pool.sort(key=lambda c: (
             c['是否删除企微'],
             abs((c['_date_obj'] - qn_date_obj).days),
         ))
-        best = candidates[0]
+        best = match_pool[0]
         summary['matched_count'] += 1
 
         # 比对 3 个标志位
@@ -391,6 +418,8 @@ def douyin_qingniao_match():
             '差异详情': '; '.join(diff_flags) if diff_flags else None,
             '青鸟线索ID': qn.id,
             '客户来源': best['客户来源'],
+            '平台来源': best['平台来源'],
+            '是否存量客户': _bool_to_str(best['是否为存量客户']),
             '添加员工姓名': best['添加员工姓名'],
             '是否删除企微': _bool_to_str(best['是否删除企微']),
             '互动次数': best['互动次数'],

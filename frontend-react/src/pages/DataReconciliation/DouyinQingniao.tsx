@@ -2,7 +2,8 @@
  * 抖音青鸟线索通数据对账 (v3.3.6)
  *
  * 业务定位：
- *   将青鸟线索通回传数据与系统 fact_conv_content 抖音引流线索做联合匹配，
+ *   将青鸟线索通回传数据与系统 fact_conv_content 线索做联合匹配（v3.3.11 多级匹配：
+ *   优先「平台来源=抖音」的候选，无抖音候选时兜底其他平台，防止平台打标丢失漏匹），
  *   比对 3 个标志位（开口 / 有效 / 开户），输出 4 类对账状态：
  *   - 未匹到：青鸟侧有记录但系统侧抖音引流线索中找不到候选
  *   - 疑似漏打标：青鸟侧某标志位「未打」但系统侧对应标志=1
@@ -10,9 +11,9 @@
  *   - 正确：3 个标志位两边一致
  *
  * 匹配字段：青鸟侧「微信线索昵称 + 日期」vs 系统侧「微信昵称 + 线索日期」
- * 匹配方式：归一化昵称精确匹配 + 日期容差 ±N 天
+ * 匹配方式：归一化昵称精确匹配 + 日期容差 ±N 天；多级匹配优先平台来源=抖音
  *
- * 数据源: fact_qingniao_leads + fact_conv_content (抖音引流线索)
+ * 数据源: fact_qingniao_leads + fact_conv_content（全渠道线索，优先抖音平台）
  * 端点:   POST /api/v1/data-reconciliation/douyin-qingniao/match
  *         GET  /api/v1/data-reconciliation/douyin-qingniao/date-range
  */
@@ -53,6 +54,8 @@ interface ReconcileRecord {
   差异详情: string | null;
   青鸟线索ID: number;
   客户来源: string | null;
+  平台来源: string | null;       // v3.3.11：系统侧候选平台来源（优先抖音，无抖音候选时兜底其他平台）
+  是否存量客户: string | null;   // v3.3.11：'是' = 匹配到存量客户（仅标注，不剔除）
   添加员工姓名: string | null;
   // v3.3.10：系统侧 fact_conv_content 新增字段
   是否删除企微: string | null;       // '是' / '否' / null（未匹到时为 null）
@@ -347,7 +350,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       '青鸟线索ID', '青鸟昵称', '青鸟日期', '企微昵称', '线索日期',
       '后台是否开口', '后台是否有效', '后台是否开户',
       '青鸟是否开口', '青鸟是否有效', '青鸟是否开户',
-      '状态', '差异详情', '客户来源', '添加员工姓名',
+      '状态', '差异详情', '客户来源', '平台来源', '存量客户', '添加员工姓名',
       '是否删除企微', '互动轮次', '主动发消息次数', '批次标注',
     ];
     const rows = filteredRecords.map(r => [
@@ -355,7 +358,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
       r.企微昵称 ?? '', r.线索日期 ?? '',
       r.后台是否开口 ?? '', r.后台是否有效 ?? '', r.后台是否开户 ?? '',
       r.青鸟是否开口, r.青鸟是否有效, r.青鸟是否开户,
-      r.状态, r.差异详情 ?? '', r.客户来源 ?? '', r.添加员工姓名 ?? '',
+      r.状态, r.差异详情 ?? '', r.客户来源 ?? '', r.平台来源 ?? '', r.是否存量客户 ?? '', r.添加员工姓名 ?? '',
       r.是否删除企微 ?? '', r.互动次数 ?? '', r.营销人员互动次数 ?? '',
       selectedBatchTag ?? '',
     ]);
@@ -447,6 +450,26 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
     {
       title: '客户来源', dataIndex: '客户来源', key: '客户来源', width: 180,
       render: (v: string | null) => v ? sanitizeText(v) : <Text type="secondary">—</Text>,
+    },
+    {
+      // v3.3.11：系统侧候选平台来源（优先抖音，无抖音候选时兜底其他平台）
+      title: '平台来源', dataIndex: '平台来源', key: '平台来源', width: 90,
+      render: (v: string | null) => {
+        if (v === null) return <Text type="secondary">—</Text>;
+        return v === '抖音'
+          ? <Tag color="blue">抖音</Tag>
+          : <Tag>{sanitizeText(v)}</Tag>;
+      },
+    },
+    {
+      // v3.3.11：存量客户仅标注不剔除，便于业务识别
+      title: '存量客户', dataIndex: '是否存量客户', key: '是否存量客户', width: 100,
+      render: (v: string | null) => {
+        if (v === null) return <Text type="secondary">—</Text>;
+        return v === '是'
+          ? <Tag color="orange">存量客户</Tag>
+          : <Text>否</Text>;
+      },
     },
     {
       title: '添加员工', dataIndex: '添加员工姓名', key: '添加员工姓名', width: 100,
@@ -635,7 +658,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
                 columns={columns}
                 dataSource={filteredRecords}
                 size="small"
-                scroll={{ x: 1930 }}
+                scroll={{ x: 2130 }}
                 pagination={{
                   pageSize: 50,
                   showSizeChanger: true,
@@ -652,7 +675,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
         <ReportFooter
           sources={[
             { label: '数据源', value: 'fact_qingniao_leads + fact_conv_content（全渠道线索）' },
-            { label: '匹配字段', value: '微信线索昵称（青鸟）+ 微信昵称（系统）；日期 + 线索日期（容差 ±N 天）' },
+            { label: '匹配字段', value: '微信线索昵称（青鸟）+ 微信昵称（系统）；日期 + 线索日期（容差 ±N 天）；多级匹配优先平台来源=抖音，无抖音候选兜底其他平台' },
             { label: '对账端点', value: 'POST /api/v1/data-reconciliation/douyin-qingniao/match' },
             { label: '状态判定', value: '已删除 > 疑似漏打标 > 疑似误打标 > 正确；已删除企微不参与打标差异判定' },
           ]}
