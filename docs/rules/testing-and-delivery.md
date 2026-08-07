@@ -192,11 +192,13 @@
 | 前端 TS/TSX | typecheck | `cd frontend-react && npm run typecheck` |
 | 前端页面/组件/样式 | build | `cd frontend-react && npm run build` |
 | 规则/文档 | 规则架构检查 | `python scripts/check_rule_architecture.py` |
-| 后端新增/修改 API | API 契约对账 | `python scripts/check_api_contract.py` |
+| 后端新增/修改 API | API 契约对账（含后端 vs 移动端关键算法一致性） | `python scripts/check_api_contract.py` |
 | 前端新增/修改路由 | 路由 drift 对账 | `python scripts/check_route_drift.py` |
 | 修改 featureFlags | featureFlag 对账 | `python scripts/check_feature_flags.py` |
 | 新增 mobileRouteHandler case | case 覆盖对账 | `python scripts/check_mobile_routes_coverage.py` |
 | 前端新增/修改报表筛选器 | FilterBar 使用对账 | `python scripts/check_filter_bar_usage.py` |
+| 聚合表/上游文件变更 | 数据质量审计（聚合表业务键重复行） | `python scripts/audit_data_quality.py` |
+| 核心报表聚合逻辑变更 | 数值口径对账（totals=Σitems） | `python -m unittest tests.api.test_numeric_calibration` |
 | lazy 路由 | 路由 smoke | `cd frontend-react && npm run test:smoke` |
 | Bug 修复 | 最小回归 | 对应 `tests/` 或 `frontend-react/tests/regression/` |
 | lint 或大范围前端重构 | lint | `cd frontend-react && npm run lint` |

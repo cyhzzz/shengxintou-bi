@@ -42,6 +42,20 @@ jobs:
       - name: FilterBar usage vs hand-written RangePicker
         run: python scripts/check_filter_bar_usage.py
 
+  data-quality:
+    name: Aggregate table data quality
+    runs-on: windows-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Audit aggregate table duplicate rows
+        env:
+          DATABASE_PATH: "database/ci-smoke.db"
+        run: python scripts/audit_data_quality.py
+
   backend-smoke:
     name: Backend API smoke
     runs-on: windows-latest

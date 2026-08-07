@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM  Shengxintou BI - pre-commit check
-REM  Content: rule architecture + cross-platform contract + backend API smoke + frontend build
+REM  Content: rule architecture + cross-platform contract + data quality audit + backend API smoke + frontend build
 REM  Runtime: about 1-2 minutes
 REM  Usage: run before commit; commit only after all checks pass
 REM ============================================================
@@ -19,7 +19,7 @@ echo.
 set ALL_PASS=1
 
 REM ---- Step 1: rule architecture ----
-echo [1/8] Rule architecture check...
+echo [1/9] Rule architecture check...
 python scripts\check_rule_architecture.py
 set RULE_EXIT=%ERRORLEVEL%
 if %RULE_EXIT%==0 (
@@ -31,7 +31,7 @@ if %RULE_EXIT%==0 (
 echo.
 
 REM ---- Step 2: cross-platform contract drift ----
-echo [2/8] Cross-platform contract: API vs mobileRouteHandler...
+echo [2/9] Cross-platform contract: API vs mobileRouteHandler...
 python scripts\check_api_contract.py
 set CONTRACT_EXIT=%ERRORLEVEL%
 if %CONTRACT_EXIT%==0 (
@@ -42,7 +42,7 @@ if %CONTRACT_EXIT%==0 (
 )
 echo.
 
-echo [3/8] Cross-platform contract: router vs smoke spec...
+echo [3/9] Cross-platform contract: router vs smoke spec...
 python scripts\check_route_drift.py
 set ROUTE_EXIT=%ERRORLEVEL%
 if %ROUTE_EXIT%==0 (
@@ -53,7 +53,7 @@ if %ROUTE_EXIT%==0 (
 )
 echo.
 
-echo [4/8] Cross-platform contract: featureFlags usage...
+echo [4/9] Cross-platform contract: featureFlags usage...
 python scripts\check_feature_flags.py
 set FLAGS_EXIT=%ERRORLEVEL%
 if %FLAGS_EXIT%==0 (
@@ -64,7 +64,7 @@ if %FLAGS_EXIT%==0 (
 )
 echo.
 
-echo [5/8] Cross-platform contract: mobileRouteHandler case coverage...
+echo [5/9] Cross-platform contract: mobileRouteHandler case coverage...
 python scripts\check_mobile_routes_coverage.py
 set COVERAGE_EXIT=%ERRORLEVEL%
 if %COVERAGE_EXIT%==0 (
@@ -76,7 +76,7 @@ if %COVERAGE_EXIT%==0 (
 echo.
 
 REM ---- Step 6: FilterBar usage ----
-echo [6/8] Frontend FilterBar usage vs hand-written RangePicker...
+echo [6/9] Frontend FilterBar usage vs hand-written RangePicker...
 python scripts\check_filter_bar_usage.py
 set FILTER_EXIT=%ERRORLEVEL%
 if %FILTER_EXIT%==0 (
@@ -87,8 +87,21 @@ if %FILTER_EXIT%==0 (
 )
 echo.
 
-REM ---- Step 7: backend API smoke ----
-echo [7/8] Backend API smoke...
+REM ---- Step 7: data quality audit (aggregate table duplicate rows) ----
+echo [7/9] Data quality audit: aggregate table duplicate rows...
+python scripts\audit_data_quality.py
+set QUALITY_EXIT=%ERRORLEVEL%
+if %QUALITY_EXIT%==0 (
+    echo [PASS] Data quality audit passed
+) else (
+    echo [FAIL] Data quality audit failed ^(exit: %QUALITY_EXIT%^)
+    echo        ^(duplicate rows in aggregate tables, dedupe upstream and re-import^)
+    set ALL_PASS=0
+)
+echo.
+
+REM ---- Step 8: backend API smoke ----
+echo [8/9] Backend API smoke...
 python -m unittest discover -s tests/api -q 2>&1
 set API_EXIT=%ERRORLEVEL%
 if %API_EXIT%==0 (
@@ -99,8 +112,8 @@ if %API_EXIT%==0 (
 )
 echo.
 
-REM ---- Step 8: frontend build ----
-echo [8/8] Frontend build ^(vite build^)...
+REM ---- Step 9: frontend build ----
+echo [9/9] Frontend build ^(vite build^)...
 cd frontend-react
 call npm.cmd run build
 set BUILD_EXIT=%ERRORLEVEL%

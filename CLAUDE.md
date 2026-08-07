@@ -182,12 +182,12 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 改动 | 最小验证 |
 | --- | --- |
 | 规则架构 / 核心文件 | `python scripts/check_rule_architecture.py` + 通用验证 + `docs/rules/overview.md` 核心文件清单中该文件的额外验证 |
-| Python 后端 | `python -m unittest discover -s tests/api -v` |
+| Python 后端 | `python -m unittest discover -s tests/api -v`（含数值口径对账 `test_numeric_calibration`）；聚合表重复行用 `python scripts/audit_data_quality.py`（见 `docs/rules/business-invariants.md` 第 4 节） |
 | 前端 TS/TSX | `cd frontend-react && npm run typecheck` |
 | 前端页面/组件/样式 | typecheck + `npm run build` |
 | lint 或大范围前端重构 | `npm run lint` |
 | lazy 路由 | `npm run test:smoke` |
-| 跨端契约（API/路由/flag/case） | `python scripts/check_api_contract.py` + `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节触发条件） |
+| 跨端契约（API/路由/flag/case/算法） | `python scripts/check_api_contract.py`（含后端 vs 移动端关键算法一致性对账，见 `docs/rules/business-invariants.md` 第 6 节）+ `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节） |
 | 报表筛选器 | `python scripts/check_filter_bar_usage.py`（禁止手写 `<RangePicker>` + 自定义按钮；详见 `docs/rules/frontend.md` 第 9 节） |
 | 移动端 SQLite 路由 | `python scripts/test_mobile_routes.py` |
 | Bug 修复 | 对应最小回归用例 |
