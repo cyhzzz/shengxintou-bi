@@ -81,6 +81,9 @@ def _connect(url: str):
         return engine.connect(), True
     # SQLite：解析 sqlite:///path
     db_path = url.replace('sqlite:///', '', 1)
+    parent = os.path.dirname(db_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     import sqlite3
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
