@@ -38,8 +38,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import config  # noqa: E402
-
 # 聚合表 -> 业务唯一维度（这些维度上不应出现重复行）
 # 若上游 ETL 产出同维度多行，说明文件本身有重复，必须在上游修正后再导入。
 AGGREGATE_KEYS: Dict[str, List[str]] = {
@@ -52,13 +50,27 @@ AGGREGATE_KEYS: Dict[str, List[str]] = {
 
 
 def _resolve_db_url() -> str:
-    """从 config 取数据库 URI（跟随 .env）；无法 import 时兜底 SQLite。"""
-    try:
-        return config.SQLALCHEMY_DATABASE_URI
-    except Exception:
-        _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        _db_path = os.path.join(_root, 'database', 'shengxintou.db').replace('\\\\', '/')
-        return f'sqlite:///{_db_path}'
+    """解析数据库 URI（不依赖 Flask/config，避免 CI 无后端依赖时 import dotenv 失败）。
+
+    优先级与 config.py 一致：
+      1. DATABASE_URL（PG/Supabase）
+      2. DATABASE_PATH（SQLite 路径，可相对项目根）
+      3. 兜底 项目根/database/shengxintou.db
+    """
+    raw_url = os.getenv('DATABASE_URL', '').strip()
+    if raw_url:
+        if raw_url.startswith('postgres://'):
+            raw_url = 'postgresql+psycopg://' + raw_url[len('postgres://'):]
+        return raw_url
+    db_path_env = os.getenv('DATABASE_PATH', '').strip()
+    if db_path_env:
+        if os.path.isabs(db_path_env):
+            _db_path = db_path_env
+        else:
+            _db_path = os.path.join(ROOT, db_path_env)
+    else:
+        _db_path = os.path.join(ROOT, 'database', 'shengxintou.db')
+    return f'sqlite:///{_db_path}'
 
 
 def _connect(url: str):
