@@ -474,15 +474,6 @@ export interface XhsKosWeeklyData {
     new: XhsKosRankingItem[];
     existing_new_open: XhsKosRankingItem[];
   }>;
-  year_breakdown: Record<string, Record<string, {
-    label: string;
-    total_leads: number;
-    opened_count: number;
-    valid_customer_count: number;
-    total_assets: number;
-    opening_rate: number;
-    valid_customer_rate: number;
-  }>>;
   overview: Record<string, {
     total_leads: number;
     mouth_count: number;

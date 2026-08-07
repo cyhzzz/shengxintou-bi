@@ -2,7 +2,7 @@
 """分支KOS转化周报口径单测（v3.8.0）
 
 数据口径：fact_conv_content.笔记ID 关联 agg_xhs_note.创作者（分支KOS投顾名单）。
-本测试只测纯函数（名单匹配 / 聚合 / 榜单口径 / 年度拆分 / 趋势 / 默认周），不依赖数据库。
+本测试只测纯函数（名单匹配 / 聚合 / 榜单口径 / 趋势 / 默认周），不依赖数据库。
 
 运行：
   - 全部：   python -m unittest discover -s tests/api -v
@@ -26,7 +26,6 @@ from backend.routes.data.xhs_kos_weekly import (  # noqa: E402
     _aggregate,
     _build_rankings,
     _build_trend,
-    _build_year_breakdown,
     _latest_kos_week_range,
     is_kos_creator,
     kos_name_of,
@@ -127,17 +126,6 @@ class KosRankingCaliberTest(unittest.TestCase):
 
 
 class KosMiscTest(unittest.TestCase):
-    def test_year_breakdown(self):
-        leads = [
-            _lead('赵茜', '2025-06-01', opened=1),
-            _lead('赵茜', '2026-06-01', opened=1),
-            _lead('赵茜', '2026-08-01', opened=1),  # 超过 end_date，不计入
-        ]
-        yb = _build_year_breakdown(leads, '2026-07-31')
-        self.assertEqual(yb['y2025']['total_leads'], 1)
-        self.assertEqual(yb['y2026']['total_leads'], 1)
-        self.assertIn('25年线索', yb['y2025']['label'])
-
     def test_trend_monthly(self):
         leads = [
             _lead('赵茜', '2026-05-01', opened=1),

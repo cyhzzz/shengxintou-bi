@@ -23,8 +23,8 @@ const WeeklyReportPreview: React.FC<WeeklyReportPreviewProps> = ({ content, load
 
   if (!content) {
     const tip = mode === 'poster'
-      ? '本页进入后会自动生成一次默认海报；请点击上方【生成周报】。'
-      : '点击“生成周报”按钮开始生成周报';
+      ? '本页进入后会自动生成默认海报；也可在上方选择日期后点击【查询】。'
+      : '请在上方选择日期后点击【查询】生成周报';
     return (
       <Empty
         className={styles.emptyContainer}

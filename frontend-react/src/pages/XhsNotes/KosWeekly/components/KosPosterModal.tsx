@@ -2,7 +2,7 @@
  * 分支KOS转化周报 · 海报组件（v3.8.0）
  *
  * 样式与员工转化周报 PosterModal 对齐：masthead + 3 张榜单表（总榜/新增周榜/存量新开户周榜）
- * + 年度拆分行 + 底部 Notes。
+ * + 底部 Notes。
  */
 import React, { useRef, useState } from 'react';
 import { Modal, message, Spin } from 'antd';
@@ -11,7 +11,6 @@ import {
   withKosRoster,
   type KosPlatformRankings,
   type KosRankingItem,
-  type KosYearBreakdownItem,
 } from '../kosRoster';
 import { saveBlobFile, buildMobileSaveMessage, captureElement } from '@/utils/saveBlob';
 import styles from './PosterModal.module.scss';
@@ -21,7 +20,6 @@ interface KosPosterModalProps {
   startDate: string;
   endDate: string;
   rankings: KosPlatformRankings;
-  yearBreakdown?: { y2025: KosYearBreakdownItem; y2026: KosYearBreakdownItem };
   onCancel?: () => void;
   mode?: 'modal' | 'inline';
 }
@@ -95,8 +93,7 @@ const renderTableRow = (item: KosRankingItem, index: number, isTotal = false) =>
 const renderRankingTable = (
   data: KosRankingItem[],
   title: string,
-  indexLabel: string,
-  yearBreakdown?: { y2025: KosYearBreakdownItem; y2026: KosYearBreakdownItem }
+  indexLabel: string
 ) => {
   // 固定名单内保留榜单原始降序，缺少数据的投顾补 0 后置。
   data = withKosRoster(data);
@@ -149,28 +146,6 @@ const renderRankingTable = (
             <>
               {data.map((item, index) => renderTableRow(item, index))}
               {renderTableRow(total as KosRankingItem, 0, true)}
-              {yearBreakdown && (
-                <>
-                  <tr className={styles.yearRow} key="y2026">
-                    <td colSpan={2} style={{ whiteSpace: 'pre-line' }}>26年线索<br/>26年开户</td>
-                    <td className={styles.number}>{formatNumber(yearBreakdown.y2026.total_leads)}</td>
-                    <td className={styles.highlight}>{formatNumber(yearBreakdown.y2026.opened_count)}</td>
-                    <td className={styles.number}>{formatNumber(yearBreakdown.y2026.valid_customer_count)}</td>
-                    <td className={styles.number}>{formatAssets(yearBreakdown.y2026.total_assets)}</td>
-                    <td className={styles.rate}>{(yearBreakdown.y2026.opening_rate || 0).toFixed(2)}%</td>
-                    <td className={styles.rate}>{(yearBreakdown.y2026.valid_customer_rate || 0).toFixed(2)}%</td>
-                  </tr>
-                  <tr className={styles.yearRow} key="y2025">
-                    <td colSpan={2} style={{ whiteSpace: 'pre-line' }}>25年线索<br/>25年开户</td>
-                    <td className={styles.number}>{formatNumber(yearBreakdown.y2025.total_leads)}</td>
-                    <td className={styles.highlight}>{formatNumber(yearBreakdown.y2025.opened_count)}</td>
-                    <td className={styles.number}>{formatNumber(yearBreakdown.y2025.valid_customer_count)}</td>
-                    <td className={styles.number}>{formatAssets(yearBreakdown.y2025.total_assets)}</td>
-                    <td className={styles.rate}>{(yearBreakdown.y2025.opening_rate || 0).toFixed(2)}%</td>
-                    <td className={styles.rate}>{(yearBreakdown.y2025.valid_customer_rate || 0).toFixed(2)}%</td>
-                  </tr>
-                </>
-              )}
             </>
           )}
         </tbody>
@@ -221,7 +196,6 @@ const KosPosterModal: React.FC<KosPosterModalProps> = ({
   startDate,
   endDate,
   rankings,
-  yearBreakdown,
   onCancel,
   mode = 'modal',
 }) => {
@@ -352,7 +326,7 @@ const KosPosterModal: React.FC<KosPosterModalProps> = ({
 
           {/* 内容区域 */}
           <div className={styles.content}>
-            {renderRankingTable(rankings.total, '投顾开户总榜', '01', yearBreakdown)}
+            {renderRankingTable(rankings.total, '投顾开户总榜', '01')}
             {renderRankingTable(rankings.new, '投顾新增线索开户周榜', '02')}
             {renderRankingTable(rankings.existing_new_open || [], '投顾存量线索新开户周榜', '03')}
             {renderFooterNote(startDate, endDate)}

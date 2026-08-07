@@ -378,7 +378,6 @@ class ApiSmokeTest(unittest.TestCase):
                 self.assertIn('kos_name', item)
                 self.assertIn('total_leads', item)
                 self.assertIn('opened_count', item)
-        self.assertIn('year_breakdown', data)
         self.assertIn('overview', data)
         self.assertIn('trend', data)
 

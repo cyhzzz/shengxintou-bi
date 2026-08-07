@@ -38,16 +38,6 @@ export interface KosPlatformRankings {
   existing_new_open?: KosRankingItem[];
 }
 
-export interface KosYearBreakdownItem {
-  label: string;
-  total_leads: number;
-  opened_count: number;
-  valid_customer_count: number;
-  total_assets: number;
-  opening_rate: number;
-  valid_customer_rate: number;
-}
-
 export interface KosWeeklyData {
   platform: string;
   roster_count?: number;
@@ -65,7 +55,6 @@ export interface KosWeeklyData {
     total_assets?: number;
   }>;
   rankings: Record<string, KosPlatformRankings>;
-  year_breakdown?: Record<string, { y2025: KosYearBreakdownItem; y2026: KosYearBreakdownItem }>;
   trend?: unknown[];
 }
 

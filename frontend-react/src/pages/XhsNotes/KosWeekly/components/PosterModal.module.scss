@@ -59,7 +59,9 @@
 /* ==================== 浮动工具栏 ==================== */
 .floatingToolbar {
   position: sticky;
-  top: 0;
+  /* 页面滚动容器 .content 自带 padding: var(--spacer-24)，sticky top 以内容盒为基准，
+     不加补偿会吸顶后距滚动区顶部 24px 空隙（横条上方露出背景条）；负 top 与 padding 抵消 */
+  top: calc(-1 * var(--spacer-24));
   z-index: 50;
   display: flex;
   gap: 8px;
@@ -385,21 +387,6 @@
         color: var(--paper);
         padding-top: 14px;
         padding-bottom: 14px;
-      }
-    }
-
-    /* 年度拆分行 */
-    .yearRow {
-      background: var(--ink-050);
-      font-weight: 500;
-
-      td {
-        border-top: 1px solid var(--ink-200);
-        border-bottom: 1px solid var(--ink-100);
-        color: var(--ink-500);
-        padding-top: 10px;
-        padding-bottom: 10px;
-        font-size: 12px;
       }
     }
 

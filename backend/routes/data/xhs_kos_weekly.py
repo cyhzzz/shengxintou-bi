@@ -220,31 +220,6 @@ def _build_overview(leads, start_date, end_date):
     }
 
 
-def _build_year_breakdown(leads, end_date):
-    ed = _parse_date(end_date)
-    result = {}
-    for year in (2025, 2026):
-        ys, ye = date(year, 1, 1), date(year, 12, 31)
-        items = _aggregate([
-            l for l in leads
-            if l['线索日期_obj'] and ys <= l['线索日期_obj'] <= ye
-            and (ed is None or l['线索日期_obj'] <= ed)
-        ])
-        total_leads = sum(i['total_leads'] for i in items)
-        opened = sum(i['opened_count'] for i in items)
-        valid = sum(i['valid_customer_count'] for i in items)
-        result[f'y{year}'] = {
-            'label': f'{year % 100}年线索\n{year % 100}年开户',
-            'total_leads': total_leads,
-            'opened_count': opened,
-            'valid_customer_count': valid,
-            'total_assets': round(sum(i['total_assets'] for i in items), 2),
-            'opening_rate': round(opened / total_leads * 100, 2) if total_leads else 0,
-            'valid_customer_rate': round(valid / opened * 100, 2) if opened else 0,
-        }
-    return result
-
-
 def _build_trend(leads, start_date, end_date):
     sd, ed = _parse_date(start_date), _parse_date(end_date)
     agg = defaultdict(lambda: {'leads': 0, 'opened': 0, 'valid': 0})
@@ -286,7 +261,7 @@ def get_kos_weekly():
 
     请求体（JSON）：{ "start_date": "2026-07-01", "end_date": "2026-07-31" }（可选）
     响应 data 结构与 /employee-conversion/weekly 对齐（单平台：小红书）：
-      rankings / year_breakdown / overview / trend / roster_count / roster / platform
+      rankings / overview / trend / roster_count / roster / platform
     """
     data = request.get_json(silent=True) or {}
     start_date = data.get('start_date')
@@ -299,7 +274,6 @@ def get_kos_weekly():
             'roster_count': len(KOS_ROSTER),
             'roster': KOS_ROSTER,
             'rankings': {PLATFORM: _build_rankings(leads, start_date, end_date)},
-            'year_breakdown': {PLATFORM: _build_year_breakdown(leads, end_date)},
             'overview': {PLATFORM: _build_overview(leads, start_date, end_date)},
             'trend': _build_trend(leads, start_date, end_date),
         },

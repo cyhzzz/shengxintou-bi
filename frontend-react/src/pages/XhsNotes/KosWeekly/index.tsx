@@ -3,7 +3,7 @@
  *
  * 数据口径：fact_conv_content.笔记ID 关联 agg_xhs_note.创作者（分支KOS投顾名单）。
  * 能力对齐员工转化周报：海报视图（默认）/ 文本模式 / 复制 / 导出 Word / Excel。
- * 海报样式与员工转化-转化周报一致（小红书配色 + 3 张榜单 + 年度拆分 + Notes）。
+ * 海报样式与员工转化-转化周报一致（小红书配色 + 3 张榜单 + Notes）。
  * 筛选器统一使用 FilterBar（日期范围变化自动生成周报）。
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -232,13 +232,12 @@ const KosWeeklyPage: React.FC = () => {
 
         {/* 视图主体 */}
         {viewMode === 'poster' ? (
-          reportData && dateRange.startDate && dateRange.endDate && (reportData?.overview?.[PLATFORM]?.total_leads ?? reportData?.overview?.[PLATFORM]?.leads ?? 0) > 0 ? (
+          reportData && dateRange.startDate && dateRange.endDate ? (
             <KosPosterModal
               mode="inline"
               startDate={dateRange.startDate}
               endDate={dateRange.endDate}
               rankings={reportData.rankings?.[PLATFORM] || { total: [], existing: [], new: [], existing_new_open: [] }}
-              yearBreakdown={reportData.year_breakdown?.[PLATFORM]}
             />
           ) : (
             <WeeklyReportPreview content="" loading={loading} mode="poster" />
