@@ -63,6 +63,7 @@ tools/jdk17.zip
 tools/android-sdk/
 tools/platform-tools/
 tools/build-tools/
+tools/nsis/
 
 # ===== IDE 配置 =====
 .vscode/
