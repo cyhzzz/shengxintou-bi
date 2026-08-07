@@ -34,7 +34,6 @@ MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
     '/system/data-sync',  # Supabase 同步（已封存）
     '/data-sync',         # Supabase 同步（蓝图 url_prefix=/api/v1/data-sync）
     '/data-reconciliation',  # 抖音青鸟对账（仅桌面端）
-    '/xhs/kos-weekly',      # 分支KOS转化周报（仅桌面/Web 端，移动端 featureFlag 禁用）
     '/account-mapping',
     '/account-agency-mapping',
     '/config',            # 系统配置（仅桌面端）
@@ -69,6 +68,49 @@ CASE_ALIASES: Dict[str, str] = {
     'xhs-notes-list': 'xhs-notes-list',  # 同时支持两种写法，case 已覆盖
     'xhs-notes/list': 'xhs-notes/list',
 }
+
+# 两端必须算法一致的关键逻辑（后端 Python 与移动端 TS 各写一份，需逐处对齐）。
+# 背景：复合来源均分曾因"后端改了、移动端漏改"导致两端数值不一致。
+# 校验方式：在后端文件与 mobileRouteHandler.ts 中分别统计 backend_pattern / mobile_pattern
+#           的出现次数，要求两端一致（都实现、数量相等）。缺失或数量不等 → drift。
+ALGO_MARKERS: List[Dict[str, str]] = [
+    {
+        'name': '复合来源线索均分（anchor-clusters / anchor-weekly-analysis）',
+        'backend_file': ROUTES_DIR / 'data' / 'leads.py',
+        'backend_pattern': r'div = max\(n, 1\)',
+        'mobile_pattern': r'div = Math\.max\(n, 1\)',
+    },
+]
+
+
+def count_pattern(text: str, pattern: str) -> int:
+    """统计正则 pattern 在文本中的出现次数（0 = 未实现）。"""
+    try:
+        return len(re.findall(pattern, text))
+    except re.error:
+        return -1
+
+
+def check_algorithm_consistency() -> List[str]:
+    """对账后端与移动端的关键算法实现。返回 drift 信息列表（空 = 一致）。"""
+    if not MOBILE_HANDLER.exists():
+        return []
+    mobile_text = MOBILE_HANDLER.read_text(encoding='utf-8')
+    drifts: List[str] = []
+    for marker in ALGO_MARKERS:
+        b_file = marker['backend_file']
+        b_text = b_file.read_text(encoding='utf-8') if b_file.exists() else ''
+        b_cnt = count_pattern(b_text, marker['backend_pattern'])
+        m_cnt = count_pattern(mobile_text, marker['mobile_pattern'])
+        # 后端有实现但移动端缺失，或数量不一致 → 判为 drift
+        if b_cnt <= 0:
+            continue  # 后端未实现该算法，不比对
+        if m_cnt != b_cnt:
+            drifts.append(
+                f"[{marker['name']}] 后端 {b_cnt} 处 vs 移动端 {m_cnt} 处，"
+                f"数量不一致，需在 mobileRouteHandler.ts 同步（后端位置见 leads.py）"
+            )
+    return drifts
 
 
 def extract_blueprint_prefixes() -> Dict[str, str]:
@@ -304,6 +346,19 @@ def main() -> int:
 
     if known_drifts:
         print(f'⚠️  有 {len(known_drifts)} 个已知 drift 待逐步补齐（不影响 CI）')
+
+    # ---- 算法一致性检查 ----
+    algo_drifts = check_algorithm_consistency()
+    print()
+    print('--- 算法一致性（后端 vs 移动端） ---')
+    if algo_drifts:
+        for d in algo_drifts:
+            print(f'  ❌ {d}')
+        print('   规则见 docs/rules/business-invariants.md 第 6 节（复合来源线索均分）')
+        print('   两端算法必须逐处对齐，新增/修改均分逻辑需同时更新 mobileRouteHandler.ts')
+        return 1
+    print('  ✅ 关键算法后端与移动端一致')
+
     print('✅ 无新 drift，后端 API 与 mobileRouteHandler 对齐')
     return 0
 

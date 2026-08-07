@@ -35,7 +35,7 @@ export interface FeatureFlags {
   showReportGeneration: boolean;
   /** 侧边栏「抖音青鸟对账」菜单（移动端禁用，依赖上传+对账桌面工作流） */
   showDataReconciliation: boolean;
-  /** 侧边栏「小红书 · 分支KOS转化周报」菜单（移动端禁用，后端端点未移植到 mobileRouteHandler） */
+  /** 侧边栏「小红书 · 分支KOS转化周报」菜单（移动端已开放，mobileRouteHandler 已实现） */
   showKosWeekly: boolean;
 }
 
@@ -79,8 +79,8 @@ const mobileFlags: FeatureFlags = {
   showReportGeneration: true,
   // v3.6.1：移动端禁用抖音青鸟对账（核心是文件上传+对账桌面工作流，mobileRouteHandler 未实现）
   showDataReconciliation: false,
-  // v3.8.0：移动端禁用分支KOS转化周报（后端端点未移植到 mobileRouteHandler）
-  showKosWeekly: false,
+  // v3.8.0：移动端开放分支KOS转化周报（已移植到 mobileRouteHandler /xhs/kos-weekly）
+  showKosWeekly: true,
 };
 
 /**

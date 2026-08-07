@@ -132,6 +132,33 @@ tests = [
         'sql': '''SELECT MAX("日期") AS latest FROM "agg_vendor_daily"''',
         'params': [],
     },
+    {
+        'name': 'kos-weekly',
+        'sql': '''SELECT
+            f.id AS id,
+            a."创作者" AS creator,
+            f."线索日期" AS 线索日期,
+            f."是否客户开口" AS 是否客户开口,
+            f."是否有效线索" AS 是否有效线索,
+            f."是否开户" AS 是否开户,
+            f."是否为有效户" AS 是否为有效户,
+            f."是否为存量客户" AS 是否为存量客户,
+            f."开户时间" AS 开户时间,
+            f."资产" AS 资产
+          FROM fact_conv_content f
+          INNER JOIN agg_xhs_note a ON a."笔记ID" = f."笔记ID"''',
+        'params': [],
+    },
+    {
+        'name': 'kos-weekly/filter-options',
+        'sql': '''SELECT
+            f.id AS id,
+            a."创作者" AS creator,
+            f."线索日期" AS 线索日期
+          FROM fact_conv_content f
+          INNER JOIN agg_xhs_note a ON a."笔记ID" = f."笔记ID"''',
+        'params': [],
+    },
 ]
 
 if __name__ == '__main__':

@@ -33,7 +33,7 @@
 
 | 脚本 | 检查内容 | 触发条件 |
 | --- | --- | --- |
-| `python scripts/check_api_contract.py` | 后端 `@bp.route` 注册的端点 vs `mobileRouteHandler.ts` case 分支 | 改动后端 routes 或 mobileRouteHandler |
+| `python scripts/check_api_contract.py` | 后端 `@bp.route` 注册的端点 vs `mobileRouteHandler.ts` case 分支；另校验关键算法（如复合来源均分）后端与移动端实现数量一致 | 改动后端 routes、mobileRouteHandler 或后端/移动端关键算法 |
 | `python scripts/check_route_drift.py` | `router/index.tsx` 注册的路由 vs `route-health.spec.ts` 的 `PUBLIC_ROUTES` 列表 | 改动路由或 smoke 用例 |
 | `python scripts/check_feature_flags.py` | `features.ts` 中声明的 flag 是否被实际使用；`desktopAndWebFlags` / `mobileFlags` 字段是否对称 | 改动 features.ts 或菜单 |
 | `python scripts/check_mobile_routes_coverage.py` | `mobileRouteHandler.ts` 的 case 分支 vs `test_mobile_routes.py` 测试用例覆盖 | 改动 mobileRouteHandler case 或新增 case |
@@ -45,6 +45,13 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 ## 4. 四端兼容性必查清单
 
 改动前确认每一项：
+
+### 4.0 新增业务报表 / 功能的全端默认原则（最高优先级）
+
+- [ ] **新增业务报表默认应在全端提供**（开发版 Web / 桌面版 / 移动端 Android / PWA 端），不得自行对移动端/PWA 隐藏。
+- [ ] **移动端禁用任何新业务报表前必须先征求用户确认**（如在 features.ts 置 `showXxx: false` 或加入 mobileRouteHandler 忽略列表），并说明禁用理由（如依赖桌面端专属能力、后端端点未移植等）。不得在用户不知情时擅自禁用。
+- [ ] 仅当功能确实依赖桌面/Web 专属能力（如文件上传、对账桌面工作流、系统配置）时，才允许移动端禁用，且须在注释中写明原因。
+- [ ] 若需禁用，同步更新 `mobileRouteHandler.ts`（或加入 `MOBILE_IGNORED_PREFIXES`）、`features.ts`、`router/index.tsx`、测试与对账脚本，保持跨端契约检查通过。
 
 ### 4.1 新增 API 端点
 
