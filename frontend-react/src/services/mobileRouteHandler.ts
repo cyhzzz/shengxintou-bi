@@ -4283,6 +4283,9 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleAppMarketCreative(body);
     case 'reports/app-market/cost-analysis':
       return handleAppMarketCostAnalysis(body);
+    // v3.7.3: 归因转化率分析（数据源为本地 Excel，移动端暂不支持）
+    case 'reports/app-market/attribution-conversion':
+      throw new Error('归因转化率分析暂不支持移动端，请在桌面端查看');
 
     // 小红书
     case 'xhs-notes-list':

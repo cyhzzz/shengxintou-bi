@@ -35,6 +35,8 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   // v3.3.10：creative → plan-analysis（命名统一；旧路径走 Navigate 重定向，保留一项用例验证重定向可用）
   { name: '应用市场-计划分析', path: '/app-market/plan-analysis' },
   { name: '应用市场-创意(旧路径重定向)', path: '/app-market/creative' },
+  // v3.7.3：归因转化率子报表
+  { name: '应用市场-归因转化率', path: '/app-market/attribution-conversion' },
   { name: '直播-漏斗', path: '/live/funnel' },
   { name: '直播-带货', path: '/live/direct-sales' },
   { name: '直播-投顾IP', path: '/live/advisor-ip' },

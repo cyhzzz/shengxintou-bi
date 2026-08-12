@@ -67,6 +67,8 @@ const AppMarketDetailPage = lazy(() => import('@/pages/Reports/AppMarket/Detail'
 const AppMarketPlanAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/PlanAnalysis'));
 // v3.6.3: 应用市场 · 消耗和成本
 const AppMarketCostAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/CostAnalysis'));
+// v3.7.3: 应用市场 · 归因转化率分析
+const AppMarketAttributionConversionPage = lazy(() => import('@/pages/Reports/AppMarket/AttributionConversion'));
 
 // 直播 v3.1
 const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
@@ -133,6 +135,8 @@ const mainChildren = [
       { path: 'creative', element: <Navigate to="/app-market/plan-analysis" replace /> },
       // v3.6.3: 消耗和成本
       { path: 'cost-analysis', element: withSuspense(AppMarketCostAnalysisPage) },
+      // v3.7.3: 归因转化率分析
+      { path: 'attribution-conversion', element: withSuspense(AppMarketAttributionConversionPage) },
     ],
   },
   // 直播 v3.1 占位

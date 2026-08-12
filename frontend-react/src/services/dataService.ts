@@ -372,6 +372,12 @@ export const dataServiceReports = {
   getAppMarketCostAnalysis: async (filters: { start_date: string; end_date: string }) => {
     return http.post('/reports/app-market/cost-analysis', { filters });
   },
+  // v3.7.3 应用市场 · 归因转化率分析
+  getAppMarketAttributionConversion: async (filters: {
+    start_date?: string; end_date?: string; platform?: string;
+  }) => {
+    return http.post('/reports/app-market/attribution-conversion', { filters });
+  },
 };
 
 

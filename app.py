@@ -605,6 +605,7 @@ from backend.auth import bp as auth_bp, init_auth
 from backend.routes import weekly_reports
 from backend.routes.reports import app_market as app_market_report_blueprint
 from backend.routes.reports import app_market_cost as app_market_cost_blueprint
+from backend.routes.reports import app_market_attribution as app_market_attribution_blueprint
 from backend.routes.reports import omni_channel as omni_channel_report_blueprint
 # v3.3.10: 小红书计划分析（仿应用市场 /plan-analysis，数据源 fact_conv_content）
 from backend.routes.reports import xhs_plan_analysis as xhs_plan_analysis_report_blueprint
@@ -666,6 +667,8 @@ app.register_blueprint(weekly_reports.bp)  # weekly_reports has url_prefix in bl
 app.register_blueprint(app_market_report_blueprint.bp)
 # v3.6.3: 应用市场 · 消耗和成本（URL prefix 已在蓝图定义: /api/v1/reports/app-market）
 app.register_blueprint(app_market_cost_blueprint.bp)
+# v3.7.3: 应用市场 · 归因转化率分析（URL prefix 已在蓝图定义: /api/v1/reports/app-market）
+app.register_blueprint(app_market_attribution_blueprint.bp)
 app.register_blueprint(omni_channel_report_blueprint.bp)
 # v3.3.10: 小红书计划分析（URL prefix 已在蓝图定义: /api/v1/reports/xhs）
 app.register_blueprint(xhs_plan_analysis_report_blueprint.bp)
