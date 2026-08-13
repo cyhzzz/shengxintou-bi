@@ -277,6 +277,35 @@ class ApiSmokeTest(unittest.TestCase):
         # 若返回了 selected_platform，应等于请求的平台
         self.assertEqual(data.get('selected_platform'), '华为')
 
+    def test_47b_app_market_attribution_conversion(self):
+        # v3.8.1 应用市场 · 归因转化率（fact_conv_appmarket 表数据源）
+        # 漏斗：激活 → 开户注册 → 身份证 → 银行卡 → 提交开户 → 开户成功
+        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END, 'platform': '全部'}}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/attribution-conversion', payload),
+            '/reports/app-market/attribution-conversion')
+        self.assertIsInstance(data, dict)
+        self.assertIn('daily_data', data)
+        self.assertIn('weekly_data', data)
+        self.assertIn('platforms', data)
+        self.assertIn('platform', data)
+        # 日数据结构（每日各步骤计数 + 步骤间转化率）
+        if data['daily_data']:
+            d = data['daily_data'][0]
+            for k in ('date', 'weekday', 'week_start', 'activate', 'register', 'id_card',
+                      'bank_card', 'submit', 'success',
+                      'rate_activate_register', 'rate_register_idcard',
+                      'rate_idcard_bankcard', 'rate_bankcard_submit', 'rate_submit_success'):
+                self.assertIn(k, d, f'daily_data[0] 缺少字段 {k}')
+        # 周数据结构（周合计 + 步骤间转化率）
+        if data['weekly_data']:
+            w = data['weekly_data'][0]
+            for k in ('week_start', 'week_end', 'activate', 'register', 'id_card',
+                      'bank_card', 'submit', 'success',
+                      'rate_activate_register', 'rate_register_idcard',
+                      'rate_idcard_bankcard', 'rate_bankcard_submit', 'rate_submit_success'):
+                self.assertIn(k, w, f'weekly_data[0] 缺少字段 {k}')
+
     def test_48_xhs_plan_analysis(self):
         # v3.3.10 小红书 · 计划分析（仿应用市场 plan-analysis）
         # 数据源：fact_conv_content（平台来源=小红书）

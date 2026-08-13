@@ -18,6 +18,7 @@ export const PAGE_ROUTES = {
   'app-market-comparison': '/app-market/comparison',
   'app-market-detail': '/app-market/detail',
   'app-market-creative': '/app-market/creative',
+  'app-market-attribution': '/app-market/attribution-conversion',
   'live-funnel': '/live/funnel',
   'data-import': '/system/data-import',
   'account-management': '/system/account-management',
