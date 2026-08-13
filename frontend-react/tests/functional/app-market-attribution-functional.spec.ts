@@ -13,7 +13,6 @@ import {
   expectMainContentVisible,
   expectFilterBarVisible,
   clickSearchButton,
-  getTableRowCount,
   hasDataInTable,
   checkElementExists,
   waitForLoadingComplete,
