@@ -128,6 +128,20 @@ tests = [
         'params': ['2026-01-01', '2026-12-31'],
     },
     {
+        'name': 'reports/app-market/attribution-conversion',
+        'sql': '''SELECT "下载日期" AS d,
+            COALESCE(SUM("是否激活APP"), 0) AS activate,
+            COALESCE(SUM("是否开户注册"), 0) AS register,
+            COALESCE(SUM("是否注册身份证"), 0) AS id_card,
+            COALESCE(SUM("是否注册银行卡"), 0) AS bank_card,
+            COALESCE(SUM("是否提交开户"), 0) AS submit,
+            COALESCE(SUM("是否开户成功"), 0) AS success
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "下载日期" ORDER BY "下载日期"''',
+        'params': ['2026-01-01', '2026-12-31'],
+    },
+    {
         'name': 'data-freshness',
         'sql': '''SELECT MAX("日期") AS latest FROM "agg_vendor_daily"''',
         'params': [],

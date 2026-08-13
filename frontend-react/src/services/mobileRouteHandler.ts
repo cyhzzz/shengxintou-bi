@@ -761,6 +761,127 @@ async function handleAppMarketCostAnalysis(body: any): Promise<any> {
 }
 
 // ============================================================================
+// 应用市场 · 归因转化率 (app-market/attribution-conversion)
+// 数据源: fact_conv_appmarket（1 行=1 APP 下载），按周(周一~周日)聚合各步骤转化率
+// 与后端 backend/routes/reports/app_market_attribution.py 逻辑一致
+// ============================================================================
+
+function _attributionWeekEnd(weekStart: string): string {
+  // weekStart 是周一（YYYY-MM-DD），+6 天为周日
+  const d = new Date(weekStart + 'T00:00:00');
+  d.setDate(d.getDate() + 6);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _rate4(numerator: number, denominator: number): number {
+  if (denominator === 0) return 0;
+  return Math.round((numerator / denominator) * 10000) / 10000;
+}
+
+async function handleAppMarketAttributionConversion(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const platform = filters.platform || '全部';
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+
+  // 平台列表（与后端 available_platforms 一致：表中实际存在的去重值）
+  const platformSql = `SELECT DISTINCT "应用市场" AS p FROM fact_conv_appmarket WHERE "应用市场" IS NOT NULL AND "应用市场" != '' ORDER BY "应用市场"`;
+  const platformRows = await querySql<Row>(platformSql);
+  const available_platforms = platformRows.map((r) => String(r.p)).sort((a, b) => a.localeCompare(b, 'zh'));
+
+  const conditions: ({ sql: string; params: unknown[] } | null)[] = [];
+  if (platform && platform !== '全部') {
+    conditions.push({ sql: '"应用市场" = ?', params: [platform] });
+  }
+  conditions.push(dateClause('下载日期', sd, ed));
+  const whereClause = buildWhere(conditions.filter(Boolean) as { sql: string; params: unknown[] }[]);
+
+  // 日聚合（SQL 层按下载日期分组求和）
+  const dailySql = `SELECT "下载日期" AS d,
+    COALESCE(SUM("是否激活APP"), 0) AS activate,
+    COALESCE(SUM("是否开户注册"), 0) AS register,
+    COALESCE(SUM("是否注册身份证"), 0) AS id_card,
+    COALESCE(SUM("是否注册银行卡"), 0) AS bank_card,
+    COALESCE(SUM("是否提交开户"), 0) AS submit,
+    COALESCE(SUM("是否开户成功"), 0) AS success
+    FROM fact_conv_appmarket ${whereClause.clause}
+    GROUP BY "下载日期" ORDER BY "下载日期"`;
+  const dailyRows = await querySql<Row>(dailySql, whereClause.params);
+
+  const WEEKDAY_MAP = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const daily_data: any[] = [];
+  const weekMap: Record<string, any> = {};
+
+  for (const r of dailyRows) {
+    const dateStr = String(r.d).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+    const dObj = new Date(dateStr + 'T00:00:00');
+    const weekday = WEEKDAY_MAP[dObj.getDay()];
+    const ws = _weekStart(dateStr);
+    const rec: any = {
+      date: dateStr,
+      weekday,
+      week_start: ws,
+      activate: toInt(r.activate),
+      register: toInt(r.register),
+      id_card: toInt(r.id_card),
+      bank_card: toInt(r.bank_card),
+      submit: toInt(r.submit),
+      success: toInt(r.success),
+    };
+    rec['rate_activate_register'] = _rate4(rec.register, rec.activate);
+    rec['rate_register_idcard'] = _rate4(rec.id_card, rec.register);
+    rec['rate_idcard_bankcard'] = _rate4(rec.bank_card, rec.id_card);
+    rec['rate_bankcard_submit'] = _rate4(rec.submit, rec.bank_card);
+    rec['rate_submit_success'] = _rate4(rec.success, rec.submit);
+    daily_data.push(rec);
+
+    const wk = weekMap[ws] || { activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0 };
+    wk.activate += rec.activate;
+    wk.register += rec.register;
+    wk.id_card += rec.id_card;
+    wk.bank_card += rec.bank_card;
+    wk.submit += rec.submit;
+    wk.success += rec.success;
+    weekMap[ws] = wk;
+  }
+
+  const weekly_data = Object.entries(weekMap)
+    .map(([ws, w]: [string, any]) => {
+      const rec: any = {
+        week_start: ws,
+        week_end: _attributionWeekEnd(ws),
+        activate: w.activate,
+        register: w.register,
+        id_card: w.id_card,
+        bank_card: w.bank_card,
+        submit: w.submit,
+        success: w.success,
+      };
+      rec['rate_activate_register'] = _rate4(rec.register, rec.activate);
+      rec['rate_register_idcard'] = _rate4(rec.id_card, rec.register);
+      rec['rate_idcard_bankcard'] = _rate4(rec.bank_card, rec.id_card);
+      rec['rate_bankcard_submit'] = _rate4(rec.submit, rec.bank_card);
+      rec['rate_submit_success'] = _rate4(rec.success, rec.submit);
+      return rec;
+    })
+    .sort((a, b) => a.week_start.localeCompare(b.week_start));
+
+  return {
+    success: true,
+    data: {
+      daily_data,
+      weekly_data,
+      platforms: available_platforms,
+      platform,
+    },
+    meta: { version: 'v3.8.1', source: 'fact_conv_appmarket 数据库表' },
+  };
+}
+
+// ============================================================================
 // 应用市场总览 (app-market/summary)
 // ============================================================================
 
@@ -4283,9 +4404,9 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleAppMarketCreative(body);
     case 'reports/app-market/cost-analysis':
       return handleAppMarketCostAnalysis(body);
-    // v3.7.3: 归因转化率分析（数据源为本地 Excel，移动端暂不支持）
+    // v3.8.1: 归因转化率分析（fact_conv_appmarket 数据库表，移动端已实现）
     case 'reports/app-market/attribution-conversion':
-      throw new Error('归因转化率分析暂不支持移动端，请在桌面端查看');
+      return handleAppMarketAttributionConversion(body);
 
     // 小红书
     case 'xhs-notes-list':

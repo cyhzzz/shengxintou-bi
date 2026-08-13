@@ -212,6 +212,16 @@ export default function MainLayout() {
         if (filteredChildren.length === 0) return null;
         return { ...it, children: filteredChildren };
       }
+      // v3.8.1：应用市场子菜单按 features 过滤（归因转化率）
+      if (it.key === 'app-market' && it.children) {
+        const filteredChildren = it.children.filter((c: any) => {
+          if (!c) return false;
+          if (c.key === '/app-market/attribution-conversion' && !featureFlags.showAppMarketAttribution) return false;
+          return true;
+        });
+        if (filteredChildren.length === 0) return null;
+        return { ...it, children: filteredChildren };
+      }
       return item;
     }).filter(Boolean) as MenuProps['items'];
   }, []);

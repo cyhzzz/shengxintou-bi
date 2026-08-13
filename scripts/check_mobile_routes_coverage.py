@@ -55,7 +55,6 @@ KNOWN_UNTESTED: Dict[str, str] = {
     'investment-review': 'medium',
     'reports/app-market/plan-analysis': 'medium',
     'reports/app-market/creative': 'low',  # Navigate 重定向，仍可调用
-    'reports/app-market/attribution-conversion': 'low',  # 移动端暂不支持（本地 Excel 数据源）
     'xhs-notes-list': 'low',
     'xhs-notes/list': 'low',
     'xhs-notes/filter-options': 'low',

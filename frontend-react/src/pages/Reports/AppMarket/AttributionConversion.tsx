@@ -1,36 +1,25 @@
 /**
- * 应用市场 · 归因转化率分析（v3.7.3）
- * 数据源: 归因明细 Excel（C:\省心投-元昊手搓\归因明细\）
+ * 应用市场 · 归因转化率分析（v3.8.1）
+ * 数据源: fact_conv_appmarket 数据库表（1 行=1 APP 下载）
  * 按周（周一~周日）聚合各步骤转化率：
  *   激活 → 开户注册 → 身份证 → 银行卡 → 提交开户 → 开户成功
  *
- * 布局（v3.7.3 优化）：
- *   1. 筛选器（平台 + 日期区间）
- *   2. 周度转化率趋势折线图（支持按应用市场筛选）
+ * 布局：
+ *   1. 筛选器（FilterBar 日期范围 + 平台单选）
+ *   2. 周度转化率趋势折线图（5 个独立量程，支持按应用市场筛选）
  *   3. 归因转化率明细（按周折叠，可展开查看每日，降序排列）
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Spin, Table, Tag, Select, DatePicker, Button, Space, message } from 'antd';
+import { Card, Spin, Table, Tag, Select, Button, Space, message } from 'antd';
 import { RiseOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
-import { FadeInSection, ReportFooter } from '@/components';
+import { FadeInSection, ReportFooter, FilterBar } from '@/components';
 import { dataServiceReports } from '@/services/dataService';
+import { useFilterStore } from '@/stores';
 import type { EChartsOption } from 'echarts';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import styles from './index.module.scss';
-
-const { RangePicker } = DatePicker;
-
-// 莫兰迪配色
-const PLATFORM_COLORS: Record<string, string> = {
-  '华为': '#B5A084',
-  '小米': '#D4A373',
-  '荣耀': '#8BA7C4',
-  'oppo': '#9DBE8E',
-  'vivo': '#A8A8C9',
-  '苹果': '#C4C4C4',
-};
 
 // 转化率颜色（高绿中橙低红）
 function rateColor(rate: number): string {
@@ -155,13 +144,10 @@ function buildTreeData(daily: DailyRow[], weekly: WeeklyRow[]): TableRow[] {
 }
 
 const AttributionConversionPage: React.FC = () => {
+  const { dateRange } = useFilterStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [platform, setPlatform] = useState<string>('全部');
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-    dayjs('2026-03-01'),
-    dayjs('2026-08-10'),
-  ]);
   // 控制表格展开的行 key（周合计行）
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
 
@@ -169,8 +155,8 @@ const AttributionConversionPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await dataServiceReports.getAppMarketAttributionConversion({
-        start_date: dateRange[0].format('YYYY-MM-DD'),
-        end_date: dateRange[1].format('YYYY-MM-DD'),
+        start_date: dateRange.startDate,
+        end_date: dateRange.endDate,
         platform,
       });
       if (res?.success) {
@@ -189,7 +175,7 @@ const AttributionConversionPage: React.FC = () => {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dateRange.startDate, dateRange.endDate, platform]);
 
   // 树形表格数据
   const tableData = useMemo<TableRow[]>(() => {
@@ -385,15 +371,21 @@ const AttributionConversionPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      {/* 筛选器 */}
+      {/* 筛选器：FilterBar（日期范围 + 查询/重置）+ 平台单选 */}
       <FadeInSection>
-        <Card size="small" style={{ marginBottom: 16 }}>
+        <FilterBar
+          showPlatform={false}
+          showAgency={false}
+          onSearch={() => loadData()}
+          onReset={() => loadData()}
+        />
+        <Card size="small" style={{ marginBottom: 16, marginTop: 8 }}>
           <Space wrap>
-            <span>应用市场:</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>应用市场:</span>
             <Select
               value={platform}
               onChange={setPlatform}
-              style={{ width: 120 }}
+              style={{ width: 140 }}
               options={[
                 { value: '全部', label: '全部应用市场' },
                 ...(data?.platforms || []).map((p: string) => ({
@@ -402,18 +394,6 @@ const AttributionConversionPage: React.FC = () => {
                 })),
               ]}
             />
-            <span>日期范围:</span>
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => {
-                if (dates && dates[0] && dates[1]) {
-                  setDateRange([dates[0], dates[1]]);
-                }
-              }}
-            />
-            <Button type="primary" icon={<RiseOutlined />} onClick={loadData} loading={loading}>
-              查询
-            </Button>
           </Space>
         </Card>
       </FadeInSection>
@@ -488,7 +468,7 @@ const AttributionConversionPage: React.FC = () => {
               scroll={{ x: 1400, y: 600 }}
               expandable={{
                 expandedRowKeys: expandedKeys,
-                onExpandedRowsChange: (keys: React.Key[]) => setExpandedKeys([...keys]),
+                onExpandedRowsChange: (keys: readonly React.Key[]) => setExpandedKeys([...keys]),
               }}
               rowClassName={(row: TableRow) =>
                 row.rowType === 'weekly' ? 'weekly-summary-row' : 'daily-row'
@@ -500,10 +480,10 @@ const AttributionConversionPage: React.FC = () => {
         <FadeInSection>
           <ReportFooter
             sources={[
-              { label: '数据源', value: '归因明细 Excel（C:\\省心投-元昊手搓\\归因明细\\）' },
+              { label: '数据源', value: 'fact_conv_appmarket 数据库表（1 行=1 APP 下载）' },
               { label: '端点', value: 'POST /api/v1/reports/app-market/attribution-conversion' },
               { label: '口径', value: '按下载日期聚合，统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分' },
-              { label: '移动端', value: '暂不支持（数据源为本地 Excel 文件）' },
+              { label: '移动端', value: '已支持（mobileRouteHandler 同步实现）' },
             ]}
           />
         </FadeInSection>

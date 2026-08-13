@@ -37,6 +37,8 @@ export interface FeatureFlags {
   showDataReconciliation: boolean;
   /** 侧边栏「小红书 · 分支KOS转化周报」菜单（移动端已开放，mobileRouteHandler 已实现） */
   showKosWeekly: boolean;
+  /** 侧边栏「应用市场 · 归因转化率」菜单（移动端已开放，mobileRouteHandler 已实现） */
+  showAppMarketAttribution: boolean;
 }
 
 /**
@@ -63,6 +65,7 @@ const desktopAndWebFlags: FeatureFlags = {
   showReportGeneration: true,
   showDataReconciliation: true,
   showKosWeekly: true,
+  showAppMarketAttribution: true,
 };
 
 /** 移动版配置（Capacitor Android） */
@@ -81,6 +84,8 @@ const mobileFlags: FeatureFlags = {
   showDataReconciliation: false,
   // v3.8.0：移动端开放分支KOS转化周报（已移植到 mobileRouteHandler /xhs/kos-weekly）
   showKosWeekly: true,
+  // v3.8.1：移动端开放应用市场归因转化率（已移植到 mobileRouteHandler）
+  showAppMarketAttribution: true,
 };
 
 /**
