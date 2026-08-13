@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-"""应用市场 · 归因转化率分析（v3.7.3）
+"""应用市场 · 归因转化率分析（v3.7.3 → v3.7.4 改用数据库）
 
-数据源：归因明细 Excel 文件（C:\\省心投-元昊手搓\\归因明细\\）
-每行记录一个设备号 OAID 的开户进展。
-
+数据源：fact_conv_appmarket 表（设备级漏斗，1 行=1 APP 下载）
 按周（周一~周日）聚合各步骤转化率：
   激活 → 开户注册 → 身份证 → 银行卡 → 提交开户 → 开户成功
 
@@ -11,175 +9,102 @@
   1. daily_data — 每日各步骤计数 + 步骤间转化率
   2. weekly_data — 每周各步骤计数 + 步骤间转化率
 """
-import os
-import time
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
+from sqlalchemy import func, and_
+from backend.models_v2 import FactConvAppmarket
+from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.dialect_helpers import make_week_start_expr
 
 bp = Blueprint('app_market_attribution', __name__, url_prefix='/api/v1/reports/app-market')
-
-# 归因明细 Excel 文件目录（可通过环境变量覆盖）
-ATTRIBUTION_DIR = os.environ.get(
-    'ATTRIBUTION_DIR',
-    r'C:\省心投-元昊手搓\归因明细'
-)
 
 APP_MARKET_PLATFORMS = ['华为', '小米', '荣耀', 'oppo', 'vivo', '苹果']
 
 _META = {
-    'version': 'v3.7.3',
-    'source': '归因明细 Excel',
+    'version': 'v3.7.4',
+    'source': 'fact_conv_appmarket 数据库表',
     'note': '各应用市场每设备号OAID开户进展，按周(周一~周日)聚合各步骤转化率',
 }
 
-# ---------------------------------------------------------------------------
-# 内存缓存：避免每次请求都重读 Excel（~20 万行）
-# ---------------------------------------------------------------------------
-_cache = {
-    'df': None,          # pandas DataFrame
-    'mtime': 0,          # 上次读取时文件的最大修改时间戳
-    'loaded_at': 0,      # 加载时刻
-}
+# 漏斗步骤列 → 别名映射
+FUNNEL_STAGES = [
+    ('是否激活APP', 'activate'),
+    ('是否开户注册', 'register'),
+    ('是否注册身份证', 'id_card'),
+    ('是否注册银行卡', 'bank_card'),
+    ('是否提交开户', 'submit'),
+    ('是否开户成功', 'success'),
+]
 
-
-def _get_files():
-    """返回目录下所有 .xlsx 文件（排除临时文件）"""
-    if not os.path.isdir(ATTRIBUTION_DIR):
-        return []
-    return [
-        os.path.join(ATTRIBUTION_DIR, f)
-        for f in os.listdir(ATTRIBUTION_DIR)
-        if f.endswith('.xlsx') and not f.startswith('~')
-    ]
-
-
-def _latest_mtime(files):
-    return max(os.path.getmtime(f) for f in files) if files else 0
-
-
-def _load_data():
-    """加载 Excel 数据，带文件修改时间缓存"""
-    import pandas as pd
-
-    files = _get_files()
-    if not files:
-        return None
-
-    mtime = _latest_mtime(files)
-    if _cache['df'] is not None and mtime == _cache['mtime']:
-        return _cache['df']
-
-    dfs = []
-    for f in files:
-        try:
-            df = pd.read_excel(f, engine='openpyxl')
-            dfs.append(df)
-        except Exception:
-            pass
-
-    if not dfs:
-        return None
-
-    df = pd.concat(dfs, ignore_index=True)
-    # 清洗列名
-    df.columns = df.columns.str.strip()
-
-    # 清洗"是否"列（有些值带前导空格，如 ' 否'）
-    bool_cols = [
-        '是否激活APP', '是否开户注册', '是否注册身份证',
-        '是否注册银行卡', '是否提交开户', '是否开户成功',
-    ]
-    for col in bool_cols:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip()
-
-    # 转换下载日期
-    df['下载日期'] = pd.to_datetime(df['下载日期'], errors='coerce')
-    df = df.dropna(subset=['下载日期'])
-
-    # 缓存
-    _cache['df'] = df
-    _cache['mtime'] = mtime
-    _cache['loaded_at'] = time.time()
-
-    return df
+WEEKDAY_MAP = {0: '周一', 1: '周二', 2: '周三', 3: '周四', 4: '周五', 5: '周六', 6: '周日'}
 
 
 def _week_start(d):
     """返回日期 d 所在周的周一日期"""
+    if isinstance(d, str):
+        d = datetime.strptime(d, '%Y-%m-%d').date()
     return d - timedelta(days=d.weekday())
 
 
 def _week_end(d):
     """返回日期 d 所在周的周日日期"""
+    if isinstance(d, str):
+        d = datetime.strptime(d, '%Y-%m-%d').date()
     return d + timedelta(days=6 - d.weekday())
 
 
-WEEKDAY_MAP = {0: '周一', 1: '周二', 2: '周三', 3: '周四', 4: '周五', 5: '周六', 6: '周日'}
+def _rate(numerator, denominator):
+    if denominator == 0:
+        return 0.0
+    return round(numerator / denominator, 4)
 
 
-def _aggregate(df, platform=None, start_date=None, end_date=None):
-    """按日期+平台聚合各步骤计数，并计算转化率"""
-    import pandas as pd
-
-    # 过滤平台
+def _build_query(platform, start_date, end_date):
+    """构建基础过滤查询"""
+    q = db.session.query(FactConvAppmarket)
     if platform and platform != '全部':
-        df = df[df['应用市场'] == platform]
-
-    # 过滤日期
+        q = q.filter(FactConvAppmarket.应用市场 == platform)
     if start_date:
-        df = df[df['下载日期'] >= pd.to_datetime(start_date)]
+        q = q.filter(FactConvAppmarket.下载日期 >= start_date)
     if end_date:
-        df = df[df['下载日期'] <= pd.to_datetime(end_date)]
+        q = q.filter(FactConvAppmarket.下载日期 <= end_date)
+    return q
 
-    if df.empty:
-        return [], []
 
-    bool_cols = [
-        '是否激活APP', '是否开户注册', '是否注册身份证',
-        '是否注册银行卡', '是否提交开户', '是否开户成功',
-    ]
-    col_map = {
-        '是否激活APP': '激活',
-        '是否开户注册': '开户注册',
-        '是否注册身份证': '身份证',
-        '是否注册银行卡': '银行卡',
-        '是否提交开户': '提交开户',
-        '是否开户成功': '开户成功',
-    }
+def _aggregate(platform, start_date, end_date):
+    """按日期+平台聚合各步骤计数，并计算转化率（SQL 聚合）"""
 
-    # 按日期聚合（"全部"平台时合并所有平台）
-    df['_date'] = df['下载日期'].dt.date
-    daily = df.groupby('_date').apply(lambda g: pd.Series({
-        col_map[col]: (g[col] == '是').sum() for col in bool_cols if col in g.columns
-    })).reset_index()
+    # ---- 每日聚合 ----
+    daily_q = _build_query(platform, start_date, end_date)
+    daily_q = daily_q.with_entities(
+        FactConvAppmarket.下载日期,
+        *[func.coalesce(func.sum(getattr(FactConvAppmarket, col)), 0).label(alias)
+          for col, alias in FUNNEL_STAGES],
+    ).group_by(FactConvAppmarket.下载日期).order_by(FactConvAppmarket.下载日期)
 
-    daily = daily.sort_values('_date')
-
-    # 添加星期和周开始
-    daily['星期'] = daily['_date'].apply(lambda d: WEEKDAY_MAP[d.weekday()])
-    daily['周开始'] = daily['_date'].apply(lambda d: _week_start(d))
-
-    # 计算转化率
-    def _rate(numerator, denominator):
-        if denominator == 0:
-            return 0.0
-        return round(numerator / denominator, 4)
+    daily_rows = daily_q.all()
 
     daily_records = []
-    for _, row in daily.iterrows():
-        activate = int(row['激活'])
-        register = int(row['开户注册'])
-        id_card = int(row['身份证'])
-        bank_card = int(row['银行卡'])
-        submit = int(row['提交开户'])
-        success = int(row['开户成功'])
+    for row in daily_rows:
+        date_str = row.下载日期
+        try:
+            d = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            continue
 
+        activate = int(getattr(row, 'activate', 0) or 0)
+        register = int(getattr(row, 'register', 0) or 0)
+        id_card = int(getattr(row, 'id_card', 0) or 0)
+        bank_card = int(getattr(row, 'bank_card', 0) or 0)
+        submit = int(getattr(row, 'submit', 0) or 0)
+        success = int(getattr(row, 'success', 0) or 0)
+
+        ws = _week_start(d)
         daily_records.append({
-            'date': row['_date'].isoformat(),
-            'weekday': row['星期'],
-            'week_start': row['周开始'].isoformat(),
+            'date': date_str,
+            'weekday': WEEKDAY_MAP[d.weekday()],
+            'week_start': ws.isoformat(),
             'activate': activate,
             'register': register,
             'id_card': id_card,
@@ -193,30 +118,35 @@ def _aggregate(df, platform=None, start_date=None, end_date=None):
             'rate_submit_success': _rate(success, submit),
         })
 
-    # 周聚合
-    df['_week_start'] = df['下载日期'].apply(lambda d: _week_start(d))
-    weekly = df.groupby('_week_start').apply(
-        lambda g: pd.Series({
-            col_map[col]: (g[col] == '是').sum() for col in bool_cols if col in g.columns
-        })
-    ).reset_index()
-    weekly = weekly.rename(columns={'_week_start': '周开始'})
+    # ---- 周聚合 ----
+    week_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+    weekly_q = _build_query(platform, start_date, end_date)
+    weekly_q = weekly_q.with_entities(
+        week_expr,
+        *[func.coalesce(func.sum(getattr(FactConvAppmarket, col)), 0).label(alias)
+          for col, alias in FUNNEL_STAGES],
+    ).group_by(week_expr).order_by(week_expr)
 
-    weekly = weekly.sort_values('周开始')
+    weekly_rows = weekly_q.all()
 
     weekly_records = []
-    for _, row in weekly.iterrows():
-        ws = row['周开始']
-        activate = int(row['激活'])
-        register = int(row['开户注册'])
-        id_card = int(row['身份证'])
-        bank_card = int(row['银行卡'])
-        submit = int(row['提交开户'])
-        success = int(row['开户成功'])
+    for row in weekly_rows:
+        ws_val = row.week_start
+        if isinstance(ws_val, str):
+            ws_date = datetime.strptime(ws_val, '%Y-%m-%d').date()
+        else:
+            ws_date = ws_val
+
+        activate = int(getattr(row, 'activate', 0) or 0)
+        register = int(getattr(row, 'register', 0) or 0)
+        id_card = int(getattr(row, 'id_card', 0) or 0)
+        bank_card = int(getattr(row, 'bank_card', 0) or 0)
+        submit = int(getattr(row, 'submit', 0) or 0)
+        success = int(getattr(row, 'success', 0) or 0)
 
         weekly_records.append({
-            'week_start': ws.strftime('%Y-%m-%d') if hasattr(ws, 'strftime') else str(ws),
-            'week_end': _week_end(ws).strftime('%Y-%m-%d') if hasattr(ws, 'strftime') else str(_week_end(ws)),
+            'week_start': ws_date.isoformat(),
+            'week_end': _week_end(ws_date).isoformat(),
             'activate': activate,
             'register': register,
             'id_card': id_card,
@@ -243,19 +173,13 @@ def attribution_conversion():
     start_date = filters.get('start_date')
     end_date = filters.get('end_date')
 
-    df = _load_data()
-    if df is None:
-        return jsonify({
-            'success': False,
-            'error': f'未找到归因明细 Excel 文件，请检查目录: {ATTRIBUTION_DIR}',
-            'data': {'daily_data': [], 'weekly_data': [], 'platforms': APP_MARKET_PLATFORMS},
-            'meta': _META,
-        })
-
     # 获取数据中实际存在的平台列表
-    available_platforms = sorted(df['应用市场'].dropna().unique().tolist())
+    available_platforms = sorted(
+        [r[0] for r in db.session.query(FactConvAppmarket.应用市场)
+         .distinct().all() if r[0]]
+    )
 
-    daily_data, weekly_data = _aggregate(df, platform, start_date, end_date)
+    daily_data, weekly_data = _aggregate(platform, start_date, end_date)
 
     return jsonify({
         'success': True,
