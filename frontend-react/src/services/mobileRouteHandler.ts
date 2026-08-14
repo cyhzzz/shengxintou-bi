@@ -869,15 +869,13 @@ async function handleAppMarketAttributionConversion(body: any): Promise<any> {
     })
     .sort((a, b) => a.week_start.localeCompare(b.week_start));
 
+  // 注意：与其他 handler 一致，这里返回纯数据对象（http.ts 移动端路径会包装为 { success, data }）。
+  // 若带 success/data/meta 包装，页面 res.data 会多包一层，取不到 daily_data/weekly_data → 「暂无周度数据」。
   return {
-    success: true,
-    data: {
-      daily_data,
-      weekly_data,
-      platforms: available_platforms,
-      platform,
-    },
-    meta: { version: 'v3.8.1', source: 'fact_conv_appmarket 数据库表' },
+    daily_data,
+    weekly_data,
+    platforms: available_platforms,
+    platform,
   };
 }
 

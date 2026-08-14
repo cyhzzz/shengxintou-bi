@@ -94,6 +94,33 @@ def extract_test_names() -> Set[str]:
     return names
 
 
+def check_handler_return_shape() -> list[str]:
+    """检查 mobileRouteHandler 的 handler 是否误包了 API 响应外壳。
+
+    历史事故（v3.8.1）：handleAppMarketAttributionConversion 返回了
+    `{ success: true, data: {...}, meta: {...} }`（照抄后端 Flask 返回格式），
+    而 http.ts 移动端路径已经统一包装 `{ success: true, data: handlerResult }`，
+    导致页面 res.data 多包一层 → 取不到 daily_data/weekly_data → 报表显示「暂无周度数据」。
+
+    约定：mobileRouteHandler 的所有 handler 必须返回**纯数据对象**（与其他 handler 一致），
+    不允许出现顶层 `success:` 键。此处检测文件中 handler 返回的 success: 出现次数。
+
+    注意：仅检测代码行中的 `success:`（排除注释），`meta:` 是合法数据字段不检测。
+    """
+    if not MOBILE_HANDLER.exists():
+        return []
+    violations: list[str] = []
+    for lineno, line in enumerate(MOBILE_HANDLER.read_text(encoding='utf-8').splitlines(), start=1):
+        stripped = line.strip()
+        # 跳过注释行
+        if stripped.startswith('//') or stripped.startswith('*') or stripped.startswith('/*'):
+            continue
+        # 检测 success: true / success: false 等响应包装（布尔字面量；数据字段如 success: toInt() 不匹配）
+        if re.search(r"['\"]?success['\"]?\s*:\s*(true|false)\b", stripped) and not stripped.startswith('//'):
+            violations.append(f'  L{lineno}: {stripped[:80]}')
+    return violations
+
+
 def case_matches_test(case: str, test_names: Set[str]) -> bool:
     """判断 case 是否被测试覆盖。
 
@@ -128,6 +155,17 @@ def main() -> int:
     print(f'mobileRouteHandler case 总数: {len(cases)}')
     print(f'test_mobile_routes.py 用例数: {len(test_names)}')
     print()
+
+    # 防回归：handler 返回值不得带 success 响应包装（http.ts 已统一包装）
+    shape_violations = check_handler_return_shape()
+    if shape_violations:
+        print('--- DRIFT: handler 返回值出现 success 响应包装（应返回纯数据对象） ---')
+        for v in shape_violations:
+            print(v)
+        print('  → http.ts 移动端路径已包装 { success, data }，handler 必须返回纯数据对象，否则页面取不到 res.data.xxx')
+        print()
+        print(f'❌ 检测到 {len(shape_violations)} 处 success 包装')
+        return 1
 
     matched: Set[str] = set()
     untested: Set[str] = set()
