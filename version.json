@@ -1,9 +1,10 @@
 {
-    "version": "3.8.1",
-    "release_date": "2026-08-13",
+    "version": "3.8.2",
+    "release_date": "2026-08-14",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.8.2 修复应用市场「归因转化率」报表移动端不显示图表（handleAppMarketAttributionConversion 返回格式多包一层 success/data/meta，去除包装与 http.ts 统一约定一致，移动端/PWA 恢复图表显示；check_mobile_routes_coverage 新增 handler 返回格式防回归检查）",
         "v3.8.1 应用市场新增「归因转化率」子报表（fact_conv_appmarket 数据库表数据源，按周聚合各步骤转化率：激活→开户注册→身份证→银行卡→提交开户→开户成功，含5个独立折线图+树形折叠明细表）",
         "v3.8.0 新增小红书分支KOS转化周报（fact_conv_content 笔记ID 关联分支投顾名单，周榜+海报）；修复周报海报无数据周预览不显示与吸顶导出工具栏 24px 空隙，移除海报年度拆分行",
         "v3.7.3 直播获客漏斗复合来源线索按主播数均分（修复线索虚增）+ 线索数口径调整为含存量总线索（主播引流总线索数），并补充 anchor-clusters 均分单测",
