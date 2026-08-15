@@ -122,7 +122,17 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # CORS配置 - 使用Flask-CORS扩展（推荐）
-CORS(app, resources={r"/api/*": {"origins": "*", "headers": "Content-Type,Authorization", "methods": "GET,PUT,POST,DELETE,OPTIONS", "supports_credentials": True}})
+# 本地开发环境使用白名单，支持通过 CORS_ORIGINS 环境变量扩展（逗号分隔）
+_default_cors_origins = [
+    "http://localhost:5173",   # Vite 开发服务器
+    "http://127.0.0.1:5173",  # Vite 开发服务器（IP 形式）
+    "http://localhost:5000",   # Flask 后端
+    "http://127.0.0.1:5000",  # Flask 后端（IP 形式）
+]
+_extra_origins = os.getenv('CORS_ORIGINS', '').strip()
+if _extra_origins:
+    _default_cors_origins.extend([o.strip() for o in _extra_origins.split(',') if o.strip()])
+CORS(app, resources={r"/api/*": {"origins": _default_cors_origins, "headers": "Content-Type,Authorization", "methods": "GET,PUT,POST,DELETE,OPTIONS", "supports_credentials": True}})
 
 # ============================================================================
 # Swagger/OpenAPI 文档配置
