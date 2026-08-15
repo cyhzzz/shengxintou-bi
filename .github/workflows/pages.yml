@@ -3,10 +3,14 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main]
+    # v3.8.5：打 tag v* 触发 release 时同步重建部署 PWA（与 release.yml 四端发版统一）。
+    #   paths 加入 version.json：发版流程必改 version.json，保证 tag 提交必触发。
+    tags: ['v*']
     paths:
       - 'website/**'
       - 'frontend-react/**'
       - '.github/workflows/pages.yml'
+      - 'version.json'
   workflow_dispatch:
 
 permissions:
