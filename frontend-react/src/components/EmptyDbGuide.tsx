@@ -24,23 +24,18 @@ import { hasWebDAVCredentials } from '@/services/mobileSync';
 const EMPTY_DB_CHECK_SQL = 'SELECT COUNT(*) AS CNT FROM fact_conv_appmarket';
 
 const EmptyDbGuide: React.FC = () => {
-  const [checked, setChecked] = useState(false);
-  const [needSync, setNeedSync] = useState(false);
   const [hasCreds, setHasCreds] = useState(false);
+  const [needSync, setNeedSync] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 仅移动端 / PWA 端需要本地数据库，Web/桌面端走后端 API 不检查
+  const isMobile = isMobileClient() || isPwaClient();
+  // 数据同步页自身不显示引导（避免引导循环）
+  const onSyncPage = location.pathname === '/system/database-backup';
+
   useEffect(() => {
-    // 仅移动端 / PWA 端需要本地数据库，Web/桌面端走后端 API 不检查
-    if (!isMobileClient() && !isPwaClient()) {
-      setChecked(true);
-      return;
-    }
-    // 数据同步页自身不显示引导（避免引导循环）
-    if (location.pathname === '/system/database-backup') {
-      setChecked(true);
-      return;
-    }
+    if (!isMobile || onSyncPage) return;
 
     let cancelled = false;
     (async () => {
@@ -62,15 +57,14 @@ const EmptyDbGuide: React.FC = () => {
       if (cancelled) return;
       setHasCreds(creds);
       setNeedSync(empty);
-      setChecked(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, [isMobile, onSyncPage, location.pathname]);
 
-  if (!checked || !needSync) return null;
+  if (!isMobile || onSyncPage || !needSync) return null;
 
   return (
     <Alert
