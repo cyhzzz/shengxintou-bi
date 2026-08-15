@@ -38,9 +38,18 @@ function Read-FileNoBom([string]$path) {
 if (Test-Path $manifestPath) {
     $manifest = Read-FileNoBom $manifestPath
     if ($manifest -notmatch 'android:screenOrientation') {
-        $manifest = $manifest -replace 'android:launchMode="singleTask"', 'android:launchMode="singleTask"`n            android:screenOrientation="landscape"'
-        Write-FileNoBom $manifestPath $manifest
-        Write-Output "[patch] AndroidManifest.xml: added screenOrientation=landscape"
+        # 用字符串操作避免 PowerShell -replace 单引号里 `n 不转义、把字面反引号注入 XML 的问题
+        $marker = 'android:launchMode="singleTask"'
+        $insertText = "`n            android:screenOrientation=`"landscape`""
+        $idx = $manifest.IndexOf($marker)
+        if ($idx -ge 0) {
+            $insertPos = $idx + $marker.Length
+            $manifest = $manifest.Substring(0, $insertPos) + $insertText + $manifest.Substring($insertPos)
+            Write-FileNoBom $manifestPath $manifest
+            Write-Output "[patch] AndroidManifest.xml: added screenOrientation=landscape"
+        } else {
+            Write-Output "[warn] AndroidManifest.xml: marker 'android:launchMode' not found, cannot inject screenOrientation"
+        }
     } else {
         Write-Output "[skip] AndroidManifest.xml: screenOrientation already set"
     }
