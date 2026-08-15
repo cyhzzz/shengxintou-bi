@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import MobileSyncButton from '@/components/MobileSyncButton';
+import EmptyDbGuide from '@/components/EmptyDbGuide';
 import AnimatedOutlet from '@/components/AnimatedOutlet';
 import { useAppStore } from '@/stores/useAppStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -376,6 +377,8 @@ export default function MainLayout() {
           </div>
         </Header>
         <Content className={styles.content}>
+          {/* v3.8.2：移动端/PWA 空库首次使用引导（WebDAV 配置提示） */}
+          <EmptyDbGuide />
           <LazyMotion features={domAnimation} strict>
             <AnimatedOutlet />
           </LazyMotion>
