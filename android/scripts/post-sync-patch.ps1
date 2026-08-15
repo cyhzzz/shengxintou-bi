@@ -10,7 +10,9 @@
 #   5. settings.gradle 加阿里云镜像（国内网络无法直连 maven.apache.org）
 #   6. gradle.properties 加 in-process kotlin + 关闭 daemon（避免 TRAE Sandbox 拦截 ~/.kotlin）
 #   7. gradle-wrapper.properties 改腾讯云镜像（services.gradle.org 超时）
-#   8. 内置 DB 打包进 APK assets（public/assets/databases/shengxintouSQLite.db）
+#   8. 内置【空库】打包进 APK assets（public/assets/databases/shengxintouSQLite.db）
+#      v3.8.2 安全改造：不再内置真实业务数据库（防泄露），仅打包表结构空库，
+#      首次启动后用户需自行配置 WebDAV 凭据从坚果云拉取数据
 #   9. APK 打包后复制到 android/release/（shengxintou-vX.Y.Z.apk）
 #
 # 注意：PowerShell 5.1 的 Set-Content -Encoding UTF8 会写 BOM，
@@ -235,39 +237,61 @@ if (Test-Path $wrapperPropsPath) {
     }
 }
 
-# ========== 8. 内置 DB 打包进 APK assets ==========
-# v3.5.3：SQLite 插件 UtilsFile.java 期望路径为 public/assets/databases/
-#         从 database/shengxintou.db 复制到 APK assets 最终位置 + Vite public 目录
-#         首次启动时 copyFromAssets(false) 即可初始化本地 DB
-$sourceDb = Join-Path $PSScriptRoot "..\..\database\shengxintou.db"
-if (-not (Test-Path $sourceDb)) {
-    # 兜底：从 frontend-react/public 旧位置取
-    $sourceDb = Join-Path $PSScriptRoot "..\..\frontend-react\public\databases\shengxintouSQLite.db"
-}
-if (Test-Path $sourceDb) {
-    # APK assets 最终位置（cap sync 后 dist 内容已复制到此，再补 DB）
+# ========== 8. 内置【空库】打包进 APK assets ==========
+# v3.8.2 安全改造：APK 不再内置真实业务数据（防泄露）。
+# 从 database/shengxintou.db 提取表结构（CREATE TABLE/INDEX 等）生成 0 行数据的空库，
+# 复制到 APK assets + Vite public 目录。首次启动 copyFromAssets 拿到空库后，
+# 用户需在「数据同步」页配置 WebDAV 凭据从坚果云拉取真实数据。
+$schemaDb = Join-Path $PSScriptRoot "..\..\database\shengxintou.db"
+if (Test-Path $schemaDb) {
+    # APK assets 最终位置（cap sync 后 dist 内容已复制到此，再补空库）
     $apkAssetsDir = Join-Path $androidNativeDir "app\src\main\assets\public\assets\databases"
     New-Item -ItemType Directory -Force -Path $apkAssetsDir | Out-Null
     $apkDst = Join-Path $apkAssetsDir "shengxintouSQLite.db"
-    Copy-Item -Path $sourceDb -Destination $apkDst -Force
-    $sizeMB = [math]::Round((Get-Item $apkDst).Length / 1MB, 2)
-    Write-Output "[patch] APK assets DB: $apkDst ($sizeMB MB)"
 
-    # 同步到 Vite public 目录，让下次 npm run build 也包含
+    # 同步到 Vite public 目录，让下次 npm run build 也包含空库
     $vitePublicDir = Join-Path $PSScriptRoot "..\..\frontend-react\public\assets\databases"
     New-Item -ItemType Directory -Force -Path $vitePublicDir | Out-Null
     $viteDst = Join-Path $vitePublicDir "shengxintouSQLite.db"
-    Copy-Item -Path $sourceDb -Destination $viteDst -Force
-    Write-Output "[patch] Vite public DB: $viteDst"
 
-    # 清理旧位置（避免重复打包）
-    $oldPublicDb = Join-Path $PSScriptRoot "..\..\frontend-react\public\databases\shengxintouSQLite.db"
-    if ((Test-Path $oldPublicDb) -and ($oldPublicDb -ne $sourceDb)) {
-        Remove-Item $oldPublicDb -Force
-        Write-Output "[patch] removed old public/databases/shengxintouSQLite.db"
+    # 用 Python 从 schema 库生成空库（仅表结构，0 行数据）
+    $pyScript = @"
+import sqlite3, os
+src = r'$($schemaDb.Replace("'","''"))'
+dst = r'$($apkDst.Replace("'","''"))'
+if os.path.exists(dst):
+    try: os.remove(dst)
+    except OSError: pass
+sconn = sqlite3.connect(src)
+rows = sconn.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'").fetchall()
+sconn.close()
+dconn = sqlite3.connect(dst)
+for (s,) in rows:
+    try: dconn.execute(s)
+    except sqlite3.OperationalError: pass
+dconn.commit(); dconn.close()
+"@
+    $pyOk = $false
+    foreach ($pyExe in @("$PSScriptRoot\..\..\.venv\Scripts\python.exe", "python")) {
+        try {
+            $pyScript | & $pyExe - 2>$null
+            if (Test-Path $apkDst) { $pyOk = $true; break }
+        } catch { }
+    }
+    if ($pyOk) {
+        Copy-Item -Path $apkDst -Destination $viteDst -Force
+        $sizeKB = [math]::Round((Get-Item $apkDst).Length / 1KB, 0)
+        Write-Output "[patch] APK assets 空库: $apkDst ($sizeKB KB, 0 行业务数据)"
+        Write-Output "[patch] Vite public 空库: $viteDst"
+
+        # 清理旧位置的真实库副本（避免误打包）
+        $oldPublicDb = Join-Path $PSScriptRoot "..\..\frontend-react\public\databases\shengxintouSQLite.db"
+        if (Test-Path $oldPublicDb) { Remove-Item $oldPublicDb -Force }
+    } else {
+        Write-Output "[warn] 空库生成失败 — APK 将不含内置数据库（首次启动需先同步）"
     }
 } else {
-    Write-Output "[warn] source DB not found: database/shengxintou.db — 内置 DB 不会打包"
+    Write-Output "[warn] schema DB not found: database/shengxintou.db — 不内置数据库"
 }
 
 Write-Output "[done] post-sync-patch complete"
