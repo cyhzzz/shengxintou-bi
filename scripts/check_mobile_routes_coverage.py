@@ -26,7 +26,20 @@ from typing import Dict, Set
 
 ROOT = Path(__file__).resolve().parents[1]
 MOBILE_HANDLER = ROOT / 'frontend-react' / 'src' / 'services' / 'mobileRouteHandler.ts'
+# v3.8.x：handler 按报表域拆分到 mobileHandlers/ 目录，case 分发仍在主文件
+MOBILE_HANDLERS_DIR = MOBILE_HANDLER.parent / 'mobileHandlers'
 TEST_ROUTES = ROOT / 'scripts' / 'test_mobile_routes.py'
+
+
+def read_mobile_text() -> str:
+    """读取移动端路由处理器全文（分发器 + mobileHandlers/ 各报表域模块）。"""
+    parts = []
+    if MOBILE_HANDLER.exists():
+        parts.append(MOBILE_HANDLER.read_text(encoding='utf-8'))
+    if MOBILE_HANDLERS_DIR.is_dir():
+        for f in sorted(MOBILE_HANDLERS_DIR.glob('*.ts')):
+            parts.append(f.read_text(encoding='utf-8'))
+    return '\n'.join(parts)
 
 # 已知未测试的 case（历史遗留，记录在此供后续逐步补齐）
 # 新增 case 不允许加入此列表，必须同步补测试
@@ -76,7 +89,7 @@ def extract_mobile_cases() -> Set[str]:
     """从 mobileRouteHandler.ts 提取所有 case 路径。"""
     if not MOBILE_HANDLER.exists():
         return set()
-    text = MOBILE_HANDLER.read_text(encoding='utf-8')
+    text = read_mobile_text()
     case_re = re.compile(r"^\s*case\s+['\"]([^'\"]+)['\"]\s*:", re.MULTILINE)
     return set(case_re.findall(text))
 
@@ -110,7 +123,7 @@ def check_handler_return_shape() -> list[str]:
     if not MOBILE_HANDLER.exists():
         return []
     violations: list[str] = []
-    for lineno, line in enumerate(MOBILE_HANDLER.read_text(encoding='utf-8').splitlines(), start=1):
+    for lineno, line in enumerate(read_mobile_text().splitlines(), start=1):
         stripped = line.strip()
         # 跳过注释行
         if stripped.startswith('//') or stripped.startswith('*') or stripped.startswith('/*'):
