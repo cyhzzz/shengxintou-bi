@@ -255,7 +255,7 @@ jobs:
         with:
           tag_name: ${{ needs.gate.outputs.tag }}
           files: |
-            artifacts/exe/*Setup*.exe
+            artifacts/exe/*setup*.exe
             artifacts/exe/frontend-dist.zip
             artifacts/apk/*.apk
           fail_on_unmatched_files: true
