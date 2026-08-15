@@ -148,8 +148,9 @@ JWT_EXPIRES_HOURS = float(os.getenv('JWT_EXPIRES_HOURS', '24'))
 
 # feat-local-auth 方案 A：默认 admin 账号
 # 首次启动时，如果 app_users 表为空，自动创建此账号
+# 密码未配置时为空串，app.py 会在创建时生成随机密码并打印到日志
 DEFAULT_ADMIN_EMAIL = os.getenv('DEFAULT_ADMIN_EMAIL', 'admin@shengxintou.local')
-DEFAULT_ADMIN_PASSWORD = os.getenv('DEFAULT_ADMIN_PASSWORD', 'shengxintou2026')
+DEFAULT_ADMIN_PASSWORD = os.getenv('DEFAULT_ADMIN_PASSWORD', '')
 
 # 文件上传配置
 # v3.5.8：桌面版上传目录也放 USER_DATA_DIR（升级不丢失临时上传文件）

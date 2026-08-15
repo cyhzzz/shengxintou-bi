@@ -702,8 +702,12 @@ with app.app_context():
             from backend.auth.jwt_utils import hash_password
             from datetime import datetime
             if AppUser.query.count() == 0:
+                import secrets
                 admin_email = top_config.DEFAULT_ADMIN_EMAIL
                 admin_password = top_config.DEFAULT_ADMIN_PASSWORD
+                if not admin_password:
+                    admin_password = secrets.token_urlsafe(12)
+                    logger.warning(f"⚠ DEFAULT_ADMIN_PASSWORD 未配置，已生成随机密码（请妥善保存并尽快修改）")
                 admin = AppUser(
                     email=admin_email,
                     password_hash=hash_password(admin_password),
@@ -717,6 +721,8 @@ with app.app_context():
                 db.session.add(admin)
                 db.session.commit()
                 logger.info(f"✓ 默认 admin 账号已创建：{admin_email}（请尽快修改密码）")
+                if not top_config.DEFAULT_ADMIN_PASSWORD:
+                    logger.info(f"✓ 默认管理员初始密码：{admin_password}")
             else:
                 logger.debug("app_users 表已有用户，跳过默认 admin 创建")
         except Exception as e:
