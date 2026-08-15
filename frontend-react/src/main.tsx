@@ -43,14 +43,20 @@ const showDebugOverlay = (entry: { kind: string; message: string; stack?: string
     'white-space:pre-wrap', 'word-break:break-all',
   ].join(';');
   const stack = entry.stack || '(no stack)';
+  // 安全方式构建 DOM，避免 innerHTML 拼接导致的 XSS
+  const esc = (s: string) => {
+    const el = document.createElement('span');
+    el.textContent = s;
+    return el.innerHTML;
+  };
   box.innerHTML = [
-    `<b style="color:#ff6b6b">[${entry.kind}] ${entry.message}</b>`,
+    `<b style="color:#ff6b6b">[${esc(entry.kind)}] ${esc(entry.message)}</b>`,
     ``,
-    `<b>Time:</b> ${entry.time}`,
-    `<b>URL:</b> ${entry.url}`,
+    `<b>Time:</b> ${esc(entry.time)}`,
+    `<b>URL:</b> ${esc(entry.url)}`,
     ``,
     `<b>Stack:</b>`,
-    stack,
+    esc(stack),
     ``,
     `<i style="color:#888">已写入 localStorage.mobile_errors</i>`,
     ``,
