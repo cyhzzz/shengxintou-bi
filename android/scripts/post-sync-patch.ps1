@@ -89,13 +89,16 @@ if (Test-Path $genIconsScript) {
 }
 
 # ========== 3. patch JDK 21 → 17 ==========
+# 注意：cap add/sync 生成的原生工程在 android/android/，而依赖模块
+# node_modules/ 在 android/ 项目根目录（settings.gradle 用 ../node_modules 引用），
+# 因此 node_modules 条目要用相对 android/android 的 ..\node_modules\... 路径。
 $gradleFiles = @(
     "app\capacitor.build.gradle"
-    "node_modules\@capacitor-community\sqlite\android\build.gradle"
-    "node_modules\@capacitor\android\capacitor\build.gradle"
-    "node_modules\@capacitor\preferences\android\build.gradle"
-    "node_modules\@capacitor\status-bar\android\build.gradle"
-    "node_modules\@capacitor\filesystem\android\build.gradle"
+    "..\node_modules\@capacitor-community\sqlite\android\build.gradle"
+    "..\node_modules\@capacitor\android\capacitor\build.gradle"
+    "..\node_modules\@capacitor\preferences\android\build.gradle"
+    "..\node_modules\@capacitor\status-bar\android\build.gradle"
+    "..\node_modules\@capacitor\filesystem\android\build.gradle"
 )
 foreach ($rel in $gradleFiles) {
     $f = Join-Path $androidNativeDir $rel
