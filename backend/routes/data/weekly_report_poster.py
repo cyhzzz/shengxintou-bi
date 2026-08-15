@@ -30,7 +30,7 @@ def get_platform_template(platform):
     return template_map.get(platform)
 
 
-@bp.route('/api/v1/weekly-report/poster/preview', methods=['POST'])
+@bp.route('/weekly-report/poster/preview', methods=['POST'])
 @handle_exceptions
 def preview_poster():
     """
@@ -191,7 +191,7 @@ def preview_poster():
     return template_content
 
 
-@bp.route('/api/v1/weekly-report/poster/export', methods=['POST'])
+@bp.route('/weekly-report/poster/export', methods=['POST'])
 @handle_exceptions
 def export_poster():
     """
