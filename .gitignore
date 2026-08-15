@@ -71,6 +71,7 @@ tools/nsis/
 .idea/
 # Trae IDE spec (本地配置，不入库)
 .trae/
+.trae-html-share-packages/
 *.swp
 *.swo
 
