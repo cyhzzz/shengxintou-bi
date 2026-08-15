@@ -1,0 +1,237 @@
+name: Release
+
+# 打 tag vX.Y.Z 时自动编译并挂载 release 资产：
+#   - Windows 桌面安装包（shengxintou-bi-setup-*.exe，NSIS）
+#   - 前端热更新包（frontend-dist.zip）
+#   - Android APK（shengxintou-v*.apk，debug 签名）
+#
+# CI 门禁：打包前先等该 tag 提交在 ci.yml（workflow CI）的 run 完成，
+# 且结论必须为 success 才会继续编译；CI 失败/超时则整个 release 流程失败，
+# 不会产生任何 release 资产（保证"CI 全绿才打包"）。
+#
+# 用法：本地只 push tag（如 scripts/release.sh / release.bat），
+# gate → build-exe/build-apk → publish 三级自动完成编译 + 挂载。
+# 手动调试：workflow_dispatch 需填 tag_name（跳过 CI 门禁，开发者显式触发）。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: '要构建并挂载产物的目标 tag（如 v3.8.4）'
+        required: true
+
+permissions:
+  contents: write
+  actions: read   # gate 需要列 workflow run 判断 CI 是否全绿
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Wait for CI green
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      tag: ${{ steps.extract.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract target tag
+        id: extract
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for CI workflow to pass on this commit
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            const deadline = Date.now() + 30 * 60 * 1000;
+            let last = 'no run found yet';
+            while (Date.now() < deadline) {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id: 'ci.yml', head_sha: sha,
+              });
+              const run = runs.data.workflow_runs && runs.data.workflow_runs[0];
+              if (run) {
+                last = `run#${run.id} ${run.status}/${run.conclusion} (${run.name})`;
+                if (run.status === 'completed') {
+                  if (run.conclusion === 'success') {
+                    console.log(`CI passed: ${last}`);
+                    return;
+                  }
+                  core.setFailed(`CI not green, abort release: ${last}`);
+                  return;
+                }
+              }
+              await new Promise((r) => setTimeout(r, 30000));
+            }
+            core.setFailed(`Timed out waiting for CI to go green (last: ${last})`);
+
+  build-exe:
+    name: Build Windows installer (exe + frontend-dist.zip)
+    needs: gate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend-react/package-lock.json
+            desktop/package-lock.json
+
+      - name: Install backend deps (PyInstaller + Flask)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Install frontend deps
+        working-directory: frontend-react
+        run: npm ci --no-audit --no-fund
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Sync desktop version from version.json
+        working-directory: desktop
+        run: npm run sync-version
+
+      - name: Run build-installer.ps1
+        shell: pwsh
+        run: ./scripts/build-installer.ps1 -Root $env:GITHUB_WORKSPACE
+
+      - name: Verify artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem desktop/release | Select-Object Name, Length
+          if (-not (Get-ChildItem desktop/release -Filter '*Setup*.exe' -ErrorAction SilentlyContinue)) { throw 'Setup exe not found' }
+          if (-not (Test-Path desktop/release/frontend-dist.zip)) { throw 'frontend-dist.zip not found' }
+
+      - name: Upload exe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: exe-build
+          path: |
+            desktop/release/*Setup*.exe
+            desktop/release/frontend-dist.zip
+          if-no-files-found: error
+
+  build-apk:
+    name: Build Android APK
+    needs: gate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend-react/package-lock.json
+            android/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install frontend deps
+        working-directory: frontend-react
+        run: npm ci --no-audit --no-fund
+
+      - name: Install android deps (Capacitor)
+        working-directory: android
+        run: npm ci --no-audit --no-fund
+
+      # GitHub windows runner 自带 Android SDK；确认 compileSdk 35 组件存在
+      - name: Ensure Android SDK components (platform-35 / build-tools)
+        shell: pwsh
+        run: |
+          if (-not $env:ANDROID_HOME) { throw 'ANDROID_HOME not set on runner' }
+          $sdk = Join-Path $env:ANDROID_HOME 'cmdline-tools\latest\bin\sdkmanager.bat'
+          if (-not (Test-Path $sdk)) { Write-Host 'sdkmanager not found, skipping explicit install'; exit 0 }
+          & $sdk --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" --sdk_root="$env:ANDROID_HOME" 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw "sdkmanager install failed (exit $LASTEXITCODE)" }
+
+      # post-sync-patch 需要 database/shengxintou.db 提取表结构生成内置空库，
+      # CI 无该文件（gitignore），用 ORM create_all 生成表结构空库
+      - name: Generate empty schema DB for APK assets
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          New-Item -ItemType Directory -Force -Path database | Out-Null
+          python -c "import sys; sys.path.insert(0, '.'); from flask import Flask; from backend.database import db; import backend.models_v2, backend.models; app=Flask(__name__); app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///database/shengxintou.db'; db.init_app(app); app.app_context().push(); db.create_all(); print('empty schema db created')"
+
+      - name: Run build-apk.ps1
+        shell: pwsh
+        run: ./android/scripts/build-apk.ps1
+
+      - name: Verify APK
+        shell: pwsh
+        run: |
+          Get-ChildItem android/release | Select-Object Name, Length
+          if (-not (Get-ChildItem android/release -Filter '*.apk' -ErrorAction SilentlyContinue)) { throw 'APK not found' }
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-build
+          path: android/release/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Attach assets to GitHub Release
+    needs: [gate, build-exe, build-apk]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download exe artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: exe-build
+          path: artifacts/exe
+
+      - name: Download apk artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apk-build
+          path: artifacts/apk
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.gate.outputs.tag }}
+          files: |
+            artifacts/exe/*Setup*.exe
+            artifacts/exe/frontend-dist.zip
+            artifacts/apk/*.apk
+          fail_on_unmatched_files: true

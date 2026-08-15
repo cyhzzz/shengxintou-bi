@@ -6,13 +6,13 @@
 #   bash scripts/release.sh              交互式询问版本号
 #   bash scripts/release.sh 3.3.6        直接指定版本号
 #
-# 流程（自当前版本起，release.sh 只负责变更提交，发版构建由开发者本地手动完成）：
+# 流程（release.sh 只负责版本变更与推 tag；打包挂载由 GitHub Actions 自动完成）：
 #   1. 更新 version.json
 #   2. git commit + tag vX.Y.Z
 #   3. git push origin main --tags
-#   4. [开发者本地手动] scripts/build-installer.ps1（Windows）
-#      + cd android && npm run build:apk（Android）
-#      + gh release upload vX.Y.Z 上传产物
+#   4. [自动] 推送 vX.Y.Z tag 触发 .github/workflows/release.yml：
+#      GitHub Actions 先等 CI 全绿，再自动构建 server.exe 安装包 + frontend-dist.zip
+#      + Android APK，并挂载到 https://github.com/cyhzzz/shengxintou-bi/releases/tag/vX.Y.Z
 
 set -e
 
@@ -44,8 +44,7 @@ echo "即将发布 v$NEW_VER，流程："
 echo "  1. 更新 version.json"
 echo "  2. git commit + tag v$NEW_VER"
 echo "  3. git push origin main --tags"
-echo "  4. [本地手动] scripts/build-installer.ps1（Windows） + cd android && npm run build:apk（Android）"
-echo "  5. gh release upload v$NEW_VER ... --repo cyhzzz/shengxintou-bi"
+echo "  4. [自动] GitHub Actions 先等 CI 全绿，再打包 exe + APK + frontend-dist.zip 并挂载到 release"
 echo
 read -p "确认？(y/N) " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
@@ -81,8 +80,6 @@ echo "[3/4] git push origin main --tags"
 git push origin main --tags
 
 echo
-echo "[4/4] tag pushed; 等待开发者本地构建 + 上传"
-echo "下一步："
-echo "  - Windows:  ./scripts/build-installer.ps1  (在 Windows 上跑)"
-echo "  - Android:  cd android && npm run build:apk"
-echo "  - 上传:      gh release upload v$NEW_VER \"./dist/*setup*.exe\" \"android/release/*.apk\" --repo cyhzzz/shengxintou-bi"
+echo "[4/4] tag pushed; GitHub Actions 将自动（等 CI 全绿后）打包并挂载产物"
+echo "查看进度： https://github.com/cyhzzz/shengxintou-bi/actions"
+echo "发布页：   https://github.com/cyhzzz/shengxintou-bi/releases/tag/v$NEW_VER"

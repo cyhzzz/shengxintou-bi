@@ -23,15 +23,21 @@
 .PARAMETER OnlyNSIS
   只跑阶段 3（等同 -SkipPyInstaller -SkipFrontend）
 
+.PARAMETER Root
+  仓库根目录。缺省用本地开发路径 D:\AIproject\省心投BI；
+  CI（GitHub Actions）传 -Root $env:GITHUB_WORKSPACE 复用本脚本。
+
 .EXAMPLE
   .\scripts\build-installer.ps1
   .\scripts\build-installer.ps1 -OnlyNSIS
+  .\scripts\build-installer.ps1 -Root $env:GITHUB_WORKSPACE
 #>
 [CmdletBinding()]
 param(
   [switch]$SkipPyInstaller,
   [switch]$SkipFrontend,
-  [switch]$OnlyNSIS
+  [switch]$OnlyNSIS,
+  [string]$Root = ''
 )
 
 if ($OnlyNSIS) {
@@ -40,9 +46,14 @@ if ($OnlyNSIS) {
 }
 
 $ErrorActionPreference = 'Stop'
-$ROOT = 'D:\AIproject\省心投BI'
+if ([string]::IsNullOrWhiteSpace($Root)) {
+  $Root = 'D:\AIproject\省心投BI'
+}
+$ROOT = $Root
 $DESKTOP = Join-Path $ROOT 'desktop'
 $LOG = Join-Path $ROOT 'logs'
+# CI 环境没有 logs 目录，确保存在避免日志重定向失败
+New-Item -ItemType Directory -Force -Path $LOG | Out-Null
 
 function Write-Step($msg) { Write-Host "`n[1/3] $msg" -ForegroundColor Cyan }
 function Write-OK($msg)   { Write-Host "  ✓ $msg" -ForegroundColor Green }
