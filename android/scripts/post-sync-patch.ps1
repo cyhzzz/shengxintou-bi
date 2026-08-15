@@ -255,29 +255,37 @@ if (Test-Path $schemaDb) {
     $viteDst = Join-Path $vitePublicDir "shengxintouSQLite.db"
 
     # 用 Python 从 schema 库生成空库（仅表结构，0 行数据）
+    # 注意1：os.remove 在 WorkBuddy 环境被 safe-delete shim 拦截，用先写 tmp 再 os.replace 原子替换
+    # 注意2：PowerShell 5.1 管道给 python stdin 有编码问题，改为写临时 .py 文件再执行
     $pyScript = @"
 import sqlite3, os
 src = r'$($schemaDb.Replace("'","''"))'
 dst = r'$($apkDst.Replace("'","''"))'
-if os.path.exists(dst):
-    try: os.remove(dst)
+tmp = dst + '.tmp'
+if os.path.exists(tmp):
+    try: os.remove(tmp)
     except OSError: pass
 sconn = sqlite3.connect(src)
 rows = sconn.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'").fetchall()
 sconn.close()
-dconn = sqlite3.connect(dst)
+dconn = sqlite3.connect(tmp)
 for (s,) in rows:
     try: dconn.execute(s)
     except sqlite3.OperationalError: pass
 dconn.commit(); dconn.close()
+os.replace(tmp, dst)
 "@
+    $tmpPy = Join-Path $PSScriptRoot "..\..\logs\gen_empty_db_$([guid]::NewGuid().ToString('N').Substring(0,8)).py"
+    New-Item -ItemType Directory -Force -Path (Split-Path $tmpPy) | Out-Null
+    Write-FileNoBom $tmpPy $pyScript
     $pyOk = $false
     foreach ($pyExe in @("$PSScriptRoot\..\..\.venv\Scripts\python.exe", "python")) {
         try {
-            $pyScript | & $pyExe - 2>$null
+            & $pyExe $tmpPy 2>$null
             if (Test-Path $apkDst) { $pyOk = $true; break }
         } catch { }
     }
+    Remove-Item $tmpPy -Force -ErrorAction SilentlyContinue
     if ($pyOk) {
         Copy-Item -Path $apkDst -Destination $viteDst -Force
         $sizeKB = [math]::Round((Get-Item $apkDst).Length / 1KB, 0)
