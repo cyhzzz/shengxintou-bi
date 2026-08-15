@@ -20,6 +20,19 @@ ROOT = Path(__file__).resolve().parents[1]
 ROUTES_DIR = ROOT / 'backend' / 'routes'
 APP_PY = ROOT / 'app.py'
 MOBILE_HANDLER = ROOT / 'frontend-react' / 'src' / 'services' / 'mobileRouteHandler.ts'
+# v3.8.x：handler 按报表域拆分到 mobileHandlers/ 目录，case 分发仍在主文件
+MOBILE_HANDLERS_DIR = MOBILE_HANDLER.parent / 'mobileHandlers'
+
+
+def read_mobile_text() -> str:
+    """读取移动端路由处理器全文（分发器 + mobileHandlers/ 各报表域模块）。"""
+    parts = []
+    if MOBILE_HANDLER.exists():
+        parts.append(MOBILE_HANDLER.read_text(encoding='utf-8'))
+    if MOBILE_HANDLERS_DIR.is_dir():
+        for f in sorted(MOBILE_HANDLERS_DIR.glob('*.ts')):
+            parts.append(f.read_text(encoding='utf-8'))
+    return '\n'.join(parts)
 
 # 移动端/PWA 故意不实现的端点（见 docs/rules/cross-platform.md 第 7 节）
 MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
@@ -95,7 +108,7 @@ def check_algorithm_consistency() -> List[str]:
     """对账后端与移动端的关键算法实现。返回 drift 信息列表（空 = 一致）。"""
     if not MOBILE_HANDLER.exists():
         return []
-    mobile_text = MOBILE_HANDLER.read_text(encoding='utf-8')
+    mobile_text = read_mobile_text()
     drifts: List[str] = []
     for marker in ALGO_MARKERS:
         b_file = marker['backend_file']
@@ -232,7 +245,7 @@ def extract_mobile_cases() -> Set[str]:
     """从 mobileRouteHandler.ts 提取所有 case 路径。"""
     if not MOBILE_HANDLER.exists():
         return set()
-    text = MOBILE_HANDLER.read_text(encoding='utf-8')
+    text = read_mobile_text()
     # 匹配 case 'xxx': 或 case "xxx":
     case_re = re.compile(r"^\s*case\s+['\"]([^'\"]+)['\"]\s*:", re.MULTILINE)
     return set(case_re.findall(text))
