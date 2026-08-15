@@ -9,7 +9,7 @@ v2.1 调整：
   顶层加 meta 标注 raw_sums_keys / derived_keys。
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily, DimAccount
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -109,59 +109,75 @@ def get_dashboard_core_metrics():
             days = (e - s).days + 1
             prev_e = s - timedelta(days=1)
             prev_s = prev_e - timedelta(days=days - 1)
-            pf = dict(filters)
-            pf['start_date'] = prev_s.strftime('%Y-%m-%d')
-            pf['end_date'] = prev_e.strftime('%Y-%m-%d')
-            prev_q = _apply_filters(
-                db.session.query(
-                    func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
-                    func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
-                    func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads_wechat'),
-                    func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
-                    func.coalesce(func.sum(AggVendorDaily.线索成本 * AggVendorDaily.线索数), 0).label('cost_wechat_w'),
-                    func.coalesce(func.sum(AggVendorDaily.APP激活成本 * AggVendorDaily.APP激活人数), 0).label('cost_app_w'),
-                    func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
-                    func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
-                    func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
-                    func.coalesce(func.sum(AggVendorDaily.客户创收), 0).label('contribution'),
-                    func.coalesce(func.sum(AggVendorDaily.存量客户资产), 0).label('existing_assets'),
-                ),
-                pf, AggVendorDaily
-            ).first()
-            def _pct(a, b):
-                a, b = float(a or 0), float(b or 0)
-                return round((a - b) / b * 100, 2) if b > 0 else 0
-            # wow 构造：中国股市惯例 上升=红 / 下降=绿（不区分成本还是业务量，只跟方向）
-            def _w(curr, prev):
-                is_up = float(curr or 0) > float(prev or 0)
-                color = 'red' if is_up else 'green'
-                return {'value': _pct(curr, prev), 'trend': 'up' if is_up else 'down', 'color': color}
-            # 前后 cost_per_* 派生值（分母是 leads/opened/valid）
-            curr_cpwl = round(cost_wechat_w / leads_wechat, 2) if leads_wechat > 0 else 0
-            curr_cpaa = round(cost_app_w / leads_app, 2) if leads_app > 0 else 0
-            curr_cpa = round(cost / opened, 2) if opened > 0 else 0
-            curr_cpva = round(cost / valid, 2) if valid > 0 else 0
-            prev_leads_wechat = _i(prev_q.leads_wechat)
-            prev_leads_app = _i(prev_q.leads_app)
-            prev_cpwl = round(_f(prev_q.cost_wechat_w) / prev_leads_wechat, 2) if prev_leads_wechat > 0 else 0
-            prev_cpaa = round(_f(prev_q.cost_app_w) / prev_leads_app, 2) if prev_leads_app > 0 else 0
-            prev_cpa = round(_f(prev_q.cost) / _i(prev_q.opened), 2) if _i(prev_q.opened) > 0 else 0
-            prev_cpva = round(_f(prev_q.cost) / _i(prev_q.valid), 2) if _i(prev_q.valid) > 0 else 0
-            wow = {
-                'investment': _w(main_q.cost, prev_q.cost),
-                'total_impressions': _w(main_q.impressions, prev_q.impressions),
-                'leads_wechat': _w(leads_wechat, prev_leads_wechat),
-                'leads_app': _w(leads_app, prev_leads_app),
-                'new_customers': _w(main_q.opened, prev_q.opened),
-                'new_valid_accounts': _w(main_q.valid, prev_q.valid),
-                'customer_assets': _w(main_q.assets, prev_q.assets),
-                'customer_contribution': _w(main_q.contribution, prev_q.contribution),
-                'existing_customers_assets': _w(main_q.existing_assets, prev_q.existing_assets),
-                'cost_per_wechat_lead': _w(curr_cpwl, prev_cpwl),
-                'cost_per_app_activation': _w(curr_cpaa, prev_cpaa),
-                'cost_per_account': _w(curr_cpa, prev_cpa),
-                'cost_per_valid_account': _w(curr_cpva, prev_cpva),
-            }
+            
+            # 合并当期+环比为一次查询：用 CASE WHEN 标记 period_tag，GROUP BY 一次取两期
+            period_tag = case(
+                (and_(AggVendorDaily.日期 >= s, AggVendorDaily.日期 <= e), 'curr'),
+                (and_(AggVendorDaily.日期 >= prev_s, AggVendorDaily.日期 <= prev_e), 'prev'),
+                else_='other'
+            ).label('period_tag')
+            agg_cols = [
+                func.coalesce(func.sum(AggVendorDaily.花费), 0).label('cost'),
+                func.coalesce(func.sum(AggVendorDaily.展示量), 0).label('impressions'),
+                func.coalesce(func.sum(AggVendorDaily.线索数), 0).label('leads_wechat'),
+                func.coalesce(func.sum(AggVendorDaily.APP激活人数), 0).label('leads_app'),
+                func.coalesce(func.sum(AggVendorDaily.线索成本 * AggVendorDaily.线索数), 0).label('cost_wechat_w'),
+                func.coalesce(func.sum(AggVendorDaily.APP激活成本 * AggVendorDaily.APP激活人数), 0).label('cost_app_w'),
+                func.coalesce(func.sum(AggVendorDaily.开户人数), 0).label('opened'),
+                func.coalesce(func.sum(AggVendorDaily.有效户人数), 0).label('valid'),
+                func.coalesce(func.sum(AggVendorDaily.客户资产), 0).label('assets'),
+                func.coalesce(func.sum(AggVendorDaily.客户创收), 0).label('contribution'),
+                func.coalesce(func.sum(AggVendorDaily.存量客户资产), 0).label('existing_assets'),
+            ]
+            # 构造日期范围：prev_s .. e，覆盖两期
+            merged_filters = dict(filters)
+            merged_filters['start_date'] = prev_s.strftime('%Y-%m-%d')
+            merged_filters['end_date'] = e.strftime('%Y-%m-%d')
+            merged_q = _apply_filters(
+                db.session.query(period_tag, *agg_cols),
+                merged_filters, AggVendorDaily
+            ).filter(
+                and_(AggVendorDaily.日期 >= prev_s, AggVendorDaily.日期 <= e)
+            ).group_by(period_tag).all()
+            row_map = {r.period_tag: r for r in merged_q}
+            prev_q = row_map.get('prev')
+            if prev_q is None:
+                pass  # 上期无数据，wow 保持空
+            else:
+                def _pct(a, b):
+                    a, b = float(a or 0), float(b or 0)
+                    return round((a - b) / b * 100, 2) if b > 0 else 0
+                # wow 构造：中国股市惯例 上升=红 / 下降=绿（不区分成本还是业务量，只跟方向）
+                def _w(curr, prev):
+                    is_up = float(curr or 0) > float(prev or 0)
+                    color = 'red' if is_up else 'green'
+                    return {'value': _pct(curr, prev), 'trend': 'up' if is_up else 'down', 'color': color}
+                # 前后 cost_per_* 派生值（分母是 leads/opened/valid）
+                curr_cpwl = round(cost_wechat_w / leads_wechat, 2) if leads_wechat > 0 else 0
+                curr_cpaa = round(cost_app_w / leads_app, 2) if leads_app > 0 else 0
+                curr_cpa = round(cost / opened, 2) if opened > 0 else 0
+                curr_cpva = round(cost / valid, 2) if valid > 0 else 0
+                prev_leads_wechat = _i(prev_q.leads_wechat)
+                prev_leads_app = _i(prev_q.leads_app)
+                prev_cpwl = round(_f(prev_q.cost_wechat_w) / prev_leads_wechat, 2) if prev_leads_wechat > 0 else 0
+                prev_cpaa = round(_f(prev_q.cost_app_w) / prev_leads_app, 2) if prev_leads_app > 0 else 0
+                prev_cpa = round(_f(prev_q.cost) / _i(prev_q.opened), 2) if _i(prev_q.opened) > 0 else 0
+                prev_cpva = round(_f(prev_q.cost) / _i(prev_q.valid), 2) if _i(prev_q.valid) > 0 else 0
+                wow = {
+                    'investment': _w(main_q.cost, prev_q.cost),
+                    'total_impressions': _w(main_q.impressions, prev_q.impressions),
+                    'leads_wechat': _w(leads_wechat, prev_leads_wechat),
+                    'leads_app': _w(leads_app, prev_leads_app),
+                    'new_customers': _w(main_q.opened, prev_q.opened),
+                    'new_valid_accounts': _w(main_q.valid, prev_q.valid),
+                    'customer_assets': _w(main_q.assets, prev_q.assets),
+                    'customer_contribution': _w(main_q.contribution, prev_q.contribution),
+                    'existing_customers_assets': _w(main_q.existing_assets, prev_q.existing_assets),
+                    'cost_per_wechat_lead': _w(curr_cpwl, prev_cpwl),
+                    'cost_per_app_activation': _w(curr_cpaa, prev_cpaa),
+                    'cost_per_account': _w(curr_cpa, prev_cpa),
+                    'cost_per_valid_account': _w(curr_cpva, prev_cpva),
+                }
     except Exception:
         pass
     return jsonify({
