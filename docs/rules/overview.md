@@ -17,7 +17,7 @@
 | 后端 | Python、Flask、SQLAlchemy、pandas、SQLite |
 | 前端 | React、TypeScript、Vite、Ant Design、ECharts、Ant Design Charts/Plots、Zustand |
 | 测试 | Python `unittest` API smoke、Playwright 路由/功能/回归测试 |
-| 桌面与发布 | Electron 客户端、PyInstaller 打包 server.exe、electron-builder NSIS 安装包；发布走本地手动（`scripts/build-installer.ps1` + `cd android && npm run build:apk` + `gh release upload`） |
+| 桌面与发布 | Electron 客户端、PyInstaller 打包 server.exe、electron-builder NSIS 安装包；发布走 CI 自动打包（push tag 触发 `.github/workflows/release.yml`：gate 等 CI 全绿 → build-exe/build-apk → publish 挂载 release 资产），本地 `scripts/build-installer.ps1` / `cd android && npm run build:apk` 仅作调试回退 |
 
 具体版本以 `requirements.txt`、`frontend-react/package.json` 和工作流配置为准，不在规则中复制。
 

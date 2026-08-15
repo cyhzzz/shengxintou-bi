@@ -96,9 +96,9 @@
 - 当前版本、发布日期、版本号进位规则和 changelog 的唯一权威源是 `version.json`。
 - 普通功能开发不在规则文件追加“已落地”章节。
 - 发版脚本 `scripts/release.bat` / `release.sh` 会修改版本、commit、tag 和 push，属于高副作用操作；只有用户明确要求发版时运行。
-- 发布前先让用户补全 changelog，不接受脚本生成的“待补”占位条目作为正式发布说明。
-- **发布走本地手动流程**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push。push tag 后开发者在本机跑 `scripts\build-installer.ps1`（Windows） + `cd android && npm run build:apk`（Android）+ `gh release upload vX.Y.Z ...`。不要期望 CI 自动构建；不要并行手工制作另一套发布产物。
-- Release 失败 / 找不到产物时，直接回头查本地 `logs/build-installer-vX.Y.Z.log` 和 `logs/build-apk-vX.Y.Z.log`，不再依赖 Actions 流水线。
+- 发布前先让用户补全 changelog，不接受脚本生成的"待补"占位条目作为正式发布说明。
+- **发布走 CI 自动打包**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push。push tag 后 GitHub Actions `release.yml` 自动执行 gate → build-exe/build-apk → publish 三级流水线，产物自动挂载到 Release。无需本地构建。
+- Release 失败时优先查 GitHub Actions 日志（`release.yml` 的 build-exe/build-apk/publish 步骤），确认编译或挂载阶段的具体错误。本地 `logs/build-installer-vX.Y.Z.log` 和 `logs/build-apk-vX.Y.Z.log` 作为调试回退。
 
 ## 9. 文档交付
 

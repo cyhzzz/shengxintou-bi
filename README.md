@@ -225,7 +225,7 @@ npm run test:report
 
 ## 📦 发布流程
 
-> **当前版本起**：发布走「本地打 tag + 本地构建 + `gh release upload`」手动流程，**不再依赖 CI 自动构建**。
+> 打 tag 触发 CI 自动打包并挂载 release 资产（`.github/workflows/release.yml`），**无需本地构建**。
 
 ```powershell
 # 1) 改版本号 + tag + push（scripts/release.bat X.Y.Z 交互）
@@ -237,19 +237,13 @@ bash scripts/release.sh X.Y.Z
 # 等价流程：更新 version.json、commit、git tag vX.Y.Z、git push origin main --tags
 ```
 
-脚本只负责**改版本号 → commit → tag → push** 三件事。push tag 后，开发者需要**本地手动**继续：
+脚本只负责**改版本号 → commit → tag → push**。push tag 后 GitHub Actions `release.yml` 自动执行三级流水线：
 
-1. **Windows 安装包**：在本机跑 `scripts\build-installer.ps1`（需 Node.js 20+ + Python 3.9+ + NSIS（`tools/nsis/`）+ VC++ 运行时），产物 `dist/`。
-2. **Android APK**：在本机跑 `cd android && npm run build:apk`（需 JDK 17 + Android SDK + Node.js 20+），产物 `android/release/shengxintou-vX.Y.Z.apk`。
-3. **上传到 Release**：
-   ```bash
-   # Windows + Android 一键上传示例
-   gh release upload vX.Y.Z \
-       ".\dist\setup-*.exe" \
-       "android/release/shengxintou-vX.Y.Z.apk" \
-       --repo cyhzzz/shengxintou-bi
-   ```
-   在 [Releases 页](https://github.com/cyhzzz/shengxintou-bi/releases/tag/vX.Y.Z) 用 Web 界面编辑 release notes（从 `version.json.changelog` 提取）。
+1. **gate**：等待该 tag 提交在 `ci.yml` 的 run 完成且全绿；CI 失败/超时则终止（不产生 release 资产，保证"CI 全绿才打包"）。
+2. **build-exe / build-apk**（并行）：Windows 安装包 `shengxintou-bi-setup-<version>.exe` + `frontend-dist.zip`；Android APK `shengxintou-v<version>.apk`。
+3. **publish**：自动把三件资产挂载到 [Releases 页](https://github.com/cyhzzz/shengxintou-bi/releases/tag/vX.Y.Z)。
+
+本地打包命令保留作调试回退：`scripts\build-installer.ps1`（Windows，需 Node.js 20+ + Python 3.9+ + NSIS）+ `cd android && npm run build:apk`（Android，需 JDK 17 + Android SDK + Node.js 20+）。release notes 在 Releases 页用 Web 界面编辑（从 `version.json.changelog` 提取）。
 
 **最终用户的使用方式**：
 

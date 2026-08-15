@@ -70,7 +70,7 @@ cd frontend-react && npm run dev  # 前端
 .\scripts\build-installer.ps1 -OnlyNSIS           # 只重打 NSIS
 ```
 
-**产物**：`release/省心投BI-Setup-x.y.z.exe`
+**产物**：`desktop/release/shengxintou-bi-setup-<version>.exe`（`electron-builder.yml` 的 `win.artifactName` 小写命名）
 
 **何时需要重新打包**：
 - 后端 Python 代码变化（新增路由、修改模型、依赖更新）

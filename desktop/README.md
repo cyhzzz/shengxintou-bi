@@ -85,7 +85,7 @@ npm run dev
 2. **前端 build** — `npm run build` 生成 `frontend-react/dist/`
 3. **electron-builder** — 打 NSIS 安装包，extraResources 包含 server.exe / dist / backend / .env.desktop（重命名为 .env）/ version.json
 
-产物：`desktop/release/省心投 BI Setup <version>.exe`
+产物：`desktop/release/shengxintou-bi-setup-<version>.exe`（`electron-builder.yml` 的 `win.artifactName` 小写命名）
 
 可选参数：
 
