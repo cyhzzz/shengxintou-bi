@@ -17,7 +17,7 @@
 
 - 当前版本、发布日期、版本号规则和 changelog：`version.json`。
 - 产品定位、安装和使用：`README.md`。
-- 当前业务与工程规则：`docs/rules/`。
+- 当前业务与工程规则：`docs/rules/README.md`（专题索引）。
 - 主播类型映射：`backend/config/anchor_live_types.json`。
 - 支持的数据导入类型：`backend/routes/upload.py::DATA_TYPES`。
 - 业务表与中文列名：`backend/models_v2.py` 和上游源表。
@@ -54,7 +54,7 @@ AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询�
 
 ## 4. 最高风险业务不变式
 
-完整规则见 `docs/rules/business-invariants.md`。涉及漏斗、开户、资产、主播或应用市场时必须先读。
+完整规则见 `docs/rules/business-invariants.md`（漏斗、开户、资产、主播、应用市场口径）。**分发产物与数据安全红线见 [docs/rules/security-data-leak.md](docs/rules/security-data-leak.md)，涉及打包、发布或数据库初始化时必须先读。**
 
 - **新开户优先**：新开户及引进资产是主产出；存量客户和存量资产单独作为辅助，不能混算。
 - **内容平台非存量条件**：`是否为存量客户 == 0 OR IS NULL`；存量在有效线索之后剔除。
@@ -63,6 +63,7 @@ AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询�
 - **主播映射**：JSON 是权威源，数据库表仅作启动同步后的查询缓存；不要直接改库维护。
 - **青鸟导入**：`qingniao_leads` 按批次 append 是明确例外，其他 v2 类型默认 replace。`conversion_appmarket` 增量追加去重键 `设备号 + 下载日期`（详见 `docs/rules/business-invariants.md`）。
 - **代理商映射**：映射来自 `dim_account` 的全称/简称/字母简称；不要恢复已删除的 `dim_vendor`。
+- **数据安全红线**：APK/EXE/frontend-dist.zip 一律只内置表结构空库，真实业务库（含客户手机号/资产/创收）禁止进入任何分发产物与 Release 资产，仅由用户自行配置 WebDAV 从坚果云拉取；历史含数据 Release 资产必须清理。完整规则见 `docs/rules/security-data-leak.md`。
 
 ## 5. 架构地图
 
@@ -155,10 +156,8 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 跨端兼容（API/路由/featureFlag/SQL 同步） | `docs/rules/cross-platform.md` |
 | 决定测试、CI、Git、发布 | `docs/rules/testing-and-delivery.md` |
 | 打包、工具链、依赖工具位置 | `docs/rules/toolchain.md` |
-| 新需求 | `docs/rules/workflows/feature.md` + `docs/rules/templates/tech-spec.md` |
-| Bug 修复 | `docs/rules/workflows/bugfix.md` |
-
-总导航和维护方式见 `docs/rules/README.md`。
+| 数据安全红线：打包/发布/数据库初始化 | `docs/rules/security-data-leak.md` |
+| 新需求 / Bug 修复 | `docs/rules/workflows/feature.md`、`docs/rules/workflows/bugfix.md`、`docs/rules/templates/tech-spec.md` |
 
 ## 7. 修改红线
 
@@ -206,6 +205,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 
 - 记录并保护用户已有未提交改动；不擅自回滚、清理、stash 或覆盖。
 - 不提交 `.env`、数据库、上传文件、备份、日志、PID、prototype、临时脚本或测试截图。
+- 不把含业务数据的库打进分发产物（APK/EXE/frontend-dist.zip）或 GitHub Release 资产；只内置表结构空库，真实数据由用户 WebDAV 拉取。详见 `docs/rules/security-data-leak.md`。
 - 未经用户明确要求，不 commit、push、建分支、打 tag、创建 PR 或发布。
 - 发版脚本会修改版本、commit、tag 和 push；只有用户明确要求发版时运行。
 - 版本历史只写入 `version.json`，不要在根规则追加“某版本已落地”章节。

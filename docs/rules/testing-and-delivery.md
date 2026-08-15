@@ -159,7 +159,7 @@
 5. `settings.gradle`：阿里云 Maven 镜像
 6. `gradle.properties`：`kotlin.compiler.execution.strategy=in-process` + `org.gradle.daemon=false`
 7. `gradle-wrapper.properties`：腾讯云 Gradle 镜像
-8. `database/shengxintou.db` → `app/src/main/assets/public/assets/databases/shengxintouSQLite.db`
+8. 内置数据库（**仅表结构空库，严禁真实数据**）：`database/shengxintou.db` 由 `post-sync-patch.ps1` 第 8 步**提取 schema 生成空库**（约 12 表 0 行、~116KB），产出 `app/src/main/assets/public/assets/databases/shengxintouSQLite.db`。**禁止** `Copy-Item` 整个真实库；校验产出行数 = 0。完整红线见 `docs/rules/security-data-leak.md`。
 9. `assembleDebug`（非 release，debug keystore 自动签名，可直接安装）
 10. `Rename-ApkToChinese` 复制到 `android/release/shengxintou-v<版本号>.apk`
 

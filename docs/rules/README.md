@@ -24,6 +24,7 @@
 | 跨端兼容（API/路由/featureFlag/SQL 同步） | [`cross-platform.md`](cross-platform.md) | `frontend-react/src/services/mobileRouteHandler.ts`、`frontend-react/src/config/features.ts`、`scripts/check_*.py` |
 | 决定测试范围、提交、CI 或发布 | [`testing-and-delivery.md`](testing-and-delivery.md) | `tests/`、`frontend-react/tests/`、`scripts/`、`.github/` |
 | 打包、工具链、依赖工具位置 | [`toolchain.md`](toolchain.md) | `tools/jdk17/`、`tools/platform-tools/`、`tools/android-sdk/`、`scripts/build-installer.ps1`、`android/scripts/post-sync-patch.ps1` |
+| 数据安全红线：打包/发布/数据库初始化 | [`security-data-leak.md`](security-data-leak.md) | `android/scripts/post-sync-patch.ps1` 第 8 步（空库生成）、`backend/routes/system/`（WebDAV 同步）、`docs/rules/security-data-leak.md` |
 | 开发新需求 | [`workflows/feature.md`](workflows/feature.md) | [`templates/tech-spec.md`](templates/tech-spec.md) |
 | 修复 Bug | [`workflows/bugfix.md`](workflows/bugfix.md) | 相关回归测试目录 |
 
