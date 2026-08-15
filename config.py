@@ -142,8 +142,33 @@ CLOUD_SYNC_ENABLED = os.getenv('CLOUD_SYNC_ENABLED', 'false').lower() in ('1', '
 # - 不依赖 Supabase Auth API，完全本地签发/验证
 # - JWT_SECRET 用于签名 JWT（必须配置，建议生产用强随机值）
 # - JWT_EXPIRES_HOURS：JWT 过期时间（小时），默认 24
+def _get_jwt_secret():
+    """获取 JWT 密钥，优先使用环境变量，否则从 .jwt_secret 文件读取或生成"""
+    env_secret = os.getenv('JWT_SECRET', '').strip()
+    if env_secret:
+        return env_secret
+    
+    # 尝试从 .jwt_secret 文件读取
+    secret_file = os.path.join(BASE_DIR, '.jwt_secret')
+    if os.path.exists(secret_file):
+        with open(secret_file, 'r') as f:
+            file_secret = f.read().strip()
+            if file_secret:
+                return file_secret
+    
+    # 生成新的密钥并保存到文件
+    import secrets
+    new_secret = secrets.token_hex(32)
+    try:
+        with open(secret_file, 'w') as f:
+            f.write(new_secret)
+        print(f"已生成 JWT 密钥并保存到 {secret_file}，重启后不会失效")
+    except Exception as e:
+        print(f"警告：无法写入 .jwt_secret 文件，JWT 密钥将在重启后失效: {e}")
+    return new_secret
+
 SECRET_KEY = os.getenv('SECRET_KEY', os.urandom(32))
-JWT_SECRET = os.getenv('JWT_SECRET', '').strip() or SECRET_KEY
+JWT_SECRET = _get_jwt_secret()
 JWT_EXPIRES_HOURS = float(os.getenv('JWT_EXPIRES_HOURS', '24'))
 
 # feat-local-auth 方案 A：默认 admin 账号

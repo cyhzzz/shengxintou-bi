@@ -8,6 +8,7 @@
 .env.desktop
 .env.local
 .env.*.local
+.jwt_secret
 
 # ===== 数据库文件 =====
 *.db
