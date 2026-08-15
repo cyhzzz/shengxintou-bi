@@ -207,7 +207,7 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 - 不提交 `.env`、数据库、上传文件、备份、日志、PID、prototype、临时脚本或测试截图。
 - 不把含业务数据的库打进分发产物（APK/EXE/frontend-dist.zip）或 GitHub Release 资产；只内置表结构空库，真实数据由用户 WebDAV 拉取。详见 `docs/rules/security-data-leak.md`。
 - 未经用户明确要求，不 commit、push、建分支、打 tag、创建 PR 或发布。
-- 发版脚本会修改版本、commit、tag 和 push；只有用户明确要求发版时运行。
+- 发版脚本会修改版本、commit、tag 和 push；只有用户明确要求发版时运行。发版流程：更新 version.json → commit → `git tag vX.Y.Z` → push tag；tag 触发 `release.yml` 自动打包 exe/APK/frontend-dist.zip 并挂载 release（release 说明自动取自 version.json.changelog），无需本地构建。
 - 版本历史只写入 `version.json`，不要在根规则追加“某版本已落地”章节。
 - 规则变更后检查 `AGENTS.md` / `CLAUDE.md` SHA256、规则链接、`git diff --check` 和最终 Git 状态。
 

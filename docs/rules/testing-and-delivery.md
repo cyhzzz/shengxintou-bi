@@ -98,6 +98,7 @@
 - 发版脚本 `scripts/release.bat` / `release.sh` 会修改版本、commit、tag 和 push，属于高副作用操作；只有用户明确要求发版时运行。
 - 发布前先让用户补全 changelog，不接受脚本生成的"待补"占位条目作为正式发布说明。
 - **发布走 CI 自动打包**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push。push tag 后 GitHub Actions `release.yml` 自动执行 gate → build-exe/build-apk → publish 三级流水线，产物自动挂载到 Release。无需本地构建。
+- **Release 说明自动生成**：`release.yml` publish 步骤读取 `version.json.changelog` 当前版本条目 + `release_date` + 资产清单生成 release body（`body_path: release_body.md`）。发版前先补全 `version.json.changelog` 即为最终 release 文案，无需手动编辑 release 说明。
 - Release 失败时优先查 GitHub Actions 日志（`release.yml` 的 build-exe/build-apk/publish 步骤），确认编译或挂载阶段的具体错误。本地 `logs/build-installer-vX.Y.Z.log` 和 `logs/build-apk-vX.Y.Z.log` 作为调试回退。
 
 ## 9. 文档交付
