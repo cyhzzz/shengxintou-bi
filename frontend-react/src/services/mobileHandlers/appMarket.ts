@@ -15,7 +15,7 @@ const FUNNEL_STAGES: [string, string][] = [
   ['是否注册身份证', '注册身份证'],
   ['是否注册银行卡', '注册银行卡'],
   ['是否提交开户', '提交开户'],
-  ['是否开户成功', '开户成功'],
+  ['是否创建完资金账号', '开户成功'],
   ['是否新开户', '新开户'],
   ['是否入金', '入金'],
   ['是否有效户', '有效户'],
@@ -224,7 +224,7 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
     COALESCE(SUM("是否注册身份证"), 0) AS id_card,
     COALESCE(SUM("是否注册银行卡"), 0) AS bank_card,
     COALESCE(SUM("是否提交开户"), 0) AS submit,
-    COALESCE(SUM("是否开户成功"), 0) AS success
+    COALESCE(SUM("是否创建完资金账号"), 0) AS success
     FROM fact_conv_appmarket ${whereClause.clause}
     GROUP BY "下载日期" ORDER BY "下载日期"`;
   const dailyRows = await querySql<Row>(dailySql, whereClause.params);
@@ -435,7 +435,7 @@ export async function handleAppMarketDetail(body: any): Promise<any> {
     '注册身份证': !!r['是否注册身份证'],
     '注册银行卡': !!r['是否注册银行卡'],
     '提交开户': !!r['是否提交开户'],
-    '开户成功': !!r['是否开户成功'],
+    '开户成功': !!r['是否创建完资金账号'],
     '新开户': !!r['是否新开户'],
     '入金': !!r['是否入金'],
     '有效户': !!r['是否有效户'],
@@ -468,7 +468,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   // 5 阶段漏斗
   const funnelCols: [string, string][] = [
     ['是否激活APP', '激活APP'],
-    ['是否开户成功', '开户成功'],
+    ['是否创建完资金账号', '开户成功'],
     ['是否新开户', '新开户'],
     ['是否入金', '入金'],
     ['是否有效户', '有效户'],
@@ -594,7 +594,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
   const sql = `SELECT ${planExpr} as plan_key,
     "投放账号", "应用市场", "渠道类型",
     COALESCE(SUM("是否激活APP"), 0) as 激活APP,
-    COALESCE(SUM("是否开户成功"), 0) as 开户成功,
+    COALESCE(SUM("是否创建完资金账号"), 0) as 开户成功,
     COALESCE(SUM("是否新开户"), 0) as 新开户,
     COALESCE(SUM("是否入金"), 0) as 入金,
     COALESCE(SUM("是否有效户"), 0) as 有效户
