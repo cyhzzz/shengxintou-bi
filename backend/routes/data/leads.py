@@ -527,32 +527,38 @@ def get_anchor_clusters_trend():
     pp = defaultdict(lambda: defaultdict(lambda: {'leads':0,'new_leads':0,'mouth':0,'valid_lead':0,'new_opened':0,'new_valid':0,'new_assets':0.0}))
     all_platforms = set()
     SPLIT_PATTERN = re.compile(r"[,，;；、]+")
+    PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
     for r in rows:
+        src = (r.客户来源 or '').strip()
+        tokens = [t.strip() for t in SPLIT_PATTERN.split(src) if t.strip()]
         # live_types 筛选 — 拆 客户来源 token，看是否命中 wanted_tokens
         if live_types_filter:
-            src = (r.客户来源 or '').strip()
-            tokens = [t.strip() for t in SPLIT_PATTERN.split(src) if t.strip()]
             if not any(t in wanted_tokens for t in tokens):
                 continue
+        # 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分，
+        # 与 anchor-clusters / anchor-weekly-analysis 口径一致，避免 period totals 虚高
+        matched = {t for t in tokens if PATTERN.match(t) or t in plain_name_tokens}
+        n = len(matched)
+        div = max(n, 1)
         period = r.period
         platform = r.platform or '未知'
         all_platforms.add(platform)
         b = pt[period]
-        b['leads'] += int(r.leads or 0)
-        b['new_leads'] += int(r.new_leads or 0)
-        b['mouth'] += int(r.mouth or 0)
-        b['valid_lead'] += int(r.valid_lead or 0)
-        b['new_opened'] += int(r.new_opened or 0)
-        b['new_valid'] += int(r.new_valid or 0)
-        b['new_assets'] += float(r.new_assets or 0)
+        b['leads'] += round(int(r.leads or 0) / div)
+        b['new_leads'] += round(int(r.new_leads or 0) / div)
+        b['mouth'] += round(int(r.mouth or 0) / div)
+        b['valid_lead'] += round(int(r.valid_lead or 0) / div)
+        b['new_opened'] += round(int(r.new_opened or 0) / div)
+        b['new_valid'] += round(int(r.new_valid or 0) / div)
+        b['new_assets'] += float(r.new_assets or 0) / div
         bx = pp[period][platform]
-        bx['leads'] += int(r.leads or 0)
-        bx['new_leads'] += int(r.new_leads or 0)
-        bx['mouth'] += int(r.mouth or 0)
-        bx['valid_lead'] += int(r.valid_lead or 0)
-        bx['new_opened'] += int(r.new_opened or 0)
-        bx['new_valid'] += int(r.new_valid or 0)
-        bx['new_assets'] += float(r.new_assets or 0)
+        bx['leads'] += round(int(r.leads or 0) / div)
+        bx['new_leads'] += round(int(r.new_leads or 0) / div)
+        bx['mouth'] += round(int(r.mouth or 0) / div)
+        bx['valid_lead'] += round(int(r.valid_lead or 0) / div)
+        bx['new_opened'] += round(int(r.new_opened or 0) / div)
+        bx['new_valid'] += round(int(r.new_valid or 0) / div)
+        bx['new_assets'] += float(r.new_assets or 0) / div
     periods = sorted(pt.keys())
     return jsonify({
         'success': True,
@@ -748,11 +754,11 @@ def get_anchor_weekly_analysis():
             w['new_opened'] += round(int(r.new_opened or 0) / div)
             w['new_valid'] += round(int(r.new_valid or 0) / div)
 
-            # 整体周度汇总
+            # 整体周度汇总（v3.8.7: 同步均分，避免 weekly_totals > 各主播之和）
             if week not in weekly_agg:
                 weekly_agg[week] = {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0}
             for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid'):
-                weekly_agg[week][k] += int(getattr(r, k) or 0)
+                weekly_agg[week][k] += round(int(getattr(r, k) or 0) / div)
 
     # 组装 anchor_items + 派生率
     anchor_items = []
