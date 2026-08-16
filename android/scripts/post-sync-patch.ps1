@@ -335,9 +335,9 @@ if (Test-Path $versionJsonPath) {
     if (Test-Path $buildGradlePath) {
         $gradle = Read-FileNoBom $buildGradlePath
         $changed = $false
-        # 替换 versionName（可能是 versionName "1.0" 或 versionName = "1.0"）
-        if ($gradle -match 'versionName\s+["\'][^"\']+["\']') {
-            $gradle = $gradle -replace 'versionName\s+["\'][^"\']+["\']', "versionName `"$versionName`""
+        # 替换 versionName（Capacitor 生成格式：versionName "1.0"）
+        if ($gradle -match 'versionName\s+"[^"]+"') {
+            $gradle = $gradle -replace 'versionName\s+"[^"]+"', "versionName `"$versionName`""
             $changed = $true
         }
         # 替换 versionCode（可能是 versionCode 1 或 versionCode = 1）
