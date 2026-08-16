@@ -117,7 +117,10 @@ def get_external_data_analysis():
     total_cost = sum(v['cost'] for v in plat.values())
     total_leads = sum(v['leads'] for v in plat.values())
     total_opened = sum(v['opened'] for v in plat.values())
-    estimated_returns = total_opened * 10000
+    # ROI 估算口径：每开户客户预估贡献金额（元），可经 ROI_VALUE_PER_OPENED 环境变量配置
+    import config as app_config
+    value_per_opened = float(getattr(app_config, 'ROI_VALUE_PER_OPENED', 10000))
+    estimated_returns = total_opened * value_per_opened
     roi = round((estimated_returns - total_cost) / total_cost * 100, 2) if total_cost > 0 else 0
     roi_analysis = {
         'total_investment': round(total_cost, 2),
