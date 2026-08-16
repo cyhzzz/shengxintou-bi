@@ -147,12 +147,6 @@ class ApiSmokeTest(unittest.TestCase):
         data = self._ok(self._post('/api/v1/trend', self._dash_payload()), '/trend')
         self.assertIsInstance(data, dict)
 
-    def test_21_conversion_funnel(self):
-        data = self._ok(
-            self._post('/api/v1/conversion-funnel', self._dash_payload()),
-            '/conversion-funnel')
-        self.assertIsInstance(data, dict)
-
     def test_22_conversion_funnel_split(self):
         data = self._ok(
             self._post('/api/v1/conversion-funnel/split', self._dash_payload()),

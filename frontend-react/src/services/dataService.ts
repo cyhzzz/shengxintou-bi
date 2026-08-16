@@ -3,7 +3,7 @@
  * 提供数据查询相关接口
  */
 import { http } from './http';
-import type { ApiResponse, SummaryData, TrendData, AgencyAnalysisData, ConversionFunnelData, LeadsDetailData, DashboardCoreMetricsData, DashboardTrendData } from '@/types';
+import type { ApiResponse, SummaryData, TrendData, AgencyAnalysisData, LeadsDetailData, DashboardCoreMetricsData, DashboardTrendData } from '@/types';
 
 // 筛选条件接口
 export interface FilterParams {
@@ -97,13 +97,6 @@ export const dataService = {
     return http.get('/agency-analysis', params);
   },
 
-  /**
-   * @deprecated v3.3.9 起未使用，前端改走 @/types/api 的同名函数
-   */
-  // 获取转化漏斗数据（v2.1 单端点，保留兼容）
-  getConversionFunnel: async (filters?: FilterParams): Promise<ApiResponse<ConversionFunnelData>> => {
-    return http.post('/conversion-funnel', { filters });
-  },
   // 获取转化漏斗拆分数据（v3.1 §三: 内容平台 + 应用市场 双漏斗）
   getConversionFunnelSplit: async (filters?: FilterParams) => {
     return http.post('/conversion-funnel/split', { filters });
