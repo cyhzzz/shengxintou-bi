@@ -316,7 +316,49 @@ os.replace(tmp, dst)
 
 Write-Output "[done] post-sync-patch complete"
 
-# ========== 9. 打包后复制 APK（shengxintou 命名） ==========
+# ========== 10. 注入 APK 版本号到 build.gradle ==========
+# v3.8.6 修复：build-apk.ps1 从 version.json 读版本只用于重命名文件，
+# 但 Capacitor 生成的 build.gradle 里 versionName/versionCode 保持默认 1.0/1，
+# 导致安装后显示 1.0，无法覆盖升级安装。
+#
+# versionCode 编码方案：yyyyMMddHH（年月日时，如 2026081610 表示 2026-08-16 10:00）
+#   - 单调递增：只要打包时间晚于上次，code 必然大于上次
+#   - 历史安全：v3.8.4 已发布，假设其 code 最大为 2026081523（2026-08-15 23:00），
+#     新 code 从 2026081600 起必然大于历史所有 code
+#   - 容量充足：yyyyMMddHH 格式到 2099 年都不会溢出（最大 2099123123）
+$versionJsonPath = Join-Path $PSScriptRoot "..\..\version.json"
+$buildGradlePath = Join-Path $androidNativeDir "app\build.gradle"
+if (Test-Path $versionJsonPath) {
+    $versionJson = Get-Content $versionJsonPath -Raw | ConvertFrom-Json
+    $versionName = $versionJson.version
+    $versionCode = Get-Date -Format "yyyyMMddHH"
+    if (Test-Path $buildGradlePath) {
+        $gradle = Read-FileNoBom $buildGradlePath
+        $changed = $false
+        # 替换 versionName（可能是 versionName "1.0" 或 versionName = "1.0"）
+        if ($gradle -match 'versionName\s+["\'][^"\']+["\']') {
+            $gradle = $gradle -replace 'versionName\s+["\'][^"\']+["\']', "versionName `"$versionName`""
+            $changed = $true
+        }
+        # 替换 versionCode（可能是 versionCode 1 或 versionCode = 1）
+        if ($gradle -match 'versionCode\s+\d+') {
+            $gradle = $gradle -replace 'versionCode\s+\d+', "versionCode $versionCode"
+            $changed = $true
+        }
+        if ($changed) {
+            Write-FileNoBom $buildGradlePath $gradle
+            Write-Output "[patch] build.gradle: versionName=$versionName, versionCode=$versionCode (yyyyMMddHH)"
+        } else {
+            Write-Output "[warn] build.gradle: versionName/versionCode pattern not found"
+        }
+    } else {
+        Write-Output "[skip] build.gradle not found at $buildGradlePath (run cap sync first)"
+    }
+} else {
+    Write-Output "[warn] version.json not found at $versionJsonPath"
+}
+
+# ========== 11. 打包后复制 APK（shengxintou 命名） ==========
 # build.gradle 中 outputFileName 用 ASCII（shengxintou-vX.Y.Z.apk），
 # 打包完成后由本函数复制到 android/release/，保持 shengxintou 拼音命名
 # v3.5.3：改用 assembleDebug（debug keystore 自动签名），默认搜 debug 目录
