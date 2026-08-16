@@ -177,6 +177,14 @@ JWT_EXPIRES_HOURS = float(os.getenv('JWT_EXPIRES_HOURS', '24'))
 DEFAULT_ADMIN_EMAIL = os.getenv('DEFAULT_ADMIN_EMAIL', 'admin@shengxintou.local')
 DEFAULT_ADMIN_PASSWORD = os.getenv('DEFAULT_ADMIN_PASSWORD', '')
 
+# ============================================================================
+# 业务口径
+# ============================================================================
+
+# 外部数据分析（external-data-analysis）ROI 估算：每个开户客户的预估贡献金额（元）。
+# 用于 estimated_returns = 开户数 × 本值，无真实成交数据时的估算口径，可按业务实际调整。
+ROI_VALUE_PER_OPENED = float(os.getenv('ROI_VALUE_PER_OPENED', '10000'))
+
 # 文件上传配置
 # v3.5.8：桌面版上传目录也放 USER_DATA_DIR（升级不丢失临时上传文件）
 UPLOAD_FOLDER = os.path.join(USER_DATA_DIR, os.getenv('UPLOAD_FOLDER', 'uploads'))
