@@ -1,9 +1,10 @@
 {
-    "version": "3.8.6",
+    "version": "3.8.7",
     "release_date": "2026-08-16",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.8.7 移动端修复合集（应用市场漏斗开户成功口径同步、主播聚类趋势复合来源均分补齐、启用上传大小限制并对齐版本号）",
         "v3.8.6 tag 推送纳入 CI 门禁 + APK 注入真实版本号/版本代码（修复安装显示 1.0 无法升级）",
         "v3.8.5 代码质量专项：移动端路由处理器按报表域拆分（4452 行巨型文件 → 13 个域模块 + 分发器）+ 安全修复（错误提示 XSS 转义、CORS 白名单收敛、移除硬编码默认管理员密码改随机生成、JWT 密钥持久化）+ 性能与清理（Dashboard 重复查询合并、移除 index.html 全局禁缓存与残留 1MB echarts、清理 .trae-html-share-packages 冗余目录）",
         "v3.8.4 CI 门禁自动化：tag 触发自动打包 exe/APK 并挂载到 release，gate 等待 CI 全绿才执行打包",
