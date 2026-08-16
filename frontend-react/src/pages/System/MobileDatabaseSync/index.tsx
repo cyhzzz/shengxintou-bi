@@ -45,6 +45,7 @@ export default function MobileDatabaseSync() {
     lastSize: null,
   });
   const [syncing, setSyncing] = useState(false);
+  const [progress, setProgress] = useState<string>('');
 
   const refreshStatus = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
@@ -84,12 +85,13 @@ export default function MobileDatabaseSync() {
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
+    setProgress('准备同步...');
     try {
       // v3.6.2：PWA 端 sql.js 自动管理 DB 生命周期，无需 closeMobileDatabase
       if (!isPwaClient()) {
         try { await closeMobileDatabase(); } catch { /* ignore */ }
       }
-      const result = await syncFromWebDAV();
+      const result = await syncFromWebDAV(setProgress);
       if (result.success) {
         message.success(result.message);
         setState((s) => ({
@@ -108,6 +110,7 @@ export default function MobileDatabaseSync() {
       }
     } finally {
       setSyncing(false);
+      setProgress('');
     }
   }, [message]);
 
@@ -242,7 +245,12 @@ export default function MobileDatabaseSync() {
 
           {syncing && (
             <div style={{ textAlign: 'center', padding: 12 }}>
-              <Spin tip="正在从坚果云下载数据库..." />
+              <Spin tip={progress || '正在从坚果云下载数据库...'} />
+              {progress && (
+                <div style={{ marginTop: 8, color: 'var(--color-text-secondary)', fontSize: 12 }}>
+                  {progress}
+                </div>
+              )}
             </div>
           )}
         </Space>

@@ -262,6 +262,31 @@ async function fetchWithTimeout(
 }
 
 /**
+ * 给任意 Promise 加超时。
+ *
+ * 用于无法被 fetch AbortController 覆盖的阶段（例如 sql.js 加载 / IndexedDB 写入）：
+ * 这些阶段若卡死，UI 会永远转圈且无报错。包一层超时后，卡死会变为明确的错误提示，
+ * 而不是让用户以为「同步卡死了」。
+ *
+ * @param timeoutMsg 超时后抛出的错误信息（应给出可能原因，方便用户排查）
+ */
+async function promiseWithTimeout<T>(
+  p: Promise<T>,
+  timeoutMs: number,
+  timeoutMsg: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(timeoutMsg)), timeoutMs);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
  * GET latest_backup.txt 获取坚果云上最新的备份文件名
  *
  * 后端在上传 backup_*.db.gz 时，同时上传一个 latest_backup.txt manifest 文件，
@@ -297,7 +322,9 @@ async function getLatestRemoteDb(
   return filename;
 }
 
-export async function syncFromWebDAV(): Promise<SyncResult> {
+export async function syncFromWebDAV(
+  onProgress?: (msg: string) => void
+): Promise<SyncResult> {
   const creds = await getWebDAVCredentials();
   if (!creds) {
     return { success: false, message: '尚未配置 WebDAV 凭据，请点击「WebDAV 配置」按钮填入坚果云账号和应用密码' };
@@ -305,13 +332,14 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
 
   // v3.6.2：PWA 端走 sql.js + IndexedDB，不走 Capacitor Filesystem
   if (isPwaClient()) {
-    return syncFromWebDAVPwa(creds);
+    return syncFromWebDAVPwa(creds, onProgress);
   }
 
   const log: string[] = [];
   const step = (msg: string) => {
     log.push(msg);
     console.log(`[mobileSync] ${msg}`);
+    onProgress?.(msg);
   };
 
   try {
@@ -479,17 +507,21 @@ function buildProxyRequestUrl(
  * 代理协议：GET https://<proxy>/?url=<encoded webdav url>&auth=<basic auth>
  *           代理转发到坚果云并加 CORS 头。
  */
-async function syncFromWebDAVPwa(creds: {
-  url: string;
-  username: string;
-  password: string;
-  remoteDir: string;
-  proxyUrl?: string;
-}): Promise<SyncResult> {
+async function syncFromWebDAVPwa(
+  creds: {
+    url: string;
+    username: string;
+    password: string;
+    remoteDir: string;
+    proxyUrl?: string;
+  },
+  onProgress?: (msg: string) => void
+): Promise<SyncResult> {
   const log: string[] = [];
   const step = (msg: string) => {
     log.push(msg);
     console.log(`[pwaSync] ${msg}`);
+    onProgress?.(msg);
   };
 
   try {
@@ -563,7 +595,13 @@ async function syncFromWebDAVPwa(creds: {
     const { loadNewDb } = await import('./sqlJsAdapter');
     const arrayBuffer = await blob.arrayBuffer();
     try {
-      await loadNewDb(arrayBuffer);
+      // v3.8.8：包超时，避免 DB 过大 / WASM 内存不足 / IndexedDB 写入阻塞时
+      // 永久卡在「加载中」且无任何报错（此前会导致 UI 一直转圈）。
+      await promiseWithTimeout(
+        loadNewDb(arrayBuffer),
+        180000,
+        `数据库加载超时（180秒）。可能原因：DB 过大导致 sql.js 内存不足，或浏览器存储/配额受限。建议用「恢复内置数据」或减小备份体积`
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       // v3.6.4：配额超限错误特殊处理
@@ -628,7 +666,7 @@ async function testWebDAVConnectionPwa(
       : `${baseUrl}latest_backup.txt`).replace(/([^:])\/{2,}/g, '$1/');
     const proxyManifest = buildProxyRequestUrl(proxyUrl, manifestUrl, auth);
 
-    const resp = await fetch(proxyManifest);
+    const resp = await fetchWithTimeout(proxyManifest, 30000);
     if (resp.status === 404) {
       return { success: false, message: '连接成功，但未找到 latest_backup.txt' };
     }
