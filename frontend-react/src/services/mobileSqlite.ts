@@ -31,6 +31,11 @@ import { isPwaClient } from '@/utils/isDesktop';
 
 const DB_NAME = 'shengxintou';
 let dbOpen = false;
+// v3.8.8：并发初始化单例 Promise。App.tsx 启动流程与 EmptyDbGuide 都会触发初始化，
+// 若两次 createConnection 交错，后到的会抛 "Connection already exists" / open 失败，
+// 导致 EmptyDbGuide 的判定查询抛异常被 catch 误判为空库，引导横幅每次冷启动都误弹。
+// 用模块级 Promise 合并并发初始化，保证只真正 open 一次。
+let dbInitPromise: Promise<void> | null = null;
 
 /**
  * v3.5.3：从 APK 内置的 assets/databases/shengxintouSQLite.db 复制到应用数据目录
@@ -68,26 +73,37 @@ export async function moveDatabaseFromCache(): Promise<void> {
 
 export async function initMobileDatabase(): Promise<void> {
   if (dbOpen) return;
+  // 已有进行中的初始化则合并到同一 Promise，避免并发 createConnection 竞态
+  if (dbInitPromise) return dbInitPromise;
 
-  // v3.5.4：closeMobileDatabase 在 reload/状态错乱后可能没真正关掉原生层连接，
-  // 此时 createConnection 会抛 "Connection shengxintou already exists"。
-  // 先静默 closeConnection 一次（连接不存在时原生层会返回，不抛错），再 create。
-  try {
-    await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
-  } catch {
-    /* connection not exist is fine */
-  }
+  dbInitPromise = (async () => {
+    try {
+      // v3.5.4：closeMobileDatabase 在 reload/状态错乱后可能没真正关掉原生层连接，
+      // 此时 createConnection 会抛 "Connection shengxintou already exists"。
+      // 先静默 closeConnection 一次（连接不存在时原生层会返回，不抛错），再 create。
+      try {
+        await CapacitorSQLite.closeConnection({ database: DB_NAME, readonly: false });
+      } catch {
+        /* connection not exist is fine */
+      }
 
-  // 建立连接 + 打开数据库
-  await CapacitorSQLite.createConnection({
-    database: DB_NAME,
-    encrypted: false,
-    mode: 'no-encryption',
-    version: 1,
-    readonly: false,
-  });
-  await CapacitorSQLite.open({ database: DB_NAME });
-  dbOpen = true;
+      // 建立连接 + 打开数据库
+      await CapacitorSQLite.createConnection({
+        database: DB_NAME,
+        encrypted: false,
+        mode: 'no-encryption',
+        version: 1,
+        readonly: false,
+      });
+      await CapacitorSQLite.open({ database: DB_NAME });
+      dbOpen = true;
+    } finally {
+      // 成功/失败都清掉 in-flight Promise；失败时允许下一次重试
+      dbInitPromise = null;
+    }
+  })();
+
+  return dbInitPromise;
 }
 
 export async function querySql<T>(sql: string, params: unknown[] = []): Promise<T[]> {

@@ -116,6 +116,34 @@ export async function hasWebDAVCredentials(): Promise<boolean> {
   return !!creds;
 }
 
+// v3.8.8：持久化「上次成功同步时间」，供 EmptyDbGuide 判定数据是否过期
+const ANDROID_LAST_SYNC_KEY = 'android_last_sync_at';
+const PWA_LAST_SYNC_KEY = 'pwa_last_sync_at';
+
+export async function saveLastSyncAt(iso: string): Promise<void> {
+  try {
+    if (isPwaClient()) {
+      localStorage.setItem(PWA_LAST_SYNC_KEY, iso);
+    } else {
+      await Preferences.set({ key: ANDROID_LAST_SYNC_KEY, value: iso });
+    }
+  } catch {
+    /* 存储失败不阻塞同步 */
+  }
+}
+
+export async function getLastSyncAt(): Promise<string | null> {
+  try {
+    if (isPwaClient()) {
+      return localStorage.getItem(PWA_LAST_SYNC_KEY);
+    }
+    const { value } = await Preferences.get({ key: ANDROID_LAST_SYNC_KEY });
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -377,11 +405,14 @@ export async function syncFromWebDAV(): Promise<SyncResult> {
       throw new Error(`sanity check 失败，新库可能未正确加载: ${msg}`);
     }
 
+    const syncTimestamp = new Date().toISOString();
+    await saveLastSyncAt(syncTimestamp);
+
     return {
       success: true,
       message: `同步成功（${latestFile}）`,
       size: blob.size,
-      timestamp: new Date().toISOString(),
+      timestamp: syncTimestamp,
     };
   } catch (error) {
     // 出错时尝试重新打开数据库
