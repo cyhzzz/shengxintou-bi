@@ -67,7 +67,6 @@ WEEKLY_OVERRIDE: Dict[str, str] = {
 # 新增 drift 不允许加入此列表，必须在 mobileRouteHandler 补实现
 # 格式：{端点路径: 补实现优先级（high/medium/low）}
 KNOWN_DRIFT: Dict[str, str] = {
-    'conversion-funnel': 'high',              # 漏斗主接口，ConversionFunnel 页面用
     'dashboard/accounts': 'medium',            # Dashboard 账户列表
     'data-freshness': 'low',                  # 数据更新时间显示
     'employee-conversion/employees': 'medium', # 员工下拉选项

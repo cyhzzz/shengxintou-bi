@@ -633,7 +633,6 @@ from backend.routes.data import (
     agency_analysis,
     xhs_notes,
     cost_analysis,
-    external_analysis,
     leads,
     account_mapping,
     xhs_operation,
@@ -659,7 +658,6 @@ app.register_blueprint(trend.bp, url_prefix=API_PREFIX)
 app.register_blueprint(agency_analysis.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_notes.bp, url_prefix=API_PREFIX)
 app.register_blueprint(cost_analysis.bp, url_prefix=API_PREFIX)
-app.register_blueprint(external_analysis.bp, url_prefix=API_PREFIX)
 app.register_blueprint(leads.bp, url_prefix=API_PREFIX)
 app.register_blueprint(account_mapping.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_operation.bp, url_prefix=API_PREFIX)
