@@ -680,13 +680,14 @@ export async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
       if (!weeklyAgg[week]) {
         weeklyAgg[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
       }
+      // v3.8.7: 同步均分，避免 weekly_totals > 各主播之和（与后端 leads.py 一致）
       const wa = weeklyAgg[week];
-      wa.leads += toInt(r.leads);
-      wa.mouth += toInt(r.mouth);
-      wa.valid_lead += toInt(r.valid_lead);
-      wa.new_valid_lead += toInt(r.new_valid_lead);
-      wa.new_opened += toInt(r.new_opened);
-      wa.new_valid += toInt(r.new_valid);
+      wa.leads += Math.round(toInt(r.leads) / div);
+      wa.mouth += Math.round(toInt(r.mouth) / div);
+      wa.valid_lead += Math.round(toInt(r.valid_lead) / div);
+      wa.new_valid_lead += Math.round(toInt(r.new_valid_lead) / div);
+      wa.new_opened += Math.round(toInt(r.new_opened) / div);
+      wa.new_valid += Math.round(toInt(r.new_valid) / div);
     }
   }
 

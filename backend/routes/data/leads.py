@@ -748,11 +748,11 @@ def get_anchor_weekly_analysis():
             w['new_opened'] += round(int(r.new_opened or 0) / div)
             w['new_valid'] += round(int(r.new_valid or 0) / div)
 
-            # 整体周度汇总
+            # 整体周度汇总（v3.8.7: 同步均分，避免 weekly_totals > 各主播之和）
             if week not in weekly_agg:
                 weekly_agg[week] = {'leads': 0, 'mouth': 0, 'valid_lead': 0, 'new_valid_lead': 0, 'new_opened': 0, 'new_valid': 0}
             for k in ('leads', 'mouth', 'valid_lead', 'new_valid_lead', 'new_opened', 'new_valid'):
-                weekly_agg[week][k] += int(getattr(r, k) or 0)
+                weekly_agg[week][k] += round(int(getattr(r, k) or 0) / div)
 
     # 组装 anchor_items + 派生率
     anchor_items = []
