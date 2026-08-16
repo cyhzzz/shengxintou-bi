@@ -101,7 +101,11 @@ export default function MobileDatabaseSync() {
           lastSyncAt: result.timestamp || new Date().toISOString(),
           lastSize: result.size ?? null,
         }));
-        setTimeout(() => window.location.reload(), 1200);
+        setTimeout(() => {
+          // v3.8.8：带 ?v=timestamp 强制跳过缓存，避免命中陈旧 index.html 触发白屏
+          const sep = location.search ? '&' : '?';
+          location.href = location.pathname + sep + 'v=' + Date.now() + location.hash;
+        }, 1200);
       } else {
         message.error(result.message);
         if (!isPwaClient()) {
@@ -124,7 +128,10 @@ export default function MobileDatabaseSync() {
       await initMobileDatabase();
       message.success('已从内置数据恢复');
       setState((s) => ({ ...s, hasDb: true, lastSyncAt: new Date().toISOString() }));
-      setTimeout(() => window.location.reload(), 1200);
+      setTimeout(() => {
+        const sep = location.search ? '&' : '?';
+        location.href = location.pathname + sep + 'v=' + Date.now() + location.hash;
+      }, 1200);
     } catch (err) {
       message.error('恢复失败: ' + (err as Error).message);
     } finally {

@@ -87,21 +87,30 @@ window.addEventListener('error', (e) => {
   }
 });
 // 2. Promise 异步错误（无条件注册）
-window.addEventListener('unhandledrejection', (e) => {
+window.addEventListener('unhandledrejection', async (e) => {
   const reason = e.reason;
 
   // v3.6.4：chunk 加载失败自动重试
   // 原因：GitHub Pages 对 HTML 有缓存，新部署后旧 index.html 引用的 chunk hash
   //       已被覆盖删除，导致 "Failed to fetch dynamically imported module"。
-  // 处理：检测到此错误时自动 reload 一次（带 ?v=timestamp 强制跳过缓存），
-  //      并用 sessionStorage 标记避免无限重试。
+  // 处理（v3.8.8 增强）：检测到此错误时，先清空 Service Worker / HTTP 缓存，
+  //       再带 ?v=timestamp 强制 reload，确保重载时重新拉取全部资源
+  //       （仅靠 ?v= 加在 HTML 上无法破除已缓存的 404 chunk）。
   if (reason instanceof Error && reason.message?.includes('Failed to fetch dynamically imported module')) {
     const RETRY_KEY = '__chunk_reload_retried';
     const retried = sessionStorage.getItem(RETRY_KEY);
     if (!retried) {
       sessionStorage.setItem(RETRY_KEY, '1');
-      console.warn('[main] chunk 加载失败，自动 reload 跳过缓存');
-      location.href = location.pathname + '?v=' + Date.now() + location.hash;
+      console.warn('[main] chunk 加载失败，清理缓存并强制 reload');
+      // 清空 Service Worker 缓存（若存在），让重载重新拉取所有资源
+      if ('caches' in window) {
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        } catch { /* ignore */ }
+      }
+      const sep = location.search ? '&' : '?';
+      location.href = location.pathname + sep + 'v=' + Date.now() + location.hash;
       return;
     }
     // 已重试过仍失败，提示用户手动刷新
@@ -176,4 +185,17 @@ if ('requestIdleCallback' in window) {
     },
     { timeout: 3000 } // 3 秒内必须执行，避免空闲太久
   )
+}
+
+// v3.8.8：注册 PWA Service Worker，根治 GitHub Pages 部署后白屏
+// 仅 PWA 生产构建（base=/shengxintou-bi/app/）注册；dev / Web / 桌面端不注册，
+// 避免开发期缓存干扰。SW 文件来自 public/sw.js，构建后位于 /app/sw.js。
+if (import.meta.env.BASE_URL === '/shengxintou-bi/app/') {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('sw.js', { scope: './' })
+        .catch((err) => console.warn('[SW] 注册失败:', err));
+    });
+  }
 }
