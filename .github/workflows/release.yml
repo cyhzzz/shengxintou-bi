@@ -214,7 +214,6 @@ jobs:
       # 并注入 ANDROID_KEYSTORE_* 环境变量；build-apk.ps1 检测到后即走 release-signed 构建。
       # 若未配置密钥（如 fork/调试），此步跳过，构建退回 debug（与改动前一致）。
       - name: Decode signing keystore from secret
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: pwsh
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -222,6 +221,12 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          # 注意：secrets 上下文不能在 step 的 if 条件中使用（会导致 workflow 加载失败），
+          # 因此是否配置密钥的跳过逻辑放在脚本内判断。
+          if (-not $env:KEYSTORE_B64) {
+            Write-Host "ANDROID_KEYSTORE_BASE64 secret 未配置，跳过密钥解码（退回 debug 构建）"
+            exit 0
+          }
           $ksPath = Join-Path $env:RUNNER_TEMP 'release-keystore.jks'
           $bytes = [System.Convert]::FromBase64String($env:KEYSTORE_B64)
           [IO.File]::WriteAllBytes($ksPath, $bytes)
