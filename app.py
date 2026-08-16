@@ -121,6 +121,11 @@ app.wsgi_app = DoubleApiRewriteMiddleware(app.wsgi_app)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+# 限制上传文件大小，防止超大文件打爆磁盘
+# MAX_CONTENT_LENGTH 在 config.py 中定义（默认 50MB），此前虽定义却从未应用到 app.config，
+# 导致 Flask 实际不限制上传大小。此处显式启用。
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+
 # CORS配置 - 使用Flask-CORS扩展（推荐）
 # 本地开发环境使用白名单，支持通过 CORS_ORIGINS 环境变量扩展（逗号分隔）
 _default_cors_origins = [
@@ -595,7 +600,7 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'message': '省心投 BI 系统运行正常',
-        'version': '1.0.0'
+        'version': '3.8.5'
     })
 
 # 注册API路由

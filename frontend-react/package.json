@@ -1,7 +1,7 @@
 {
   "name": "shengxintou-platform",
   "private": true,
-  "version": "0.9.4",
+  "version": "3.8.5",
   "type": "module",
   "scripts": {
     "setup": "node ../scripts/setup.mjs",
