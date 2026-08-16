@@ -478,12 +478,16 @@ export async function handleAnchorClustersTrend(body: any): Promise<any> {
   const allPlatforms = new Set<string>();
 
   for (const r of rows) {
+    const src = String(r.customer_source || '').trim();
+    const tokens = src.split(ANCHOR_SPLIT).map(t => t.trim()).filter(Boolean);
     // live_types 筛选 — 拆 客户来源 token，看是否命中 wanted_tokens
     if (wantedTokens) {
-      const src = String(r.customer_source || '').trim();
-      const tokens = src.split(ANCHOR_SPLIT).map(t => t.trim()).filter(Boolean);
       if (!tokens.some(t => wantedTokens.has(t))) continue;
     }
+    // 复合来源（如"抖音引流-周乐意,抖音引流-杨毅"）按匹配主播数均分，
+    // 与 anchor-clusters / anchor-weekly-analysis 口径一致，避免 period totals 虚高
+    const n = new Set(tokens.filter(t => ANCHOR_PATTERN.test(t) || ltMap.plain_name_tokens.has(t))).size;
+    const div = Math.max(n, 1);
     const period = String(r.period ?? '');
     const platform = String(r.platform || '未知');
     allPlatforms.add(platform);
@@ -492,26 +496,26 @@ export async function handleAnchorClustersTrend(body: any): Promise<any> {
       periodTotals[period] = { leads: 0, new_leads: 0, mouth: 0, valid_lead: 0, new_opened: 0, new_valid: 0, new_assets: 0 };
     }
     const b = periodTotals[period];
-    b.leads += toInt(r.leads);
-    b.new_leads += toInt(r.new_leads);
-    b.mouth += toInt(r.mouth);
-    b.valid_lead += toInt(r.valid_lead);
-    b.new_opened += toInt(r.new_opened);
-    b.new_valid += toInt(r.new_valid);
-    b.new_assets += toFloat(r.new_assets);
+    b.leads += Math.round(toInt(r.leads) / div);
+    b.new_leads += Math.round(toInt(r.new_leads) / div);
+    b.mouth += Math.round(toInt(r.mouth) / div);
+    b.valid_lead += Math.round(toInt(r.valid_lead) / div);
+    b.new_opened += Math.round(toInt(r.new_opened) / div);
+    b.new_valid += Math.round(toInt(r.new_valid) / div);
+    b.new_assets += toFloat(r.new_assets) / div;
 
     if (!byPlatform[period]) byPlatform[period] = {};
     if (!byPlatform[period][platform]) {
       byPlatform[period][platform] = { leads: 0, new_leads: 0, mouth: 0, valid_lead: 0, new_opened: 0, new_valid: 0, new_assets: 0 };
     }
     const bx = byPlatform[period][platform];
-    bx.leads += toInt(r.leads);
-    bx.new_leads += toInt(r.new_leads);
-    bx.mouth += toInt(r.mouth);
-    bx.valid_lead += toInt(r.valid_lead);
-    bx.new_opened += toInt(r.new_opened);
-    bx.new_valid += toInt(r.new_valid);
-    bx.new_assets += toFloat(r.new_assets);
+    bx.leads += Math.round(toInt(r.leads) / div);
+    bx.new_leads += Math.round(toInt(r.new_leads) / div);
+    bx.mouth += Math.round(toInt(r.mouth) / div);
+    bx.valid_lead += Math.round(toInt(r.valid_lead) / div);
+    bx.new_opened += Math.round(toInt(r.new_opened) / div);
+    bx.new_valid += Math.round(toInt(r.new_valid) / div);
+    bx.new_assets += toFloat(r.new_assets) / div;
   }
 
   const periods = Object.keys(periodTotals).sort();
@@ -680,13 +684,14 @@ export async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
       if (!weeklyAgg[week]) {
         weeklyAgg[week] = { leads: 0, mouth: 0, valid_lead: 0, new_valid_lead: 0, new_opened: 0, new_valid: 0 };
       }
+      // v3.8.7: 同步均分，避免 weekly_totals > 各主播之和（与后端 leads.py 一致）
       const wa = weeklyAgg[week];
-      wa.leads += toInt(r.leads);
-      wa.mouth += toInt(r.mouth);
-      wa.valid_lead += toInt(r.valid_lead);
-      wa.new_valid_lead += toInt(r.new_valid_lead);
-      wa.new_opened += toInt(r.new_opened);
-      wa.new_valid += toInt(r.new_valid);
+      wa.leads += Math.round(toInt(r.leads) / div);
+      wa.mouth += Math.round(toInt(r.mouth) / div);
+      wa.valid_lead += Math.round(toInt(r.valid_lead) / div);
+      wa.new_valid_lead += Math.round(toInt(r.new_valid_lead) / div);
+      wa.new_opened += Math.round(toInt(r.new_opened) / div);
+      wa.new_valid += Math.round(toInt(r.new_valid) / div);
     }
   }
 
