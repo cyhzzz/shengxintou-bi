@@ -358,6 +358,55 @@ if (Test-Path $versionJsonPath) {
     Write-Output "[warn] version.json not found at $versionJsonPath"
 }
 
+# ========== 10b. 注入固定 release 签名密钥到 build.gradle ==========
+# v3.8.8 修复：APK 安装失败「签名不同」的根因 = CI 每次构建用临时 debug keystore 签名，
+#   不同版本密钥不同 → Android 拒绝原地升级（提示"签名不一致"）。
+# 改为复用 GitHub Secrets 注入的【固定密钥】：仅当 CI（release.yml）已注入 ANDROID_KEYSTORE_*
+# 环境变量且密钥库文件存在时，才注入 signingConfigs.release，并让 buildTypes.release 引用它；
+# 本地无密钥（或调试）时保持默认行为（assembleDebug + 默认 debug 签名），不受影响。
+# 注意：android/android/ 是 gitignored，CI 每次 cap sync 重新生成 build.gradle，
+#       因此签名注入必须放在本脚本（post-sync-patch，cap sync 之后运行），不能改 gitignored 的 build.gradle。
+$ksFile = $env:ANDROID_KEYSTORE_FILE
+$ksPass = $env:ANDROID_KEYSTORE_PASSWORD
+$ksAlias = $env:ANDROID_KEY_ALIAS
+$ksKeyPass = $env:ANDROID_KEY_PASSWORD
+$hasFixedKey = ($ksFile -and (Test-Path $ksFile) -and $ksPass -and $ksAlias -and $ksKeyPass)
+if ($hasFixedKey -and (Test-Path $buildGradlePath)) {
+    $gradle2 = Read-FileNoBom $buildGradlePath
+    if ($gradle2 -notmatch 'signingConfigs') {
+        # 注入 signingConfigs.release（Gradle 配置期读取 env，密钥不出 build.gradle 源码）
+        $signingBlock = @'
+    signingConfigs {
+        release {
+            def ksF = System.getenv('ANDROID_KEYSTORE_FILE')
+            if (ksF != null && file(ksF).exists()) {
+                storeFile file(ksF)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: ''
+                keyAlias System.getenv('ANDROID_KEY_ALIAS') ?: ''
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD') ?: ''
+            }
+        }
+    }
+'@
+        $gradle2 = $gradle2 -replace '(?s)(android\s*\{)', "`$1`n$signingBlock"
+
+        # 在 buildTypes.release 内追加条件式 signingConfig（仅当提供固定密钥库时生效）
+        $releaseSigning = @'
+            if (System.getenv('ANDROID_KEYSTORE_FILE') != null && file(System.getenv('ANDROID_KEYSTORE_FILE')).exists()) {
+                signingConfig signingConfigs.release
+            }
+'@
+        $gradle2 = $gradle2 -replace '(?s)(buildTypes\s*\{[^}]*?release\s*\{)', "`$1`n$releaseSigning"
+
+        Write-FileNoBom $buildGradlePath $gradle2
+        Write-Output "[patch] build.gradle: signingConfigs.release 注入（固定密钥，支持原地升级）"
+    } else {
+        Write-Output "[skip] build.gradle: signingConfigs 已存在，跳过注入"
+    }
+} else {
+    Write-Output "[skip] build.gradle: 未检测到固定密钥库（ANDROID_KEYSTORE_*），保持默认 debug 签名"
+}
+
 # ========== 11. 打包后复制 APK（shengxintou 命名） ==========
 # build.gradle 中 outputFileName 用 ASCII（shengxintou-vX.Y.Z.apk），
 # 打包完成后由本函数复制到 android/release/，保持 shengxintou 拼音命名

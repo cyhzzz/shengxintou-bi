@@ -21,7 +21,10 @@ $repoRoot = Resolve-Path "$PSScriptRoot\..\.."
 $androidRoot = Join-Path $repoRoot 'android'
 $frontendRoot = Join-Path $repoRoot 'frontend-react'
 $gradleRoot = Join-Path $androidRoot 'android'
-$apkSrcDir = Join-Path $gradleRoot 'app\build\outputs\apk\debug'
+# 固定签名密钥存在时用 release 构建（release-signed），否则退回 debug 构建（与改动前一致）
+$useReleaseKey = ($env:ANDROID_KEYSTORE_FILE -and (Test-Path $env:ANDROID_KEYSTORE_FILE))
+$apkBuildType = if ($useReleaseKey) { 'release' } else { 'debug' }
+$apkSrcDir = Join-Path $gradleRoot "app\build\outputs\apk\$apkBuildType"
 $releaseDir = Join-Path $androidRoot 'release'
 # JDK 优先用环境变量（CI 用 actions/setup-java 设置 JAVA_HOME），本地 fallback 到 tools/jdk17
 $jdkPath = $env:JAVA_HOME
@@ -61,13 +64,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "post-sync-patch 失败" }
 } finally { Pop-Location }
 
-Write-Host '[5/6] gradlew assembleDebug...' -ForegroundColor Cyan
+Write-Host "[5/6] gradlew assemble$apkBuildType$(if($useReleaseKey){' (release-signed)'}else{' (debug)'})..." -ForegroundColor Cyan
 if (-not (Test-Path $jdkPath)) { throw "JDK17 未找到：$jdkPath（请设置 JAVA_HOME 或准备 tools/jdk17）" }
 $env:JAVA_HOME = $jdkPath
 Push-Location $gradleRoot
 try {
-    & .\gradlew.bat assembleDebug
-    if ($LASTEXITCODE -ne 0) { throw "gradlew assembleDebug 失败" }
+    & .\gradlew.bat "assemble$apkBuildType"
+    if ($LASTEXITCODE -ne 0) { throw "gradlew assemble$apkBuildType 失败" }
 } finally { Pop-Location }
 
 Write-Host '[6/6] 复制产物到 release 目录并重命名中文名...' -ForegroundColor Cyan
