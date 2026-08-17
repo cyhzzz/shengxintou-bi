@@ -597,10 +597,18 @@ def favicon():
 @app.route('/api/health')
 def health_check():
     """健康检查接口"""
+    version = '3.8.9'
+    try:
+        import json as _json
+        _vf = os.path.join(BASE_DIR, 'version.json')
+        with open(_vf, 'r', encoding='utf-8') as _f:
+            version = _json.load(_f).get('version', version)
+    except Exception:
+        pass
     return jsonify({
         'status': 'ok',
         'message': '省心投 BI 系统运行正常',
-        'version': '3.8.5'
+        'version': version
     })
 
 # 注册API路由

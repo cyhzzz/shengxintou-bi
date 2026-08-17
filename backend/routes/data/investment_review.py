@@ -9,7 +9,7 @@
 （APP激活属 APP 下载链路，业务含义近似线索，详见 docs/rules/business-invariants.md §4）
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -72,6 +72,26 @@ def get_investment_review():
     q = q.group_by(AggVendorDaily.厂商, month_col).order_by(AggVendorDaily.厂商, month_col)
     rows = q.all()
 
+    # v3.8.9：叶级双链路 split（聚合到「厂商×月」后无法正确切分，必须在叶级用条件求和）。
+    # 与上方相同过滤条件下，按厂商分别累加两链路花费：
+    #   内容平台(加微)分子 = SUM(花费 WHERE 线索数>0)；应用市场(APP)分子 = SUM(花费 WHERE APP激活人数>0)
+    # 纯花费无线索无激活的行不计入任一分子，与总览 SUM(线索成本×线索数) 口径一致。
+    split_q = db.session.query(
+        AggVendorDaily.厂商,
+        func.coalesce(func.sum(case((AggVendorDaily.线索数 > 0, AggVendorDaily.花费), else_=0)), 0).label('content_cost'),
+        func.coalesce(func.sum(case((AggVendorDaily.APP激活人数 > 0, AggVendorDaily.花费), else_=0)), 0).label('app_cost'),
+    )
+    if start_date and end_date:
+        split_q = split_q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms:
+        split_q = split_q.filter(AggVendorDaily.平台.in_(platforms))
+    if agencies:
+        split_q = split_q.filter(AggVendorDaily.厂商.in_(agencies))
+    if business_models:
+        split_q = split_q.filter(AggVendorDaily.业务模式.in_(business_models))
+    split_q = split_q.group_by(AggVendorDaily.厂商)
+    split_map = {r.厂商: (float(r.content_cost or 0), float(r.app_cost or 0)) for r in split_q.all()}
+
     # 按厂商分桶 + 每个厂商算总计
     by_agency = {}
     for r in rows:
@@ -105,16 +125,19 @@ def get_investment_review():
         total_conv = sum(it['opened_conversation'] for it in items)
         total_acc = sum(it['opened_account'] for it in items)
         total_app_act = sum(it['app_activation'] for it in items)
+        # v3.8.9：双链路不混算——「加微成本」与「单APP激活成本」的分子取自叶级 split（见上方 split_map），
+        # 避免把聚合行中「纯曝光无线索日」的花费计入，与总览口径对齐。
+        total_content_cost, total_app_cost = split_map.get(agency, (0.0, 0.0))
         total_row = {
             'month': '总计',
             'cost': round(total_cost, 2),
             'leads': total_leads,
             'opened_conversation': total_conv,
             'opened_account': total_acc,
-            'lead_cost': round(total_cost / total_leads, 2) if total_leads > 0 else None,
+            'lead_cost': round(total_content_cost / total_leads, 2) if total_leads > 0 else None,
             'account_cost': round(total_cost / total_acc, 2) if total_acc > 0 else None,
             'app_activation': total_app_act,
-            'app_activation_cost': round(total_cost / total_app_act, 2) if total_app_act > 0 else None,
+            'app_activation_cost': round(total_app_cost / total_app_act, 2) if total_app_act > 0 else None,
             'is_total': True,
         }
         monthly_payload[agency] = items + [total_row]

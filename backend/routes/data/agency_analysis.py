@@ -7,7 +7,7 @@
 （APP激活属 APP 下载链路，业务含义近似线索，详见 docs/rules/business-invariants.md §4）
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
@@ -104,7 +104,8 @@ def get_agency_analysis():
                   'app_activation_users']:
             m[k] += item['metrics'][k]
 
-    grand = {'cost': 0, 'impressions': 0, 'clicks': 0, 'leads': 0, 'opened': 0, 'valid': 0, 'assets': 0, 'existing_assets': 0, 'app_act': 0}
+    grand = {'cost': 0, 'impressions': 0, 'clicks': 0, 'leads': 0, 'opened': 0, 'valid': 0, 'assets': 0, 'existing_assets': 0, 'app_act': 0,
+             'content_cost': 0, 'app_cost': 0}
     for item in summary:
         m = item['metrics']
         grand['cost'] += m['cost']
@@ -116,6 +117,25 @@ def get_agency_analysis():
         grand['app_act'] += m['app_activation_users']
         grand['assets'] += m['opened_account_assets']
         grand['existing_assets'] += m['existing_customer_assets']
+
+    # v3.8.9：双链路不混算——合计行的「单企微成本 / 单APP激活成本」必须在叶级用条件求和。
+    # 聚合到厂商粒度后无法正确切分（厂商行混合了「有线索日」与「纯曝光无线索日」的花费），
+    # 故此处用与上方相同的过滤条件，在 agg_vendor_daily 叶级行上分别累加两链路的花费：
+    #   内容平台分子 = SUM(花费 WHERE 线索数>0)
+    #   应用市场分子 = SUM(花费 WHERE APP激活人数>0)
+    # 纯花费无线索无激活的行（如纯曝光日）不计入任一分子，与总览 SUM(线索成本×线索数) 口径一致。
+    split_q = db.session.query(
+        func.coalesce(func.sum(case((AggVendorDaily.线索数 > 0, AggVendorDaily.花费), else_=0)), 0).label('content_cost'),
+        func.coalesce(func.sum(case((AggVendorDaily.APP激活人数 > 0, AggVendorDaily.花费), else_=0)), 0).label('app_cost'),
+    )
+    if start_date and end_date:
+        split_q = split_q.filter(and_(AggVendorDaily.日期 >= start_date, AggVendorDaily.日期 <= end_date))
+    if platforms: split_q = split_q.filter(AggVendorDaily.平台.in_(platforms))
+    if agencies: split_q = split_q.filter(AggVendorDaily.厂商.in_(agencies))
+    if business_models: split_q = split_q.filter(AggVendorDaily.业务模式.in_(business_models))
+    split = split_q.first()
+    grand['content_cost'] = float(split.content_cost or 0)
+    grand['app_cost'] = float(split.app_cost or 0)
 
     grand_row = {
         'platform': '', 'business_model': '', 'agency': '[合计]',
@@ -129,10 +149,10 @@ def get_agency_analysis():
             'valid_customer_users': grand['valid'],
             'opened_account_assets': round(grand['assets'], 2),
             'existing_customer_assets': round(grand['existing_assets'], 2),
-            'lead_cost': round(grand['cost'] / grand['leads'], 2) if grand['leads'] > 0 else 0,
+            'lead_cost': round(grand['content_cost'] / grand['leads'], 2) if grand['leads'] > 0 else 0,
             'account_cost': round(grand['cost'] / grand['opened'], 2) if grand['opened'] > 0 else 0,
             'app_activation_users': grand['app_act'],
-            'app_activation_cost': round(grand['cost'] / grand['app_act'], 2) if grand['app_act'] > 0 else 0,
+            'app_activation_cost': round(grand['app_cost'] / grand['app_act'], 2) if grand['app_act'] > 0 else 0,
         }
     }
     final_summary = enrich_items(summary) + list(plat_sub.values()) + [grand_row]

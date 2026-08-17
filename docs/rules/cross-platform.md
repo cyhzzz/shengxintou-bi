@@ -17,6 +17,8 @@
 
 权威源：`frontend-react/src/config/features.ts`、`frontend-react/src/utils/isDesktop.ts`、`frontend-react/src/services/http.ts`、`frontend-react/src/router/index.tsx`、`frontend-react/src/services/mobileRouteHandler.ts`。
 
+> **本地构建约束（2026-08-17 新增）**：开发版（Web）/ 桌面版（exe）/ 移动端统一用 `npm run build`（base `/`），产物即 `frontend-react/dist`；桌面 exe 的 spec `datas=[]`，运行时直接从该目录 serve 前端。**`npm run build:pwa`（base `/app/`）仅用于 CI 部署 GitHub Pages，切勿在本地仓库手动执行**——它会用带前缀的 PWA 构建覆盖 `frontend-react/dist`，导致本地 exe 加载到前缀错位的资源而报 MIME / manifest 错误（2026-08-17 已实际触发一次）。本地预览 PWA 同款构建请直接访问线上 GitHub Pages。
+
 ## 2. 跨端改动强制触发条件
 
 满足以下任意条件，**必须**执行第三节的对账脚本并按第四节清单检查：

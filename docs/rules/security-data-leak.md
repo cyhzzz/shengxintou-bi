@@ -44,7 +44,7 @@
 | --- | --- |
 | 修改 `post-sync-patch.ps1` | 第 8 步是否仍生成**空库**而非复制真实库；产物 APK 内置 DB 行数 |
 | 修改 `build-installer.ps1` 或前端打包脚本 | 是否排除 `*.db`；产物 dist 是否含数据库 |
-| 修改 WebDAV 数据同步/备份/restic 相关路由 | 备份对象必须是 `database/shengxintou.db` 本身（本地真实库），与"产物不含数据"不冲突 |
+| 修改 WebDAV 数据同步/备份相关路由 | 备份对象必须是 `database/shengxintou.db` 本身（本地真实库），与"产物不含数据"不冲突 |
 | 上传 GitHub Release 资产 | 上传前确认 APK/EXE/dist 不内置真实库；空库安全版可正常发布 |
 | 安全审计/历史 Release 巡检 | 对已发布 release 逐一核验资产，发现含数据资产立即删除 |
 
