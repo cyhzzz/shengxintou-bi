@@ -15,7 +15,7 @@ const FLASK_URL = `http://${FLASK_HOST}:${FLASK_PORT}`;
 const HEALTH_PATH = '/api/health';
 
 /** 项目根目录：开发模式下是 desktop 的父目录；打包后是 resources 目录。 */
-function resolveProjectRoot(): string {
+export function resolveProjectRoot(): string {
   const cwd = process.cwd();
   if (existsSync(path.join(cwd, '..', 'app.py'))) {
     return path.resolve(cwd, '..');
@@ -34,6 +34,15 @@ function resolveProjectRoot(): string {
   throw new Error(
     `无法定位项目根目录：尝试了 ${cwd}, ${path.resolve(cwd, '..')}, ${fromDist}, ${fromPkg}`
   );
+}
+
+/**
+ * resources 根目录（完整更新暂存/替换的目标目录）。
+ * frozen 下与 resolveProjectRoot 一致（electron-builder 把前端 dist 放在 resources/frontend-react/dist）。
+ * 开发模式下即为项目根（.update-staging 也放在项目根，便于本地联调）。
+ */
+export function resolveResourcesRoot(): string {
+  return resolveProjectRoot();
 }
 
 /**

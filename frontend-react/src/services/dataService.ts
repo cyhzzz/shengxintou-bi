@@ -203,6 +203,21 @@ export const dataService = {
   }>> => {
     return http.get('/system/frontend-update/status', { task_id: taskId });
   },
+  // v3.9.0：Windows 完整静默更新（下载 full-update.zip 并暂存，重启时替换后端+前端+版本号）
+  fullUpdateStart: async (): Promise<ApiResponse<{ task_id: string; message: string }>> => {
+    return http.post('/system/full-update/download', {});
+  },
+  fullUpdateStatus: async (taskId: string): Promise<ApiResponse<{
+    task_id: string;
+    status: string;
+    progress?: number;
+    message?: string;
+    error?: string;
+    data?: { version?: string; staging?: string };
+    log?: string[];
+  }>> => {
+    return http.get('/system/full-update/status', { task_id: taskId });
+  },
   getVersion: async (): Promise<ApiResponse<{
     version: string;
     release_date: string;

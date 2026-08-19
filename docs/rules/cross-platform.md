@@ -139,6 +139,8 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - `/api/v1/webdav/*`（WebDAV 备份管理，仅桌面端）
 - `/api/v1/version/*`（版本检查，仅桌面端）
 - `/api/v1/system/self-update/*`（自更新，仅桌面端）
+- `/api/v1/system/frontend-update/*`（v3.7.0 前端热更新，仅桌面端）
+- `/api/v1/system/full-update/*`（v3.9.0 完整静默更新，仅桌面端 Electron，移动端走重装 APK）
 - `/api/v1/system/data-sync/*`（Supabase 同步，仅桌面端，且 Supabase 功能已封存）
 - `/api/v1/data-reconciliation/*`（抖音青鸟对账，仅桌面端，移动端 features 禁用）
 - `/api/v1/account-mapping*`（账号映射管理，仅桌面端，移动端 features 禁用）

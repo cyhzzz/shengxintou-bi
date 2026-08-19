@@ -29,6 +29,10 @@ import { Capacitor } from '@capacitor/core';
 declare global {
   interface Window {
     desktop?: unknown;
+    desktopUpdater?: {
+      checkStaging: () => Promise<{ ready: boolean; version?: string }>;
+      applyAndRestart: () => Promise<{ ok: boolean; version?: string; error?: string }>;
+    };
     Capacitor?: { isNative?: () => boolean; getPlatform?: () => string; isNativePlatform?: () => boolean };
     androidBridge?: unknown;
     MSStream?: unknown;

@@ -7,9 +7,11 @@
  * - 窗口关闭 / app 退出时 taskkill 进程树
  * - 外链用系统浏览器打开，避免在 Electron 内导航
  */
-import { app, BrowserWindow, shell, dialog, Menu } from 'electron';
+import { app, BrowserWindow, shell, dialog, Menu, ipcMain } from 'electron';
 import path from 'node:path';
-import { startFlask, stopFlask, waitForFlaskHealthy, FLASK_BASE_URL } from './flask-manager';
+import fs from 'node:fs';
+import { startFlask, stopFlask, waitForFlaskHealthy, FLASK_BASE_URL, resolveResourcesRoot } from './flask-manager';
+import { applyFullUpdate } from './updater';
 
 let mainWindow: BrowserWindow | null = null;
 let flaskChild: ReturnType<typeof startFlask> | null = null;
@@ -93,7 +95,66 @@ function createWindow(): void {
 // 用默认菜单（含 DevTools / Reload / 退出快捷键），方便调试
 Menu.setApplicationMenu(null);
 
-app.whenReady().then(bootstrap);
+/**
+ * 完整静默更新 IPC（v3.9.0）。
+ *
+ * updater:check-staging → { ready, version? }
+ *   - 查询 resources/.update-staging/ 是否存在已下载的完整更新包
+ * updater:apply → { ok, version?, error? }
+ *   - 应用完整更新：停 Flask → 从 staging 替换 server/ + dist/ + version.json → 重启 Flask → 刷新窗口
+ */
+function registerUpdaterIpc(): void {
+  ipcMain.handle('updater:check-staging', () => {
+    try {
+      const root = resolveResourcesRoot();
+      const staging = path.join(root, '.update-staging');
+      if (!fs.existsSync(path.join(staging, 'server', 'server.exe'))) return { ready: false };
+      const raw = fs.readFileSync(path.join(staging, 'version.json'), 'utf-8');
+      const version = String(JSON.parse(raw).version || '');
+      return { ready: true, version };
+    } catch {
+      return { ready: false };
+    }
+  });
+
+  ipcMain.handle('updater:apply', async () => {
+    try {
+      const root = resolveResourcesRoot();
+      // 1. 先停 Flask（server.exe 运行时被占用，必须先停才能替换）
+      if (flaskChild) {
+        stopFlask(flaskChild);
+        flaskChild = null;
+      }
+      // 2. 执行替换（staging → resources 三块），失败则保留现场
+      const result = applyFullUpdate(root);
+      if (!result.ok) {
+        // 替换失败：尝试恢复 Flask，避免用户卡在无后端状态
+        try {
+          flaskChild = startFlask();
+          await waitForFlaskHealthy(60_000);
+        } catch { /* 后端恢复失败仅记日志 */ }
+        if (mainWindow) mainWindow.loadURL(FLASK_BASE_URL);
+        return { ok: false, error: result.error };
+      }
+      // 3. 替换成功：重启 Flask + 刷新窗口（等效"重启应用生效"）
+      flaskChild = startFlask();
+      await waitForFlaskHealthy(60_000);
+      if (mainWindow) {
+        mainWindow.loadURL(FLASK_BASE_URL);
+      } else {
+        createWindow();
+      }
+      return { ok: true, version: result.version };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+}
+
+app.whenReady().then(() => {
+  registerUpdaterIpc();
+  bootstrap();
+});
 
 app.on('window-all-closed', () => {
   stopFlask(flaskChild);

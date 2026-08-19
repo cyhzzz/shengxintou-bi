@@ -168,6 +168,61 @@ if (-not $SkipFrontend) {
 }
 
 # ============================================================================
+# 阶段 2.5：产出 full-update.zip（Windows 桌面版完整静默更新包）
+#   - 内含 server/（PyInstaller onedir 产物）+ frontend-react/dist/ + version.json
+#   - zip 结构与 exe 内 resources/ 布局一致：解压后可直接替换这三块
+#   - 客户端 self_update.py 下载此包 → 重启时整体替换 → 后端+前端+版本号一起更新
+# ============================================================================
+if (-not $SkipPyInstaller -or -not $SkipFrontend) {
+  Write-Step '阶段 2.5/3：打包 full-update.zip（完整静默更新包）'
+  $serverDir = Join-Path $ROOT 'dist\server'
+  if (-not (Test-Path $serverDir)) {
+    Write-Err "full-update.zip 需要 server/（PyInstaller 产物），但 $serverDir 不存在"
+    exit 1
+  }
+  $updateTmp = Join-Path $ROOT 'logs\full-update-tmp'
+  if (Test-Path $updateTmp) { Remove-Item $updateTmp -Recurse -Force }
+  New-Item -ItemType Directory -Force -Path $updateTmp | Out-Null
+  try {
+    # 组装 resources 同构目录：server/ + backend/ + app.py + config.py + frontend-react/dist/ + version.json
+    # （与 electron-builder.yml extraResources 运行时布局一致；不打包 app.asar/icon/.env.example/elevate.exe）
+    $dstServer = Join-Path $updateTmp 'server'
+    $dstBackend = Join-Path $updateTmp 'backend'
+    $dstDistRoot = Join-Path $updateTmp 'frontend-react'
+    New-Item -ItemType Directory -Force -Path $dstServer | Out-Null
+    New-Item -ItemType Directory -Force -Path $dstBackend | Out-Null
+    New-Item -ItemType Directory -Force -Path $dstDistRoot | Out-Null
+    Copy-Item -Path (Join-Path $serverDir '*') -Destination $dstServer -Recurse -Force
+    Copy-Item -Path (Join-Path $ROOT 'backend\*') -Destination $dstBackend -Recurse -Force
+    Copy-Item -Path (Join-Path $ROOT 'app.py') -Destination $updateTmp -Force
+    Copy-Item -Path (Join-Path $ROOT 'config.py') -Destination $updateTmp -Force
+    Copy-Item -Path (Join-Path $distDir '*') -Destination (Join-Path $dstDistRoot 'dist') -Recurse -Force
+    Copy-Item -Path (Join-Path $ROOT 'version.json') -Destination $updateTmp -Force
+
+    $fullUpdateZip = Join-Path $releaseDir 'full-update.zip'
+    if (Test-Path $fullUpdateZip) { Remove-Item $fullUpdateZip -Force }
+    Write-Info '打包 full-update.zip（Release asset，用于 Windows 完整静默更新）...'
+    Push-Location $updateTmp
+    try {
+      Compress-Archive -Path './*' -DestinationPath $fullUpdateZip -CompressionLevel Optimal -Force
+    } finally {
+      Pop-Location
+    }
+    if (Test-Path $fullUpdateZip) {
+      $zipSizeMB = [math]::Round((Get-Item $fullUpdateZip).Length / 1MB, 1)
+      Write-OK "full-update.zip 生成成功 ($zipSizeMB MB)"
+    } else {
+      Write-Err 'full-update.zip 未生成（Compress-Archive 静默失败）'
+      exit 1
+    }
+  } finally {
+    if (Test-Path $updateTmp) { Remove-Item $updateTmp -Recurse -Force }
+  }
+} else {
+  Write-Step '阶段 2.5/3：跳过 full-update.zip（-SkipPyInstaller + -SkipFrontend）'
+}
+
+# ============================================================================
 # 阶段 3：electron-builder 打 NSIS 安装包
 # ============================================================================
 Write-Step '阶段 3/3：electron-builder 打 NSIS 安装包'

@@ -127,6 +127,7 @@ jobs:
           Get-ChildItem desktop/release | Select-Object Name, Length
           if (-not (Get-ChildItem desktop/release -Filter '*Setup*.exe' -ErrorAction SilentlyContinue)) { throw 'Setup exe not found' }
           if (-not (Test-Path desktop/release/frontend-dist.zip)) { throw 'frontend-dist.zip not found' }
+          if (-not (Test-Path desktop/release/full-update.zip)) { throw 'full-update.zip not found' }
 
       - name: Upload exe artifacts
         uses: actions/upload-artifact@v4
@@ -135,6 +136,7 @@ jobs:
           path: |
             desktop/release/*Setup*.exe
             desktop/release/frontend-dist.zip
+            desktop/release/full-update.zip
           if-no-files-found: error
 
   build-apk:
@@ -283,7 +285,7 @@ jobs:
         shell: bash
         run: |
           TAG="${{ needs.gate.outputs.tag }}"
-          python3 -c 'import json,sys;tag=sys.argv[1];d=json.load(open("version.json",encoding="utf-8"));ver=tag.lstrip("v");entry=next((c for c in d.get("changelog",[]) if c.startswith(tag)),"（version.json.changelog 中未找到本版本条目，请在 Release 页补充）");date=d.get("release_date","");body=["## %s · 省心投 BI"%tag,"",entry,""]+(["发布日期：%s"%date,""] if date else [])+["### 下载","","- Windows 桌面安装包：`shengxintou-bi-setup-%s.exe`"%ver,"- Android APK：`shengxintou-v%s.apk`"%ver,"- 前端热更新包：`frontend-dist.zip`"];open("release_body.md","w",encoding="utf-8").write("\n".join(body));print("release body generated: %d lines"%len(body))' "$TAG"
+          python3 -c 'import json,sys;tag=sys.argv[1];d=json.load(open("version.json",encoding="utf-8"));ver=tag.lstrip("v");entry=next((c for c in d.get("changelog",[]) if c.startswith(tag)),"（version.json.changelog 中未找到本版本条目，请在 Release 页补充）");date=d.get("release_date","");body=["## %s · 省心投 BI"%tag,"",entry,""]+(["发布日期：%s"%date,""] if date else [])+["### 下载","","- Windows 桌面安装包：`shengxintou-bi-setup-%s.exe`"%ver,"- Windows 完整更新包（静默更新用）：`full-update.zip`","- Android APK：`shengxintou-v%s.apk`"%ver,"- 前端热更新包：`frontend-dist.zip`"];open("release_body.md","w",encoding="utf-8").write("\n".join(body));print("release body generated: %d lines"%len(body))' "$TAG"
           echo "body preview:" && cat release_body.md
 
       - name: Publish release assets
@@ -294,5 +296,6 @@ jobs:
           files: |
             artifacts/exe/*setup*.exe
             artifacts/exe/frontend-dist.zip
+            artifacts/exe/full-update.zip
             artifacts/apk/*.apk
           fail_on_unmatched_files: true

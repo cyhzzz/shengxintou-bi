@@ -58,6 +58,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   // - 移动版：同步调用 Capacitor Updater，无轮询（直接 onProgress 推进）
   const [frontendUpdateBusy, setFrontendUpdateBusy] = useState(false);
   const [frontendUpdateTaskId, setFrontendUpdateTaskId] = useState<string | null>(null);
+  // v3.9.0：Windows 完整静默更新（后端+前端+版本号一起，重启生效）
+  const [fullUpdateBusy, setFullUpdateBusy] = useState(false);
+  const [fullUpdateTaskId, setFullUpdateTaskId] = useState<string | null>(null);
+  const [stagingReady, setStagingReady] = useState<{ ready: boolean; version?: string }>({ ready: false });
+  const [applyingFullUpdate, setApplyingFullUpdate] = useState(false);
 
   const dataFreshnessRef = useRef<DataFreshnessIndicatorRef>(null);
   const {
@@ -132,6 +137,57 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     } catch (e: any) {
       antdMessage.error("启动前端热更新异常：" + (e?.message || e));
       setFrontendUpdateBusy(false);
+    }
+  };
+
+  // v3.9.0：完整静默更新（桌面版 Electron）——
+  //   staging 已就绪 → 直接提示重启；未就绪 → 调后端下载 full-update.zip 并轮询
+  const checkFullUpdateStaging = async () => {
+    if (!isDesktopClient() || !window.desktopUpdater) return;
+    try {
+      const s = await window.desktopUpdater.checkStaging();
+      setStagingReady(s);
+    } catch {
+      setStagingReady({ ready: false });
+    }
+  };
+
+  const startFullUpdate = async () => {
+    setFullUpdateBusy(true);
+    setUpdateProgress(5);
+    setUpdateStage("准备完整更新...");
+    setUpdateLog([]);
+    setUpdateResult(null);
+    try {
+      const r = await dataService.fullUpdateStart();
+      if (!r.success || !r.data) {
+        antdMessage.error(r.message || "启动完整更新失败");
+        setFullUpdateBusy(false);
+        return;
+      }
+      setFullUpdateTaskId(r.data.task_id);
+    } catch (e: any) {
+      antdMessage.error("启动完整更新异常：" + (e?.message || e));
+      setFullUpdateBusy(false);
+    }
+  };
+
+  const applyFullUpdateAndRestart = async () => {
+    if (!window.desktopUpdater) return;
+    setApplyingFullUpdate(true);
+    setUpdateStage("正在应用更新并重启服务...");
+    try {
+      const res = await window.desktopUpdater.applyAndRestart();
+      if (res?.ok) {
+        antdMessage.success(`已更新到 v${res.version || ""}，正在刷新...`);
+        setStagingReady({ ready: false });
+      } else {
+        antdMessage.error("应用更新失败：" + (res?.error || "未知错误"));
+      }
+    } catch (e: any) {
+      antdMessage.error("应用更新异常：" + (e?.message || e));
+    } finally {
+      setApplyingFullUpdate(false);
     }
   };
 
@@ -258,6 +314,51 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   useEffect(() => {
     if (frontendUpdateTaskId) setUpdateModalOpen(true);
   }, [frontendUpdateTaskId]);
+
+  // v3.9.0：完整更新下载轮询（桌面版）——完成后检查 staging 就绪
+  useEffect(() => {
+    if (!fullUpdateTaskId) return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const r = await dataService.fullUpdateStatus(fullUpdateTaskId);
+        if (cancelled) return;
+        if (r.success && r.data) {
+          const d = r.data;
+          setUpdateStage(d.message || "");
+          setUpdateLog(d.log || []);
+          setUpdateProgress(d.progress ?? 50);
+          if (d.status === "completed") {
+            setUpdateResult({ status: "success", message: d.message });
+            setUpdateProgress(100);
+            setFullUpdateBusy(false);
+            setFullUpdateTaskId(null);
+            await checkFullUpdateStaging();
+            antdMessage.success("完整更新包已就绪，点击「重启应用生效」即可应用。");
+            return;
+          } else if (d.status === "failed") {
+            setUpdateResult({ status: "failed", message: d.message, error: d.error });
+            setFullUpdateBusy(false);
+            setFullUpdateTaskId(null);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("poll full-update failed", e);
+      }
+      setTimeout(tick, 1500);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [fullUpdateTaskId]);
+
+  // v3.9.0：打开帮助 Modal 时检查是否有已下载待应用的完整更新
+  useEffect(() => {
+    if (visible) checkFullUpdateStaging();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   return (
     <>
@@ -398,8 +499,32 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                       {featureFlags.showGithubSyncButton && (
                         isDesktopClient() ? (
                           <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                            {hasUpdate && (
+                              stagingReady.ready ? (
+                                <Button
+                                  type="primary"
+                                  icon={<CloudDownloadOutlined />}
+                                  loading={applyingFullUpdate}
+                                  onClick={applyFullUpdateAndRestart}
+                                  className={styles.updateBtn}
+                                  block
+                                >
+                                  重启应用生效（v{stagingReady.version || remoteVersion}）
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="primary"
+                                  icon={<CloudDownloadOutlined />}
+                                  loading={fullUpdateBusy}
+                                  onClick={startFullUpdate}
+                                  className={styles.updateBtn}
+                                  block
+                                >
+                                  下载并更新到 v{remoteVersion}（后端+前端，重启生效）
+                                </Button>
+                              )
+                            )}
                             <Button
-                              type="primary"
                               icon={<CloudDownloadOutlined />}
                               loading={frontendUpdateBusy}
                               onClick={startFrontendUpdate}

@@ -433,3 +433,132 @@ def frontend_update_status():
         return jsonify({"success": False, "error": "TASK_NOT_FOUND", "message": "任务不存在或已过期"}), 404
     with _update_lock:
         return jsonify({"success": True, "data": {"task_id": task_id, **_update_tasks[task_id]}})
+
+
+# ============================================================================
+# Windows 完整静默更新（v3.9.0）
+# 从 GitHub Release 下载 full-update.zip（server/ + frontend-react/dist/ + version.json），
+# 解压校验后暂存到 resources/.update-staging/，由 Electron 主进程在重启时替换。
+# 设计边界：
+#   - 后端只负责「下载 + 校验 + 暂存」，不做自我替换（server.exe 运行时被占用）。
+#   - 替换动作由 Electron 主进程执行：停 Flask → 从 staging 覆盖 resources 三块 → 重启 Flask → 刷新窗口。
+#   - 替代并废弃旧的 frontend-update（仅前端，不更新后端与版本号）。
+# ============================================================================
+
+_FULL_UPDATE_ZIP_URL = "https://github.com/cyhzzz/shengxintou-bi/releases/latest/download/full-update.zip"
+_FULL_UPDATE_STAGING_DIR = ".update-staging"
+
+
+def _staging_dir() -> str:
+    """resources/.update-staging（frozen 下 project_root = resources/）。"""
+    return os.path.join(_project_root(), _FULL_UPDATE_STAGING_DIR)
+
+
+def _validate_full_update_zip(zf: zipfile.ZipFile) -> dict:
+    """校验 full-update.zip 结构，返回其中 version.json 内容。"""
+    names = zf.namelist()
+    # 与 Electron updater.ts REQUIRED_STAGING 对齐：完整更新需含全部运行时资产
+    required = [
+        ("server/server.exe", "server/"),
+        ("backend/routes/version.py", "backend/"),
+        ("app.py", "app.py"),
+        ("config.py", "config.py"),
+        ("frontend-react/dist/index.html", "frontend-react/dist/"),
+        ("version.json", "version.json"),
+    ]
+    missing = [label for needle, label in required if not any(n.startswith(needle) for n in names)]
+    if missing:
+        raise ValueError("full-update.zip 结构不完整，缺少: " + ", ".join(missing))
+    try:
+        raw = zf.read("version.json").decode("utf-8")
+        import json  # 局部 import（与 _read_version_json 一致，顶部未导入 json）
+        version_data = json.loads(raw)
+    except Exception as e:
+        raise ValueError("full-update.zip 内 version.json 解析失败: " + str(e)) from e
+    return version_data
+
+
+def _do_full_update_download(task_id):
+    """下载 full-update.zip → 校验 → 解压到 .update-staging（异步线程）。"""
+    log_lines = []
+
+    def _log(msg):
+        log_lines.append(msg)
+        logger.info(f"[full-update:{task_id}] {msg}")
+
+    try:
+        with _update_lock:
+            _update_tasks[task_id].update({"status": "running", "progress": 5, "message": "排队中..."})
+
+        staging = _staging_dir()
+        # 清理旧暂存，避免残留脏数据
+        if os.path.exists(staging):
+            shutil.rmtree(staging)
+        os.makedirs(staging, exist_ok=True)
+
+        _log(f"下载 {_FULL_UPDATE_ZIP_URL} ...")
+        with _update_lock:
+            _update_tasks[task_id].update({"progress": 15, "message": "正在下载完整更新包..."})
+
+        req = urllib.request.Request(_FULL_UPDATE_ZIP_URL, headers={"User-Agent": "shengxintou-bi-updater/1.0"})
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            zip_data = resp.read()
+        _log(f"下载完成: {len(zip_data)} bytes ({round(len(zip_data)/1024/1024, 1)} MB)")
+        with _update_lock:
+            _update_tasks[task_id].update({"progress": 50, "message": "下载完成，正在校验更新包..."})
+
+        # 校验 zip 结构 + 版本
+        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+            version_data = _validate_full_update_zip(zf)
+            _log(f"更新包版本: v{version_data.get('version')}")
+            with _update_lock:
+                _update_tasks[task_id].update({"progress": 65, "message": "校验通过，正在解压..."})
+            zf.extractall(staging)
+
+        _log(f"已解压到 {staging}")
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "completed",
+                "progress": 100,
+                "message": "完整更新包已就绪，重启应用后生效。",
+                "data": {"version": version_data.get("version"), "staging": staging},
+                "log": log_lines,
+            })
+    except Exception as e:
+        _log(f"完整更新下载失败: {e}")
+        with _update_lock:
+            _update_tasks[task_id].update({
+                "status": "failed",
+                "progress": 0,
+                "message": f"完整更新下载失败: {e}",
+                "log": log_lines,
+            })
+
+
+@bp.route("/full-update/download", methods=["POST"])
+@handle_exceptions
+def start_full_update_download():
+    """启动完整静默更新：下载 full-update.zip 并暂存到 .update-staging。"""
+    task_id = str(uuid.uuid4())
+    with _update_lock:
+        _update_tasks[task_id] = {
+            "status": "running",
+            "progress": 5,
+            "message": "排队中...",
+            "log": [],
+            "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        }
+    thread = threading.Thread(target=_do_full_update_download, args=(task_id,), daemon=True)
+    thread.start()
+    return jsonify({"success": True, "data": {"task_id": task_id, "message": "完整更新下载任务已启动"}})
+
+
+@bp.route("/full-update/status", methods=["GET"])
+@handle_exceptions
+def full_update_status():
+    """查询完整更新下载状态。前端 1s 轮询。"""
+    task_id = request.args.get("task_id", "").strip()
+    if not task_id or task_id not in _update_tasks:
+        return jsonify({"success": False, "error": "TASK_NOT_FOUND", "message": "任务不存在或已过期"}), 404
+    with _update_lock:
+        return jsonify({"success": True, "data": {"task_id": task_id, **_update_tasks[task_id]}})

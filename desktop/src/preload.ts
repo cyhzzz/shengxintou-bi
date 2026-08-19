@@ -1,15 +1,21 @@
 /**
- * preload 脚本：最小化暴露，目前无 IPC 接口。
+ * preload 脚本：暴露桌面端能力给渲染进程。
  *
- * 后续如需加：
- * - 版本号查询
- * - 强制刷新
- * - 退出应用
- * 可在 contextBridge.exposeInMainWorld 中加。
+ * window.desktopUpdater（v3.9.0）：
+ *   - checkStaging(): 查询是否有已下载待应用的完整更新
+ *   - applyAndRestart(): 应用完整更新（停 Flask → 替换 → 重启 Flask → 刷新窗口）
+ *     resolve(data)：{ ok, version?, error? }
  */
-import { contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('desktop', {
   version: '0.1.0',
   platform: process.platform,
+});
+
+contextBridge.exposeInMainWorld('desktopUpdater', {
+  checkStaging: (): Promise<{ ready: boolean; version?: string }> =>
+    ipcRenderer.invoke('updater:check-staging'),
+  applyAndRestart: (): Promise<{ ok: boolean; version?: string; error?: string }> =>
+    ipcRenderer.invoke('updater:apply'),
 });
