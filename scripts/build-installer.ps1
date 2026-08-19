@@ -189,14 +189,15 @@ if (-not $SkipPyInstaller -or -not $SkipFrontend) {
     $dstServer = Join-Path $updateTmp 'server'
     $dstBackend = Join-Path $updateTmp 'backend'
     $dstDistRoot = Join-Path $updateTmp 'frontend-react'
+    $dstDist = Join-Path $dstDistRoot 'dist'
     New-Item -ItemType Directory -Force -Path $dstServer | Out-Null
     New-Item -ItemType Directory -Force -Path $dstBackend | Out-Null
-    New-Item -ItemType Directory -Force -Path $dstDistRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $dstDist | Out-Null
     Copy-Item -Path (Join-Path $serverDir '*') -Destination $dstServer -Recurse -Force
     Copy-Item -Path (Join-Path $ROOT 'backend\*') -Destination $dstBackend -Recurse -Force
     Copy-Item -Path (Join-Path $ROOT 'app.py') -Destination $updateTmp -Force
     Copy-Item -Path (Join-Path $ROOT 'config.py') -Destination $updateTmp -Force
-    Copy-Item -Path (Join-Path $distDir '*') -Destination (Join-Path $dstDistRoot 'dist') -Recurse -Force
+    Copy-Item -Path (Join-Path $distDir '*') -Destination $dstDist -Recurse -Force
     Copy-Item -Path (Join-Path $ROOT 'version.json') -Destination $updateTmp -Force
 
     $fullUpdateZip = Join-Path $releaseDir 'full-update.zip'
