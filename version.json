@@ -1,9 +1,10 @@
 {
-    "version": "3.8.9",
-    "release_date": "2026-08-17",
+    "version": "3.9.0",
+    "release_date": "2026-08-19",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v3.9.0 Windows 完整静默更新：release 新增 full-update.zip（server/backend/app/config/frontend-dist/version.json 六块运行时资产），应用内一键下载并重启生效（后端+前端+版本号一起更新，修复此前热更新后 version 不更新），Electron 主进程停 Flask 替换失败回滚",
         "v3.8.9 修复厂商分析/投放评审合计行「单企微成本 / 单APP激活成本」双链路混算（叶级按链路分别取分子，与总览单企微成本口径对齐），并补「本地禁跑 build:pwa」规则与清理一处安全文档遗留词",
         "v3.8.8 APK 改为固定 release 签名密钥（GitHub Secrets 注入，CI 跨版本复用同一密钥），支持原地覆盖升级；旧版因签名不同需卸载一次后再装",
         "v3.8.7 移动端修复合集（应用市场漏斗开户成功口径同步、主播聚类趋势复合来源均分补齐、启用上传大小限制并对齐版本号）",
