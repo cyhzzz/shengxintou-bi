@@ -202,7 +202,7 @@ function _rate4(numerator: number, denominator: number): number {
 
 export async function handleAppMarketAttributionConversion(body: any): Promise<any> {
   const filters = body?.filters || {};
-  const platform = filters.platform || '全部';
+  const platforms = filters.platforms || [];
   const { start_date: sd, end_date: ed } = getDateRange(filters);
 
   // 平台列表（与后端 available_platforms 一致：表中实际存在的去重值）
@@ -211,8 +211,8 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
   const available_platforms = platformRows.map((r) => String(r.p)).sort((a, b) => a.localeCompare(b, 'zh'));
 
   const conditions: ({ sql: string; params: unknown[] } | null)[] = [];
-  if (platform && platform !== '全部') {
-    conditions.push({ sql: '"应用市场" = ?', params: [platform] });
+  if (platforms.length > 0) {
+    conditions.push(inClause('应用市场', platforms));
   }
   conditions.push(dateClause('下载日期', sd, ed));
   const whereClause = buildWhere(conditions.filter(Boolean) as { sql: string; params: unknown[] }[]);
@@ -294,7 +294,7 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
     daily_data,
     weekly_data,
     platforms: available_platforms,
-    platform,
+    selected_platforms: platforms,
   };
 }
 
