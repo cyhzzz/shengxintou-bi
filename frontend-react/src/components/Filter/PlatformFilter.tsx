@@ -24,21 +24,19 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
   options,
 }) => {
   const { selectedPlatforms, setPlatforms } = useFilterStore();
-  const [platformOptions, setPlatformOptions] = useState<{value: string; label: string}[]>([]);
+  const [metadataOptions, setMetadataOptions] = useState<{value: string; label: string}[]>([]);
 
-  // 外部传入 options 时优先使用；否则从 metadata 加载平台列表
+  // 外部传入 options 时优先使用；否则从 metadata 异步加载平台列表
+  const platformOptions = (options && options.length > 0) ? options : metadataOptions;
+
   useEffect(() => {
-    if (options && options.length > 0) {
-      setPlatformOptions(options);
-      return;
-    }
-    const loadPlatforms = async () => {
-      const response = await metadataService.getMetadata();
-      if (response.success && response.data) {
-        setPlatformOptions((response.data.platforms || []).map((p: string) => ({ value: p, label: p })));
-      }
-    };
-    loadPlatforms();
+    if (options && options.length > 0) return;
+    let cancelled = false;
+    metadataService.getMetadata().then((response) => {
+      if (cancelled || !response.success || !response.data) return;
+      setMetadataOptions((response.data.platforms || []).map((p: string) => ({ value: p, label: p })));
+    });
+    return () => { cancelled = true; };
   }, [options]);
 
   const handleChange = (values: string[]) => {

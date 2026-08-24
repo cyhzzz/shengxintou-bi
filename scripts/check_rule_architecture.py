@@ -14,7 +14,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / 'AGENTS.md'
 CLAUDE = ROOT / 'CLAUDE.md'
-WORKSPACE_MEMORY = ROOT.parent / '.workbuddy' / 'memory' / 'MEMORY.md'
+WORKSPACE_MEMORY = ROOT / '.workbuddy' / 'memory' / 'MEMORY.md'
 RULES = ROOT / 'docs' / 'rules'
 PROMPT = ROOT / 'docs' / '6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md'
 MAX_LINES = 220

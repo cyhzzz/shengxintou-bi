@@ -77,7 +77,8 @@ FUNNEL_STAGES = [
     ('身份证上传量', FactConvAppmarket.是否注册身份证 == 1),
     ('银行卡上传量', FactConvAppmarket.是否注册银行卡 == 1),
     ('开户提交量', FactConvAppmarket.是否提交开户 == 1),
-    ('开户成功量', FactConvAppmarket.是否开户成功 == 1),
+    # 开户成功阶段口径：必须用「是否创建完资金账号」（business-invariants.md 第3节）
+    ('开户成功量', FactConvAppmarket.是否创建完资金账号 == 1),
 ]
 
 
@@ -387,9 +388,12 @@ def _plan_week_analysis(markets, start_date, end_date, week_start):
             _count_devices(FactConvAppmarket.是否注册身份证 == 1).label('id_card'),
             _count_devices(FactConvAppmarket.是否注册银行卡 == 1).label('bank_card'),
             _count_devices(FactConvAppmarket.是否提交开户 == 1).label('submit'),
-            _count_devices(FactConvAppmarket.是否开户成功 == 1).label('success'),
+            _count_devices(FactConvAppmarket.是否创建完资金账号 == 1).label('success'),
             _count_devices(AD_ACCOUNT_CONDITIONS).label('ad_account'),
-        ).filter(FactConvAppmarket.广告计划ID.in_(plan_ids))
+        ).filter(
+            FactConvAppmarket.广告计划ID.in_(plan_ids),
+            FactConvAppmarket.渠道类型 == '互联网引流',
+        )
         if start_date:
             fact_q = fact_q.filter(FactConvAppmarket.下载日期 >= start_date)
         if end_date:

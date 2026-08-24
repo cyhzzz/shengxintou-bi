@@ -259,7 +259,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       } else {
         message.error(res?.message || '加载失败');
       }
-    } catch (e) {
+    } catch (_e) {
       message.error('加载失败');
     } finally {
       setLoading(false);

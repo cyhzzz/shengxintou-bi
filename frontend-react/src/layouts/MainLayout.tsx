@@ -99,7 +99,7 @@ const menuItems: MenuProps['items'] = [
       { key: '/app-market/cost-analysis', label: '消耗和成本', icon: <DollarOutlined /> },
       // v3.7.3: 归因转化率分析
       { key: '/app-market/attribution-conversion', label: '归因转化率', icon: <RiseOutlined /> },
-      // v3.8.2: 广告计划分析（计划分解 + 下载链路 + 消耗）
+      // v3.9.1: 广告计划分析（计划分解 + 下载链路 + 消耗）
       { key: '/app-market/ad-plan-analysis', label: '广告计划分析', icon: <FileDoneOutlined /> },
     ],
   },
