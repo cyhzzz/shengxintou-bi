@@ -7,6 +7,7 @@ import { Card, Button, Space, Table, Modal, message, Alert, Spin, Tag, Form, Inp
 import { CloudUploadOutlined, ReloadOutlined, DeleteOutlined, CloudDownloadOutlined, WifiOutlined, SyncOutlined, SettingOutlined, ApiOutlined } from '@ant-design/icons';
 import BackupProgress from './components/BackupProgress';
 import VersionUpdateModal from './components/VersionUpdateModal';
+import TableSyncCard from './components/TableSyncCard';
 import { http } from '@/services/http';
 import { dataServiceWebdav, dataServiceSync, type WebdavSyncStatus, type SyncStatus, type SyncResult, type WebdavConfig } from '@/services/dataService';
 import type {
@@ -666,6 +667,9 @@ const DatabaseBackupPage: React.FC = () => {
           }
         />
       </Card>
+
+      {/* 逐表同步卡片（v3.9.3：WebDAV 逐表上传/下载，无身份全等权限） */}
+      <TableSyncCard />
 
       {/* 双向同步卡片（SQLite ↔ Supabase PG） */}
       <Card className={styles.dbSyncCard}>

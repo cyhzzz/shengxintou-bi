@@ -651,6 +651,12 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
             cur = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
             n = cur.fetchone()[0]
             written[table_name] = n
+            # v3.9.3：记录本机最近一次改动该表的时间戳，供 WebDAV 逐表同步做"版本新者胜"
+            try:
+                from backend.utils.table_sync import set_table_watermark
+                set_table_watermark(table_name)
+            except Exception as wm_err:  # 打点失败不阻断导入
+                logger.warning('更新表 watermark 失败: %s', wm_err)
     if local_engine:
         # 释放本地创建的 engine 连接池（脚本/测试直跑场景），
         # 避免 SQLite 文件句柄残留导致文件被占用；共享 db.engine 不处理。

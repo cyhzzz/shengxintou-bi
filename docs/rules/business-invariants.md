@@ -177,7 +177,24 @@
 - 多候选时选日期差最小记录；批次筛选只限制青鸟侧数据。
 - 标志位转换和差异判定由后端完成，前端展示后端结果，不自行重算匹配状态。
 
-## 10. 数据安全（分发产物与数据可见性）
+## 10. WebDAV 逐表同步（无身份全等权限）
+
+逐表同步是把 WebDAV 整库快照拆成「每张业务表一个独立 `.db` 文件 + 表级清单 `tables/manifest.json`」，让不同同事各自增量上传自己改动的表，云端各表保持独立最新。
+
+- **权威实现**：`backend/utils/table_sync.py`（`SYNC_TABLES` / 版本计算 / 单表导出合并）、`backend/routes/webdav_backup.py`（`/webdav/tables/manifest|upload|download`）。
+- **业务可同步表 = `SYNC_TABLES`（8 张）**：`dim_account`、`dim_ad_plan_class`、`fact_conv_content`、`fact_conv_appmarket`、`agg_vendor_daily`、`agg_xhs_note`、`agg_daily_channel_open`、`fact_qingniao_leads`。
+- **无身份、全等权限**：不做登录/负责人/表归属模型；任何用户对本机表都是等权限，冲突全靠版本信号解决。
+- **版本信号（混合）**：优先本机「最近一次写入/导入该表时间戳」watermark（`YYYYMMDD_HHMMSS`，`raw_import.py` 写入层打点）；事实/聚合表无 watermark 时兜底 `MAX(业务日期)`；维表无 watermark 时有数据返回初始化版本 `'0'`（存在即初始化，可首次上传），空表才返回 `None`。
+- **冲突策略「新者胜、等者不动」**：上传时本地版本严格**新于**云端才覆盖，否则跳过保留云端；下载时云端严格**新于**本地才覆盖，否则保留本地。相等版本互不覆盖。
+- **单表为整表快照**：导出 `DROP+CREATE+INSERT` 全量（非行级 diff）；不参与任何业务口径/规范化（与 `raw_import` 边界一致）。
+- **向下兼容（老同事未升级怎么办）**：整库 `.db` 快照 + `latest_backup.txt` 链路完全保留，老客户端照常、新逐表端点独立不依赖老表结构。老/新客户端路径**分目录并存**：老整库写 `{backup_dir}/backup_*.db`，新逐表写 `{backup_dir}/tables/table_sync/{table}.db`，文件名/路径不冲突、不会互相覆盖；`list_backups` 只列 backup_dir 首层 `.db/.db.gz`，`tables/` 目录不会被误判成备份。
+- **双向新老兼容**：
+  - **上传**：新客户端逐表上传成功后，会**连同再 push 一份最新整库快照**（`_push_whole_snapshot`），老版本同事只读整库 + `latest_backup.txt`，也能拉到新客户端更新的数据；快照同步失败仅记录 `__whole_snapshot__`，不阻断逐表结果。全员未升级期间云端会是「整库快照（随上传刷新）+ 逐表文件」两份，以逐表为准、整库供老客户端兜底。
+  - **下载**：在逐表文件基础上，还会检查云端最新整库快照里**该表的最新业务日期**（`snapshot_table_max_date`，仅事实/聚合表有可比日期）。若老整库该表日期**严格新于**云端逐表版本（说明老同事整库 push 了更新的数据），则从快照拆分该表合并入库（`from='snapshot'`）；否则仍以逐表为准。任何来源都不覆盖本地更新的版本（新者胜、等者不动），避免旧整库反向覆盖新逐表。
+- **维表初始化版本**：升级本版（引入逐表）时维表（无 watermark 但有数据）自动打初始化版本 `'0'` 使其也能首次上传；任何真实导入 watermark 都比它新。
+- **最终一致**：跨表（如广告计划三表联查）为最终一致，非强一致；不同表可能来自不同同事的最新版本。
+
+## 11. 数据安全（分发产物与数据可见性）
 
 业务口径不变式之上，另有**最高风险安全红线**独立约束"数据在打包、发布、数据库初始化链路上的可见性"：APK/EXE/frontend-dist.zip 一律只内置表结构空库，真实业务库禁止进入分发产物与 Release 资产，仅由用户自行配置 WebDAV 从坚果云拉取；历史含数据 Release 资产必须清理；仓库保持 PUBLIC（不靠私有化兜底）。完整规则见 [`docs/rules/security-data-leak.md`](security-data-leak.md)。涉及打包、发布或数据库初始化的改动必须先读。
 

@@ -304,6 +304,60 @@ export const dataServiceWebdav = {
   },
 };
 
+// v3.9.3：WebDAV 逐表同步（无身份、全等权限，版本新者胜）
+//   后端端点：/webdav/tables/manifest、/webdav/tables/upload、/webdav/tables/download
+export interface TableSyncEntry {
+  version: string | null;
+  rows: number;
+}
+export interface TableSyncManifestData {
+  not_configured: boolean;
+  local: Record<string, TableSyncEntry>;
+  cloud: Record<string, TableSyncEntry>;
+  schema_version?: string;
+}
+export interface TableSyncResultRow {
+  status: 'uploaded' | 'downloaded' | 'skipped' | 'error';
+  version?: string;
+  rows?: number;
+  reason?: string;
+  message?: string;
+  from?: 'snapshot';
+  filename?: string;
+  size?: number;
+}
+export interface TableSyncOpResult {
+  results: Record<string, TableSyncResultRow>;
+}
+export interface TableSyncMeta {
+  name: string;
+  label: string;
+  type: 'dim' | 'fact';
+}
+// 逐表同步的业务表清单（与后端 table_sync.SYNC_TABLES 顺序/中文名一致）
+export const SYNC_TABLE_META: TableSyncMeta[] = [
+  { name: 'dim_account', label: '代理商账号', type: 'dim' },
+  { name: 'dim_ad_plan_class', label: '广告计划分类', type: 'dim' },
+  { name: 'fact_conv_content', label: '内容线索', type: 'fact' },
+  { name: 'fact_conv_appmarket', label: '应用市场转化', type: 'fact' },
+  { name: 'agg_vendor_daily', label: '渠道日报', type: 'fact' },
+  { name: 'agg_xhs_note', label: '小红书笔记', type: 'fact' },
+  { name: 'agg_daily_channel_open', label: '全渠道开户日报', type: 'fact' },
+  { name: 'fact_qingniao_leads', label: '青鸟线索', type: 'fact' },
+];
+
+export const dataServiceTableSync = {
+  getManifest: async (): Promise<{ success: boolean; data?: TableSyncManifestData; error?: string; message?: string }> => {
+    return http.get('/webdav/tables/manifest') as unknown as { success: boolean; data?: TableSyncManifestData; error?: string; message?: string };
+  },
+  upload: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
+    return http.post('/webdav/tables/upload', { tables }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
+  },
+  download: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
+    return http.post('/webdav/tables/download', { tables }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
+  },
+};
+
 // v3.5.8：WebDAV 配置（与后端 /webdav/config 响应一致）
 export interface WebdavConfig {
   url: string;

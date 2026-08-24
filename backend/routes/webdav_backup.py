@@ -1111,3 +1111,280 @@ def _restore_async(task_id, filename):
     except Exception as e:
         backup_tasks[task_id]['status'] = 'failed'
         backup_tasks[task_id]['message'] = f'恢复失败: {str(e)}'
+
+
+# =====================================================================
+# v3.9.3：逐表同步（无身份、全等权限，版本新者胜、等者不动）
+# =====================================================================
+
+def _get_table_sync_client():
+    """构造逐表同步所需的 (WebDAVBackupClient, engine_dict)。"""
+    import config
+    from backend.utils.webdav_client import WebDAVBackupClient
+    from backend.database import db
+    client = WebDAVBackupClient(
+        url=config.WEBDAV_URL,
+        username=config.WEBDAV_USERNAME,
+        password=config.WEBDAV_PASSWORD,
+        backup_dir=config.WEBDAV_BACKUP_DIR
+    )
+    return client, {'engine': db.engine,
+                    'is_pg': getattr(config, 'DATABASE_DIALECT', 'sqlite') == 'postgresql'}
+
+
+def _push_whole_snapshot(client):
+    """把当前本地主库上传为整库快照，让老版本同事（只读整库 + latest_backup.txt）也能拉到新数据。
+
+    逐表上传成功后会连同分表一起 push 一份最新整库快照；失败仅记录，不阻断逐表结果。
+    返回上传结果 dict。
+    """
+    import config as _cfg
+    db_path = current_app.config.get('DATABASE_PATH', 'database/shengxintou.db')
+    if not os.path.isabs(db_path):
+        db_path = os.path.join(current_app.root_path, '..', db_path)
+        db_path = os.path.abspath(db_path)
+
+    result = client.upload_backup(
+        db_path, 'table-sync',
+        use_compression=getattr(_cfg, 'WEBDAV_USE_COMPRESSION', False))
+    # 补 meta（sync-check 依赖 data_latest）
+    try:
+        target_app = current_app._get_current_object()
+        local_sources, local_latest = _compute_local_sources(target_app)
+        meta = {
+            'filename': result['filename'],
+            'created': result.get('upload_time'),
+            'data_latest': local_latest,
+            'local_sources': local_sources,
+            'schema_version': 'v3.9.3',
+        }
+        client.upload_json(meta, client.meta_filename_for(result['filename']))
+    except Exception:
+        pass
+    # 清理旧整库快照，避免无限堆积
+    try:
+        backups = client.list_backups()
+        max_backups = getattr(_cfg, 'WEBDAV_MAX_BACKUPS', 3)
+        for old in backups[max_backups:]:
+            try:
+                client.delete_backup(old['filename'])
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return result
+
+
+def _valid_table_names(names) -> list:
+    from backend.utils.table_sync import SYNC_TABLES
+    allow = set(SYNC_TABLES)
+    return [n for n in names if isinstance(n, str) and n in allow]
+
+
+@bp.route('/tables/manifest', methods=['GET'])
+@handle_exceptions
+def table_manifest():
+    """逐表清单：返回本机各表版本/行数 + 云端各表版本。"""
+    if not _is_webdav_configured():
+        return jsonify({'success': True, 'data': {'not_configured': True}})
+    try:
+        from backend.utils.table_sync import SYNC_TABLES, compute_table_local
+        client, env = _get_table_sync_client()
+        cloud = client.get_table_manifest() or {'tables': {}}
+        engine = env['engine']
+        with current_app.app_context():
+            local = {}
+            for t in SYNC_TABLES:
+                version, rows = compute_table_local(engine, t)
+                local[t] = {'version': version, 'rows': rows}
+        return jsonify({'success': True, 'data': {
+            'not_configured': False,
+            'local': local,
+            'cloud': cloud.get('tables', {}),
+            'schema_version': cloud.get('schema_version'),
+        }})
+    except Exception as e:
+        msg = str(e)
+        is_conn = '无法连接' in msg or ('WebDAV' in msg and ('SSL' in msg or '重置' in msg or '拒绝' in msg))
+        return jsonify({
+            'success': False,
+            'error': 'UPSTREAM_UNAVAILABLE' if is_conn else 'MANIFEST_FAILED',
+            'message': f'获取逐表清单失败: {msg}',
+        }), (502 if is_conn else 500)
+
+
+@bp.route('/tables/upload', methods=['POST'])
+@handle_exceptions
+def table_upload():
+    """逐表上传：本地版本严格新于云端才上传，否则跳过（保留云端）。"""
+    if not _is_webdav_configured():
+        return jsonify({'success': False, 'message': '尚未配置 WebDAV 服务器'}), 400
+    body = request.get_json() or {}
+    names = _valid_table_names(body.get('tables') or [])
+    if not names:
+        return jsonify({'success': False, 'message': '未选择有效业务表'}), 400
+
+    try:
+        from backend.utils.table_sync import compute_table_local, export_table_to_sqlite_file
+        import tempfile
+        client, env = _get_table_sync_client()
+        engine, is_pg = env['engine'], env['is_pg']
+        manifest = client.get_table_manifest() or {'tables': {}}
+        cloud_tables = manifest.setdefault('tables', {})
+        results = {}
+        changed = False
+
+        with current_app.app_context(), tempfile.TemporaryDirectory() as tmpdir:
+            for t in names:
+                version, rows = compute_table_local(engine, t)
+                if not version:
+                    results[t] = {'status': 'skipped', 'reason': 'no_local_version'}
+                    continue
+                cloud_info = cloud_tables.get(t)
+                if cloud_info and str(version) <= str(cloud_info.get('version', '')):
+                    results[t] = {'status': 'skipped', 'reason': 'cloud_newer'}
+                    continue
+                try:
+                    tmp_db = os.path.join(tmpdir, f'{t}.db')
+                    export_table_to_sqlite_file(engine, t, tmp_db)
+                    size = os.path.getsize(tmp_db)
+                    client.upload_table_file(tmp_db, t, use_compression=False)
+                    from datetime import datetime as _dt
+                    cloud_tables[t] = {
+                        'version': version,
+                        'rows': rows,
+                        'size': size,
+                        'updated_at': _dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                    changed = True
+                    results[t] = {'status': 'uploaded', 'version': version, 'rows': rows}
+                except Exception as e:
+                    results[t] = {'status': 'error', 'message': str(e)}
+
+            if changed:
+                manifest['schema_version'] = 'v3.9.3'
+                manifest['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                client.put_table_manifest(manifest)
+
+                # 兼容老客户端：连同分表一起 push 一份最新整库快照。
+                # 老版本同事只读整库 + latest_backup.txt，若只上传分表他们永远看不到新数据。
+                # 失败不阻断逐表结果，仅记录到 __whole_snapshot__。
+                try:
+                    snap = _push_whole_snapshot(client)
+                    results['__whole_snapshot__'] = {
+                        'status': 'uploaded',
+                        'filename': snap['filename'],
+                        'size': snap['size'],
+                    }
+                except Exception as snap_err:
+                    results['__whole_snapshot__'] = {'status': 'error', 'message': f'整库快照同步失败: {snap_err}'}
+
+        return jsonify({'success': True, 'data': {'results': results}})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'逐表上传失败: {str(e)}'}), 500
+
+
+@bp.route('/tables/download', methods=['POST'])
+@handle_exceptions
+def table_download():
+    """逐表下载：云端版本严格新于本地才合并入库，否则跳过。
+
+    新老兼容：在逐表文件的基础上，还会检查云端最新整库快照里该表的最新数据日期——
+    老版本同事仍走整库 push 时，若快照里该表日期比云端逐表版本更新，则从快照拆分该表合并，
+    保证升级后也能拿到老同事新推的数据。任何来源都不覆盖本地更新的版本（新者胜、等者不动）。
+    """
+    if not _is_webdav_configured():
+        return jsonify({'success': False, 'message': '尚未配置 WebDAV 服务器'}), 400
+    body = request.get_json() or {}
+    names = _valid_table_names(body.get('tables') or [])
+    if not names:
+        return jsonify({'success': False, 'message': '未选择有效业务表'}), 400
+
+    try:
+        from backend.utils.table_sync import (
+            compute_table_local, merge_sqlite_table_into,
+            download_latest_snapshot, snapshot_table_max_date,
+            TABLE_DATE_COLS, normalize_version,
+        )
+        import tempfile
+        client, env = _get_table_sync_client()
+        engine, is_pg = env['engine'], env['is_pg']
+        manifest = client.get_table_manifest()
+        cloud_tables = (manifest or {}).get('tables', {})
+        results = {}
+
+        with current_app.app_context(), tempfile.TemporaryDirectory() as tmpdir:
+            # 整库快照（懒加载一次）：老同事整库 push 的兜底源 + 表日期对比源
+            snapshot_path = None
+
+            def _ensure_snapshot():
+                nonlocal snapshot_path
+                if snapshot_path is None:
+                    snapshot_path = download_latest_snapshot(client, tmpdir)
+                return snapshot_path
+
+            for t in names:
+                local_version, _ = compute_table_local(engine, t)
+                cloud_info = cloud_tables.get(t)
+                cloud_ver = (cloud_info or {}).get('version')
+
+                # 老整库快照里该表最新数据日期（事实/聚合表才有可比日期；维表返回 None）
+                snap_date = None
+                if t in TABLE_DATE_COLS:
+                    snap = _ensure_snapshot()
+                    if snap:
+                        snap_date = snapshot_table_max_date(snap, t)
+
+                local_num = normalize_version(local_version)
+                snap_num = normalize_version(snap_date)
+                cloud_num = normalize_version(cloud_ver)
+
+                # 1) 云端逐表清单缺失 → 整库快照兜底
+                if not cloud_ver:
+                    if not snap:
+                        snap = _ensure_snapshot()
+                    if snap is None or snap_date is None:
+                        results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
+                        continue
+                    if local_num is not None and snap_num is not None and local_num >= snap_num:
+                        results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                        continue
+                    try:
+                        n = merge_sqlite_table_into(engine, t, snap, is_pg)
+                        results[t] = {'status': 'downloaded', 'rows': n, 'from': 'snapshot', 'version': snap_date}
+                    except Exception as e:
+                        results[t] = {'status': 'error', 'message': f'整库快照兜底失败: {str(e)}'}
+                    continue
+
+                # 2) 逐表存在，但老整库快照该表日期严格更新 → 快照才是最新数据，拆分合并
+                if snap_date and snap_num is not None and cloud_num is not None and snap_num > cloud_num:
+                    if local_num is not None and local_num >= snap_num:
+                        results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                        continue
+                    try:
+                        snap = _ensure_snapshot()
+                        n = merge_sqlite_table_into(engine, t, snap, is_pg)
+                        results[t] = {'status': 'downloaded', 'rows': n, 'from': 'snapshot',
+                                      'version': snap_date, 'reason': 'snapshot_newer_than_manifest'}
+                    except Exception as e:
+                        results[t] = {'status': 'error', 'message': f'整库快照兜底失败: {str(e)}'}
+                    continue
+
+                # 3) 常规逐表对比：云端严格新于本地才下载合并
+                if local_num is not None and cloud_num is not None and local_num >= cloud_num:
+                    results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                    continue
+                try:
+                    tmp_db = os.path.join(tmpdir, f'{t}.db')
+                    ok = client.download_table_file(t, tmp_db)
+                    if not ok:
+                        results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
+                        continue
+                    n = merge_sqlite_table_into(engine, t, tmp_db, is_pg)
+                    results[t] = {'status': 'downloaded', 'rows': n, 'version': cloud_ver}
+                except Exception as e:
+                    results[t] = {'status': 'error', 'message': str(e)}
+
+        return jsonify({'success': True, 'data': {'results': results}})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'逐表下载失败: {str(e)}'}), 500

@@ -406,6 +406,80 @@ class WebDAVBackupClient:
         except Exception as e:
             raise Exception(f"删除失败: {str(e)}")
 
+    # ---- v3.9.3：逐表同步（单表文件 + 表级清单） ----
+
+    def _tables_dir(self):
+        """tables 目录前缀（相对 backup_dir）。"""
+        return f'{self.backup_dir}/tables/table_sync' if self.backup_dir else 'tables/table_sync'
+
+    def _table_name(self, name):
+        """单表文件相对 backup_dir 的路径（表名中转义目录穿越）。"""
+        safe = name.replace('/', '_').replace('\\', '_')
+        return f'{self._tables_dir()}/{safe}.db'
+
+    def upload_table_file(self, local_path, table_name, use_compression=False):
+        """上传单表 SQLite 文件到 WebDAV tables 目录。返回远端相对路径。"""
+        import tempfile
+        file_to_upload = local_path
+        temp_compressed_path = None
+        try:
+            if use_compression:
+                temp_compressed_path = tempfile.NamedTemporaryFile(
+                    mode='wb', delete=False, suffix='.db.gz').name
+                temp_compressed_path = temp_compressed_path.replace('.tmp.', '_tmp.')
+                with open(local_path, 'rb') as f_in:
+                    with gzip.open(temp_compressed_path, 'wb') as f_out:
+                        f_out.writelines(f_in)
+                file_to_upload = temp_compressed_path
+
+            remote_url = self._get_remote_url(self._table_name(table_name))
+            with open(file_to_upload, 'rb') as f:
+                resp = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+            if resp.status_code not in (200, 201, 204):
+                raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+            return self._table_name(table_name)
+        finally:
+            if temp_compressed_path and os.path.exists(temp_compressed_path):
+                os.remove(temp_compressed_path)
+
+    def download_table_file(self, table_name, local_path):
+        """从 WebDAV 下载单表 SQLite 文件到本地。返回 bool。"""
+        remote_url = self._get_remote_url(self._table_name(table_name))
+        resp = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
+        if resp.status_code not in (200, 206):
+            if resp.status_code == 404:
+                return False
+            raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+        with open(local_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        return True
+
+    def get_table_manifest(self):
+        """拉取云端表级清单 tables/table_sync/manifest.json。不存在返回 None。"""
+        import json
+        remote_url = self._get_remote_url(f'{self._tables_dir()}/manifest.json')
+        resp = requests.get(remote_url, auth=self.auth, **self._requests_kwargs())
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+        try:
+            return json.loads(resp.text)
+        except Exception:
+            return None
+
+    def put_table_manifest(self, manifest: dict) -> None:
+        """写云端表级清单 manifest.json。"""
+        import json
+        remote_url = self._get_remote_url(f'{self._tables_dir()}/manifest.json')
+        resp = requests.put(remote_url, data=json.dumps(manifest, ensure_ascii=False),
+                            headers={'Content-Type': 'application/json'},
+                            auth=self.auth, **self._requests_kwargs())
+        if resp.status_code not in (200, 201, 204):
+            raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+
     def verify_backup(self, filename, expected_md5):
         """
         验证备份文件完整性
