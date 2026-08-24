@@ -69,6 +69,8 @@ const AppMarketPlanAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/P
 const AppMarketCostAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/CostAnalysis'));
 // v3.7.3: 应用市场 · 归因转化率分析
 const AppMarketAttributionConversionPage = lazy(() => import('@/pages/Reports/AppMarket/AttributionConversion'));
+// v3.8.2: 应用市场 · 广告计划分析（计划分解 + 下载链路 + 消耗）
+const AppMarketAdPlanAnalysisPage = lazy(() => import('@/pages/Reports/AppMarket/AdPlanAnalysis'));
 
 // 直播 v3.1
 const LiveFunnelPage = lazy(() => import('@/pages/Live/Funnel'));
@@ -137,6 +139,8 @@ const mainChildren = [
       { path: 'cost-analysis', element: withSuspense(AppMarketCostAnalysisPage) },
       // v3.7.3: 归因转化率分析
       { path: 'attribution-conversion', element: withSuspense(AppMarketAttributionConversionPage) },
+      // v3.8.2: 广告计划分析
+      { path: 'ad-plan-analysis', element: withSuspense(AppMarketAdPlanAnalysisPage) },
     ],
   },
   // 直播 v3.1 占位

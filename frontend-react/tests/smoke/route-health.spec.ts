@@ -37,6 +37,8 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '应用市场-创意(旧路径重定向)', path: '/app-market/creative' },
   // v3.7.3：归因转化率子报表
   { name: '应用市场-归因转化率', path: '/app-market/attribution-conversion' },
+  // v3.8.2：广告计划分析（结合 dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily）
+  { name: '应用市场-广告计划分析', path: '/app-market/ad-plan-analysis' },
   { name: '直播-漏斗', path: '/live/funnel' },
   { name: '直播-带货', path: '/live/direct-sales' },
   { name: '直播-投顾IP', path: '/live/advisor-ip' },

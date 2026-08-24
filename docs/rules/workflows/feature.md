@@ -86,7 +86,7 @@ spec 文件复制到 `docs/superpowers/specs/`（已 gitignore，不入仓库）
 
 - 涉及业务口径/导入类型/三端差异/工具链/打包流程/测试体系/公共组件契约/架构契约 → 必须更新对应规则文件。
 - 单个 Bug 修复/UI 微调/性能优化 → 不更新规则。
-- 更新规则后必须运行 `python scripts/check_rule_architecture.py` 并同步 `AGENTS.md` / `CLAUDE.md`。
+- 更新规则后必须运行 `python scripts/check_rule_architecture.py` 并同步 `AGENTS.md` / `CLAUDE.md` / `.workbuddy/memory/MEMORY.md`。
 
 ### 是否需要建议用户手动触发验证
 

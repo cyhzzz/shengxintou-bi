@@ -34,7 +34,7 @@ from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('upload', __name__)
 
-# v2 数据类型（7 个）—— 原样导入；qingniao_leads 例外走 append + 批次标注
+# v2 数据类型（8 个）—— 原样导入；qingniao_leads 例外走 append + 批次标注
 DATA_TYPES = {
     'account_mapping':      '投放账号映射',
     'conversion_content':   '内容平台加微链路',
@@ -42,6 +42,7 @@ DATA_TYPES = {
     'vendor_daily':         '厂商广告投放分析',
     'xhs_note':             '小红书笔记',
     'channel_open':         '开户渠道分析',
+    'appmarket_plan_class': '应用市场计划分解',
     'qingniao_leads':       '抖音青鸟线索通',
 }
 
@@ -389,5 +390,6 @@ def _target_tables(data_type: str):
         'vendor_daily':         ['agg_vendor_daily'],
         'xhs_note':             ['agg_xhs_note'],
         'channel_open':         ['agg_daily_channel_open'],
+        'appmarket_plan_class':  ['dim_ad_plan_class'],
         'qingniao_leads':       ['fact_qingniao_leads'],
     }.get(data_type, [])

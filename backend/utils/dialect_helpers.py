@@ -8,7 +8,7 @@ feat-desktop-supabase：切到 Supabase PG 后，原 SQLite 专属语法会报�
 
 集中在本模块，让报表路由保持 dialect 无关。
 """
-from sqlalchemy import func, literal, cast
+from sqlalchemy import func, literal, cast, case, text
 from sqlalchemy.types import Date
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -69,3 +69,26 @@ def make_week_start_expr(col):
         return func.date_trunc('week', cast(col, Date))
     # SQLite 专属修饰符，PG 不支持
     return func.date(col, 'weekday 0', '-6 days')
+
+
+def make_friday_week_start_expr(col):
+    """返回 col 所在「周五起始周」（上周五 → 本周四）的起始日表达式。
+
+    广告计划分析的周度口径统一为「上周五 ~ 本周四」：
+      - SQLite: date(col, 'weekday 4', '-6 days')
+        = 该周最后一天(周四)往前 6 天 -> 本周五（周五为该周起始日）
+      - PG: date_trunc('week') 得到 ISO 周一；col 落在周一~周四 -> 上周五（周一-3 天），
+        col 落在周五~周日 -> 本周五（周一+4 天）
+    """
+    d = _dialect()
+    if d == 'postgresql':
+        col_date = cast(col, Date)
+        return (
+            func.date_trunc('week', col_date)
+            + case(
+                (func.extract('isodow', col_date) <= 4, text("interval '-3 days'")),
+                else_=text("interval '4 days'"),
+            )
+        )
+    # SQLite 专属修饰符，PG 不支持
+    return func.date(col, 'weekday 4', '-6 days')

@@ -18,6 +18,8 @@ interface FilterBarProps {
   showAgency?: boolean;
   showBusinessModel?: boolean;
   showEmployee?: boolean;
+  /** 外部传入的平台选项（优先使用，缺省时 PlatformFilter 从 metadata 加载） */
+  platformOptions?: { value: string; label: string }[];
   onSearch?: (filters: {
     startDate: string;
     endDate: string;
@@ -34,6 +36,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
   showAgency = true,
   showBusinessModel = false,
   showEmployee = false,
+  platformOptions,
   onSearch,
   onReset,
 }) => {
@@ -77,7 +80,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
         {showPlatform && (
           <div className={styles.filterGroup}>
             <span className={styles.filterLabel}>平台:</span>
-            <PlatformFilter />
+            <PlatformFilter options={platformOptions} />
           </div>
         )}
 

@@ -2,7 +2,7 @@
 """
 v2 原样导入处理器（无中间计算）
 
-6 个新数据类型，对应 6 张新表（4 张 DWS + 2 张 DWD + dim_account 维度）：
+7 个新数据类型，对应 7 张新表（4 张 DWS + 2 张 DWD + dim_account 维度 + dim_ad_plan_class 维度）：
 
   account_mapping       -> dim_account (含代理商信息：名称/简称/字母简称)
   conversion_content    -> fact_conv_content (1 行=1 企微，内容平台加微链路)
@@ -10,12 +10,20 @@ v2 原样导入处理器（无中间计算）
   vendor_daily          -> agg_vendor_daily (日×平台×厂商×业务模式统一漏斗超集)
   xhs_note              -> agg_xhs_note (笔记级 + 笔记聚合，丢 Unnamed: 24)
   channel_open          -> agg_daily_channel_open (非广告渠道开户)
+  appmarket_plan_class  -> dim_ad_plan_class (应用市场广告计划分类维度)
 
 原则：
 1. 原样导入（pandas to_sql replace on new tables），无业务计算
 2. 加载期规范化只做：'nan'->NULL、时间解析、丢脏列、超长 ID 转字符串
 3. 不做维度合并、不算漏斗率、不补映射（数据源自带的全量保留）
 4. 不派生冗余表（如 dim_vendor，直接从 dim_account 去重使用）
+
+特殊导入规则（详见 docs/rules/business-invariants.md）：
+- qingniao_leads：批次 append（例外）
+- conversion_appmarket：增量(overwrite=False)按 设备号+下载日期 去重；
+  全量替换(overwrite=True)为按日期分区替换（保留 2026-06-30 及之前，只重写 7/1 以后）
+- vendor_daily：默认按日期分区替换（保留 2026-06-30 及之前，只重写 7/1 以后）；
+  若新文件自身含 7/1 之前数据（全量文件）则退化为整表替换（以文件为准）
 """
 import os
 import io
@@ -27,6 +35,31 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+# 应用市场下载链路（conversion_appmarket → fact_conv_appmarket）的分区替换边界：
+# 保留 2026-06-30 及之前的历史数据；之后上传的文件仅含 2026-07-01 以后的数据，
+# 导入（含"全量替换"开关开启时）只清空并重写 该日期 及以后的数据，避免整表替换丢失历史。
+APPMARKET_CONV_REPLACE_FROM = '2026-07-01'
+
+# 厂商广告投放分析（vendor_daily → agg_vendor_daily）的分区替换边界：
+# 与 conversion_appmarket 口径一致，默认保留 2026-06-30 及之前历史；之后上传的文件
+# （通常是 2026-07-01 起的滚动增量）只清空并重写 7/1 及以后，避免整表替换丢失历史。
+# 智能退化：若新文件自身含 7/1 之前的数据（即全量文件），则整表替换（以文件为准），
+# 从而既能保护滚动增量场景的历史，又能在补全全量文件时刷新全部（含 6/30 及之前）数据。
+VENDOR_DAILY_REPLACE_FROM = '2026-07-01'
+
+
+def _vendor_daily_min_date(df: "pd.DataFrame"):
+    """取 vendor_daily DataFrame 的「日期」列最小日期 (YYYY-MM-DD)，无则返回 None。"""
+    if "日期" not in df.columns:
+        return None
+    try:
+        s = pd.to_datetime(df["日期"], errors="coerce").dropna()
+        if s.empty:
+            return None
+        return s.min().strftime("%Y-%m-%d")
+    except Exception:
+        return None
 
 
 def _resolve_db_url() -> str:
@@ -46,6 +79,9 @@ def _resolve_db_url() -> str:
 # 6 个新数据类型到处理器函数的映射
 HANDLERS = {}  # filled after function defs
 
+# 应用市场白名单（与归因转化率报表口径一致；OPPO/VIVO 源表大写，落库前 .lower()）
+ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
+
 
 def _read_excel(path: str) -> pd.DataFrame:
     """读取 Excel（自动尝试 sheet 0 / 1 / 2）。"""
@@ -56,6 +92,42 @@ def _read_excel(path: str) -> pd.DataFrame:
         return df
     except Exception:
         return pd.read_excel(path, sheet_name=0)
+
+
+def _read_excel_smart(path: str, required_col: str) -> pd.DataFrame:
+    """读取 Excel，智能识别含 ``required_col`` 列的明细数据 sheet。
+
+    背景：归因明细等 Excel 常含多个 sheet（Sheet2 透视表在前、Sheet1
+    明细在后）。``sheet_name=0`` 会误读透视表（仅几行且大多是 Unnamed
+    列）。此函数遍历所有 sheet，优先返回列中含 ``required_col`` 的
+    第一个 sheet；若都不含则退回列数最多的 sheet（明细表列数远多于
+    透视表）；最后兜底走 ``_read_excel``。
+    """
+    try:
+        xl = pd.ExcelFile(path, engine="openpyxl")
+    except Exception:
+        return _read_excel(path)
+    try:
+        best_sheet = None  # (sheet_name, col_count)
+        for s in xl.sheet_names:
+            try:
+                probe = pd.read_excel(xl, sheet_name=s, nrows=5)
+            except Exception:
+                continue
+            if required_col in probe.columns:
+                return pd.read_excel(xl, sheet_name=s)
+            if best_sheet is None or len(probe.columns) > best_sheet[1]:
+                best_sheet = (s, len(probe.columns))
+
+        if best_sheet is not None and best_sheet[1] > 0:
+            return pd.read_excel(xl, sheet_name=best_sheet[0])
+        return _read_excel(path)
+    finally:
+        # 显式释放 ExcelFile，避免 Windows 下上传文件句柄残留（文件被占用）
+        try:
+            xl.close()
+        except Exception:
+            pass
 
 
 def _clean_nan(df: pd.DataFrame) -> pd.DataFrame:
@@ -178,8 +250,12 @@ def handle_conversion_content(path: str):
 
 
 def handle_conversion_appmarket(path: str):
-    """8.1应用市场归因明细.xlsx -> fact_conv_appmarket（1 行=1 APP 下载）。"""
-    df = _read_excel(path)
+    """8.1应用市场归因明细.xlsx -> fact_conv_appmarket（1 行=1 APP 下载）。
+
+    该 Excel 可能含多个 sheet（透视表 + 明细数据），需要智能识别含
+    ``设备号`` 列的明细 sheet，避免误读透视表/汇总 sheet。
+    """
+    df = _read_excel_smart(path, required_col="\u8bbe\u5907")
     df = _clean_nan(df)
     for c in df.columns:
         if any(k in c for k in ["\u8bbe\u5907", "ID", "id"]):
@@ -274,12 +350,54 @@ def handle_channel_open(path: str):
     return {"agg_daily_channel_open": df}, {"row_counts": {"agg_daily_channel_open": len(df)}}
 
 
+def handle_appmarket_plan_class(path: str):
+    """广告计划分类表.xlsx -> dim_ad_plan_class（1 行=1 广告分组，应用市场计划分解维度）。
+
+    列：应用市场 / 广告分组ID / 广告分组名称 / 版位 / 子版位 / 出价。
+
+    规范（v2 原样导入，仅格式层）：
+    1. 应用市场 .lower() 归一（OPPO/VIVO → oppo/vivo），与 fact_conv_appmarket 口径一致
+    2. 仅保留 7 大应用市场白名单，其余行丢弃
+    3. 广告分组ID 超长 ID 安全转换（BigInteger / 超界转字符串）
+    4. 覆盖写入（replace），无中间计算
+    """
+    df = _read_excel(path)
+    df = _clean_nan(df)
+
+    # 1) 应用市场归一（小写）+ 2) 白名单过滤
+    def _norm_market(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        return str(v).strip().lower()
+    df["应用市场"] = df["应用市场"].apply(_norm_market)
+    df = df[df["应用市场"].isin(ALLOWED_PLATFORMS)].copy()
+    df = df.reset_index(drop=True)
+
+    # 3) 广告分组ID 超长 ID 安全转换
+    if "广告分组ID" in df.columns:
+        df["广告分组ID"] = _safe_overlong_id(df["广告分组ID"])
+
+    # 保序选取落库列（原样，仅中文列名，id 由 ORM 自增）
+    keep = ["应用市场", "广告分组ID", "广告分组名称", "版位", "子版位", "出价"]
+    keep = [c for c in keep if c in df.columns]
+    plan_df = df[keep].copy()
+
+    # 保留 id 列（SQLAlchemy ORM 需要 id 主键）—— 显式 1..n，便于覆盖写入对齐
+    if "id" not in plan_df.columns:
+        plan_df.insert(0, "id", range(1, len(plan_df) + 1))
+
+    return {"dim_ad_plan_class": plan_df}, {
+        "row_counts": {"dim_ad_plan_class": len(plan_df)},
+    }
+
+
 HANDLERS["account_mapping"] = handle_account_mapping
 HANDLERS["conversion_content"] = handle_conversion_content
 HANDLERS["conversion_appmarket"] = handle_conversion_appmarket
 HANDLERS["vendor_daily"] = handle_vendor_daily
 HANDLERS["xhs_note"] = handle_xhs_note
 HANDLERS["channel_open"] = handle_channel_open
+HANDLERS["appmarket_plan_class"] = handle_appmarket_plan_class
 
 
 def handle_qingniao_leads(path: str, batch_tag: str = None):
@@ -386,6 +504,10 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
       原因：to_sql(if_exists='replace') = DROP TABLE + 按 pandas 推断类型重建，
       会摧毁 PG 的 BIGSERIAL 序列、主键约束、index=True 索引；下次 ORM 插入必报错。
     - qingniao_leads 仍用纯 append（保留历史批次，不 DELETE）
+    - conversion_appmarket 全量替换时按日期分区（保留 6/30 及之前，只重写 7/1 以后），
+      见 APPMARKET_CONV_REPLACE_FROM 注释；增量模式（overwrite=False）仍按 设备号+下载日期 去重
+    - vendor_daily 默认按日期分区（保留 6/30 及之前，只重写 7/1 以后，见
+      VENDOR_DAILY_REPLACE_FROM）；若新文件自身含 7/1 之前数据（全量文件）则退化为整表替换
     - 删除 sqlite_sequence 操作（SQLite 专属，PG 报错；DELETE + append 不需要重置序列）
 
     性能优化：
@@ -404,10 +526,13 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
             from flask import current_app
             from backend.database import db
             engine = db.engine
+            local_engine = False
         except Exception:
             engine = create_engine(_resolve_db_url())
+            local_engine = True
     else:
         engine = create_engine(db_url)
+        local_engine = True
     written = {}
     is_pg = str(engine.url).startswith(("postgresql://", "postgresql+psycopg://"))
 
@@ -484,7 +609,40 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
                     df.to_sql(table_name, con=engine, if_exists="append", index=False, chunksize=1000)
             else:
                 # DELETE + append：清空旧数据但保留 ORM 表结构（主键/序列/索引）
-                conn.execute(text(f'DELETE FROM "{table_name}"'))
+                if data_type == "conversion_appmarket" and APPMARKET_CONV_REPLACE_FROM:
+                    # 应用市场下载链路：保留 6/30 及之前历史，只替换 7/1 以后数据
+                    # （新文件仅含 7/1 以后数据；防止"全量替换"开关清空历史）
+                    logger.info(
+                        f'conversion_appmarket 分区替换: DELETE {table_name} '
+                        f'WHERE 下载日期 >= {APPMARKET_CONV_REPLACE_FROM}'
+                    )
+                    conn.execute(text(
+                        f'DELETE FROM "{table_name}" WHERE "下载日期" >= :cutoff'
+                    ), {"cutoff": APPMARKET_CONV_REPLACE_FROM})
+                    # 丢弃 id 列让 DB 自增生成，避免与保留的历史行主键冲突
+                    if "id" in df.columns:
+                        df = df.drop(columns=["id"])
+                elif data_type == "vendor_daily":
+                    # 厂商广告投放分析：与下载链路口径一致，默认保留 6/30 及之前历史。
+                    # 智能判断：若新文件 min(日期) >= 7/1（滚动增量文件），只替换 7/1 以后；
+                    # 若新文件含 7/1 之前数据（全量文件），则整表替换（以文件为准）。
+                    _cutoff = VENDOR_DAILY_REPLACE_FROM
+                    _min_date = _vendor_daily_min_date(df)
+                    if _min_date is not None and _min_date >= _cutoff:
+                        logger.info(
+                            f'vendor_daily 分区替换: DELETE {table_name} '
+                            f'WHERE 日期 >= {_cutoff}'
+                        )
+                        conn.execute(text(
+                            f'DELETE FROM "{table_name}" WHERE "日期" >= :cutoff'
+                        ), {"cutoff": _cutoff})
+                        if "id" in df.columns:
+                            df = df.drop(columns=["id"])
+                    else:
+                        logger.info(f'vendor_daily 全量替换: DELETE {table_name}')
+                        conn.execute(text(f'DELETE FROM "{table_name}"'))
+                else:
+                    conn.execute(text(f'DELETE FROM "{table_name}"'))
                 conn.commit()
                 if is_pg:
                     _pg_copy_insert(df, table_name, engine)
@@ -493,5 +651,9 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
             cur = conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
             n = cur.fetchone()[0]
             written[table_name] = n
+    if local_engine:
+        # 释放本地创建的 engine 连接池（脚本/测试直跑场景），
+        # 避免 SQLite 文件句柄残留导致文件被占用；共享 db.engine 不处理。
+        engine.dispose()
     meta["written"] = written
     return meta

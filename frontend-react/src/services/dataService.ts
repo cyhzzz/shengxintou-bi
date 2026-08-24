@@ -380,11 +380,17 @@ export const dataServiceReports = {
   getAppMarketCostAnalysis: async (filters: { start_date: string; end_date: string }) => {
     return http.post('/reports/app-market/cost-analysis', { filters });
   },
-  // v3.7.3 应用市场 · 归因转化率分析
+  // v3.8.1 应用市场 · 归因转化率分析
   getAppMarketAttributionConversion: async (filters: {
-    start_date?: string; end_date?: string; platform?: string;
+    start_date?: string; end_date?: string; platforms?: string[];
   }) => {
     return http.post('/reports/app-market/attribution-conversion', { filters });
+  },
+  // v3.8.2 应用市场 · 广告计划分析（计划分解 + 下载链路 + 消耗）
+  getAppMarketAdPlanAnalysis: async (params: {
+    filters?: { platforms?: string[]; start_date?: string; end_date?: string };
+  }) => {
+    return http.post('/reports/app-market/ad-plan-analysis', params);
   },
 };
 

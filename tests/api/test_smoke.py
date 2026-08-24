@@ -17,6 +17,7 @@ import os
 import sys
 import unittest
 import json
+from datetime import datetime
 
 # 确保项目根目录在 sys.path 中
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -282,7 +283,7 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIn('daily_data', data)
         self.assertIn('weekly_data', data)
         self.assertIn('platforms', data)
-        self.assertIn('platform', data)
+        self.assertIn('selected_platforms', data)
         # 日数据结构（每日各步骤计数 + 步骤间转化率）
         if data['daily_data']:
             d = data['daily_data'][0]
@@ -299,6 +300,74 @@ class ApiSmokeTest(unittest.TestCase):
                       'rate_activate_register', 'rate_register_idcard',
                       'rate_idcard_bankcard', 'rate_bankcard_submit', 'rate_submit_success'):
                 self.assertIn(k, w, f'weekly_data[0] 缺少字段 {k}')
+
+    def test_46b_app_market_ad_plan_analysis(self):
+        # v3.8.2 广告计划分析（新独立页面）：默认全部 7 大应用市场，含苹果/鸿蒙
+        payload = {'filters': {'platforms': []}}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/ad-plan-analysis', payload),
+            '/reports/app-market/ad-plan-analysis')
+        self.assertIsInstance(data, dict)
+        for k in ('platforms', 'overview', 'plan_detail', 'by_placement', 'by_market', 'weekly_open', 'weeks', 'plan_week_detail'):
+            self.assertIn(k, data)
+        # 修复点：苹果/鸿蒙 必须出现在可筛选市场列表中
+        self.assertIn('苹果', data['platforms'])
+        self.assertIn('鸿蒙', data['platforms'])
+        # 概览结构合法
+        ov = data['overview']
+        self.assertIn('total_open', ov)
+        self.assertIn('total_spend', ov)
+        self.assertIn('total_open_cost', ov)
+        # 按应用市场聚合应覆盖全部 7 大市场
+        bm_markets = {m['market'] for m in data['by_market']}
+        self.assertEqual(bm_markets, set(data['platforms']))
+
+    def test_46c_app_market_ad_plan_weekly_modules(self):
+        # v3.8.2 广告计划分析：按周开户量 + 按周分计划 + 分计划展开（周度=上周五~本周四）
+        payload = {'filters': {'platforms': [], 'start_date': '2026-06-01', 'end_date': '2026-08-20'}}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/ad-plan-analysis', payload),
+            '/reports/app-market/ad-plan-analysis?weekly=1')
+        # 新字段齐全
+        for k in ('weekly_open', 'weeks', 'selected_week', 'week_plans', 'plan_week_detail'):
+            self.assertIn(k, data)
+        # 按周开户量：结构 + 周度口径（周五起始周）
+        if data['weekly_open']:
+            w = data['weekly_open'][0]
+            self.assertIn('week_start', w)
+            self.assertIn('week_end', w)
+            self.assertIn('open_count', w)
+            ws = datetime.strptime(w['week_start'], '%Y-%m-%d').date()
+            self.assertEqual(ws.weekday(), 4)  # 4 = 周五
+        # 周选择器 + 所选周
+        self.assertIsInstance(data['weeks'], list)
+        self.assertTrue(data['selected_week'] is None or data['selected_week'] in data['weeks'])
+        # 分计划展开：汇总含全部漏斗指标
+        if data['plan_week_detail']:
+            pl = data['plan_week_detail'][0]
+            for k in ('plan_id', 'plan_name', 'market', 'summary', 'weeks'):
+                self.assertIn(k, pl)
+            for k in ('消耗', '展示', '点击', '点击率', '下载量', '下载率', '激活量', '激活率',
+                      '开户注册量', '开户注册率', '身份证上传量', '身份证上传率', '银行卡上传量', '银行卡上传率',
+                      '开户提交量', '开户提交率', '开户成功量', '开户成功率', '广告开户量', '广告开户率', '广告开户成本'):
+                self.assertIn(k, pl['summary'])
+            if pl['weeks']:
+                w = pl['weeks'][0]
+                self.assertIn('week_start', w)
+                self.assertIn('消耗', w)
+                self.assertIn('广告开户量', w)
+
+    def test_47b_app_market_ad_plan_analysis_filtered(self):
+        # v3.8.2 广告计划分析：指定 苹果 单选，by_market 仅含苹果
+        payload = {'filters': {'platforms': ['苹果']}}
+        data = self._ok(
+            self._post('/api/v1/reports/app-market/ad-plan-analysis', payload),
+            '/reports/app-market/ad-plan-analysis?platforms=苹果')
+        bm_markets = [m['market'] for m in data['by_market']]
+        self.assertEqual(bm_markets, ['苹果'])
+        # 苹果有消耗与开户（市场级口径），但无 plan 分解
+        self.assertGreater(data['overview']['total_spend'], 0)
+        self.assertEqual(len(data['plan_detail']), 0)
 
     def test_48_xhs_plan_analysis(self):
         # v3.3.10 小红书 · 计划分析（仿应用市场 plan-analysis）

@@ -117,6 +117,9 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleAppMarketCreative(body);
     case 'reports/app-market/cost-analysis':
       return handleAppMarketCostAnalysis(body);
+    // 广告计划分析（计划周粒度漏斗，数据量大，暂不支持移动端；与归因转化率同策略）
+    case 'reports/app-market/ad-plan-analysis':
+      throw new Error('广告计划分析暂不支持移动端，请在桌面端查看');
     case 'reports/app-market/attribution-conversion':
       return handleAppMarketAttributionConversion(body);
 

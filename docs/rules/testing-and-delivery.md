@@ -12,7 +12,7 @@
 
 | 影响范围 | 必跑 | 条件性验证 |
 | --- | --- | --- |
-| `AGENTS.md`、`CLAUDE.md`、`docs/rules/` | `python scripts/check_rule_architecture.py`、`git diff --check` | 修改检查脚本时加 `py_compile` |
+| `AGENTS.md`、`CLAUDE.md`、`.workbuddy/memory/MEMORY.md`、`docs/rules/` | `python scripts/check_rule_architecture.py`、`git diff --check` | 修改检查脚本时加 `py_compile` |
 | Python 后端路由/查询 | `python -m unittest discover -s tests/api -v` | 新逻辑增加定向测试 |
 | 模型/导入 | API smoke + 隔离数据库样例 | replace/append、主键、类型和已有库兼容 |
 | 前端 TS/TSX | `npm run typecheck` | 页面/组件再跑 build |
@@ -88,7 +88,7 @@
 - 使用 `.github/ISSUE_TEMPLATE/` 和 `.github/PULL_REQUEST_TEMPLATE.md` 当前模板。
 - PR 标题采用 `feat:`、`fix:`、`refactor:`、`docs:`、`chore:` 等 Conventional Commits 前缀。
 - PR 影响范围和验证清单应与实际 diff 一致，不能机械全勾。
-- 修改规则架构时运行自动检查，不再靠人工肉眼保证 `AGENTS.md` / `CLAUDE.md` 同步。
+- 修改规则架构时运行自动检查，不再靠人工肉眼保证 `AGENTS.md` / `CLAUDE.md` / `.workbuddy/memory/MEMORY.md` 同步。
 - merge/review 策略遵守仓库维护者和平台设置，Agent 不自行假设可 squash 或直接推 main。
 
 ## 8. 版本与发布
@@ -105,7 +105,7 @@
 
 - README 只维护产品、安装、使用、结构和面向使用者的文档索引。
 - 规则只描述当前有效状态；版本历史进入 `version.json`，过期设计进入 `docs/_archive/`。
-- 修改 `AGENTS.md` 或 `CLAUDE.md` 必须同步并运行规则检查。
+- 修改 `AGENTS.md`、`CLAUDE.md` 或 `.workbuddy/memory/MEMORY.md` 必须同步并运行规则检查。
 - 文档提到文件、命令、端点和表时，至少通过当前仓库存在性或代码搜索交叉验证。
 - 不把本地被 `.gitignore` 排除的 spec 当成已交付的版本化文档，除非项目明确选择该目录。
 
@@ -298,7 +298,7 @@
 **判断原则**：只有**稳定架构、公共契约、高风险不变式或工具链**变化时才更新规则；单次 Bug 的实现细节不自动升级为长期规则。
 
 更新规则后必须：
-1. 同步 `AGENTS.md` / `CLAUDE.md`（若根规则也受影响）
+1. 同步 `AGENTS.md` / `CLAUDE.md` / `.workbuddy/memory/MEMORY.md`（若根规则也受影响）
 2. 运行 `python scripts/check_rule_architecture.py`
 3. 确认 `git diff --check` 无空白错误
 

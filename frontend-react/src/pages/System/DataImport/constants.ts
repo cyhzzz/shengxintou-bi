@@ -1,5 +1,5 @@
 /**
- * 数据导入相关常量和类型定义（v2 - 6 个新 type，原样导入）
+ * 数据导入相关常量和类型定义（v2 - 7 个新 type，原样导入）
  *
  * 新类型 → 新表（原样导入，无中间计算）：
  *   account_mapping       → dim_account + dim_vendor
@@ -8,6 +8,7 @@
  *   vendor_daily          → agg_vendor_daily
  *   xhs_note              → agg_xhs_note
  *   channel_open          → agg_daily_channel_open
+ *   appmarket_plan_class   → dim_ad_plan_class
  */
 
 // 数据类型
@@ -17,7 +18,8 @@ export type DataType =
   | 'conversion_appmarket'
   | 'vendor_daily'
   | 'xhs_note'
-  | 'channel_open';
+  | 'channel_open'
+  | 'appmarket_plan_class';
 
 // 数据类型配置
 export interface DataTypeConfig {
@@ -78,5 +80,13 @@ export const DATA_TYPES: DataTypeConfig[] = [
     targetTables: ['agg_daily_channel_open'],
     guideFile: 'channel_open_guide.md',
     icon: '🏦',
+  },
+  {
+    type: 'appmarket_plan_class',
+    label: '应用市场计划分解',
+    description: '广告分组按应用市场/版位/子版位/出价方式分类（关联下载链路拆解获客贡献）',
+    targetTables: ['dim_ad_plan_class'],
+    guideFile: 'appmarket_plan_class_guide.md',
+    icon: '📋',
   },
 ];

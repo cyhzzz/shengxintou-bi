@@ -157,7 +157,7 @@ const AttributionConversionPage: React.FC = () => {
       const res = await dataServiceReports.getAppMarketAttributionConversion({
         start_date: dateRange.startDate,
         end_date: dateRange.endDate,
-        platform,
+        platforms: platform === '全部' ? [] : [platform],
       });
       if (res?.success) {
         setData(res.data);

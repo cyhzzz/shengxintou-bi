@@ -69,6 +69,31 @@ class DimAnchorLiveType(db.Model):
     updated_at = Column(DateTime, nullable=False)                          # 最后修改时间
 
 
+class DimAdPlanClass(db.Model):
+    """应用市场广告计划分类维度（← 广告计划分类表.xlsx，1 行=1 广告分组）
+
+    广告投放侧的分类维度表，把每个「广告分组ID」按应用市场 + 版位 + 子版位
+    + 出价方式归类，用于后续「应用市场计划分解」分析（与应用市场下载链路
+    fact_conv_appmarket.广告计划ID 关联，拆解各分组/版位的获客贡献）。
+
+    导入规则（v2 原样导入，仅格式层规范）：
+    - 应用市场：源表可能为 OPPO/VIVO 大写，落库统一 .lower() → oppo/vivo，
+      与 fact_conv_appmarket / 归因白名单口径一致
+    - 仅保留 7 大应用市场（oppo/vivo/荣耀/小米/华为/鸿蒙/苹果），其余丢弃
+    - 广告分组ID：超长 ID 安全转字符串，避免 SQLite INTEGER 上限溢出
+    - 覆盖写入（replace），无中间计算
+    """
+    __tablename__ = 'dim_ad_plan_class'
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    应用市场 = Column(Text, index=True)                 # oppo/vivo/荣耀/小米/华为/鸿蒙/苹果
+    广告分组ID = Column(BigInteger, index=True)         # 关联 fact_conv_appmarket.广告计划ID
+    广告分组名称 = Column(Text)
+    版位 = Column(Text)
+    子版位 = Column(Text)
+    出价 = Column(Text)                                 # 出价方式（ocpd付费/开始开户/CPD...）
+
+
 # ============================================================================
 # DWD 明细层
 # ============================================================================
@@ -208,6 +233,8 @@ class AggVendorDaily(db.Model):
     有效户成本 = Column(Float)
     线索转化率 = Column(Float)
     开户转化率 = Column(Float)
+    计划ID = Column(BigInteger)            # 广告计划ID（与 dim_ad_plan_class.广告分组ID 关联）
+    计划名称 = Column(Text)
 
 
 class AggXhsNote(db.Model):

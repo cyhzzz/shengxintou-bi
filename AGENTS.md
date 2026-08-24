@@ -1,6 +1,6 @@
 # 省心投 BI — AI 编码规则
 
-> 仓库根规则。`AGENTS.md` 与 `CLAUDE.md` 必须字节一致；修改后运行 `python scripts/check_rule_architecture.py`。
+> 仓库根规则。`AGENTS.md`、`CLAUDE.md` 与 `.workbuddy/memory/MEMORY.md` 必须字节一致；修改后运行 `python scripts/check_rule_architecture.py`。
 > 默认开发环境：Windows + PowerShell；本地工作目录通常为 `D:/AIproject/省心投BI`。
 
 ## 1. 指令与权威源

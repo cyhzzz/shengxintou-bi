@@ -13,18 +13,25 @@ interface PlatformFilterProps {
   onChange?: (platforms: string[]) => void;
   allowClear?: boolean;
   placeholder?: string;
+  /** 外部传入的平台选项（优先使用，缺省时从 /api/v1/metadata 加载） */
+  options?: { value: string; label: string }[];
 }
 
 const PlatformFilter: React.FC<PlatformFilterProps> = ({
   onChange,
   allowClear = true,
   placeholder = '选择平台',
+  options,
 }) => {
   const { selectedPlatforms, setPlatforms } = useFilterStore();
   const [platformOptions, setPlatformOptions] = useState<{value: string; label: string}[]>([]);
 
-  // 加载平台列表
+  // 外部传入 options 时优先使用；否则从 metadata 加载平台列表
   useEffect(() => {
+    if (options && options.length > 0) {
+      setPlatformOptions(options);
+      return;
+    }
     const loadPlatforms = async () => {
       const response = await metadataService.getMetadata();
       if (response.success && response.data) {
@@ -32,7 +39,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({
       }
     };
     loadPlatforms();
-  }, []);
+  }, [options]);
 
   const handleChange = (values: string[]) => {
     setPlatforms(values);

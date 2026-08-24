@@ -171,28 +171,28 @@
   }
 }
 
-// ---------- v3.7.3 归因转化率：树形表格样式 ----------
+// ---------- v3.8.1 归因转化率：树形表格样式 ----------
 
-// 周合计行（父行）— 蓝色高亮
+// 周合计行（父行）— 品牌色高亮
 :global(.weekly-summary-row) > td {
-  background: #f0f5ff !important;
-  font-weight: 600;
-  border-top: 2px solid #91caff !important;
+  background: var(--color-brand-bg) !important;
+  font-weight: var(--font-weight-semibold);
+  border-top: 2px solid var(--color-brand-border) !important;
 }
 
 // 周合计行的展开图标
 :global(.weekly-summary-row) .ant-table-row-expand-icon {
-  border-color: #2f54eb;
+  border-color: var(--color-brand);
 }
 
-// 每日数据行（子行）— 浅灰背景
+// 每日数据行（子行）— 次级背景
 :global(.daily-row) > td {
-  background: #fafbfc !important;
-  font-size: 12px;
-  color: #666;
+  background: var(--bg-secondary) !important;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
 }
 
 // 子行悬停效果
 :global(.daily-row):hover > td {
-  background: #f0f0f0 !important;
+  background: var(--bg-hover) !important;
 }

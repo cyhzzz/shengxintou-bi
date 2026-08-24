@@ -14,6 +14,7 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / 'AGENTS.md'
 CLAUDE = ROOT / 'CLAUDE.md'
+WORKSPACE_MEMORY = ROOT.parent / '.workbuddy' / 'memory' / 'MEMORY.md'
 RULES = ROOT / 'docs' / 'rules'
 PROMPT = ROOT / 'docs' / '6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md'
 MAX_LINES = 220
@@ -57,6 +58,7 @@ ROOT_REFERENCES = (
     'frontend-react/src/types/api.ts',
     'website/',
     'scripts/check_filter_bar_usage.py',
+    '.workbuddy/memory/MEMORY.md',
 )
 
 COVERAGE = {
@@ -186,6 +188,21 @@ def check_files_and_root(passes: list[str], errors: list[str]) -> None:
     else:
         digest = hashlib.sha256(agents_bytes).hexdigest()
         passes.append(f'root mirrors match ({digest[:12]}...)')
+
+    # .workbuddy/memory/MEMORY.md 是工作区级镜像（不在 git 仓库内）
+    # 存在时必须与 AGENTS.md 字节一致；不存在时跳过（CI / 其他开发者环境）
+    if WORKSPACE_MEMORY.is_file():
+        memory_bytes = WORKSPACE_MEMORY.read_bytes()
+        if memory_bytes != agents_bytes:
+            errors.append(
+                f'.workbuddy/memory/MEMORY.md differs from AGENTS.md '
+                f'({len(memory_bytes)} vs {len(agents_bytes)} bytes); '
+                f'run: copy AGENTS.md to .workbuddy/memory/MEMORY.md'
+            )
+        else:
+            passes.append(f'workspace memory mirror matches ({digest[:12]}...)')
+    else:
+        passes.append('workspace memory mirror not present (skipped)')
 
     text = read_text(AGENTS, errors)
     if not text:

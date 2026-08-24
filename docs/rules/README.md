@@ -1,6 +1,6 @@
 # 省心投 BI 规则导航
 
-本目录保存**当前有效**的业务与工程规则。根目录 `AGENTS.md` / `CLAUDE.md` 只保留每次会话必须加载的摘要；执行具体任务时按本页索引读取对应规则。
+本目录保存**当前有效**的业务与工程规则。根目录 `AGENTS.md` / `CLAUDE.md`（及工作区 `.workbuddy/memory/MEMORY.md`）只保留每次会话必须加载的摘要；执行具体任务时按本页索引读取对应规则。
 
 ## 规则优先级
 
@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 当前版本、发布日期、版本号规则、changelog | `version.json` | 其他文档只引用，不复制当前版本号或版本流水账 |
 | 产品定位、安装、运行和用户入口 | `README.md` | 规则文档只保留实现任务所需摘要 |
-| AI 会话入口和最高频红线 | `AGENTS.md` / `CLAUDE.md` | 两份文件必须字节一致 |
+| AI 会话入口和最高频红线 | `AGENTS.md` / `CLAUDE.md` / `.workbuddy/memory/MEMORY.md` | 三份文件必须字节一致 |
 | 当前业务与工程规则 | `docs/rules/` | 只描述当前有效状态，不记录每次发版历史 |
 | 主播类型映射 | `backend/config/anchor_live_types.json` | 启动时同步到 `dim_anchor_live_type`，不要直接改库维护 |
 | API 支持的数据导入类型 | `backend/routes/upload.py` 的 `DATA_TYPES` | 前端常量、指南与测试应跟随它同步 |
@@ -58,6 +58,6 @@
 2. 新规则必须满足：可复用、会影响正确性、无法轻易从代码直接看出。
 3. 单次 Bug 的实现细节不自动升级为长期规则；只有高风险、可复现的模式才沉淀。
 4. 架构、模块边界或公共契约变化时更新专题规则和导航；普通页面功能不更新根规则。
-5. 修改 `AGENTS.md` 后同步 `CLAUDE.md`，并运行 `python scripts/check_rule_architecture.py`。
+5. 修改 `AGENTS.md` 后同步 `CLAUDE.md` 和 `.workbuddy/memory/MEMORY.md`，并运行 `python scripts/check_rule_architecture.py`。
 6. 不在规则中硬编码测试数量、文件数量、当前版本号等高频变化数据。
 

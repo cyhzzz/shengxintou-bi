@@ -142,6 +142,18 @@ tests = [
         'params': ['2026-01-01', '2026-12-31'],
     },
     {
+        # 广告计划分析（移动端暂不支持，但底层数据与桌面端同源；
+        # 此处验证移动端 SQLite 含该报表所需的 fact_conv_appmarket 广告开户节点数据，
+        # 与 backend/routes/reports/app_market_ad_plan.py 口径一致）
+        'name': 'reports/app-market/ad-plan-analysis',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
         'name': 'data-freshness',
         'sql': '''SELECT MAX("日期") AS latest FROM "agg_vendor_daily"''',
         'params': [],
