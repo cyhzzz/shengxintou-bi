@@ -641,3 +641,325 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
     all_count: items.length,
   };
 }
+
+// ============================================================================
+// 应用市场 · 广告计划分析 (reports/app-market/ad-plan-analysis)
+// 结合三个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily
+// 复刻 backend/routes/reports/app_market_ad_plan.py（周度口径：上周五~本周四）
+// ============================================================================
+
+// 7 大应用市场（与归因转化率 / 计划分解口径一致）
+const AD_PLAN_ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
+
+// 广告开户复合条件（固定常量，无参数绑定）
+const AD_ACCOUNT_COND = `"是否创建完资金账号" = 1 AND "渠道类型" = '互联网引流' AND "是否新开户" = 1`;
+
+/** 周五起始周（上周五~本周四）SQLite 表达式：date(col, 'weekday 4', '-6 days') */
+function fridayWeekExpr(col: string): string {
+  return `date("${col}", 'weekday 4', '-6 days')`;
+}
+
+/** 周五起始周结束日（周四）= 周起始 + 6 天 */
+function _adWeekEnd(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00');
+  d.setDate(d.getDate() + 6);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** 步骤间转化率（分母为 0 返回 0，前端展示 '-'） */
+function adRate(numerator: number, denominator: number): number {
+  if (!denominator) return 0;
+  return Math.round((numerator / denominator) * 10000) / 10000;
+}
+
+/** 由各阶段原始计数构建指标行（含步骤间转化率与广告开户成本） */
+function buildAdMetrics(
+  spend: number, impressions: number, clicks: number,
+  downloads: number, activate: number, register: number, id_card: number,
+  bank_card: number, submit: number, success: number, ad_account: number
+): Record<string, any> {
+  return {
+    '消耗': round2(toFloat(spend)),
+    '展示': toInt(impressions),
+    '点击': toInt(clicks),
+    '点击率': adRate(clicks, impressions),
+    '下载量': toInt(downloads),
+    '下载率': adRate(downloads, clicks),
+    '激活量': toInt(activate),
+    '激活率': adRate(activate, downloads),
+    '开户注册量': toInt(register),
+    '开户注册率': adRate(register, activate),
+    '身份证上传量': toInt(id_card),
+    '身份证上传率': adRate(id_card, register),
+    '银行卡上传量': toInt(bank_card),
+    '银行卡上传率': adRate(bank_card, id_card),
+    '开户提交量': toInt(submit),
+    '开户提交率': adRate(submit, bank_card),
+    '开户成功量': toInt(success),
+    '开户成功率': adRate(success, submit),
+    '广告开户量': toInt(ad_account),
+    '广告开户率': adRate(ad_account, success),
+    '广告开户成本': toInt(ad_account) > 0 ? round2(spend / toInt(ad_account)) : null,
+  };
+}
+
+export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
+  const filters = getFilters(body);
+  const { start_date: sd, end_date: ed } = getDateRange(filters);
+  const platforms: string[] = Array.isArray(filters.platforms) ? filters.platforms : [];
+  const week_start: string | undefined = filters.week_start;
+
+  // 市场解析：空 -> 全部 7 大市场（与后端 _resolve_markets 一致）
+  const requested = platforms.filter(p => AD_PLAN_ALLOWED_PLATFORMS.includes(p));
+  const markets = requested.length > 0 ? requested : AD_PLAN_ALLOWED_PLATFORMS;
+
+  const marketIn = (col: string) => inClause(col, markets)!;
+  const marketWhere = buildWhere([marketIn('应用市场'), dateClause('下载日期', sd, ed)]);
+  const platformWhere = buildWhere([marketIn('平台'), { sql: '"花费" > 0', params: [] }, dateClause('日期', sd, ed)]);
+
+  // ---- 开户概览：按应用市场聚合 开户 + 消耗 ----
+  const openRows = await querySql<Row>(
+    `SELECT "应用市场" as market,
+       COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_cnt
+     FROM fact_conv_appmarket ${marketWhere.clause}
+     GROUP BY "应用市场"`,
+    marketWhere.params
+  );
+  const openMap: Record<string, number> = {};
+  for (const r of openRows) openMap[r.market] = toInt(r.open_cnt);
+
+  const spendRows = await querySql<Row>(
+    `SELECT "平台" as platform, COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台"`,
+    platformWhere.params
+  );
+  const spendMap: Record<string, number> = {};
+  for (const r of spendRows) spendMap[r.platform] = toFloat(r.spend);
+
+  const total_open = Object.values(openMap).reduce((s, v) => s + v, 0);
+  const total_spend = round2(Object.values(spendMap).reduce((s, v) => s + v, 0));
+  const overview = {
+    total_open,
+    total_spend,
+    total_open_cost: total_open ? round2(total_spend / total_open) : null,
+  };
+
+  const by_market = markets.map(m => {
+    const oc = openMap[m] || 0;
+    const sp = round2(spendMap[m] || 0);
+    return { market: m, open_count: oc, spend: sp, open_cost: oc ? round2(sp / oc) : null };
+  }).sort((a, b) => b.open_count - a.open_count);
+
+  // ---- 计划分解维度 (dim_ad_plan_class) ----
+  const planRows = await querySql<Row>(
+    `SELECT "应用市场" as market, "广告分组ID" as plan_id, "广告分组名称" as plan_name,
+       "版位" as placement, "子版位" as sub_placement, "出价" as bid
+     FROM dim_ad_plan_class ${buildWhere([marketIn('应用市场')]).clause}`,
+    buildWhere([marketIn('应用市场')]).params
+  );
+  const plans = planRows.map(r => ({
+    plan_id: Number(r.plan_id),
+    market: r.market,
+    plan_name: r.plan_name,
+    placement: r.placement,
+    sub_placement: r.sub_placement,
+    bid: r.bid,
+  }));
+  const planIds = Array.from(new Set(plans.map(p => p.plan_id)));
+  // SQLite 中整数列与字符串参数比较会做数值转换，IN 参数统一传字符串
+  const planIdStrs = planIds.map(String);
+
+  // ---- 计划级 开户 / 消耗 映射（plan 分解 5 大市场）----
+  const poMap: Record<number, number> = {};
+  const psMap: Record<number, number> = {};
+  if (planIds.length > 0) {
+    const poWhere = buildWhere([inClause('广告计划ID', planIdStrs), dateClause('下载日期', sd, ed)]);
+    const poRows = await querySql<Row>(
+      `SELECT "广告计划ID" as plan_id, COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_cnt
+       FROM fact_conv_appmarket ${poWhere.clause}
+       GROUP BY "广告计划ID"`,
+      poWhere.params
+    );
+    for (const r of poRows) poMap[Number(r.plan_id)] = toInt(r.open_cnt);
+
+    const psWhere = buildWhere([{ sql: '"花费" > 0', params: [] }, inClause('计划ID', planIdStrs), dateClause('日期', sd, ed)]);
+    const psRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, COALESCE(SUM("花费"), 0) as spend
+       FROM agg_vendor_daily ${psWhere.clause}
+       GROUP BY "计划ID"`,
+      psWhere.params
+    );
+    for (const r of psRows) psMap[Number(r.plan_id)] = toFloat(r.spend);
+  }
+
+  // 计划明细 + 版位聚合
+  const plan_detail = plans.map(p => {
+    const oc = poMap[p.plan_id] || 0;
+    const sp = round2(psMap[p.plan_id] || 0);
+    return {
+      plan_id: String(p.plan_id),
+      market: p.market, plan_name: p.plan_name, placement: p.placement,
+      sub_placement: p.sub_placement, bid: p.bid,
+      open_count: oc, spend: sp, open_cost: oc ? round2(sp / oc) : null,
+    };
+  }).sort((a, b) => (b.open_count || 0) - (a.open_count || 0) || (b.spend || 0) - (a.spend || 0));
+
+  const placementAgg: Record<string, { open_count: number; spend: number }> = {};
+  for (const p of plan_detail) {
+    const key = `${p.placement || '未分类'}|${p.sub_placement || '未分类'}`;
+    const agg = placementAgg[key] || { open_count: 0, spend: 0 };
+    agg.open_count += p.open_count;
+    agg.spend += p.spend;
+    placementAgg[key] = agg;
+  }
+  const by_placement = Object.entries(placementAgg).map(([key, agg]) => {
+    const [placement, sub_placement] = key.split('|');
+    return {
+      placement, sub_placement,
+      open_count: agg.open_count,
+      spend: round2(agg.spend),
+      open_cost: agg.open_count ? round2(agg.spend / agg.open_count) : null,
+    };
+  }).sort((a, b) => b.open_count - a.open_count);
+
+  // ---- 按周开户量（周五起始周），per-market ----
+  const weeklyOpenRows = await querySql<Row>(
+    `SELECT "应用市场" as market, ${fridayWeekExpr('下载日期')} as week_start,
+       COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_count
+     FROM fact_conv_appmarket ${marketWhere.clause}
+     GROUP BY "应用市场", week_start ORDER BY "应用市场", week_start`,
+    marketWhere.params
+  );
+  const weekly_open = weeklyOpenRows.map(r => {
+    const ws = String(r.week_start).slice(0, 10);
+    return { market: r.market, week_start: ws, week_end: _adWeekEnd(ws), open_count: toInt(r.open_count) };
+  });
+
+  // ---- 按周分计划 + 分计划展开 ----
+  const aggBy: Record<string, { spend: number; impressions: number; clicks: number }> = {};
+  const factBy: Record<string, { downloads: number; activate: number; register: number; id_card: number; bank_card: number; submit: number; success: number; ad_account: number }> = {};
+  if (planIds.length > 0) {
+    const aggWeekWhere = buildWhere([
+      inClause('计划ID', planIdStrs),
+      { sql: '("花费" > 0 OR "展示量" > 0 OR "点击量" > 0)', params: [] },
+      dateClause('日期', sd, ed),
+    ]);
+    const aggWeekRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, ${fridayWeekExpr('日期')} as week_start,
+         COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks
+       FROM agg_vendor_daily ${aggWeekWhere.clause}
+       GROUP BY "计划ID", week_start`,
+      aggWeekWhere.params
+    );
+    for (const r of aggWeekRows) {
+      aggBy[`${Number(r.plan_id)}|${String(r.week_start).slice(0, 10)}`] = {
+        spend: toFloat(r.spend), impressions: toFloat(r.impressions), clicks: toFloat(r.clicks),
+      };
+    }
+
+    const factWeekWhere = buildWhere([
+      inClause('广告计划ID', planIdStrs),
+      { sql: '"渠道类型" = ?', params: ['互联网引流'] },
+      dateClause('下载日期', sd, ed),
+    ]);
+    const factWeekRows = await querySql<Row>(
+      `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('下载日期')} as week_start,
+         COUNT(DISTINCT "设备号") as downloads,
+         COUNT(DISTINCT CASE WHEN "是否激活APP" = 1 THEN "设备号" END) as activate,
+         COUNT(DISTINCT CASE WHEN "是否开户注册" = 1 THEN "设备号" END) as register,
+         COUNT(DISTINCT CASE WHEN "是否注册身份证" = 1 THEN "设备号" END) as id_card,
+         COUNT(DISTINCT CASE WHEN "是否注册银行卡" = 1 THEN "设备号" END) as bank_card,
+         COUNT(DISTINCT CASE WHEN "是否提交开户" = 1 THEN "设备号" END) as submit,
+         COUNT(DISTINCT CASE WHEN "是否创建完资金账号" = 1 THEN "设备号" END) as success,
+         COUNT(DISTINCT CASE WHEN ${AD_ACCOUNT_COND} THEN "设备号" END) as ad_account
+       FROM fact_conv_appmarket ${factWeekWhere.clause}
+       GROUP BY "广告计划ID", week_start`,
+      factWeekWhere.params
+    );
+    for (const r of factWeekRows) {
+      factBy[`${Number(r.plan_id)}|${String(r.week_start).slice(0, 10)}`] = {
+        downloads: toFloat(r.downloads), activate: toFloat(r.activate), register: toFloat(r.register),
+        id_card: toFloat(r.id_card), bank_card: toFloat(r.bank_card), submit: toFloat(r.submit),
+        success: toFloat(r.success), ad_account: toFloat(r.ad_account),
+      };
+    }
+  }
+
+  const plan_week_detail: any[] = [];
+  const allWeeks = new Set<string>();
+  for (const p of plans) {
+    const pid = p.plan_id;
+    const weekSet = new Set<string>();
+    for (const k in aggBy) if (k.startsWith(`${pid}|`)) weekSet.add(k.split('|')[1]);
+    for (const k in factBy) if (k.startsWith(`${pid}|`)) weekSet.add(k.split('|')[1]);
+    const keys = Array.from(weekSet);
+
+    const week_rows = keys.map(wk => {
+      const a = aggBy[`${pid}|${wk}`] || { spend: 0, impressions: 0, clicks: 0 };
+      const f = factBy[`${pid}|${wk}`] || { downloads: 0, activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0, ad_account: 0 };
+      const m = buildAdMetrics(a.spend, a.impressions, a.clicks, f.downloads, f.activate, f.register, f.id_card, f.bank_card, f.submit, f.success, f.ad_account);
+      m['week_start'] = wk;
+      m['week_end'] = _adWeekEnd(wk);
+      return m;
+    }).sort((x, y) => y.week_start.localeCompare(x.week_start));
+
+    keys.forEach(wk => allWeeks.add(wk));
+
+    const sumMetrics = buildAdMetrics(
+      keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.spend || 0), 0),
+      keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.impressions || 0), 0),
+      keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.clicks || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.downloads || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.activate || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.register || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.id_card || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.bank_card || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.submit || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.success || 0), 0),
+      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.ad_account || 0), 0),
+    );
+    plan_week_detail.push({
+      plan_id: String(pid),
+      market: p.market, plan_name: p.plan_name, placement: p.placement,
+      sub_placement: p.sub_placement, bid: p.bid,
+      summary: sumMetrics,
+      weeks: week_rows,
+    });
+  }
+  plan_week_detail.sort((a, b) => (b.summary['消耗'] || 0) - (a.summary['消耗'] || 0));
+
+  const weeks = Array.from(allWeeks).sort((a, b) => b.localeCompare(a));
+  const selected = week_start && weeks.includes(week_start) ? week_start : (weeks[0] || null);
+
+  const week_plans: any[] = [];
+  if (selected) {
+    for (const pl of plan_week_detail) {
+      const row = pl.weeks.find((w: any) => w.week_start === selected);
+      if (row) {
+        week_plans.push({
+          plan_id: pl.plan_id, market: pl.market, plan_name: pl.plan_name,
+          placement: pl.placement, sub_placement: pl.sub_placement, ...row,
+        });
+      }
+    }
+    week_plans.sort((a, b) => (b['消耗'] || 0) - (a['消耗'] || 0));
+  }
+
+  return {
+    platforms: AD_PLAN_ALLOWED_PLATFORMS,
+    selected_platforms: platforms,
+    overview,
+    plan_detail,
+    by_placement,
+    by_market,
+    weekly_open,
+    weeks,
+    selected_week: selected,
+    week_plans,
+    plan_week_detail,
+  };
+}

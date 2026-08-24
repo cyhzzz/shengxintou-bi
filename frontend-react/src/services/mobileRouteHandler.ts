@@ -10,7 +10,7 @@
  * - 内容平台存量剔除：是否为存量客户 = 0 OR IS NULL
  */
 import { handleOmniChannelSummary, handleOmniChannelFilterOptions, handleOmniChannelDailyCalendar, handleOmniChannelDailyTrend, handleOmniChannelByChannel } from './mobileHandlers/omniChannel';
-import { handleAppMarketFunnel, handleAppMarketFilterOptions, handleAppMarketSummary, handleAppMarketDetail, handleAppMarketCostAnalysis, handleAppMarketAttributionConversion, handleAppMarketPlanAnalysis, handleAppMarketCreative } from './mobileHandlers/appMarket';
+import { handleAppMarketFunnel, handleAppMarketFilterOptions, handleAppMarketSummary, handleAppMarketDetail, handleAppMarketCostAnalysis, handleAppMarketAttributionConversion, handleAppMarketPlanAnalysis, handleAppMarketCreative, handleAppMarketAdPlanAnalysis } from './mobileHandlers/appMarket';
 import { handleDashboardCoreMetrics, handleDashboardTrendData } from './mobileHandlers/dashboard';
 import { handleCostAnalysis } from './mobileHandlers/costAnalysis';
 import { handleAgencyAnalysis } from './mobileHandlers/agencyAnalysis';
@@ -117,9 +117,9 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleAppMarketCreative(body);
     case 'reports/app-market/cost-analysis':
       return handleAppMarketCostAnalysis(body);
-    // 广告计划分析（计划周粒度漏斗，数据量大，暂不支持移动端；与归因转化率同策略）
+    // 广告计划分析（计划周粒度漏斗，结合 dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily）
     case 'reports/app-market/ad-plan-analysis':
-      throw new Error('广告计划分析暂不支持移动端，请在桌面端查看');
+      return handleAppMarketAdPlanAnalysis(body);
     case 'reports/app-market/attribution-conversion':
       return handleAppMarketAttributionConversion(body);
 
