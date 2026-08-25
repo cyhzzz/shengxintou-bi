@@ -1,0 +1,4 @@
+# 统一文本文件入库为 LF，检出按平台（Windows 检出 CRLF）
+# 二进制文件由 text=auto 自动检测，不受行尾影响
+# 消除 core.autocrlf 造成的 LF/CRLF 幻影差异
+* text=auto
