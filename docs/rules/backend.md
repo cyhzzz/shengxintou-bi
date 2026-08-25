@@ -107,6 +107,8 @@
 - WebDAV 网络层错误（SSL、连接重置、拒绝、超时等）返回 `502`，错误码 `UPSTREAM_UNAVAILABLE`。
 - 其他列表/业务失败返回 `500`，错误码 `LIST_FAILED` 或当前端点约定码。
 - 不降低 `WEBDAV_VERIFY_SSL` 默认安全性；代理和证书行为由配置控制。
+- 坚果云 WAF 按请求 UA 指纹重置 python-requests 默认连接（`ConnectionResetError 10054`），`webdav_client.py` 用 `_WEBDAV_USER_AGENT`（Chrome 浏览器 UA）统一注入规避；新增 WebDAV 调用必须走 `_requests_kwargs()`。
+- 坚果云 WAF 对写操作（MKCOL/PUT/DELETE）有滑动窗口限流，突发连发返回 HTTP 409；逐表目录用 `_ENSURED_TABLES_DIRS` 缓存只建一次，写操作失败按 `2+2*retries` 退避重试。
 - 飞书相关环境变量目前是预留项，生产无同步路由消费；不要根据旧代码重新暴露接口。
 
 ## 8. 配置与敏感信息
