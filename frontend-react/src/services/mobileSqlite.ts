@@ -140,6 +140,31 @@ export async function closeMobileDatabase(): Promise<void> {
 }
 
 /**
+ * v3.9.5：批量执行写语句（DROP/CREATE/INSERT），一条事务。
+ *
+ * 用于移动端分表同步把云端「单表 .db」合并进本地 Capacitor SQLite：
+ * 对每张表 DROP + CREATE（原 schema）+ 逐行 INSERT，语义与后端 merge_sqlite_table_into 一致，
+ * 且不触碰其它表。用 executeSet（单事务）保证中途失败整体回滚、不产生半更新表。
+ */
+export async function executeSetSql(
+  statements: { statement: string; values: unknown[] }[]
+): Promise<void> {
+  if (!statements || statements.length === 0) return;
+  if (!dbOpen) await initMobileDatabase();
+  const result = await CapacitorSQLite.executeSet({
+    database: DB_NAME,
+    set: statements.map((s) => ({
+      statement: s.statement,
+      values: s.values as any[],
+    })),
+  });
+  if (!result?.changes && statements.some((s) => /^(DROP|CREATE|INSERT)/i.test(s.statement.trimStart()))) {
+    // executeSet 空 changes 在纯 DDL 场景属正常（无行变更），这里不报错；仅日志
+    console.log('[mobileSqlite] executeSetSql: changes=', result?.changes);
+  }
+}
+
+/**
  * v3.5.3：检查 DB 是否存在于 SQLite 插件读取的目录
  *
  * 用原生 API isDatabase({ database }) 检查

@@ -20,6 +20,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { syncFromWebDAV, hasWebDAVCredentials } from '@/services/mobileSync';
+import { syncTablesFromWebDAV } from '@/services/mobileTableSync';
 import { databaseExists, copyDatabaseFromAssets, closeMobileDatabase, initMobileDatabase } from '@/services/mobileSqlite';
 import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 import MobileSyncButton from '@/components/MobileSyncButton';
@@ -118,6 +119,37 @@ export default function MobileDatabaseSync() {
     }
   }, [message]);
 
+  // v3.9.5：分表增量同步（按 manifest 只拉取比本地新的表，避免整库重复下载）
+  const handleTableSync = useCallback(async () => {
+    setSyncing(true);
+    setProgress('准备分表同步...');
+    try {
+      const result = await syncTablesFromWebDAV(setProgress);
+      if (result.success) {
+        message.success(result.message);
+        setState((s) => ({
+          ...s,
+          hasDb: true,
+          hasCreds: true,
+          lastSyncAt: result.timestamp || new Date().toISOString(),
+          lastSize: s.lastSize,
+        }));
+        // 分表同步不替换主库文件，无需 reload；只刷新本地数据供报表读取
+        if (!isPwaClient()) {
+          try { await initMobileDatabase(); } catch { /* ignore */ }
+        }
+      } else {
+        message.error(result.message);
+        if (!isPwaClient()) {
+          try { await initMobileDatabase(); } catch { /* ignore */ }
+        }
+      }
+    } finally {
+      setSyncing(false);
+      setProgress('');
+    }
+  }, [message]);
+
   // v3.6.2：PWA 端没有内置 DB，此函数仅在安卓端有效
   const handleRestoreFromAssets = useCallback(async () => {
     if (isPwaClient()) return;
@@ -178,6 +210,10 @@ export default function MobileDatabaseSync() {
             从坚果云下载最新的本地数据库快照，覆盖本地数据后即可离线查看报表。
             仅支持下载，不支持上传。
           </Paragraph>
+          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            「分表同步」按需增量拉取比本地新的业务表（更省流量）；首次使用或云端无逐表清单时，
+            请先用「从坚果云同步」整库拉取一次。
+          </Paragraph>
 
           {/* v3.6.0：未配置时友好引导，不报错 */}
           {!state.hasCreds && !state.loading && (
@@ -231,6 +267,15 @@ export default function MobileDatabaseSync() {
               disabled={!state.hasCreds}
             >
               {state.hasDb ? '从坚果云同步' : '立即同步'}
+            </Button>
+            {/* v3.9.5：分表增量同步（需已有本地库，云端有逐表清单） */}
+            <Button
+              icon={<CloudDownloadOutlined />}
+              loading={syncing}
+              onClick={handleTableSync}
+              disabled={!state.hasCreds || !state.hasDb}
+            >
+              分表同步
             </Button>
             {/* v3.6.2：PWA 端无内置 DB，不显示「恢复内置数据」按钮 */}
             {!pwaMode && (

@@ -227,6 +227,57 @@ export async function hasLocalDb(): Promise<boolean> {
 }
 
 /**
+ * 单个分表文件解析结果（v3.9.5 移动端分表同步）
+ *
+ * 由 mobileTableSync 用 sql.js 打开云端「单表 .db」文件后产出：
+ *   - createSql：表内 sqlite_master 记录的原始 CREATE 语句（保留完整列类型）
+ *   - columns / rows：全量数据，用于 INSERT
+ */
+export interface ParsedTable {
+  name: string;
+  createSql: string;
+  columns: string[];
+  rows: SqlValue[][];
+}
+
+/**
+ * 把若干分表合并进当前 PWA 主库并持久化到 IndexedDB（v3.9.5）
+ *
+ * 合并语义与后端 merge_sqlite_table_into 一致：对每张表 DROP + CREATE + INSERT（全量替换），
+ * 不破坏其它表。写完后把整个主库 export 写回 IndexedDB。
+ */
+export async function mergeParsedTablesIntoLocal(tables: ParsedTable[]): Promise<void> {
+  if (!db) await initSqlJsDatabase();
+  if (!db) throw new Error('本地数据库未初始化');
+
+  for (const t of tables) {
+    db.run(`DROP TABLE IF EXISTS "${t.name}"`);
+    db.run(t.createSql);
+    if (t.columns.length > 0 && t.rows.length > 0) {
+      const placeholders = t.columns.map(() => '?').join(',');
+      const stmt = db.prepare(`INSERT INTO "${t.name}" VALUES (${placeholders})`);
+      try {
+        for (const row of t.rows) {
+          stmt.bind(row as SqlValue[]);
+          stmt.step();
+          stmt.reset();
+        }
+      } finally {
+        stmt.free();
+      }
+    }
+  }
+
+  // export 后写回 IndexedDB，保证下次启动读到的是合并后的数据
+  const exported = db.export();
+  const buffer = exported.buffer.slice(
+    exported.byteOffset,
+    exported.byteOffset + exported.byteLength
+  ) as ArrayBuffer;
+  await saveDbToIndexedDB(buffer);
+}
+
+/**
  * 删除 IndexedDB 中的 DB（用于重新同步前清理）
  */
 export async function deleteLocalDb(): Promise<void> {
