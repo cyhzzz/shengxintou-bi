@@ -1175,6 +1175,24 @@ def _push_whole_snapshot(client):
     return result
 
 
+def _start_snapshot_push(client):
+    """后台线程上传整库快照（fire-and-forget），不阻塞逐表上传响应。
+
+    原因：整库快照要压缩 + PUT 大文件，同步执行会拖爆前端 30s 超时（表现为"请求超时"）。
+    Flask 后台线程须显式 app context：先取 app 对象，线程内 push。
+    """
+    app = current_app._get_current_object()
+
+    def _run():
+        with app.app_context():
+            try:
+                _push_whole_snapshot(client)
+            except Exception as e:
+                app.logger.warning('后台整库快照同步失败: %s', e)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def _valid_table_names(names) -> list:
     from backend.utils.table_sync import SYNC_TABLES
     allow = set(SYNC_TABLES)
@@ -1266,15 +1284,13 @@ def table_upload():
                 manifest['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 client.put_table_manifest(manifest)
 
-                # 兼容老客户端：连同分表一起 push 一份最新整库快照。
-                # 老版本同事只读整库 + latest_backup.txt，若只上传分表他们永远看不到新数据。
-                # 失败不阻断逐表结果，仅记录到 __whole_snapshot__。
+                # 兼容老客户端：连同分表后台 push 一份最新整库快照（异步，不阻塞响应，
+                # 避免整库压缩+上传耗时拖爆前端 30s 超时导致「请求超时」）。
                 try:
-                    snap = _push_whole_snapshot(client)
+                    _start_snapshot_push(client)
                     results['__whole_snapshot__'] = {
-                        'status': 'uploaded',
-                        'filename': snap['filename'],
-                        'size': snap['size'],
+                        'status': 'started',
+                        'message': '整库快照将在后台同步',
                     }
                 except Exception as snap_err:
                     results['__whole_snapshot__'] = {'status': 'error', 'message': f'整库快照同步失败: {snap_err}'}

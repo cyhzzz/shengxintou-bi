@@ -317,7 +317,7 @@ export interface TableSyncManifestData {
   schema_version?: string;
 }
 export interface TableSyncResultRow {
-  status: 'uploaded' | 'downloaded' | 'skipped' | 'error';
+  status: 'uploaded' | 'downloaded' | 'skipped' | 'error' | 'started';
   version?: string;
   rows?: number;
   reason?: string;
@@ -350,11 +350,12 @@ export const dataServiceTableSync = {
   getManifest: async (): Promise<{ success: boolean; data?: TableSyncManifestData; error?: string; message?: string }> => {
     return http.get('/webdav/tables/manifest') as unknown as { success: boolean; data?: TableSyncManifestData; error?: string; message?: string };
   },
+  // 逐表上传/下载可能涉及大表导出+WebDAV 传输，放宽超时（默认 30s 不够，会"请求超时"）
   upload: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
-    return http.post('/webdav/tables/upload', { tables }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
+    return http.post('/webdav/tables/upload', { tables }, { timeout: 180000 }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
   },
   download: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
-    return http.post('/webdav/tables/download', { tables }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
+    return http.post('/webdav/tables/download', { tables }, { timeout: 180000 }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
   },
 };
 

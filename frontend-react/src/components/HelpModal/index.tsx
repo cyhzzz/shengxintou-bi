@@ -43,6 +43,8 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   } | null>(null);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateTaskId, setUpdateTaskId] = useState<string | null>(null);
+  // 进度弹窗当前跟踪的任务类型（决定成功后页脚动作：git/frontend → 刷新页面；full → 引导重启生效）
+  const [updateTaskType, setUpdateTaskType] = useState<'git' | 'frontend' | 'full' | null>(null);
   const [updateProgress, setUpdateProgress] = useState(0);
   const [updateStage, setUpdateStage] = useState<string>("");
   const [updateLog, setUpdateLog] = useState<string[]>([]);
@@ -105,6 +107,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     setUpdateStage("提交更新任务...");
     setUpdateLog([]);
     setUpdateResult(null);
+    setUpdateTaskType("git");
     try {
       const r = await dataService.selfUpdateStart(force);
       if (!r.success || !r.data) {
@@ -126,6 +129,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     setUpdateStage("提交前端热更新任务...");
     setUpdateLog([]);
     setUpdateResult(null);
+    setUpdateTaskType("frontend");
     try {
       const r = await dataService.frontendUpdateStart();
       if (!r.success || !r.data) {
@@ -158,16 +162,20 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     setUpdateStage("准备完整更新...");
     setUpdateLog([]);
     setUpdateResult(null);
+    // 立即打开进度弹窗：完整更新包下载需要数分钟，若不弹窗则点击后零可见反馈（无反应）
+    setUpdateModalOpen(true);
+    setUpdateTaskType("full");
     try {
       const r = await dataService.fullUpdateStart();
       if (!r.success || !r.data) {
-        antdMessage.error(r.message || "启动完整更新失败");
+        // 失败展示在弹窗内（持久），而不是一闪而过的 toast，避免看起来像"没反应"
+        setUpdateResult({ status: "failed", message: r.message || "启动完整更新失败" });
         setFullUpdateBusy(false);
         return;
       }
       setFullUpdateTaskId(r.data.task_id);
     } catch (e: any) {
-      antdMessage.error("启动完整更新异常：" + (e?.message || e));
+      setUpdateResult({ status: "failed", message: "启动完整更新异常：" + (e?.message || e) });
       setFullUpdateBusy(false);
     }
   };
@@ -315,6 +323,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     if (frontendUpdateTaskId) setUpdateModalOpen(true);
   }, [frontendUpdateTaskId]);
 
+  // 当有 fullUpdateTaskId 时自动打开进度 Modal（兜底：任何路径启动完整更新都可见反馈）
+  useEffect(() => {
+    if (fullUpdateTaskId) setUpdateModalOpen(true);
+  }, [fullUpdateTaskId]);
+
   // v3.9.0：完整更新下载轮询（桌面版）——完成后检查 staging 就绪
   useEffect(() => {
     if (!fullUpdateTaskId) return;
@@ -329,6 +342,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
           setUpdateLog(d.log || []);
           setUpdateProgress(d.progress ?? 50);
           if (d.status === "completed") {
+            setUpdateTaskType("full");
             setUpdateResult({ status: "success", message: d.message });
             setUpdateProgress(100);
             setFullUpdateBusy(false);
@@ -605,20 +619,27 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
         title="代码更新进度"
         open={updateModalOpen}
         onCancel={() => {
-          if (updateResult?.status === "success") {
+          if (updateResult?.status === "success" && updateTaskType !== "full") {
             window.location.reload();
           } else {
             setUpdateModalOpen(false);
             setUpdateTaskId(null);
+            setUpdateTaskType(null);
           }
         }}
         footer={[
           updateResult?.status === "success" ? (
-            <Button key="reload" type="primary" onClick={() => window.location.reload()}>
-              刷新页面
-            </Button>
+            updateTaskType === "full" ? (
+              <Button key="close-full" type="primary" onClick={() => { setUpdateModalOpen(false); setUpdateTaskType(null); }}>
+                关闭（点击「重启应用生效」应用更新）
+              </Button>
+            ) : (
+              <Button key="reload" type="primary" onClick={() => window.location.reload()}>
+                刷新页面
+              </Button>
+            )
           ) : updateResult ? (
-            <Button key="close" onClick={() => { setUpdateModalOpen(false); setUpdateTaskId(null); }}>
+            <Button key="close" onClick={() => { setUpdateModalOpen(false); setUpdateTaskId(null); setUpdateTaskType(null); }}>
               关闭
             </Button>
           ) : (
@@ -644,9 +665,15 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
             </pre>
           )}
           {updateResult?.status === "success" && (
-            <Text type="success">
-              ✅ 更新成功：v{updateResult.before_version} → v{updateResult.after_version}
-            </Text>
+            updateTaskType === "full" ? (
+              <Text type="success">
+                ✅ 完整更新包已就绪（v{remoteVersion || "新版本"}），关闭后点击「重启应用生效」应用更新。
+              </Text>
+            ) : (
+              <Text type="success">
+                ✅ 更新成功：v{updateResult.before_version} → v{updateResult.after_version}
+              </Text>
+            )
           )}
           {updateResult?.status === "failed" && (
             <Text type="danger">

@@ -321,9 +321,11 @@ export default function TableSyncCard() {
                           <strong>整库快照（老客户端兼容）</strong>：
                           {r.status === 'error'
                             ? <span style={{ color: 'var(--color-danger)' }}>失败 — {r.message}</span>
-                            : r.filename
-                              ? <span style={{ color: 'var(--color-success)' }}>已同步 — {r.filename}</span>
-                              : <span>已同步</span>}
+                            : r.status === 'started'
+                              ? <span>后台同步中…</span>
+                              : r.filename
+                                ? <span style={{ color: 'var(--color-success)' }}>已同步 — {r.filename}</span>
+                                : <span>已同步</span>}
                         </li>
                       );
                     }

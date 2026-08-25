@@ -24,6 +24,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from backend.utils import table_sync as ts  # noqa: E402
+from backend.utils import webdav_client as wc  # noqa: E402
+from backend.utils.webdav_client import WebDAVBackupClient  # noqa: E402
 
 
 def _build_source(db_path):
@@ -188,6 +190,53 @@ class TableSyncUtilTest(unittest.TestCase):
         self.assertIsNone(ts.normalize_version(None))
         # 同一天：日期(无时间) < 带时间戳的 watermark，语义正确
         self.assertLess(ts.normalize_version('2026-08-24'), ts.normalize_version('20260824_083000'))
+
+
+class WebDAVTablePathTest(unittest.TestCase):
+    """回归：逐表同步的远端路径拼接必须只含单层 backup_dir。
+
+    历史 Bug：_tables_dir() 曾返回 'shengxintou-backup/tables/table_sync'（已含 backup_dir），
+    再经 _get_remote_url/_get_remote_path 又拼一次 backup_dir，形成双重路径
+    '.../shengxintou-backup/shengxintou-backup/tables/table_sync/...'，
+    远端父目录不存在导致 PUT 返回 409（逐表上传失败）。
+    """
+
+    URL = 'https://dav.jianguoyun.com/dav/'
+    BACKUP_DIR = '/shengxintou-backup'
+
+    def setUp(self):
+        wc._ENSURED_TABLES_DIRS.clear()
+        patcher = mock.patch.object(WebDAVBackupClient, '_ensure_backup_dir_exists')
+        self.addCleanup(patcher.stop)
+        patcher.start()
+        self.client = WebDAVBackupClient(
+            url=self.URL, username='u', password='p',
+            backup_dir=self.BACKUP_DIR)
+
+    def test_tables_dir_is_relative(self):
+        self.assertEqual(self.client._tables_dir(), 'tables/table_sync')
+        self.assertEqual(self.client._table_name('dim_account'),
+                         'tables/table_sync/dim_account.db')
+
+    def test_remote_url_has_single_backup_dir(self):
+        url = self.client._get_remote_url(self.client._table_name('dim_account'))
+        self.assertEqual(url, 'https://dav.jianguoyun.com/dav/shengxintou-backup/tables/table_sync/dim_account.db')
+        self.assertNotIn('shengxintou-backup/shengxintou-backup', url)
+        manifest_url = self.client._get_remote_url(self.client._tables_dir() + '/manifest.json')
+        self.assertEqual(manifest_url, 'https://dav.jianguoyun.com/dav/shengxintou-backup/tables/table_sync/manifest.json')
+
+    def test_mkcol_targets_single_backup_dir(self):
+        with mock.patch.object(wc.requests, 'request') as mreq:
+            resp = mock.Mock()
+            resp.status_code = 201
+            mreq.return_value = resp
+            self.client._ensure_tables_dir_exists()
+            urls = [call.args[1] for call in mreq.call_args_list]
+            self.assertEqual(len(urls), 2)
+            self.assertEqual(urls[0], 'https://dav.jianguoyun.com/dav/shengxintou-backup/tables')
+            self.assertEqual(urls[1], 'https://dav.jianguoyun.com/dav/shengxintou-backup/tables/table_sync')
+            for u in urls:
+                self.assertNotIn('shengxintou-backup/shengxintou-backup', u)
 
 
 

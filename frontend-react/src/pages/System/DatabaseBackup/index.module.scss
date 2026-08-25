@@ -10,6 +10,11 @@
       font-weight: var(--font-weight-semibold);
     }
   }
+
+  // 多个 Card 纵向堆叠时保持间距（WebDAV 配置 / 逐表同步 / 双向同步）
+  :global(.ant-card) + :global(.ant-card) {
+    margin-top: var(--spacer-16);
+  }
 }
 
 .actionsBar {

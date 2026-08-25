@@ -8,11 +8,23 @@ from webdav3.client import Client
 from webdav3.exceptions import WebDavException, RemoteResourceNotFound
 import os
 import hashlib
+import time
 from datetime import datetime
 import requests
 from requests.auth import HTTPBasicAuth
 import gzip
 import tempfile
+
+# 坚果云 WAF 会按 UA/TLS 指纹直接重置 python-requests 的默认 UA 连接（ConnectionResetError 10054），
+# 表现为所有 WebDAV 调用失败（逐表上传/下载、备份列表等）。用浏览器 UA 可规避（curl/浏览器 UA 实测均 207）。
+_WEBDAV_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+)
+
+# 已确保存在的逐表目录（url + backup_dir）。坚果云 WAF 对写入方法有速率限制，突发写入会返回 409，
+# 因此逐表目录只需首次 MKCOL 建一次，之后直接复用（缓存到本进程生命周期）。
+_ENSURED_TABLES_DIRS = set()
 
 
 class WebDAVBackupClient:
@@ -79,9 +91,9 @@ class WebDAVBackupClient:
                     # 不抛出异常，让后续操作决定是否失败
 
     def _requests_kwargs(self):
-        """构造 requests 调用的公共参数（代理 / SSL 校验），从 config 读取。"""
+        """构造 requests 调用的公共参数（UA / 代理 / SSL 校验），从 config 读取。"""
         import config
-        kw: dict = {}
+        kw: dict = {'headers': {'User-Agent': _WEBDAV_USER_AGENT}}
         proxy = getattr(config, 'WEBDAV_PROXY', None)
         if proxy:
             kw['proxies'] = {'http': proxy, 'https': proxy}
@@ -104,8 +116,10 @@ class WebDAVBackupClient:
         try:
             import requests as _req
             list_url = f'{self.url}{self.backup_dir}/' if self.backup_dir else self.url
-            resp = _req.request('PROPFIND', list_url, headers={'Depth': '1'},
-                                auth=self.auth, timeout=20, **self._requests_kwargs())
+            kwargs = self._requests_kwargs()
+            kwargs['headers']['Depth'] = '1'
+            resp = _req.request('PROPFIND', list_url,
+                                auth=self.auth, timeout=20, **kwargs)
             return {
                 'success': resp.status_code in (207, 200, 401, 403),
                 'status_code': resp.status_code,
@@ -254,7 +268,7 @@ class WebDAVBackupClient:
                         os.remove(temp_download_path)
             else:
                 # 直接下载
-                response = requests.get(remote_url, auth=self.auth, stream=True)
+                response = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
                 if response.status_code not in [200, 206]:
                     raise Exception(f"HTTP {response.status_code}: {response.text}")
 
@@ -294,17 +308,15 @@ class WebDAVBackupClient:
             else:
                 list_url = self.url
 
-            # 发送 PROPFIND 请求
-            headers = {
-                'Depth': '1'
-            }
+            # 发送 PROPFIND 请求（Depth 与公共 UA 头合并，避免重复 headers 关键字）
             try:
+                kwargs = self._requests_kwargs()
+                kwargs['headers']['Depth'] = '1'
                 response = requests.request(
                     method='PROPFIND',
                     url=list_url,
-                    headers=headers,
                     auth=self.auth,
-                    **self._requests_kwargs()
+                    **kwargs
                 )
             except Exception as e:
                 raise Exception(self._wrap_conn_err(e))
@@ -409,17 +421,39 @@ class WebDAVBackupClient:
     # ---- v3.9.3：逐表同步（单表文件 + 表级清单） ----
 
     def _tables_dir(self):
-        """tables 目录前缀（相对 backup_dir）。"""
-        return f'{self.backup_dir}/tables/table_sync' if self.backup_dir else 'tables/table_sync'
+        """tables 目录前缀（相对 backup_dir 的相对路径；_get_remote_url/_get_remote_path 会再拼 backup_dir，
+        因此这里不能再包含 backup_dir，否则会拼出双重 backup_dir 导致远端父目录不存在、PUT 返回 409）。"""
+        return 'tables/table_sync'
 
     def _table_name(self, name):
         """单表文件相对 backup_dir 的路径（表名中转义目录穿越）。"""
         safe = name.replace('/', '_').replace('\\', '_')
         return f'{self._tables_dir()}/{safe}.db'
 
+    def _ensure_tables_dir_exists(self):
+        """确保逐表目录 tables/table_sync 在远端存在（坚果云要求父目录先建，否则 PUT 返回 409）。
+
+        从 backup_dir 逐级 MKCOL；新建返回 201，已存在返回 409，均视为成功。
+        本进程内只建一次（缓存），避免每次上传都发 MKCOL 触发坚果云 WAF 的写入速率限制。
+        """
+        key = (self.url, self.backup_dir)
+        if key in _ENSURED_TABLES_DIRS:
+            return
+        rel = self._tables_dir()
+        parts = [p for p in rel.split('/') if p]
+        current = ''
+        for part in parts:
+            current = f'{current}/{part}' if current else part
+            url = self._get_remote_url(current)
+            resp = requests.request('MKCOL', url, auth=self.auth, **self._requests_kwargs())
+            if resp.status_code not in (200, 201, 204, 301, 302, 405, 409):
+                raise Exception(f'创建远端目录失败 HTTP {resp.status_code}: {resp.text}')
+        _ENSURED_TABLES_DIRS.add(key)
+
     def upload_table_file(self, local_path, table_name, use_compression=False):
         """上传单表 SQLite 文件到 WebDAV tables 目录。返回远端相对路径。"""
         import tempfile
+        self._ensure_tables_dir_exists()
         file_to_upload = local_path
         temp_compressed_path = None
         try:
@@ -433,8 +467,15 @@ class WebDAVBackupClient:
                 file_to_upload = temp_compressed_path
 
             remote_url = self._get_remote_url(self._table_name(table_name))
+            retries = 0
             with open(file_to_upload, 'rb') as f:
                 resp = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+            # 坚果云 WAF 会对写入方法做临时拦截（HTTP 409），重试规避瞬时失败
+            while resp.status_code in (409, 429, 500, 502, 503) and retries < 3:
+                time.sleep(2 + 2 * retries)
+                retries += 1
+                with open(file_to_upload, 'rb') as f:
+                    resp = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
             if resp.status_code not in (200, 201, 204):
                 raise Exception(f"HTTP {resp.status_code}: {resp.text}")
             return self._table_name(table_name)
@@ -473,10 +514,18 @@ class WebDAVBackupClient:
     def put_table_manifest(self, manifest: dict) -> None:
         """写云端表级清单 manifest.json。"""
         import json
+        self._ensure_tables_dir_exists()
         remote_url = self._get_remote_url(f'{self._tables_dir()}/manifest.json')
+        kwargs = self._requests_kwargs()
+        kwargs['headers']['Content-Type'] = 'application/json'
         resp = requests.put(remote_url, data=json.dumps(manifest, ensure_ascii=False),
-                            headers={'Content-Type': 'application/json'},
-                            auth=self.auth, **self._requests_kwargs())
+                            auth=self.auth, **kwargs)
+        retries = 0
+        while resp.status_code in (409, 429, 500, 502, 503) and retries < 3:
+            time.sleep(2 + 2 * retries)
+            retries += 1
+            resp = requests.put(remote_url, data=json.dumps(manifest, ensure_ascii=False),
+                                auth=self.auth, **kwargs)
         if resp.status_code not in (200, 201, 204):
             raise Exception(f"HTTP {resp.status_code}: {resp.text}")
 
@@ -556,10 +605,10 @@ class WebDAVBackupClient:
         try:
             payload = _json.dumps(data, ensure_ascii=False).encode('utf-8')
             remote_url = self._get_remote_url(remote_filename)
+            kwargs = self._requests_kwargs()
+            kwargs['headers']['Content-Type'] = 'application/json'
             response = requests.put(
-                remote_url, data=payload, auth=self.auth,
-                headers={'Content-Type': 'application/json'},
-                **self._requests_kwargs()
+                remote_url, data=payload, auth=self.auth, **kwargs
             )
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
