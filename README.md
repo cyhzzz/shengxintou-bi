@@ -57,6 +57,7 @@ cd frontend-react && npm run dev
 - [v2 数据导入](#v2-数据导入)
 - [项目结构](#项目结构)
 - [开发验证与文档](#开发验证与文档)
+- [AI Agent 开发接入](#ai-agent-开发接入)
 - [项目边界与维护](#项目边界与维护)
 
 ## 核心能力
@@ -178,6 +179,7 @@ Flask 把 `frontend-react/dist/` 当模板 + 静态目录托管。生产环境�
 │   │   └── webdav_backup.py        # 坚果云备份
 │   └── utils/                      # 装饰器 / WebDAV / 飞书 / 代理商映射
 ├── database/shengxintou.db         # SQLite（默认）
+├── skills/shengxintou-bi-rules/   # 可分发 Skill：打包整套规则文档体系（供不支持 AGENTS.md 的 Agent 安装）
 ├── frontend-react/
 │   ├── src/
 │   │   ├── components/             # MetricCard / ReportFooter / Chart / Filter / GuideModal
@@ -222,6 +224,17 @@ npm run test:report
 - [docs/design/monochrome-data-canvas.pdf](docs/design/monochrome-data-canvas.pdf)：单色数据画布设计稿。
 - 历史设计文档已归档至 `docs/_archive/`：v3.1 报表重梳方案 / 前端 UI 优化 PRD / 前端全栈改造清单 / 库表重构设计 v2 & v3 / 数据库架构文档 / 部署指南（v1 时代 Gunicorn + Nginx + Docker 方案，已与当前 SQLite 单文件部署脱节）/ 3 份 v2 拆分 _legacy 报告。新代码以 `AGENTS.md` 为权威源。
 
+
+## 🤖 AI Agent 开发接入
+
+本项目内置一套**开发规则文档体系**（根级 `AGENTS.md`/`CLAUDE.md` + `docs/rules/` 专题规则），供 AI 助手加载后理解产品边界、架构、业务口径、跨端契约、验证与发布红线。不同 Agent 接入方式如下：
+
+| Agent | 支持 AGENTS.md/CLAUDE.md？ | 接入方式 |
+| --- | --- | --- |
+| **Codex、Claude Code、Trae** 等 | 支持 | **直接用项目自带文档体系**即可，无需额外安装：Agent 会读取根级 `AGENTS.md` / `CLAUDE.md`，并按 [docs/rules/README.md](docs/rules/README.md) 的「按任务阅读」索引加载对应专题规则。 |
+| **Workbuddy、豆包** 等 | 不支持 | **建议安装本项目 Skill**：把 [`skills/shengxintou-bi-rules/`](skills/shengxintou-bi-rules/SKILL.md) 目录复制到目标环境的 skill 目录（或按该环境方式导入），该 Skill 已打包整套规则文档体系与必要参考，在修改项目时由 Agent **自动调用**，即可获得与内置规则一致的开发约束。 |
+
+> 说明：`skills/shengxintou-bi-rules/` 内的 `references/` 是 `docs/rules/` 与根级规则的**快照副本**，便于脱离仓库分发；在仓库内开发时仍以 `docs/rules/` 与根级规则为实时权威源。
 
 ## 📦 发布流程
 
