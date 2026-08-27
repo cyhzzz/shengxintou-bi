@@ -40,7 +40,7 @@
 | API 支持的数据导入类型 | `backend/routes/upload.py` 的 `DATA_TYPES` | 前端常量、指南与测试应跟随它同步 |
 | 数据库表与中文列名 | `backend/models.py`、`backend/models_v2.py` 和上游源表 | 不为迎合前端重命名业务列 |
 | 前端生成 API 客户端 | Orval 配置和生成命令 | `frontend-react/src/types/api.ts` 禁止手改 |
-| 已批准功能设计 | 项目当前使用的 spec 目录 | 不回填到根规则，不替代当前代码 |
+| 已批准功能设计 | `docs/superpowers/specs/`（已 gitignore 不入仓库，命名 `YYYY-MM-DD-需求名.md`） | 不回填到根规则，不替代当前代码；流程见 [`workflows/feature.md`](workflows/feature.md) |
 | 历史设计和过期说明 | `docs/_archive/`、`docs/*_legacy.md` | 仅供追溯 |
 | AI 规则构建 Prompt 可移植版本 | `docs/6a2aaa141b82ca7bef7bccb8_AI项目Spec规则构建Prompt.md` | 仅供查阅，规则迁移时参考其检查清单 |
 

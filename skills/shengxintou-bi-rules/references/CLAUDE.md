@@ -1,7 +1,7 @@
 # 省心投 BI — AI 编码规则
 
 > 仓库根规则。`AGENTS.md`、`CLAUDE.md` 与 `.workbuddy/memory/MEMORY.md` 必须字节一致；修改后运行 `python scripts/check_rule_architecture.py`。
-> 默认开发环境：Windows + PowerShell；本地工作目录通常为 `D:/AIproject/省心投BI`。
+> 默认开发环境：Windows（PowerShell / Git Bash）；本地工作目录通常为 `D:/AIproject/省心投BI`。
 
 ## 1. 指令与权威源
 
@@ -13,18 +13,17 @@
 4. `docs/rules/` 中与任务相关的专题规则。
 5. README、部署文档和历史设计。
 
+文档与实现冲突时，先以当前代码、配置、测试和 `version.json` 交叉验证，再修正文档；不要照搬历史说明。
+
 ### 单一权威源
 
-- 当前版本、发布日期、版本号规则和 changelog：`version.json`。
-- 产品定位、安装和使用：`README.md`。
-- 当前业务与工程规则：`docs/rules/README.md`（专题索引）。
-- 主播类型映射：`backend/config/anchor_live_types.json`。
-- 支持的数据导入类型：`backend/routes/upload.py::DATA_TYPES`。
-- 业务表与中文列名：`backend/models_v2.py` 和上游源表。
-- 生成 API 客户端：Orval 配置与生成命令；禁止手改 `frontend-react/src/types/api.ts`。
-- `docs/_archive/` 和 `docs/*_legacy.md` 仅供历史查阅，不作为当前实现依据。
+完整「单一权威源」对照表以 [docs/rules/README.md](docs/rules/README.md) 为权威版本。会话内最常触发的权威：
 
-文档与实现冲突时，先以当前代码、配置、测试和 `version.json` 交叉验证，再修正文档；不要照搬历史说明。
+- 当前版本、发布日期、版本号规则和 changelog：`version.json`；产品定位、安装和使用：`README.md`。
+- 主播类型映射：`backend/config/anchor_live_types.json`；支持的数据导入类型：`backend/routes/upload.py::DATA_TYPES`。
+- 业务表与中文列名：`backend/models_v2.py` 和上游源表。
+- API 客户端由 Orval 生成，禁止手改 `frontend-react/src/types/api.ts`。
+- `docs/_archive/` 和 `docs/*_legacy.md` 仅供历史查阅，不作为当前实现依据。
 
 ## 2. 首次进入仓库
 
@@ -63,7 +62,7 @@ AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询�
 - **主播映射**：JSON 是权威源，数据库表仅作启动同步后的查询缓存；不要直接改库维护。
 - **青鸟导入**：`qingniao_leads` 按批次 append 是明确例外，其他 v2 类型默认 replace。`conversion_appmarket` 增量追加去重键 `设备号 + 下载日期`（详见 `docs/rules/business-invariants.md`）。
 - **代理商映射**：映射来自 `dim_account` 的全称/简称/字母简称；不要恢复已删除的 `dim_vendor`。
-- **数据安全红线**：APK/EXE/frontend-dist.zip 一律只内置表结构空库，真实业务库（含客户手机号/资产/创收）禁止进入任何分发产物与 Release 资产，仅由用户自行配置 WebDAV 从坚果云拉取；历史含数据 Release 资产必须清理。完整规则见 `docs/rules/security-data-leak.md`。
+- **数据安全红线**：APK/EXE/frontend-dist.zip 一律只内置表结构空库，真实业务库（含客户手机号/资产/创收）禁止进入任何分发产物与 Release 资产，仅由用户自行配置 WebDAV 从坚果云拉取；历史含数据 Release 资产必须清理。详见 `docs/rules/security-data-leak.md`。
 
 ## 5. 架构地图
 
@@ -87,8 +86,7 @@ backend/utils/                 异常、代理商、WebDAV、周报工具、方�
 - API 前缀：`/api/v1`。
 - 数据库：`DATABASE_URL` 优先（PG/Supabase），未设走 SQLite（`DATABASE_PATH`）；`raw_import.py` 用 `is_pg` 判断自动走 COPY 或 to_sql。
 - 鉴权：`AUTH_ENABLED=true` 启用 JWT 中间件（桌面版默认）；`false` 全放行（开发版默认）。
-- Flask 生产时托管 `frontend-react/dist/`，SPA 深链接由 `serve_react_app` 兜底。
-- `DoubleApiRewriteMiddleware` 兼容旧缓存产生的 `/api/api/...`。
+- Flask 生产时托管 `frontend-react/dist/`，SPA 深链接由 `serve_react_app` 兜底；`DoubleApiRewriteMiddleware` 兼容旧缓存产生的 `/api/api/...`。
 
 ### 前端
 
@@ -115,15 +113,12 @@ scripts/build-installer.ps1     三阶段打包脚本（PyInstaller + 前端 bui
 ### 移动端（Android / Capacitor）
 
 ```text
-android/                        Capacitor 根目录（capacitor.config.ts + package.json + scripts/）
-android/android/                Android Studio 原生工程（cap sync 生成，cap sync 会覆盖配置）
-android/scripts/post-sync-patch.ps1  cap sync 后注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名
-android/scripts/generate-icons.ps1   生成 ic_launcher 图标（50% 安全区防切割）
-android/gradle-home/            项目级 Gradle 缓存（避免沙箱拦截 ~/.gradle）
+android/                        Capacitor 根目录（capacitor.config.ts + package.json + gradle-home/ 项目级 Gradle 缓存）
+android/android/                Android Studio 原生工程（cap sync 生成且会覆盖配置）
+android/scripts/                post-sync-patch.ps1（sync 后注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名）+ generate-icons.ps1（ic_launcher 图标，50% 安全区防切割）
 android/release/                拼音名 APK 输出（shengxintou-vX.Y.Z.apk）
-frontend-react/src/services/mobileSqlite.ts / mobileSync.ts  CapacitorSQLite 直连 + 坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
-frontend-react/src/utils/isDesktop.ts        isMobileClient 三重兜底（isNativePlatform/getPlatform/androidBridge）
-frontend-react/src/main.tsx                  动态 import App 等 Capacitor bridge 就绪再渲染
+frontend-react/src/services/mobileSqlite.ts / mobileSync.ts   CapacitorSQLite 直连 + 坚果云 WebDAV 同步（Filesystem Cache + moveDatabasesAndAddSuffix）
+frontend-react/src/utils/isDesktop.ts + main.tsx              isMobileClient 三重兜底（isNativePlatform/getPlatform/androidBridge）、动态 import 等 Capacitor bridge 就绪再渲染
 ```
 
 ### 官网（GitHub Pages）
@@ -138,14 +133,15 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 开发版（Web） | SQLite（默认） | `AUTH_ENABLED=false` | `npm run build` | 无 |
 | 桌面版（Electron） | PG/Supabase | `AUTH_ENABLED=true` | `npm run build` + PyInstaller + electron-builder | `scripts/build-installer.ps1` |
 | 移动端（Android） | 本地 SQLite | 跳过鉴权（内置） | `npm run build` + cap sync + assembleDebug | `android/scripts/post-sync-patch.ps1` |
-| PWA 端（iOS Safari） | IndexedDB + sql.js | 跳过鉴权 | `npm run build:pwa`（base=`/app/`） | GitHub Pages 自动部署（`.github/workflows/pages.yml`） |
+| PWA 端（iOS Safari） | IndexedDB + sql.js | 跳过鉴权 | `npm run build:pwa`（base=`/app/`） | GitHub Pages 自动部署 |
 
-- 数据库切换与鉴权：`.env` 设 `DATABASE_URL=postgresql+psycopg://...` 走 PG、`AUTH_ENABLED=true/false` 控制鉴权。
-- 前端运行时判断：`window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 控制菜单显隐与 ProtectedRoute。
+- 数据库切换与鉴权由 `.env` 控制（`DATABASE_URL=postgresql+psycopg://...` 走 PG）；前端运行时靠 `window.desktop` 注入标志（`isDesktop.ts`）+ `features.ts` 控制菜单显隐与 ProtectedRoute。
 - 打包脚本：桌面版 `scripts/build-installer.ps1`（Node.js 20+ + Python 3.9+ + NSIS）；移动端 `cd android && npm run build:apk`（JDK 17 + Android SDK + Node.js 20+）。
 - 移动端/PWA 详细约束（Capacitor SQLite 顺序、HashRouter、sql.js、WebDAV 代理、IndexedDB persist）见 `docs/rules/cross-platform.md` 第 4 节。
 
 ## 6. 按任务读取规则
+
+任务 → 规则的完整索引（含关键实现入口列）以 [docs/rules/README.md](docs/rules/README.md) 的「按任务阅读」为权威版本。速查：
 
 | 任务 | 必读 |
 | --- | --- |
@@ -186,19 +182,15 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 | 前端页面/组件/样式 | typecheck + `npm run build` |
 | lint 或大范围前端重构 | `npm run lint` |
 | lazy 路由 | `npm run test:smoke` |
-| 跨端契约（API/路由/flag/case/算法） | `python scripts/check_api_contract.py`（含后端 vs 移动端关键算法一致性对账，见 `docs/rules/business-invariants.md` 第 6 节）+ `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节） |
+| 跨端契约（API/路由/flag/case/算法） | `python scripts/check_api_contract.py`（含后端 vs 移动端关键算法一致性对账）+ `check_route_drift.py` + `check_feature_flags.py` + `check_mobile_routes_coverage.py`（详见 `docs/rules/cross-platform.md` 第 2 节） |
 | 报表筛选器 | `python scripts/check_filter_bar_usage.py`（禁止手写 `<RangePicker>` + 自定义按钮；详见 `docs/rules/frontend.md` 第 9 节） |
 | 移动端 SQLite 路由 | `python scripts/test_mobile_routes.py` |
 | Bug 修复 | 对应最小回归用例 |
 | 发版前 | `scripts/run-full-tests.bat` |
 
-需用户手动触发的验证（AI 适时建议，不自行执行）：Windows 打包 `scripts\build-installer.ps1`（后端/Electron/NSIS 变化时）、Android APK `cd android && npm run build:apk`（`services/mobile*.ts`/`capacitor.config.ts`/移动端 UI 修复时）、Android smoke `python tests\mobile\smoke_test.py`（移动端崩溃/同步/路由修复后）、全链路测试 `scripts\run-full-tests.bat`（跨模块/发版前）。
+需用户手动触发的验证（AI 适时建议，不自行执行）：Windows 打包 `scripts\build-installer.ps1`、Android APK `cd android && npm run build:apk`、Android smoke `python tests\mobile\smoke_test.py`、全链路 `scripts\run-full-tests.bat`；各命令的具体触发时机见 `docs/rules/testing-and-delivery.md` 第 11-13 节，工具链位置见 `docs/rules/toolchain.md`。
 
-详细 CI 清单、新报表测试同步清单、规则文档更新判断清单见 `docs/rules/testing-and-delivery.md` 第 11-13 节；工具链位置见 `docs/rules/toolchain.md`。
-
-- 新核心 API 增加 `tests/api/test_smoke.py` smoke。
-- 新 lazy 公开路由增加 `frontend-react/tests/smoke/route-health.spec.ts` 用例。
-- 可复现 Bug 在现有测试体系中增加最小回归测试。
+- 新核心 API 增加 `tests/api/test_smoke.py` smoke；新 lazy 公开路由增加 `frontend-react/tests/smoke/route-health.spec.ts` 用例；可复现 Bug 在现有测试体系中增加最小回归测试。
 - 提交前运行 `scripts/pre-commit-check.bat`；全量功能测试只在发版或明确要求时运行。
 
 ## 9. Git、安全与交付
@@ -214,8 +206,8 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 ## 10. 文档维护
 
 - 根规则只保留每次会话必读内容，目标控制在 200 行左右。
-- 稳定业务/工程约束进入 `docs/rules/`，单个需求方案进入项目选定的 spec 目录。
+- 稳定业务/工程约束进入 `docs/rules/`；单个需求的 TECH_SPEC 统一放 `docs/superpowers/specs/`（已 gitignore 不入仓库，命名 `YYYY-MM-DD-需求名.md`，流程见 `docs/rules/workflows/feature.md`），完成后保留为设计证据。
 - README 面向用户与贡献者；历史设计归档到 `docs/_archive/`。
 - 不在规则中硬编码当前版本、测试数量、文件数量等高频变化事实。
-- 更新规则前先确认权威源；同一动态信息只维护一份，其余位置链接引用。
+- 更新规则前先确认权威源；同一动态信息只维护一份，其余位置链接引用。「按任务阅读」与「单一权威源」完整表的唯一权威版本在 `docs/rules/README.md`，根规则只保留摘要。
 - 规则体系文档（根级 `AGENTS.md` / `CLAUDE.md` 或 `docs/rules/`）有调整时，同步更新 Skill `skills/shengxintou-bi-rules/` 的规则快照：把根级规则与 `docs/rules/` 重新复制到其 `references/`，确保分离分发版本与权威源一致。
