@@ -218,3 +218,4 @@ frontend-react/src/main.tsx                  动态 import App 等 Capacitor bri
 - README 面向用户与贡献者；历史设计归档到 `docs/_archive/`。
 - 不在规则中硬编码当前版本、测试数量、文件数量等高频变化事实。
 - 更新规则前先确认权威源；同一动态信息只维护一份，其余位置链接引用。
+- 规则体系文档（根级 `AGENTS.md` / `CLAUDE.md` 或 `docs/rules/`）有调整时，同步更新 Skill `skills/shengxintou-bi-rules/` 的规则快照：把根级规则与 `docs/rules/` 重新复制到其 `references/`，确保分离分发版本与权威源一致。
