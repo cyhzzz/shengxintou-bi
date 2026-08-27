@@ -236,6 +236,8 @@ npm run test:report
 
 > 说明：`skills/shengxintou-bi-rules/` 内的 `references/` 是 `docs/rules/` 与根级规则的**快照副本**，便于脱离仓库分发；在仓库内开发时仍以 `docs/rules/` 与根级规则为实时权威源。
 
+> 💡 该 Skill 也可作为**业务数据助手**使用：不参与代码开发、仅想基于本地省心投软件原始库表做数据问答 / 查询 / 排查 / 临时图表的业务同事，可到官网（GitHub Pages）【下载】**AI Skill 数据助手**（`shengxintou-bi-rules.zip`，随仓库自动构建、保持最新）单独下载使用；在数据助手模式下它只读分析本地库表，且所有查询/图表等产物都会写入 `<软件目录>/.技能临时分析/`，不会改动已安装软件。
+
 ## 📦 发布流程
 
 > 打 tag 触发 CI 自动打包并挂载 release 资产（`.github/workflows/release.yml`），**无需本地构建**。

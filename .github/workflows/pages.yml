@@ -9,6 +9,7 @@ on:
     paths:
       - 'website/**'
       - 'frontend-react/**'
+      - 'skills/**'
       - '.github/workflows/pages.yml'
       - 'version.json'
   workflow_dispatch:
@@ -56,6 +57,19 @@ jobs:
           mkdir -p staging/app
           cp -r website/* staging/
           cp -r frontend-react/dist/* staging/app/
+          # 生成 Skill 独立下载包（业务同事/数据助手用），每次随源码打包避免与技能内容不同步
+          python - <<'EOF'
+          import os, zipfile
+          src = 'skills/shengxintou-bi-rules'
+          dst = 'staging/shengxintou-bi-rules.zip'
+          if os.path.exists(dst):
+              os.remove(dst)
+          with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as z:
+              for root, _dirs, files in os.walk(src):
+                  for f in files:
+                      p = os.path.join(root, f)
+                      z.write(p, arcname=p.replace('skills' + os.sep, '', 1))
+          EOF
           # 确保有 .nojekyll（避免 GitHub Pages 忽略 _ 开头的文件）
           touch staging/.nojekyll
 
