@@ -220,5 +220,78 @@ class VendorDailyPartitionTest(unittest.TestCase):
         self.assertEqual(VENDOR_DAILY_REPLACE_FROM, '2026-07-01')
 
 
+class AppmarketPeriodReplaceTest(unittest.TestCase):
+    """应用市场下载链路区间拆分（h1/q3/q4）：只清空并重写指定区间，不影响其它月份。"""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='conv_appmarket_period_')
+        self.db = os.path.join(self.tmp, 'p.db')
+
+    def tearDown(self):
+        try:
+            for f in os.listdir(self.tmp):
+                os.remove(os.path.join(self.tmp, f))
+            os.rmdir(self.tmp)
+        except OSError:
+            pass
+
+    def _seed(self):
+        con = sqlite3.connect(self.db)
+        con.execute('CREATE TABLE fact_conv_appmarket (id INTEGER PRIMARY KEY AUTOINCREMENT, "设备号" TEXT, "下载日期" TEXT, "是否激活APP" INTEGER)')
+        con.executemany(
+            'INSERT INTO fact_conv_appmarket ("设备号","下载日期","是否激活APP") VALUES (?,?,?)',
+            [
+                ('h1-a', '2026-03-15', 1),   # H1 旧数据
+                ('q3-a', '2026-07-15', 1),   # Q3 旧数据
+                ('q4-a', '2026-11-15', 1),   # Q4 旧数据
+                ('old-1', '2025-12-31', 1),  # 跨年历史（应始终保留）
+            ],
+        )
+        con.commit()
+        con.close()
+
+    def _rows(self):
+        con = sqlite3.connect(self.db)
+        rows = sorted(con.execute('SELECT 设备号, 下载日期 FROM "fact_conv_appmarket"').fetchall())
+        con.close()
+        return rows
+
+    def test_q3_only_replaces_q3(self):
+        self._seed()
+        xlsx = os.path.join(self.tmp, 'q3.xlsx')
+        pd.DataFrame({
+            '设备号': ['q3-b', 'q3-c'],
+            '下载日期': ['2026-08-01', '2026-09-10'],
+            '是否激活APP': [1, 0],
+        }).to_excel(xlsx, index=False)
+
+        write_to_db('conversion_appmarket', xlsx, db_url=f'sqlite:///{self.db}',
+                    period=('2026-07-01', '2026-09-30'))
+
+        rows = self._rows()
+        # Q3 旧数据被替换；H1、Q4、跨年历史均保留
+        self.assertIn(('h1-a', '2026-03-15'), rows)
+        self.assertIn(('q4-a', '2026-11-15'), rows)
+        self.assertIn(('old-1', '2025-12-31'), rows)
+        self.assertNotIn(('q3-a', '2026-07-15'), rows)
+        self.assertIn(('q3-b', '2026-08-01'), rows)
+        self.assertIn(('q3-c', '2026-09-10'), rows)
+
+    def test_h1_q4_independent(self):
+        self._seed()
+        # 上传 H1 区间文件
+        xlsx_h1 = os.path.join(self.tmp, 'h1.xlsx')
+        pd.DataFrame({'设备号': ['h1-b'], '下载日期': ['2026-05-20'], '是否激活APP': [1]}).to_excel(xlsx_h1, index=False)
+        write_to_db('conversion_appmarket', xlsx_h1, db_url=f'sqlite:///{self.db}',
+                    period=('2026-01-01', '2026-06-30'))
+
+        rows = self._rows()
+        self.assertNotIn(('h1-a', '2026-03-15'), rows)  # H1 旧被替换
+        self.assertIn(('h1-b', '2026-05-20'), rows)     # H1 新
+        self.assertIn(('q3-a', '2026-07-15'), rows)      # Q3 未动
+        self.assertIn(('q4-a', '2026-11-15'), rows)      # Q4 未动
+        self.assertIn(('old-1', '2025-12-31'), rows)     # 历史保留
+
+
 if __name__ == '__main__':
     unittest.main()

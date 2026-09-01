@@ -51,6 +51,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
   const [statusMessage, setStatusMessage] = useState<string>('');
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 应用市场下载链路（1-6月 / 7-9月 / 10-12月）区间拆分类型：只按区间替换，隐藏全量替换开关
+  const isAppmarketPeriod = dataType.startsWith('conversion_appmarket_');
+  const isBaseAppmarket = dataType === 'conversion_appmarket';
+
   // 轮询任务状态
   const pollTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
     // feat-local-auth：用 http 客户端自动带 Authorization 头，避免 401
@@ -209,15 +213,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
   return (
     <div className={styles.uploader}>
       <div className={styles.options}>
-        <Space>
-          <span>全量替换:</span>
-          <Switch checked={overwrite} onChange={setOverwrite} />
+        {isAppmarketPeriod ? (
           <span className={styles.hint}>
-            {dataType === 'conversion_appmarket'
-              ? '开启后清空旧数据再导入；关闭后按设备号+下载日期增量追加'
-              : '仅应用市场转化明细支持增量追加'}
+            按所选区间替换该时段数据（不影响其它月份）；请确保上传文件仅含本区间数据
           </span>
-        </Space>
+        ) : (
+          <Space>
+            <span>全量替换:</span>
+            <Switch checked={overwrite} onChange={setOverwrite} />
+            <span className={styles.hint}>
+              {isBaseAppmarket
+                ? '开启后清空旧数据再导入；关闭后按设备号+下载日期增量追加'
+                : '仅应用市场转化明细支持增量追加'}
+            </span>
+          </Space>
+        )}
       </div>
 
       <Dragger {...uploadProps} disabled={uploading} className={styles.dragger}>

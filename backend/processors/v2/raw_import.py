@@ -506,6 +506,9 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     - qingniao_leads 仍用纯 append（保留历史批次，不 DELETE）
     - conversion_appmarket 全量替换时按日期分区（保留 6/30 及之前，只重写 7/1 以后），
       见 APPMARKET_CONV_REPLACE_FROM 注释；增量模式（overwrite=False）仍按 设备号+下载日期 去重
+    - conversion_appmarket 区间拆分类型（period=(start,end)）传入时，只清空并重写
+      该区间内的数据（DELETE WHERE 下载日期 BETWEEN start AND end），不影响其它月份；
+      该分支优先于增量模式与固定 cutoff，确保每季度的独立上传互不干扰
     - vendor_daily 默认按日期分区（保留 6/30 及之前，只重写 7/1 以后，见
       VENDOR_DAILY_REPLACE_FROM）；若新文件自身含 7/1 之前数据（全量文件）则退化为整表替换
     - 删除 sqlite_sequence 操作（SQLite 专属，PG 报错；DELETE + append 不需要重置序列）
@@ -518,6 +521,7 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
     tables = result["tables"]
     meta = result["meta"]
     overwrite = kwargs.get("overwrite", True)
+    period = kwargs.get("period")  # (start, end) 区间拆分，仅应用市场下载链路使用
 
     if db_url is None:
         # feat-desktop-supabase：优先复用 Flask-SQLAlchemy 的 engine，
@@ -561,6 +565,25 @@ def write_to_db(data_type: str, file_path: str, db_url: str = None, **kwargs) ->
 
             if data_type == "qingniao_leads":
                 # append 模式：保留历史批次数据，不 DELETE
+                if is_pg:
+                    _pg_copy_insert(df, table_name, engine)
+                else:
+                    df.to_sql(table_name, con=engine, if_exists="append", index=False, chunksize=1000)
+            elif data_type == "conversion_appmarket" and period:
+                # 区间拆分上传：只清空并重写 [start, end] 区间，不影响其它月份
+                start, end = period
+                logger.info(
+                    f'conversion_appmarket 区间替换: DELETE {table_name} '
+                    f'WHERE 下载日期 BETWEEN {start} AND {end}'
+                )
+                conn.execute(text(
+                    f'DELETE FROM "{table_name}" '
+                    f'WHERE "下载日期" >= :s AND "下载日期" <= :e'
+                ), {"s": start, "e": end})
+                # 丢弃 id 列让 DB 自增生成，避免与保留的其它月份行主键冲突
+                if "id" in df.columns:
+                    df = df.drop(columns=["id"])
+                conn.commit()
                 if is_pg:
                     _pg_copy_insert(df, table_name, engine)
                 else:

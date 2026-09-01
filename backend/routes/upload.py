@@ -16,6 +16,8 @@ v2 改造要点：
   xhs_notes_list/xhs_notes_daily/xhs_notes_content_daily）已退役，返回 410 Gone。
 - 保留 DataImportLog 记录（用于上传历史与进度跟踪）。
 - 异步线程处理（保留 progress 查询体验）。
+- 应用市场下载链路（conversion_appmarket）按时间区间拆分为 3 个上传路径
+  （1-6月 / 7-9月 / 10-12月），均落 fact_conv_appmarket，导入只清空并重写各自区间。
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -39,11 +41,24 @@ DATA_TYPES = {
     'account_mapping':      '投放账号映射',
     'conversion_content':   '内容平台加微链路',
     'conversion_appmarket': '应用市场下载链路',
+    'conversion_appmarket_h1': '应用市场下载链路(1-6月)',
+    'conversion_appmarket_q3': '应用市场下载链路(7-9月)',
+    'conversion_appmarket_q4': '应用市场下载链路(10-12月)',
     'vendor_daily':         '厂商广告投放分析',
     'xhs_note':             '小红书笔记',
     'channel_open':         '开户渠道分析',
     'appmarket_plan_class': '应用市场计划分解',
     'qingniao_leads':       '抖音青鸟线索通',
+}
+
+# 应用市场下载链路按时间区间拆分为 3 个独立上传路径（2026 年）：
+#   1-6 月 / 7-9 月 / 10-12 月。三者均落 fact_conv_appmarket，但导入时只清空并重写
+# 各自区间内的数据，互不干扰（避免一次上传误操作覆盖全年）。
+# 旧单一 conversion_appmarket 类型仍保留（保留 6/30 及之前历史、只重写 7/1 以后的口径）。
+APPMARKET_PERIOD_KEYS = {
+    'conversion_appmarket_h1': ('2026-01-01', '2026-06-30'),
+    'conversion_appmarket_q3': ('2026-07-01', '2026-09-30'),
+    'conversion_appmarket_q4': ('2026-10-01', '2026-12-31'),
 }
 
 # v1 已退役数据类型（保留识别名但返回 410）
@@ -69,10 +84,13 @@ def allowed_file(filename):
 # 后台处理线程
 # -----------------------------------------------------------------------------
 def _process_file(task_id: str, filepath: str, data_type: str,
-                  overwrite: bool, log_id: int, batch_tag: str = None):
+                  overwrite: bool, log_id: int, batch_tag: str = None,
+                  period: tuple = None):
     """异步处理文件（v2 原样导入）。
 
     qingniao_leads 支持 batch_tag 参数（批次标注），其他类型忽略此参数。
+    period 为 (start, end) 日期区间（仅应用市场下载链路区间拆分类型使用），
+    传入后会按区间清空并重写，不影响其它月份。
     """
     try:
         from app import app
@@ -93,7 +111,12 @@ def _process_file(task_id: str, filepath: str, data_type: str,
             if data_type == 'qingniao_leads':
                 meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
             else:
-                meta = raw_import.write_to_db(data_type, filepath, overwrite=overwrite)
+                # 应用市场区间拆分类型（h1/q3/q4）落库到同一张 fact_conv_appmarket，
+                # 仅按 period 区间清空并重写；period 为空走原 conversion_appmarket 口径。
+                base_type = 'conversion_appmarket' if period else data_type
+                meta = raw_import.write_to_db(
+                    base_type, filepath, overwrite=overwrite, period=period
+                )
             elapsed = time.time() - started
 
             written = meta.get('written', {})
@@ -206,6 +229,9 @@ def upload_file():
 
     overwrite = request.form.get('overwrite', 'false').lower() == 'true'
 
+    # 应用市场下载链路区间拆分类型（h1/q3/q4）：取对应日期区间，导入时只重写该区间
+    period = APPMARKET_PERIOD_KEYS.get(data_type)
+
     # v3.3.6：批次标注（仅 qingniao_leads 使用，其他类型忽略）
     # 不传时由 raw_import.handle_qingniao_leads 默认用 'YYYYMMDDHHmm'
     batch_tag = request.form.get('batch_tag', '').strip() or None
@@ -247,7 +273,7 @@ def upload_file():
     # 启动异步线程
     thread = threading.Thread(
         target=_process_file,
-        args=(task_id, filepath, data_type, overwrite, log_id, batch_tag),
+        args=(task_id, filepath, data_type, overwrite, log_id, batch_tag, period),
         daemon=True,
     )
     thread.start()
@@ -387,6 +413,9 @@ def _target_tables(data_type: str):
         'account_mapping':      ['dim_account'],
         'conversion_content':   ['fact_conv_content'],
         'conversion_appmarket': ['fact_conv_appmarket'],
+        'conversion_appmarket_h1': ['fact_conv_appmarket'],
+        'conversion_appmarket_q3': ['fact_conv_appmarket'],
+        'conversion_appmarket_q4': ['fact_conv_appmarket'],
         'vendor_daily':         ['agg_vendor_daily'],
         'xhs_note':             ['agg_xhs_note'],
         'channel_open':         ['agg_daily_channel_open'],

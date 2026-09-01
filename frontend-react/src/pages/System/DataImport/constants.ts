@@ -16,6 +16,9 @@ export type DataType =
   | 'account_mapping'
   | 'conversion_content'
   | 'conversion_appmarket'
+  | 'conversion_appmarket_h1'
+  | 'conversion_appmarket_q3'
+  | 'conversion_appmarket_q4'
   | 'vendor_daily'
   | 'xhs_note'
   | 'channel_open'
@@ -51,8 +54,32 @@ export const DATA_TYPES: DataTypeConfig[] = [
   },
   {
     type: 'conversion_appmarket',
-    label: '应用市场下载链路',
-    description: '小米/华为/OPPO/VIVO/荣耀/苹果 下载→开户归因明细',
+    label: '应用市场下载链路(全量)',
+    description: '旧口径：保留 6/30 及之前历史，只重写 7/1 以后',
+    targetTables: ['fact_conv_appmarket'],
+    guideFile: 'conversion_appmarket_guide.md',
+    icon: '📱',
+  },
+  {
+    type: 'conversion_appmarket_h1',
+    label: '应用市场下载链路(1-6月)',
+    description: '1月1日-6月30日 下载→开户归因明细（仅替换该区间）',
+    targetTables: ['fact_conv_appmarket'],
+    guideFile: 'conversion_appmarket_guide.md',
+    icon: '📱',
+  },
+  {
+    type: 'conversion_appmarket_q3',
+    label: '应用市场下载链路(7-9月)',
+    description: '7月1日-9月30日 下载→开户归因明细（仅替换该区间）',
+    targetTables: ['fact_conv_appmarket'],
+    guideFile: 'conversion_appmarket_guide.md',
+    icon: '📱',
+  },
+  {
+    type: 'conversion_appmarket_q4',
+    label: '应用市场下载链路(10-12月)',
+    description: '10月1日-12月31日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
     icon: '📱',
