@@ -56,6 +56,12 @@
 - 口径固定为互联网引流的页面不应再提供有歧义的渠道类型筛选。
 - 应用市场新增资产只累计 `是否新开户 == 1` 设备行的 `总资产`。
 
+### 计划分析周度口径
+
+- 应用市场「计划分析」（`/plan-analysis`）周度口径统一为**上周五 ~ 本周四**，周五为周起始日，Web 与移动端一致。
+- SQLite 用 `date(下载日期, 'weekday 4', '-6 days')`；PG 用 `date_trunc('week') + CASE(isodow<=4 → -3天，否则 → +4天)`（`backend/utils/dialect_helpers.py::make_friday_week_start_expr`）；移动端复用同一 `fridayWeekExpr`。
+- 「各应用市场周度获客量」为**跨平台对比图**：忽略平台单选，仅受日期 + 互联网引流约束，获客量取「新开户」。单平台被选中时，整体走势图收窄为该平台、对比图保持全市场（二者口径需区分，勿混用）。
+
 关键实现：
 
 - `backend/routes/reports/app_market.py`
