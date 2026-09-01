@@ -15,7 +15,6 @@
 export type DataType =
   | 'account_mapping'
   | 'conversion_content'
-  | 'conversion_appmarket'
   | 'conversion_appmarket_h1'
   | 'conversion_appmarket_q3'
   | 'conversion_appmarket_q4'
@@ -51,14 +50,6 @@ export const DATA_TYPES: DataTypeConfig[] = [
     targetTables: ['fact_conv_content'],
     guideFile: 'conversion_content_guide.md',
     icon: '🔗',
-  },
-  {
-    type: 'conversion_appmarket',
-    label: '应用市场下载链路(全量)',
-    description: '旧口径：保留 6/30 及之前历史，只重写 7/1 以后',
-    targetTables: ['fact_conv_appmarket'],
-    guideFile: 'conversion_appmarket_guide.md',
-    icon: '📱',
   },
   {
     type: 'conversion_appmarket_h1',

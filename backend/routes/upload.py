@@ -40,7 +40,6 @@ bp = Blueprint('upload', __name__)
 DATA_TYPES = {
     'account_mapping':      '投放账号映射',
     'conversion_content':   '内容平台加微链路',
-    'conversion_appmarket': '应用市场下载链路',
     'conversion_appmarket_h1': '应用市场下载链路(1-6月)',
     'conversion_appmarket_q3': '应用市场下载链路(7-9月)',
     'conversion_appmarket_q4': '应用市场下载链路(10-12月)',
@@ -54,7 +53,7 @@ DATA_TYPES = {
 # 应用市场下载链路按时间区间拆分为 3 个独立上传路径（2026 年）：
 #   1-6 月 / 7-9 月 / 10-12 月。三者均落 fact_conv_appmarket，但导入时只清空并重写
 # 各自区间内的数据，互不干扰（避免一次上传误操作覆盖全年）。
-# 旧单一 conversion_appmarket 类型仍保留（保留 6/30 及之前历史、只重写 7/1 以后的口径）。
+# 旧的「全量」类型（保留 6/30 及之前、只重写 7/1 以后）已移除，统一由这 3 个区间路径替代。
 APPMARKET_PERIOD_KEYS = {
     'conversion_appmarket_h1': ('2026-01-01', '2026-06-30'),
     'conversion_appmarket_q3': ('2026-07-01', '2026-09-30'),
@@ -112,8 +111,8 @@ def _process_file(task_id: str, filepath: str, data_type: str,
                 meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
             else:
                 # 应用市场区间拆分类型（h1/q3/q4）落库到同一张 fact_conv_appmarket，
-                # 仅按 period 区间清空并重写；period 为空走原 conversion_appmarket 口径。
-                base_type = 'conversion_appmarket' if period else data_type
+                # 仅按 period 区间清空并重写；period 恒非空（由 APPMARKET_PERIOD_KEYS 提供）。
+                base_type = 'conversion_appmarket'
                 meta = raw_import.write_to_db(
                     base_type, filepath, overwrite=overwrite, period=period
                 )
@@ -412,7 +411,6 @@ def _target_tables(data_type: str):
     return {
         'account_mapping':      ['dim_account'],
         'conversion_content':   ['fact_conv_content'],
-        'conversion_appmarket': ['fact_conv_appmarket'],
         'conversion_appmarket_h1': ['fact_conv_appmarket'],
         'conversion_appmarket_q3': ['fact_conv_appmarket'],
         'conversion_appmarket_q4': ['fact_conv_appmarket'],
