@@ -38,6 +38,18 @@ import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
 
+/**
+ * 将「周五起始」的 week_start(YYYY-MM-DD) 格式化为 MMDD-MMDD 横轴标签。
+ * 应用市场周度口径为上周五 ~ 本周四，周五为周起始日，故结束日 = 起始日 + 6 天（周四）。
+ */
+const fmtWeekLabel = (ws?: string): string => {
+  if (!ws) return '-';
+  const start = dayjs(ws);
+  if (!start.isValid()) return ws;
+  const end = start.add(6, 'day');
+  return `${start.format('MMDD')}-${end.format('MMDD')}`;
+};
+
 interface PlanWeeklyPoint {
   week_start: string;
   '激活APP': number;
@@ -65,6 +77,8 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
+  const [weeklyByMarket, setWeeklyByMarket] = useState<any[]>([]);
+  const [marketOrder, setMarketOrder] = useState<string[]>([]);
   const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0 });
   const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
@@ -90,6 +104,8 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
         setPlatforms(d.platforms || []);
         setPlanItems((d.plan_items || []).map((p: PlanItem, idx: number) => ({ ...p, row_id: `${idx}-${p.plan_id}` })));
         setWeeklyTotals(d.weekly_totals || []);
+        setWeeklyByMarket(d.weekly_by_market || []);
+        setMarketOrder(d.market_order || []);
         setTotals(d.totals || {});
       }
     } finally {
@@ -102,7 +118,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
   // 周度拿量能力走势（双 Y 轴：左=激活数柱 + 右=开户/新开户数线）
   const volumeOption: EChartsOption = useMemo(() => {
     if (!weeklyTotals.length) return {};
-    const weeks = weeklyTotals.map((w) => w.week_start);
+    const weekLabels = weeklyTotals.map((w) => fmtWeekLabel(w.week_start));
     return {
       tooltip: {
         trigger: 'axis',
@@ -113,7 +129,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       grid: { left: '3%', right: '6%', bottom: '12%', top: '12%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: weeks,
+        data: weekLabels,
         axisLabel: { rotate: 30, fontSize: 11 },
       },
       yAxis: [
@@ -174,7 +190,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
   // 周度精准性走势（多线转化率）
   const rateOption: EChartsOption = useMemo(() => {
     if (!weeklyTotals.length) return {};
-    const weeks = weeklyTotals.map((w) => w.week_start);
+    const weekLabels = weeklyTotals.map((w) => fmtWeekLabel(w.week_start));
     const series = [
       { key: '激活_开户率' as const, name: '激活→开户', color: pickEChartsColor(0) },
       { key: '激活_新开户率' as const, name: '激活→新开户', color: ECHARTS_COLORS[7] },
@@ -202,7 +218,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
       xAxis: {
         type: 'category',
-        data: weeks,
+        data: weekLabels,
         axisLabel: { rotate: 30, fontSize: 11 },
       },
       yAxis: [
@@ -215,6 +231,40 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       series: series as any,
     };
   }, [weeklyTotals]);
+
+  // 各应用市场周度获客量（新开户）对比，跨平台；同口径：上周五~本周四，横轴 MMDD-MMDD
+  const marketVolumeOption: EChartsOption = useMemo(() => {
+    if (!weeklyByMarket.length || !marketOrder.length) return {};
+    const weekLabels = weeklyByMarket.map((w) => fmtWeekLabel(w.week_start));
+    const series = marketOrder.map((m, i) => ({
+      name: m,
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 5,
+      itemStyle: { color: pickEChartsColor(i) },
+      lineStyle: { width: 2 },
+      data: weeklyByMarket.map((w) => (w[m] ? (w[m]['新开户'] || 0) : 0)),
+    }));
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+      },
+      legend: { bottom: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '16%', top: '10%', containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: weekLabels,
+        axisLabel: { rotate: 30, fontSize: 11 },
+      },
+      yAxis: [
+        { type: 'value', name: '新开户(获客量)' },
+      ],
+      series: series as any,
+    };
+  }, [weeklyByMarket, marketOrder]);
 
   // 是否衰减提示：首尾周对比
   const decayInfo = useMemo(() => {
@@ -270,7 +320,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
         pagination={false}
         scroll={{ x: 'max-content' }}
         columns={[
-          { title: '周起始日', dataIndex: 'week_start', width: 120, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+          { title: '周度(周五~周四)', dataIndex: 'week_start', width: 140, render: (v: string) => <strong>{fmtWeekLabel(v)}</strong> },
           { title: '激活APP', dataIndex: '激活APP', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
           { title: '开户成功', dataIndex: '开户成功', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
           { title: '新开户', dataIndex: '新开户', align: 'right' as const, width: 100, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
@@ -379,7 +429,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
                   左轴：激活APP(柱) · 右轴：开户成功 / 新开户(线)
                 </span>
                 {decayInfo && (
-                  <Tooltip title={`首周 ${decayInfo.firstWeek} → 末周 ${decayInfo.lastWeek}：激活 ${decayInfo.activateDiff >= 0 ? '+' : ''}${decayInfo.activateDiff}，新开户 ${decayInfo.newOpenDiff >= 0 ? '+' : ''}${decayInfo.newOpenDiff}`}>
+                  <Tooltip title={`首周 ${fmtWeekLabel(decayInfo.firstWeek)} → 末周 ${fmtWeekLabel(decayInfo.lastWeek)}：激活 ${decayInfo.activateDiff >= 0 ? '+' : ''}${decayInfo.activateDiff}，新开户 ${decayInfo.newOpenDiff >= 0 ? '+' : ''}${decayInfo.newOpenDiff}`}>
                     <Tag color={decayInfo.isDecay ? 'red' : 'green'} style={{ marginLeft: 8 }}>
                       {decayInfo.isDecay ? <><FallOutlined /> 量能衰减</> : <><RiseOutlined /> 量能增长</>}
                     </Tag>
@@ -390,6 +440,28 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
           >
             {weeklyTotals.length > 0 ? (
               <EChartsComponent option={volumeOption} height={320} />
+            ) : (
+              <Empty description={loading ? '加载中...' : '暂无周度数据'} />
+            )}
+          </Card>
+        </FadeInSection>
+
+        <FadeInSection delay={0.9} duration={0.8}>
+          <Card
+            size="small"
+            style={{ marginBottom: 16 }}
+            title={
+              <Space size={8} align="center">
+                <LineChartOutlined style={{ color: 'var(--chart-color-5)' }} />
+                <span>各应用市场周度获客量（新开户）</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                  同口径：上周五~本周四 · 横轴 MMDD-MMDD · 仅互联网引流 · 跨平台对比
+                </span>
+              </Space>
+            }
+          >
+            {weeklyByMarket.length > 0 ? (
+              <EChartsComponent option={marketVolumeOption} height={340} />
             ) : (
               <Empty description={loading ? '加载中...' : '暂无周度数据'} />
             )}
@@ -495,11 +567,11 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
           sources={[
             { label: '数据源', value: 'fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）' },
             { label: '端点', value: 'POST /api/v1/reports/app-market/plan-analysis' },
-            { label: '周起始日', value: 'SQLite date(下载日期, \'weekday 0\', \'-6 days\') = 该日期所在周的周一' },
+            { label: '周度口径', value: '上周五 ~ 本周四（周五为周起始日，SQLite date(下载日期, \'weekday 4\', \'-6 days\')；横轴标注 MMDD-MMDD）' },
             { label: '存量剔除', value: '非互联网引流设备需剔除（与存量客户同理）' },
             { label: '平台筛选', value: 'app_market 单选（不选 = 全部平台汇总），选中后只看该平台内计划' },
           ]}
-          notes={`计划分析按周度走势看两类指标：拿量能力（激活/开户/新开户量是否衰减）+ 精准性（各转化节点转化率是否稳定）。量增率降通常意味着流量泛化。`}
+          notes={`计划分析按周度走势看两类指标：拿量能力（激活/开户/新开户量是否衰减）+ 精准性（各转化节点转化率是否稳定）。量增率降通常意味着流量泛化。「各应用市场周度获客量」为跨平台对比图，忽略平台单选筛选、仅受日期+互联网引流约束，按上周五~本周四统计，横轴标注 MMDD-MMDD，获客量取「新开户」。`}
         />
       </FadeInSection>
     </div>

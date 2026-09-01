@@ -231,7 +231,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
   const [planWeekDetail, setPlanWeekDetail] = useState<PlanWeekDetail[]>([]);
   const [loading, setLoading] = useState(false);
-  const { dateRange } = useFilterStore();
+  const { dateRange, resetDateRange } = useFilterStore();
 
   const load = async () => {
     setLoading(true);
@@ -274,6 +274,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
 
   const resetFilters = () => {
     setSelected(markets.length ? markets : INITIAL_MARKETS);
+    resetDateRange(); // 同时重置日期范围，避免周度选择器被持久化的旧日期裁掉（按钮名“重置(全部)”应含日期）
   };
 
   // ---- 应用市场筛选集合（去除重复/已不存在的市场） ----

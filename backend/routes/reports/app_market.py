@@ -380,7 +380,7 @@ def app_market_creative():
 @bp.route('/plan-analysis', methods=['POST'])
 @handle_exceptions
 def app_market_plan_analysis():
-    # v3.3.5 应用市场 · 计划分析（按周度走势 + 按平台单选）
+    # v3.3.5 应用市场 · 计划分析（按周度走势 + 按平台单选；周度口径：上周五 ~ 本周四）
     # 业务诉求：
     #   1. 拿量能力：开户数 / APP激活数 / 是否衰减（周度量趋势）
     #   2. 精准性变化：各转化节点转化率是否稳定（周度率趋势）
@@ -404,10 +404,10 @@ def app_market_plan_analysis():
     ).order_by(FactConvAppmarket.应用市场).all()
     platforms = [r[0] for r in platform_rows]
 
-    # 周起始日表达式（dialect 无关）：SQLite 用 date(d, 'weekday 0', '-6 days')；
-    # PG 用 date_trunc('week', d)，均返回 d 所在周的周一
-    from backend.utils.dialect_helpers import make_week_start_expr
-    week_start_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+    # 周起始日表达式（dialect 无关）：应用市场周度口径统一为「上周五 ~ 本周四」，
+    # 周五为周起始日。SQLite 用 date(d, 'weekday 4', '-6 days')；PG 用 date_trunc + 偏移。
+    from backend.utils.dialect_helpers import make_friday_week_start_expr
+    week_start_expr = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
 
     # 广告计划ID 归一化（与 /creative 一致）
     # feat-cloud-supabase：PG 上 广告计划ID=bigint，投放账号=text，
@@ -505,6 +505,36 @@ def app_market_plan_analysis():
             **_calc_rates(t['激活APP'], t['开户成功'], t['新开户'], t['有效户']),
         })
 
+    # 各应用市场周度获客量（新开户），跨平台对比。
+    # 注意：此处忽略平台单选筛选（不传 app_markets），仅受日期 + 互联网引流约束，
+    # 以便在同一张图里横向比较每个应用市场的拿量能力。口径与 weekly_totals 一致（上周五~本周四）。
+    qm = db.session.query(
+        FactConvAppmarket.应用市场.label('market'),
+        week_start_expr,
+        func.coalesce(func.sum(getattr(FactConvAppmarket, '是否新开户')), 0).label('新开户'),
+        func.coalesce(func.sum(getattr(FactConvAppmarket, '是否激活APP')), 0).label('激活APP'),
+    )
+    qm = _funnel_filters(qm, dict(filters))  # 仅日期 + 互联网引流（不含单选平台）
+    qm = qm.group_by(FactConvAppmarket.应用市场, week_start_expr).order_by(week_start_expr)
+    rows_m = qm.all()
+
+    week_market = {}  # week_start -> { market: {'新开户':int,'激活APP':int} }
+    for r in rows_m:
+        m = r.market or '未归因'
+        week = str(r.week_start)
+        week_market.setdefault(week, {})
+        bucket = week_market[week].setdefault(m, {'新开户': 0, '激活APP': 0})
+        bucket['新开户'] += int(r.新开户 or 0)
+        bucket['激活APP'] += int(r.激活APP or 0)
+
+    market_order = platforms if platforms else sorted({m for w in week_market.values() for m in w})
+    weekly_by_market = []
+    for week in sorted(week_market.keys()):
+        entry = {'week_start': week}
+        for m in market_order:
+            entry[m] = week_market[week].get(m, {'新开户': 0, '激活APP': 0})
+        weekly_by_market.append(entry)
+
     # 整体汇总
     totals = {
         'total_plans': len(plan_items),
@@ -523,6 +553,8 @@ def app_market_plan_analysis():
             'platforms': platforms,
             'selected_platform': app_market,
             'weekly_totals': weekly_totals,
+            'weekly_by_market': weekly_by_market,
+            'market_order': market_order,
             'plan_items': top_plans,
             'totals': totals,
             'top_n': top_n,
