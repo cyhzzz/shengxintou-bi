@@ -449,9 +449,6 @@ export async function handleAppMarketDetail(body: any): Promise<any> {
 // 应用市场计划分析 (reports/app-market/plan-analysis)
 // ============================================================================
 
-/** SQLite 周起始日（周一）：date(d, 'weekday 0', '-6 days') */
-const WEEK_START_EXPR = `date("下载日期", 'weekday 0', '-6 days')`;
-
 export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   const filters = getFilters(body);
   const { start_date: sd, end_date: ed } = getDateRange(filters);
@@ -476,7 +473,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   const selectCols = funnelCols.map(([c, a]) => `COALESCE(SUM("${c}"), 0) as "${a}"`).join(', ');
 
   // 整体周度走势
-  const weeklySql = `SELECT ${WEEK_START_EXPR} as week_start, ${selectCols}
+  const weeklySql = `SELECT ${fridayWeekExpr('下载日期')} as week_start, ${selectCols}
     FROM fact_conv_appmarket ${where.clause}
     GROUP BY week_start ORDER BY week_start`;
   const weeklyRows = await querySql<Row>(weeklySql, where.params);
@@ -496,7 +493,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
 
   // plan_key：广告计划ID NULL/0 fallback 投放账号
   const planExpr = `CASE WHEN "广告计划ID" IS NULL OR "广告计划ID" = 0 THEN COALESCE("投放账号", '未归因') ELSE CAST("广告计划ID" AS TEXT) END`;
-  const planSql = `SELECT ${planExpr} as plan_key, "投放账号", ${WEEK_START_EXPR} as week_start, ${selectCols}
+  const planSql = `SELECT ${planExpr} as plan_key, "投放账号", ${fridayWeekExpr('下载日期')} as week_start, ${selectCols}
     FROM fact_conv_appmarket ${where.clause}
     GROUP BY plan_key, "投放账号", week_start ORDER BY week_start`;
   const planRows = await querySql<Row>(planSql, where.params);
