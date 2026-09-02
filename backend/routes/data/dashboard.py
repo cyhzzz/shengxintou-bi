@@ -321,7 +321,7 @@ def get_dashboard_trend_data():
 def get_dashboard_accounts():
     data = request.get_json() or {}
     platforms = data.get('platforms') or []
-    q = db.session.query(DimAccount.main_account_name).distinct()
+    q = db.session.query(func.coalesce(DimAccount.main_account_name, DimAccount.sub_account_name)).distinct()
     if platforms:
         q = q.filter(DimAccount.platform.in_([str(p) for p in platforms]))
     rows = [r[0] for r in q.all() if r[0]]

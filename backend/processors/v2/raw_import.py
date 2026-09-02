@@ -175,10 +175,15 @@ def _to_datetime_str(series: pd.Series) -> pd.Series:
 # ============================================================================
 
 def handle_account_mapping(path: str):
-    """申万宏源-投放账号映射表.xlsx -> dim_account（含代理商信息）。"""
+    """账号信息表 / 申万宏源-投放账号映射表.xlsx -> dim_account（含代理商信息）。
+
+    业务已由「主账号 + 子账号」两层收敛为「单层广告账号 ID 体系」：
+    单层账号落在 sub_account_id / sub_account_name；主账号ID/主账号名称
+    为旧两层结构的兼容字段，新导出不含时自动留空（None）。
+    """
     df = _read_excel(path)
     df = _clean_nan(df)
-    # 期望列：平台 / 主账号ID / 主账号名称 / 子账号ID / 子账号名称 / 代理商名称 / 代理商简称 / 代理商字母简称 / 业务模式
+    # 期望列：平台 / 主账号ID(可选,兼容旧结构) / 主账号名称(可选) / 子账号ID / 子账号名称 / 代理商名称 / 代理商简称 / 代理商字母简称 / 业务模式
     col_map = {
         "\u5e73\u53f0": "platform", "platform": "platform",
         "\u4e3b\u8d26\u53f7ID": "main_account_id",

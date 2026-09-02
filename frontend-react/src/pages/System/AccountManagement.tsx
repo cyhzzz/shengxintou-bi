@@ -13,9 +13,8 @@ const { Title } = Typography;
 
 interface AccountMappingForm {
   platform: string;
-  account_id?: string;
+  account_id: string;
   account_name: string;
-  main_account_id?: string;
   agency: string;
   agency_short?: string;
   business_model: string;
@@ -27,7 +26,6 @@ const AccountManagementPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AccountMapping | null>(null);
-  const [currentPlatform, setCurrentPlatform] = useState<string>('腾讯');
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,7 +50,6 @@ const fetchData = useCallback(async () => {
   }, [fetchData]);
 
   const handleAdd = (platform: string) => {
-    setCurrentPlatform(platform);
     setEditingRecord(null);
     form.resetFields();
     form.setFieldsValue({ platform });
@@ -60,13 +57,11 @@ const fetchData = useCallback(async () => {
   };
 
   const handleEdit = (record: AccountMapping) => {
-    setCurrentPlatform(record.platform || '');
     setEditingRecord(record);
     form.setFieldsValue({
       platform: record.platform,
       account_id: record.account_id,
       account_name: record.account_name,
-      main_account_id: record.main_account_id,
       agency: record.agency,
       agency_short: record.agency_short,
       business_model: record.business_model,
@@ -137,8 +132,8 @@ const fetchData = useCallback(async () => {
     return groups;
   }, [data]);
 
-  const getColumns = (platform: string) => {
-    const baseColumns = [
+  const getColumns = () => {
+    return [
       {
         title: '账号ID',
         dataIndex: 'account_id',
@@ -190,22 +185,7 @@ const fetchData = useCallback(async () => {
         ),
       },
     ];
-
-    if (platform === '小红书') {
-      return [
-        {
-          title: '主账号ID',
-          dataIndex: 'main_account_id',
-          key: 'main_account_id',
-        },
-        ...baseColumns,
-      ];
-    }
-
-    return baseColumns;
   };
-
-  const isXiaohongshu = currentPlatform === '小红书';
 
   return (
     <div className={styles.accountManagementPage}>
@@ -242,7 +222,7 @@ const fetchData = useCallback(async () => {
           }
         >
           <Table
-            columns={getColumns(platform)}
+            columns={getColumns()}
             dataSource={items.filter(
               (item) =>
                 !searchText ||
@@ -272,40 +252,20 @@ const fetchData = useCallback(async () => {
             <Input />
           </Form.Item>
 
-          {isXiaohongshu ? (
-            <>
-              <Form.Item
-                name="main_account_id"
-                label="主账号ID"
-                rules={[{ required: true, message: '请输入主账号ID' }]}
-              >
-                <Input placeholder="广告主账户ID" />
-              </Form.Item>
-              <Form.Item name="account_id" label="子账户ID">
-                <Input placeholder="代理商子账户ID（直投时留空）" />
-              </Form.Item>
-              <Form.Item name="account_name" label="账号名称">
-                <Input placeholder="账号名称" />
-              </Form.Item>
-            </>
-          ) : (
-            <>
-              <Form.Item
-                name="account_id"
-                label="账号ID"
-                rules={[{ required: true, message: '请输入账号ID' }]}
-              >
-                <Input placeholder="账号ID" />
-              </Form.Item>
-              <Form.Item
-                name="account_name"
-                label="账号名称"
-                rules={[{ required: true, message: '请输入账号名称' }]}
-              >
-                <Input placeholder="账号名称" />
-              </Form.Item>
-            </>
-          )}
+          <Form.Item
+            name="account_id"
+            label="账号ID"
+            rules={[{ required: true, message: '请输入账号ID' }]}
+          >
+            <Input placeholder="账号ID（单层广告账号）" />
+          </Form.Item>
+          <Form.Item
+            name="account_name"
+            label="账号名称"
+            rules={[{ required: true, message: '请输入账号名称' }]}
+          >
+            <Input placeholder="账号名称" />
+          </Form.Item>
 
           <Form.Item
             name="agency"
