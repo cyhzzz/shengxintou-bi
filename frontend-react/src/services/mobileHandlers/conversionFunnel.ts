@@ -126,6 +126,7 @@ export async function handleConversionFunnelSplit(url: string, body: any): Promi
 
   // ---- 应用市场漏斗 ----
   // 强制 渠道类型='互联网引流'；新开户作为阶段呈现，不做 WHERE 过滤
+  // 漏斗按「下载日期」做下载 cohort（追踪下载后各阶段转化）；新开户资产(aAssetWhere)仍按资金账号创建完成时间。
   const aWhere = buildWhere([
     dateClause('下载日期', sd, ed),
     { sql: '"渠道类型" = ?', params: ['互联网引流'] },
@@ -164,7 +165,7 @@ export async function handleConversionFunnelSplit(url: string, body: any): Promi
 
   // 应用市场新开户引进资产 = 是否新开户==1 的行总资产 SUM
   const aAssetWhere = buildWhere([
-    dateClause('下载日期', sd, ed),
+    dateClause('资金账号创建完成时间', sd, ed),
     { sql: '"渠道类型" = ?', params: ['互联网引流'] },
     { sql: '"是否新开户" = 1', params: [] as unknown[] },
   ]);

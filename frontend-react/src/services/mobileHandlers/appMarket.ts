@@ -40,7 +40,7 @@ function appMarketFunnelWhere(filters: any): { clause: string; params: unknown[]
   const { start_date: sd, end_date: ed } = getDateRange(filters);
   return buildWhere([
     { sql: '"渠道类型" = ?', params: ['互联网引流'] }, // 业务不变式
-    dateClause('下载日期', sd, ed),
+    dateClause('资金账号创建完成时间', sd, ed),
     inClause('应用市场', filters.app_markets),
   ]);
 }
@@ -214,11 +214,11 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
   if (platforms.length > 0) {
     conditions.push(inClause('应用市场', platforms));
   }
-  conditions.push(dateClause('下载日期', sd, ed));
+  conditions.push(dateClause('资金账号创建完成时间', sd, ed));
   const whereClause = buildWhere(conditions.filter(Boolean) as { sql: string; params: unknown[] }[]);
 
-  // 日聚合（SQL 层按下载日期分组求和）
-  const dailySql = `SELECT "下载日期" AS d,
+  // 日聚合（SQL 层按资金账号创建完成时间分组求和）
+  const dailySql = `SELECT "资金账号创建完成时间" AS d,
     COALESCE(SUM("是否激活APP"), 0) AS activate,
     COALESCE(SUM("是否开户注册"), 0) AS register,
     COALESCE(SUM("是否注册身份证"), 0) AS id_card,
@@ -226,7 +226,7 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
     COALESCE(SUM("是否提交开户"), 0) AS submit,
     COALESCE(SUM("是否创建完资金账号"), 0) AS success
     FROM fact_conv_appmarket ${whereClause.clause}
-    GROUP BY "下载日期" ORDER BY "下载日期"`;
+    GROUP BY "资金账号创建完成时间" ORDER BY "资金账号创建完成时间"`;
   const dailyRows = await querySql<Row>(dailySql, whereClause.params);
 
   const WEEKDAY_MAP = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -306,7 +306,7 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
 function appMarketWhere(filters: any, includeChannelTypeFilter = true): { clause: string; params: unknown[] } {
   const { start_date: sd, end_date: ed } = getDateRange(filters);
   const conditions: ({ sql: string; params: unknown[] } | null)[] = [
-    dateClause('下载日期', sd, ed),
+    dateClause('资金账号创建完成时间', sd, ed),
     inClause('应用市场', filters.app_markets),
   ];
   if (includeChannelTypeFilter) {
@@ -352,7 +352,7 @@ export async function handleAppMarketSummary(body: any): Promise<any> {
   let by_channel_type: any[] = [];
 
   try {
-    const monthSql = `SELECT substr("下载日期", 1, 7) as month, "应用市场" as app_market, ${FUNNEL_SUMS}
+    const monthSql = `SELECT substr("资金账号创建完成时间", 1, 7) as month, "应用市场" as app_market, ${FUNNEL_SUMS}
       FROM fact_conv_appmarket ${where.clause}
       GROUP BY month, "应用市场" ORDER BY month`;
     const monthRows = await querySql<Row>(monthSql, where.params);
@@ -457,7 +457,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
 
   // 强制 渠道类型='互联网引流'
   const where = buildWhere([
-    dateClause('下载日期', sd, ed),
+    dateClause('资金账号创建完成时间', sd, ed),
     { sql: '"渠道类型" = ?', params: ['互联网引流'] },
     app_market ? { sql: '"应用市场" = ?', params: [app_market] } : null,
   ]);
@@ -473,7 +473,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   const selectCols = funnelCols.map(([c, a]) => `COALESCE(SUM("${c}"), 0) as "${a}"`).join(', ');
 
   // 整体周度走势
-  const weeklySql = `SELECT ${fridayWeekExpr('下载日期')} as week_start, ${selectCols}
+  const weeklySql = `SELECT ${fridayWeekExpr('资金账号创建完成时间')} as week_start, ${selectCols}
     FROM fact_conv_appmarket ${where.clause}
     GROUP BY week_start ORDER BY week_start`;
   const weeklyRows = await querySql<Row>(weeklySql, where.params);
@@ -493,7 +493,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
 
   // plan_key：广告计划ID NULL/0 fallback 投放账号
   const planExpr = `CASE WHEN "广告计划ID" IS NULL OR "广告计划ID" = 0 THEN COALESCE("投放账号", '未归因') ELSE CAST("广告计划ID" AS TEXT) END`;
-  const planSql = `SELECT ${planExpr} as plan_key, "投放账号", ${fridayWeekExpr('下载日期')} as week_start, ${selectCols}
+  const planSql = `SELECT ${planExpr} as plan_key, "投放账号", ${fridayWeekExpr('资金账号创建完成时间')} as week_start, ${selectCols}
     FROM fact_conv_appmarket ${where.clause}
     GROUP BY plan_key, "投放账号", week_start ORDER BY week_start`;
   const planRows = await querySql<Row>(planSql, where.params);
@@ -582,7 +582,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
 
   // 强制 渠道类型='互联网引流'（_funnel_filters 业务规则）
   const where = buildWhere([
-    dateClause('下载日期', sd, ed),
+    dateClause('资金账号创建完成时间', sd, ed),
     { sql: '"渠道类型" = ?', params: ['互联网引流'] },
     inClause('应用市场', filters.app_markets),
   ]);
@@ -714,7 +714,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   const markets = requested.length > 0 ? requested : AD_PLAN_ALLOWED_PLATFORMS;
 
   const marketIn = (col: string) => inClause(col, markets)!;
-  const marketWhere = buildWhere([marketIn('应用市场'), dateClause('下载日期', sd, ed)]);
+  const marketWhere = buildWhere([marketIn('应用市场'), dateClause('资金账号创建完成时间', sd, ed)]);
   const platformWhere = buildWhere([marketIn('平台'), { sql: '"花费" > 0', params: [] }, dateClause('日期', sd, ed)]);
 
   // ---- 开户概览：按应用市场聚合 开户 + 消耗 ----
@@ -774,7 +774,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   const poMap: Record<number, number> = {};
   const psMap: Record<number, number> = {};
   if (planIds.length > 0) {
-    const poWhere = buildWhere([inClause('广告计划ID', planIdStrs), dateClause('下载日期', sd, ed)]);
+    const poWhere = buildWhere([inClause('广告计划ID', planIdStrs), dateClause('资金账号创建完成时间', sd, ed)]);
     const poRows = await querySql<Row>(
       `SELECT "广告计划ID" as plan_id, COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_cnt
        FROM fact_conv_appmarket ${poWhere.clause}
@@ -825,7 +825,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
 
   // ---- 按周开户量（周五起始周），per-market ----
   const weeklyOpenRows = await querySql<Row>(
-    `SELECT "应用市场" as market, ${fridayWeekExpr('下载日期')} as week_start,
+    `SELECT "应用市场" as market, ${fridayWeekExpr('资金账号创建完成时间')} as week_start,
        COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_count
      FROM fact_conv_appmarket ${marketWhere.clause}
      GROUP BY "应用市场", week_start ORDER BY "应用市场", week_start`,
@@ -861,10 +861,10 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const factWeekWhere = buildWhere([
       inClause('广告计划ID', planIdStrs),
       { sql: '"渠道类型" = ?', params: ['互联网引流'] },
-      dateClause('下载日期', sd, ed),
+      dateClause('资金账号创建完成时间', sd, ed),
     ]);
     const factWeekRows = await querySql<Row>(
-      `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('下载日期')} as week_start,
+      `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('资金账号创建完成时间')} as week_start,
          COUNT(DISTINCT "设备号") as downloads,
          COUNT(DISTINCT CASE WHEN "是否激活APP" = 1 THEN "设备号" END) as activate,
          COUNT(DISTINCT CASE WHEN "是否开户注册" = 1 THEN "设备号" END) as register,

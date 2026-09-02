@@ -59,9 +59,9 @@ def _app_market_open_map(platforms, sd, ed):
         ).label('open_cnt'),
     ).filter(FactConvAppmarket.应用市场.in_(platforms))
     if sd:
-        q = q.filter(FactConvAppmarket.下载日期 >= sd)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 >= sd)
     if ed:
-        q = q.filter(FactConvAppmarket.下载日期 <= ed)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 <= ed)
     q = q.group_by(FactConvAppmarket.应用市场)
     return {r.应用市场: int(r.open_cnt or 0) for r in q.all()}
 

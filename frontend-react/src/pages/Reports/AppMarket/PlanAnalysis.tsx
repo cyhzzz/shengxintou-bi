@@ -567,7 +567,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
           sources={[
             { label: '数据源', value: 'fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）' },
             { label: '端点', value: 'POST /api/v1/reports/app-market/plan-analysis' },
-            { label: '周度口径', value: '上周五 ~ 本周四（周五为周起始日，SQLite date(下载日期, \'weekday 4\', \'-6 days\')；横轴标注 MMDD-MMDD）' },
+            { label: '周度口径', value: '上周五 ~ 本周四（周五为周起始日，按「资金账号创建完成时间」切周：SQLite date(资金账号创建完成时间, \'weekday 4\', \'-6 days\')；横轴标注 MMDD-MMDD）' },
             { label: '存量剔除', value: '非互联网引流设备需剔除（与存量客户同理）' },
             { label: '平台筛选', value: 'app_market 单选（不选 = 全部平台汇总），选中后只看该平台内计划' },
           ]}

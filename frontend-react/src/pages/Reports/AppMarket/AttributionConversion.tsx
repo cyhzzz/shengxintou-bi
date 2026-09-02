@@ -275,7 +275,7 @@ const AttributionConversionPage: React.FC = () => {
   // 表格列定义
   const columns: ColumnsType<TableRow> = [
     {
-      title: '下载日期',
+      title: '资金账号创建完成时间',
       dataIndex: 'date',
       key: 'date',
       width: 140,
@@ -482,7 +482,7 @@ const AttributionConversionPage: React.FC = () => {
             sources={[
               { label: '数据源', value: 'fact_conv_appmarket 数据库表（1 行=1 APP 下载）' },
               { label: '端点', value: 'POST /api/v1/reports/app-market/attribution-conversion' },
-              { label: '口径', value: '按下载日期聚合，统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分' },
+              { label: '口径', value: '按资金账号创建完成时间聚合，统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分' },
               { label: '移动端', value: '已支持（mobileRouteHandler 同步实现）' },
             ]}
           />

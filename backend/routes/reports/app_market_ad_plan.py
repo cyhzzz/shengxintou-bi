@@ -131,9 +131,9 @@ def _market_open_map(markets, start_date, end_date):
         ).label('open_cnt'),
     ).filter(FactConvAppmarket.应用市场.in_(markets))
     if start_date:
-        q = q.filter(FactConvAppmarket.下载日期 >= start_date)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
     if end_date:
-        q = q.filter(FactConvAppmarket.下载日期 <= end_date)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
     q = q.group_by(FactConvAppmarket.应用市场)
     return {r.应用市场: int(r.open_cnt or 0) for r in q.all()}
 
@@ -186,9 +186,9 @@ def _plan_level_maps(plan_ids, start_date, end_date):
         ).label('open_cnt'),
     ).filter(FactConvAppmarket.广告计划ID.in_(plan_ids))
     if start_date:
-        open_q = open_q.filter(FactConvAppmarket.下载日期 >= start_date)
+        open_q = open_q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
     if end_date:
-        open_q = open_q.filter(FactConvAppmarket.下载日期 <= end_date)
+        open_q = open_q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
     open_q = open_q.group_by(FactConvAppmarket.广告计划ID)
     for r in open_q.all():
         open_map[int(r.广告计划ID)] = int(r.open_cnt or 0)
@@ -315,7 +315,7 @@ def _weekly_open(markets, start_date, end_date):
     """
     if not markets:
         return []
-    fweek = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+    fweek = make_friday_week_start_expr(FactConvAppmarket.资金账号创建完成时间).label('week_start')
     q = db.session.query(
         FactConvAppmarket.应用市场.label('market'),
         fweek,
@@ -324,9 +324,9 @@ def _weekly_open(markets, start_date, end_date):
         ).label('open_count'),
     ).filter(FactConvAppmarket.应用市场.in_(markets))
     if start_date:
-        q = q.filter(FactConvAppmarket.下载日期 >= start_date)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
     if end_date:
-        q = q.filter(FactConvAppmarket.下载日期 <= end_date)
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
     q = q.group_by(FactConvAppmarket.应用市场, fweek).order_by(FactConvAppmarket.应用市场, fweek)
 
     out = []
@@ -379,7 +379,7 @@ def _plan_week_analysis(markets, start_date, end_date, week_start):
             }
 
         # ---- fact_conv_appmarket：下载链路各阶段（按 广告计划ID + 周五周，去重设备号） ----
-        fweek2 = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+        fweek2 = make_friday_week_start_expr(FactConvAppmarket.资金账号创建完成时间).label('week_start')
         fact_q = db.session.query(
             FactConvAppmarket.广告计划ID, fweek2,
             func.count(distinct(FactConvAppmarket.设备号)).label('downloads'),
@@ -395,9 +395,9 @@ def _plan_week_analysis(markets, start_date, end_date, week_start):
             FactConvAppmarket.渠道类型 == '互联网引流',
         )
         if start_date:
-            fact_q = fact_q.filter(FactConvAppmarket.下载日期 >= start_date)
+            fact_q = fact_q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
         if end_date:
-            fact_q = fact_q.filter(FactConvAppmarket.下载日期 <= end_date)
+            fact_q = fact_q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
         fact_q = fact_q.group_by(FactConvAppmarket.广告计划ID, fweek2)
         for r in fact_q.all():
             fact_by[(int(r.广告计划ID), _ws_str(r.week_start))] = {

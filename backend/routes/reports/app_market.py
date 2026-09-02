@@ -41,11 +41,13 @@ _META = {
 }
 
 
-def _apply_filters(q, filters):
+def _apply_filters(q, filters, date_col=None):
     sd, ed = filters.get('start_date'), filters.get('end_date')
     if sd and ed:
-        q = q.filter(and_(FactConvAppmarket.下载日期 >= sd,
-                          FactConvAppmarket.下载日期 <= ed))
+        # 默认按「资金账号创建完成时间」（开户时间）切分——开户数报表（周度/月度/各市场获客量/资产）
+        # 与用户 Excel 核对口径一致。开户漏斗需按「下载日期」做下载 cohort，通过 date_col 参数覆盖。
+        col = date_col or FactConvAppmarket.资金账号创建完成时间
+        q = q.filter(and_(col >= sd, col <= ed))
     if filters.get('app_markets'):
         q = q.filter(FactConvAppmarket.应用市场.in_([str(x) for x in filters['app_markets']]))
     if filters.get('channel_types'):
@@ -53,11 +55,12 @@ def _apply_filters(q, filters):
     return q
 
 
-def _funnel_filters(q, filters):
+def _funnel_filters(q, filters, date_col=None):
     # v3.1.24 业务规则:漏斗端点只看互联网引流。
     # 「新开户」作为漏斗阶段(开户成功→新开户)呈现存量剔除,不用 WHERE 过滤——
     # 否则 是否新开户=1 的设备行其前置阶段字段全部=1,SUM 后漏斗变平。
-    q = _apply_filters(q, filters)
+    # date_col 默认=资金账号创建完成时间（开户数口径）；开户漏斗传 下载日期 做下载 cohort。
+    q = _apply_filters(q, filters, date_col=date_col)
     q = q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
     return q
 
@@ -92,7 +95,9 @@ def app_market_summary():
     """总览：SUM 各阶段 + 按月 × 应用市场透视"""
     data = request.get_json() or {}
     filters = data.get('filters') or {}
-    q = _funnel_filters(db.session.query(*_funnel_selects()), filters)
+    # 漏斗按「下载日期」做下载 cohort（追踪下载后各阶段转化）；
+    # 与下方按月开户透视 / 新开户资产（资金账号创建完成时间）口径分离。
+    q = _funnel_filters(db.session.query(*_funnel_selects()), filters, date_col=FactConvAppmarket.下载日期)
     r = q.first()
     total_counts = _funnel_dict_from_row(r)
 
@@ -109,7 +114,7 @@ def app_market_summary():
 
     month_q = _funnel_filters(
         db.session.query(
-            func.substr(FactConvAppmarket.下载日期, 1, 7).label('month'),
+            func.substr(FactConvAppmarket.资金账号创建完成时间, 1, 7).label('month'),
             FactConvAppmarket.应用市场.label('app_market'),
             *_funnel_selects(),
         ),
@@ -131,7 +136,7 @@ def app_market_summary():
             FactConvAppmarket.应用市场.label('app_market'),
             *_funnel_selects(),
         ),
-        filters
+        filters, date_col=FactConvAppmarket.下载日期
     ).group_by(FactConvAppmarket.应用市场)
     by_market = []
     for row in market_q.all():
@@ -148,7 +153,7 @@ def app_market_summary():
             FactConvAppmarket.应用市场.label('app_market'),
             *_funnel_selects(),
         ),
-        filters
+        filters, date_col=FactConvAppmarket.下载日期
     ).group_by(FactConvAppmarket.渠道类型, FactConvAppmarket.应用市场)
     by_channel_type = []
     for row in type_q.all():
@@ -178,7 +183,8 @@ def app_market_funnel():
     # 单应用市场的漏斗细节
     data = request.get_json() or {}
     filters = data.get('filters') or {}
-    q = _funnel_filters(db.session.query(*_funnel_selects()), filters)
+    # 开户漏斗按「下载日期」做下载 cohort，追踪下载后各阶段转化（不被 94% 无完成时间的行压扁）
+    q = _funnel_filters(db.session.query(*_funnel_selects()), filters, date_col=FactConvAppmarket.下载日期)
     r = q.first()
     counts = _funnel_dict_from_row(r)
     return jsonify({
@@ -407,7 +413,7 @@ def app_market_plan_analysis():
     # 周起始日表达式（dialect 无关）：应用市场周度口径统一为「上周五 ~ 本周四」，
     # 周五为周起始日。SQLite 用 date(d, 'weekday 4', '-6 days')；PG 用 date_trunc + 偏移。
     from backend.utils.dialect_helpers import make_friday_week_start_expr
-    week_start_expr = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+    week_start_expr = make_friday_week_start_expr(FactConvAppmarket.资金账号创建完成时间).label('week_start')
 
     # 广告计划ID 归一化（与 /creative 一致）
     # feat-cloud-supabase：PG 上 广告计划ID=bigint，投放账号=text，
