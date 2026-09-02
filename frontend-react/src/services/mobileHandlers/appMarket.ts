@@ -40,7 +40,9 @@ function appMarketFunnelWhere(filters: any): { clause: string; params: unknown[]
   const { start_date: sd, end_date: ed } = getDateRange(filters);
   return buildWhere([
     { sql: '"渠道类型" = ?', params: ['互联网引流'] }, // 业务不变式
-    dateClause('资金账号创建完成时间', sd, ed),
+    // 开户漏斗按「下载日期」做下载 cohort（与后端 app_market_funnel / conversionFunnel 一致）；
+    // 开户数据报（如月度/各市场获客量）按「资金账号创建完成时间」在别处处理。
+    dateClause('下载日期', sd, ed),
     inClause('应用市场', filters.app_markets),
   ]);
 }

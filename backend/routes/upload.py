@@ -110,9 +110,10 @@ def _process_file(task_id: str, filepath: str, data_type: str,
             if data_type == 'qingniao_leads':
                 meta = raw_import.write_to_db(data_type, filepath, batch_tag=batch_tag)
             else:
-                # 应用市场区间拆分类型（h1/q3/q4）落库到同一张 fact_conv_appmarket，
-                # 仅按 period 区间清空并重写；period 恒非空（由 APPMARKET_PERIOD_KEYS 提供）。
-                base_type = 'conversion_appmarket'
+                # 非 qingniao 类型走 v2 处理器。应用市场区间拆分（h1/q3/q4）统一落
+                # fact_conv_appmarket 并按 period 区间清空重写；其余类型 period 为空，
+                # 必须按各自 data_type 分发（否则会错用 conversion_appmarket 处理器）。
+                base_type = 'conversion_appmarket' if period else data_type
                 meta = raw_import.write_to_db(
                     base_type, filepath, overwrite=overwrite, period=period
                 )
