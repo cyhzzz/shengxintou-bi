@@ -27,6 +27,7 @@ SYNC_TABLES = [
     'dim_ad_plan_class',
     'fact_conv_content',
     'fact_conv_appmarket',
+    'fact_appmarket_plan_daily',
     'agg_vendor_daily',
     'agg_xhs_note',
     'agg_daily_channel_open',
@@ -37,6 +38,7 @@ SYNC_TABLES = [
 TABLE_DATE_COLS = {
     'fact_conv_content': '线索日期',
     'fact_conv_appmarket': '下载日期',
+    'fact_appmarket_plan_daily': '日期',
     'agg_vendor_daily': '日期',
     'agg_xhs_note': '发布时间',
     'agg_daily_channel_open': '时间区间',

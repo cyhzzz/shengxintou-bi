@@ -21,7 +21,8 @@ export type DataType =
   | 'vendor_daily'
   | 'xhs_note'
   | 'channel_open'
-  | 'appmarket_plan_class';
+  | 'appmarket_plan_class'
+  | 'appmarket_plan_daily';
 
 // 数据类型配置
 export interface DataTypeConfig {
@@ -106,5 +107,13 @@ export const DATA_TYPES: DataTypeConfig[] = [
     targetTables: ['dim_ad_plan_class'],
     guideFile: 'appmarket_plan_class_guide.md',
     icon: '📋',
+  },
+  {
+    type: 'appmarket_plan_daily',
+    label: '厂商广告计划维度明细',
+    description: '日×计划×关键词 投放消耗/展示/点击/下载明细（9.3）',
+    targetTables: ['fact_appmarket_plan_daily'],
+    guideFile: 'appmarket_plan_daily_guide.md',
+    icon: '📈',
   },
 ];

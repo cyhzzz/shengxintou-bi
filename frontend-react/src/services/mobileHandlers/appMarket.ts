@@ -643,7 +643,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
 
 // ============================================================================
 // 应用市场 · 广告计划分析 (reports/app-market/ad-plan-analysis)
-// 结合三个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily
+// 结合四个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily(市场级) + fact_appmarket_plan_daily(计划级)
 // 复刻 backend/routes/reports/app_market_ad_plan.py（周度口径：上周五~本周四）
 // ============================================================================
 
@@ -788,7 +788,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const psWhere = buildWhere([{ sql: '"花费" > 0', params: [] }, inClause('计划ID', planIdStrs), dateClause('日期', sd, ed)]);
     const psRows = await querySql<Row>(
       `SELECT "计划ID" as plan_id, COALESCE(SUM("花费"), 0) as spend
-       FROM agg_vendor_daily ${psWhere.clause}
+       FROM fact_appmarket_plan_daily ${psWhere.clause}
        GROUP BY "计划ID"`,
       psWhere.params
     );
@@ -839,24 +839,24 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   });
 
   // ---- 按周分计划 + 分计划展开 ----
-  const aggBy: Record<string, { spend: number; impressions: number; clicks: number }> = {};
-  const factBy: Record<string, { downloads: number; activate: number; register: number; id_card: number; bank_card: number; submit: number; success: number; ad_account: number }> = {};
+  const aggBy: Record<string, { spend: number; impressions: number; clicks: number; downloads: number }> = {};
+  const factBy: Record<string, { activate: number; register: number; id_card: number; bank_card: number; submit: number; success: number; ad_account: number }> = {};
   if (planIds.length > 0) {
     const aggWeekWhere = buildWhere([
       inClause('计划ID', planIdStrs),
-      { sql: '("花费" > 0 OR "展示量" > 0 OR "点击量" > 0)', params: [] },
+      { sql: '("花费" > 0 OR "展示量" > 0 OR "点击量" > 0 OR "下载量" > 0)', params: [] },
       dateClause('日期', sd, ed),
     ]);
     const aggWeekRows = await querySql<Row>(
       `SELECT "计划ID" as plan_id, ${fridayWeekExpr('日期')} as week_start,
-         COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks
-       FROM agg_vendor_daily ${aggWeekWhere.clause}
+         COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks, COALESCE(SUM("下载量"), 0) as downloads
+       FROM fact_appmarket_plan_daily ${aggWeekWhere.clause}
        GROUP BY "计划ID", week_start`,
       aggWeekWhere.params
     );
     for (const r of aggWeekRows) {
       aggBy[`${Number(r.plan_id)}|${String(r.week_start).slice(0, 10)}`] = {
-        spend: toFloat(r.spend), impressions: toFloat(r.impressions), clicks: toFloat(r.clicks),
+        spend: toFloat(r.spend), impressions: toFloat(r.impressions), clicks: toFloat(r.clicks), downloads: toFloat(r.downloads),
       };
     }
 
@@ -867,7 +867,6 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     ]);
     const factWeekRows = await querySql<Row>(
       `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('资金账号创建完成时间')} as week_start,
-         COUNT(DISTINCT "设备号") as downloads,
          COUNT(DISTINCT CASE WHEN "是否激活APP" = 1 THEN "设备号" END) as activate,
          COUNT(DISTINCT CASE WHEN "是否开户注册" = 1 THEN "设备号" END) as register,
          COUNT(DISTINCT CASE WHEN "是否注册身份证" = 1 THEN "设备号" END) as id_card,
@@ -881,7 +880,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     );
     for (const r of factWeekRows) {
       factBy[`${Number(r.plan_id)}|${String(r.week_start).slice(0, 10)}`] = {
-        downloads: toFloat(r.downloads), activate: toFloat(r.activate), register: toFloat(r.register),
+        activate: toFloat(r.activate), register: toFloat(r.register),
         id_card: toFloat(r.id_card), bank_card: toFloat(r.bank_card), submit: toFloat(r.submit),
         success: toFloat(r.success), ad_account: toFloat(r.ad_account),
       };
@@ -898,9 +897,9 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const keys = Array.from(weekSet);
 
     const week_rows = keys.map(wk => {
-      const a = aggBy[`${pid}|${wk}`] || { spend: 0, impressions: 0, clicks: 0 };
-      const f = factBy[`${pid}|${wk}`] || { downloads: 0, activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0, ad_account: 0 };
-      const m = buildAdMetrics(a.spend, a.impressions, a.clicks, f.downloads, f.activate, f.register, f.id_card, f.bank_card, f.submit, f.success, f.ad_account);
+      const a = aggBy[`${pid}|${wk}`] || { spend: 0, impressions: 0, clicks: 0, downloads: 0 };
+      const f = factBy[`${pid}|${wk}`] || { activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0, ad_account: 0 };
+      const m = buildAdMetrics(a.spend, a.impressions, a.clicks, a.downloads, f.activate, f.register, f.id_card, f.bank_card, f.submit, f.success, f.ad_account);
       m['week_start'] = wk;
       m['week_end'] = _adWeekEnd(wk);
       return m;
@@ -912,7 +911,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
       keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.spend || 0), 0),
       keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.impressions || 0), 0),
       keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.clicks || 0), 0),
-      keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.downloads || 0), 0),
+      keys.reduce((s, wk) => s + (aggBy[`${pid}|${wk}`]?.downloads || 0), 0),
       keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.activate || 0), 0),
       keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.register || 0), 0),
       keys.reduce((s, wk) => s + (factBy[`${pid}|${wk}`]?.id_card || 0), 0),

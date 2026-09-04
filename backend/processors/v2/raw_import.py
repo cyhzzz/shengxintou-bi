@@ -396,6 +396,64 @@ def handle_appmarket_plan_class(path: str):
     }
 
 
+def handle_appmarket_plan_daily(path: str):
+    """9.3 厂商广告计划维度明细.xlsx -> fact_appmarket_plan_daily（1 行=日×计划×关键词）。
+
+    列：日期 / 平台 / 厂商名称 / 业务模式 / 计划ID / 计划名称 / 关键词ID /
+        关键词名称 / 展示量 / 点击量 / 下载量 / 花费。
+
+    承担「广告计划分析」报表的计划级 消耗/展示/点击/下载 日指标；计划ID 与
+    dim_ad_plan_class.广告分组ID 关联。上游数据原样入库，仅格式层规范：
+    1. 平台归一 .lower()（OPPO/VIVO → oppo/vivo），仅保留 7 大市场白名单
+    2. 日期归一 _to_date_str
+    3. 计划ID/关键词ID 超长 ID 安全转换（BigInteger / 超界转字符串）
+    4. 数值列转 numeric，NaN 落 NULL
+    5. 覆盖写入（replace），无中间计算
+    """
+    df = _read_excel(path)
+    df = _clean_nan(df)
+
+    # 1) 平台归一（小写）+ 白名单过滤
+    def _norm_market(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)):
+            return None
+        return str(v).strip().lower()
+    if "平台" in df.columns:
+        df["平台"] = df["平台"].apply(_norm_market)
+        df = df[df["平台"].isin(ALLOWED_PLATFORMS)].copy()
+        df = df.reset_index(drop=True)
+
+    # 2) 日期归一
+    if "日期" in df.columns:
+        df["日期"] = _to_date_str(df["日期"])
+
+    # 3) 超长 ID 安全转换
+    for c in ("计划ID", "关键词ID"):
+        if c in df.columns:
+            df[c] = _safe_overlong_id(df[c])
+
+    # 4) 数值列转 numeric（NaN → NULL）
+    int_cols = ["展示量", "点击量", "下载量"]
+    for c in int_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").astype("Int64")
+    if "花费" in df.columns:
+        df["花费"] = pd.to_numeric(df["花费"], errors="coerce")
+
+    # 5) 保序选取落库列（原样，仅中文列名，id 由 ORM 自增）
+    keep = ["日期", "平台", "厂商名称", "业务模式", "计划ID", "计划名称",
+            "关键词ID", "关键词名称", "展示量", "点击量", "下载量", "花费"]
+    keep = [c for c in keep if c in df.columns]
+    plan_daily_df = df[keep].copy()
+
+    if "id" not in plan_daily_df.columns:
+        plan_daily_df.insert(0, "id", range(1, len(plan_daily_df) + 1))
+
+    return {"fact_appmarket_plan_daily": plan_daily_df}, {
+        "row_counts": {"fact_appmarket_plan_daily": len(plan_daily_df)},
+    }
+
+
 HANDLERS["account_mapping"] = handle_account_mapping
 HANDLERS["conversion_content"] = handle_conversion_content
 HANDLERS["conversion_appmarket"] = handle_conversion_appmarket
@@ -403,6 +461,7 @@ HANDLERS["vendor_daily"] = handle_vendor_daily
 HANDLERS["xhs_note"] = handle_xhs_note
 HANDLERS["channel_open"] = handle_channel_open
 HANDLERS["appmarket_plan_class"] = handle_appmarket_plan_class
+HANDLERS["appmarket_plan_daily"] = handle_appmarket_plan_daily
 
 
 def handle_qingniao_leads(path: str, batch_tag: str = None):

@@ -340,6 +340,7 @@ export const SYNC_TABLE_META: TableSyncMeta[] = [
   { name: 'dim_ad_plan_class', label: '广告计划分类', type: 'dim' },
   { name: 'fact_conv_content', label: '内容线索', type: 'fact' },
   { name: 'fact_conv_appmarket', label: '应用市场转化', type: 'fact' },
+  { name: 'fact_appmarket_plan_daily', label: '厂商广告计划维度明细', type: 'fact' },
   { name: 'agg_vendor_daily', label: '渠道日报', type: 'fact' },
   { name: 'agg_xhs_note', label: '小红书笔记', type: 'fact' },
   { name: 'agg_daily_channel_open', label: '全渠道开户日报', type: 'fact' },

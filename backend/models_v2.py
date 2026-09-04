@@ -192,6 +192,33 @@ class FactConvAppmarket(db.Model):
     归属营业部名称 = Column(Text)
 
 
+class FactAppmarketPlanDaily(db.Model):
+    """9.3 厂商广告计划维度明细（1 行 = 日×计划×关键词）
+
+    承担「广告计划分析」报表计划级 消耗/展示/点击/下载 日指标。
+    计划ID 与 dim_ad_plan_class.广告分组ID / fact_conv_appmarket.广告计划ID 关联。
+    """
+    __tablename__ = 'fact_appmarket_plan_daily'
+    __table_args__ = (
+        Index('idx_app_plan_daily_plan', '计划ID'),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+
+    日期 = Column(Text)
+    平台 = Column(Text)              # 归一化小写：oppo/vivo/荣耀/小米/华为/鸿蒙/苹果
+    厂商名称 = Column(Text)
+    业务模式 = Column(Text)
+    计划ID = Column(BigInteger)      # 与 plan_class.广告分组ID 关联；超长转字符串
+    计划名称 = Column(Text)
+    关键词ID = Column(BigInteger)    # 超长转字符串
+    关键词名称 = Column(Text)
+    展示量 = Column(BigInteger)
+    点击量 = Column(BigInteger)
+    下载量 = Column(BigInteger)
+    花费 = Column(Float)
+
+
 # ============================================================================
 # DWS 聚合层
 # ============================================================================
@@ -233,8 +260,6 @@ class AggVendorDaily(db.Model):
     有效户成本 = Column(Float)
     线索转化率 = Column(Float)
     开户转化率 = Column(Float)
-    计划ID = Column(BigInteger)            # 广告计划ID（与 dim_ad_plan_class.广告分组ID 关联）
-    计划名称 = Column(Text)
 
 
 class AggXhsNote(db.Model):
