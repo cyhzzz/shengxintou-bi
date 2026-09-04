@@ -1,5 +1,5 @@
 /**
- * 数据导入相关常量和类型定义（v2 - 7 个新 type，原样导入）
+ * 数据导入相关常量和类型定义（v2，原样导入）
  *
  * 新类型 → 新表（原样导入，无中间计算）：
  *   account_mapping       → dim_account + dim_vendor
@@ -9,7 +9,26 @@
  *   xhs_note              → agg_xhs_note
  *   channel_open          → agg_daily_channel_open
  *   appmarket_plan_class   → dim_ad_plan_class
+ *   appmarket_plan_daily  → fact_appmarket_plan_daily
  */
+
+import type { ComponentType, CSSProperties } from 'react';
+import {
+  BarChartOutlined,
+  TableOutlined,
+  ReadOutlined,
+  LinkOutlined,
+  DownloadOutlined,
+  PhoneOutlined,
+  BankOutlined,
+  TagsOutlined,
+  PartitionOutlined,
+  ContactsOutlined,
+  ApartmentOutlined,
+} from '@ant-design/icons';
+
+/** 图标组件类型 */
+type IconCmp = ComponentType<{ style?: CSSProperties }>;
 
 // 数据类型
 export type DataType =
@@ -24,6 +43,37 @@ export type DataType =
   | 'appmarket_plan_class'
   | 'appmarket_plan_daily';
 
+// 分组键
+export type DataGroupKey = 'delivery' | 'leads' | 'open' | 'dimension';
+
+// 分组定义（顺序即展示顺序）
+export const DATA_GROUPS: { key: DataGroupKey; label: string; icon: IconCmp }[] = [
+  { key: 'delivery', label: '投放数据', icon: BarChartOutlined },
+  { key: 'leads', label: '线索数据', icon: ContactsOutlined },
+  { key: 'open', label: '开户数据', icon: BankOutlined },
+  { key: 'dimension', label: '维度关联', icon: ApartmentOutlined },
+];
+
+// 应用市场下载链路：区间拆分（1-6月 / 7-9月 / 10-12月）
+// UI 上合并为一项展示，选择后在右侧用 Segmented 切换具体区间
+export const APPMARKET_DOWNLOAD_TYPE = 'conversion_appmarket_h1';
+export const APPMARKET_PREFIX = 'conversion_appmarket_';
+export const APPMARKET_INTERVALS: { type: DataType; label: string; desc: string }[] = [
+  { type: 'conversion_appmarket_h1', label: '1-6月', desc: '1月1日-6月30日' },
+  { type: 'conversion_appmarket_q3', label: '7-9月', desc: '7月1日-9月30日' },
+  { type: 'conversion_appmarket_q4', label: '10-12月', desc: '10月1日-12月31日' },
+];
+
+// 占位数据源（开发中，不可选择）
+export interface PlaceholderConfig {
+  group: DataGroupKey;
+  label: string;
+  icon: IconCmp;
+}
+export const PLACEHOLDER_ITEMS: PlaceholderConfig[] = [
+  { group: 'leads', label: '手机号明细数据', icon: PhoneOutlined },
+];
+
 // 数据类型配置
 export interface DataTypeConfig {
   type: DataType;
@@ -31,7 +81,8 @@ export interface DataTypeConfig {
   description: string;
   targetTables: string[];
   guideFile: string;
-  icon: string;
+  icon: IconCmp;
+  group: DataGroupKey;
 }
 
 // 数据类型列表
@@ -42,39 +93,44 @@ export const DATA_TYPES: DataTypeConfig[] = [
     description: '账号 → 代理商/业务模式映射（合并写入 dim_account + dim_vendor）',
     targetTables: ['dim_account', 'dim_vendor'],
     guideFile: 'account_mapping_guide.md',
-    icon: '🗂️',
+    icon: TagsOutlined,
+    group: 'dimension',
   },
   {
     type: 'conversion_content',
-    label: '内容平台加微链路',
-    description: '抖音/腾讯/小红书/快手加微链路明细（1 行 = 1 企微）',
+    label: '企微明细数据',
+    description: '抖音/腾讯/小红书/快手企微加微明细（1 行 = 1 企微）',
     targetTables: ['fact_conv_content'],
     guideFile: 'conversion_content_guide.md',
-    icon: '🔗',
+    icon: LinkOutlined,
+    group: 'leads',
   },
   {
     type: 'conversion_appmarket_h1',
-    label: '应用市场下载链路(1-6月)',
+    label: 'APP下载明细数据(1-6月)',
     description: '1月1日-6月30日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
-    icon: '📱',
+    icon: DownloadOutlined,
+    group: 'leads',
   },
   {
     type: 'conversion_appmarket_q3',
-    label: '应用市场下载链路(7-9月)',
+    label: 'APP下载明细数据(7-9月)',
     description: '7月1日-9月30日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
-    icon: '📱',
+    icon: DownloadOutlined,
+    group: 'leads',
   },
   {
     type: 'conversion_appmarket_q4',
-    label: '应用市场下载链路(10-12月)',
+    label: 'APP下载明细数据(10-12月)',
     description: '10月1日-12月31日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
-    icon: '📱',
+    icon: DownloadOutlined,
+    group: 'leads',
   },
   {
     type: 'vendor_daily',
@@ -82,15 +138,17 @@ export const DATA_TYPES: DataTypeConfig[] = [
     description: '日×平台×厂商×业务模式 统一漏斗超集',
     targetTables: ['agg_vendor_daily'],
     guideFile: 'vendor_daily_guide.md',
-    icon: '📊',
+    icon: BarChartOutlined,
+    group: 'delivery',
   },
   {
     type: 'xhs_note',
-    label: '小红书笔记',
+    label: '小红书笔记维度明细',
     description: '笔记级 + 笔记聚合（自动丢弃 Unnamed: 24 脏列）',
     targetTables: ['agg_xhs_note'],
     guideFile: 'xhs_note_guide.md',
-    icon: '📕',
+    icon: ReadOutlined,
+    group: 'delivery',
   },
   {
     type: 'channel_open',
@@ -98,7 +156,8 @@ export const DATA_TYPES: DataTypeConfig[] = [
     description: '非广告渠道开户日聚合（互联网引流/合作机构/员工开户/自然流入）',
     targetTables: ['agg_daily_channel_open'],
     guideFile: 'channel_open_guide.md',
-    icon: '🏦',
+    icon: BankOutlined,
+    group: 'open',
   },
   {
     type: 'appmarket_plan_class',
@@ -106,14 +165,16 @@ export const DATA_TYPES: DataTypeConfig[] = [
     description: '广告分组按应用市场/版位/子版位/出价方式分类（关联下载链路拆解获客贡献）',
     targetTables: ['dim_ad_plan_class'],
     guideFile: 'appmarket_plan_class_guide.md',
-    icon: '📋',
+    icon: PartitionOutlined,
+    group: 'dimension',
   },
   {
     type: 'appmarket_plan_daily',
-    label: '厂商广告计划维度明细',
+    label: '广告计划维度明细',
     description: '日×计划×关键词 投放消耗/展示/点击/下载明细（9.3）',
     targetTables: ['fact_appmarket_plan_daily'],
     guideFile: 'appmarket_plan_daily_guide.md',
-    icon: '📈',
+    icon: TableOutlined,
+    group: 'delivery',
   },
 ];

@@ -2,84 +2,110 @@
 
 /**
  * 数据类型选择器样式
- * 卡片网格布局，每个卡片带角标指南图标
+ * 紧凑纵向菜单列表，按业务域分组；每项=图标+名称+指南入口
  */
 
-.typeGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--spacer-12);
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-16);
 }
 
-.typeCard {
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+  margin-bottom: var(--spacer-6);
+}
+
+.groupIcon {
+  font-size: var(--text-sm);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+}
+
+.groupLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.groupItems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-4);
+}
+
+.item {
   position: relative;
-  padding: var(--spacer-12) var(--spacer-12);
-  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+  padding: var(--spacer-8) var(--spacer-10);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-normal);
-  background: var(--bg-content);
-  text-align: center;
 
   &:hover {
-    border-color: var(--color-brand);
-    box-shadow: 0 2px 8px var(--color-brand-bg);
+    background: var(--bg-hover);
   }
 
-  &.active {
-    border-color: var(--color-brand);
+  &.itemActive {
     background: var(--color-brand-bg);
-    box-shadow: 0 2px 8px var(--color-brand-border);
+    border-color: var(--color-brand-border);
+  }
+
+  &.itemDisabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background: transparent;
+    border-color: transparent;
   }
 }
 
+.itemIcon {
+  font-size: var(--text-base);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.itemLabel {
+  flex: 1;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  @include text-ellipsis;
+}
+
 .guideBtn {
-  position: absolute;
-  top: var(--spacer-8);
-  right: var(--spacer-8);
-  width: var(--spacer-24);
-  height: var(--spacer-24);
+  flex-shrink: 0;
+  width: var(--spacer-20);
+  height: var(--spacer-20);
   padding: 0;
-  border: 1px solid var(--border-default);
-  border-radius: 50%;
-  background: var(--bg-content);
+  border: none;
+  background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-normal);
+  border-radius: 50%;
   color: var(--color-text-tertiary);
   font-size: var(--text-sm);
+  transition: all var(--transition-normal);
 
   &:hover {
-    border-color: var(--color-brand);
     color: var(--color-brand);
     background: var(--color-brand-bg);
   }
-
-  // 确保点击不会触发父元素的事件
-  pointer-events: auto;
 }
 
-.cardIcon {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--spacer-8);
-  line-height: 1;
-}
-
-.cardTitle {
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacer-8) 0;
-  @include text-ellipsis;
-}
-
-.cardDesc {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin: 0;
-  line-height: 1.4;
-  @include text-ellipsis-multi(2);
-  min-height: 32px;
+.devTag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
 }

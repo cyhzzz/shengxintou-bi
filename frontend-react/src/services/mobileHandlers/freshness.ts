@@ -7,15 +7,17 @@ import { querySql } from '../mobileSqlite';
 import { type Row } from './shared';
 // ============================================================================
 // 数据新鲜度（data-freshness）— 移植自 backend/routes/metadata.py::get_data_status
-// 关于页数据状态：对 5 张源表取各表最大日期，按距今天数给出 normal/warning/critical
+// 对带日期的业务事实/聚合表取各表最大日期，按距今天数给出 normal/warning/critical
+// 分组对齐数据导入页业务域（投放数据 / 线索数据 / 开户数据）；维度表无日期不纳入。
 // ============================================================================
 
 const FRESHNESS_SOURCES = [
-  { key: 'vendor_daily',           table: 'agg_vendor_daily',         dateField: '日期',       name: '厂商日聚合',     group: 'channel_ads',  order: 1 },
-  { key: 'xhs_note',               table: 'agg_xhs_note',             dateField: '发布时间',    name: '小红书笔记聚合', group: 'content',     order: 2 },
-  { key: 'fact_conv_content',      table: 'fact_conv_content',        dateField: '线索日期',      name: '内容平台转化',     group: 'content',     order: 3 },
-  { key: 'fact_conv_appmarket',    table: 'fact_conv_appmarket',      dateField: '下载日期',      name: '应用市场转化',     group: 'app_market',  order: 4 },
-  { key: 'agg_daily_channel_open', table: 'agg_daily_channel_open',   dateField: '时间区间',      name: '全渠道开户汇总',   group: 'omni',        order: 5 },
+  { key: 'vendor_daily',            table: 'agg_vendor_daily',         dateField: '日期',       name: '厂商广告投放分析', group: 'delivery', order: 1 },
+  { key: 'fact_appmarket_plan_daily', table: 'fact_appmarket_plan_daily', dateField: '日期',   name: '广告计划维度明细', group: 'delivery', order: 2 },
+  { key: 'xhs_note',                table: 'agg_xhs_note',             dateField: '发布时间',    name: '小红书笔记维度明细', group: 'delivery', order: 3 },
+  { key: 'fact_conv_content',       table: 'fact_conv_content',        dateField: '线索日期',      name: '企微明细',     group: 'leads',    order: 1 },
+  { key: 'fact_conv_appmarket',     table: 'fact_conv_appmarket',      dateField: '下载日期',      name: 'APP下载明细',  group: 'leads',    order: 2 },
+  { key: 'agg_daily_channel_open',  table: 'agg_daily_channel_open',   dateField: '时间区间',      name: '开户渠道分析', group: 'open',     order: 1 },
 ];
 
 export async function handleDataFreshness(): Promise<Record<string, any>> {

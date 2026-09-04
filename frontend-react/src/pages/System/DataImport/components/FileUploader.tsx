@@ -2,7 +2,7 @@
  * 文件上传组件
  */
 import { useState, useRef, useEffect } from 'react';
-import { Upload, message, Progress, Switch, Space, Spin } from 'antd';
+import { Upload, message, Progress, Spin } from 'antd';
 import type { UploadProps } from 'antd/es/upload/interface';
 import { InboxOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { UploadResponse } from '@/types/api.schemas';
@@ -10,6 +10,7 @@ import { http } from '@/services/http'; // feat-local-auth：用 http 客户端�
 import ImportResult from './ImportResult';
 import styles from './FileUploader.module.scss';
 import type { DataType } from '../constants';
+import { APPMARKET_PREFIX, APPMARKET_INTERVALS } from '../constants';
 
 const { Dragger } = Upload;
 
@@ -44,15 +45,18 @@ interface TaskStatusResponse {
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }) => {
-  const [overwrite, setOverwrite] = useState(true); // 默认全量替换
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 应用市场下载链路（1-6月 / 7-9月 / 10-12月）区间拆分类型：只按区间替换，隐藏全量替换开关
-  const isAppmarketPeriod = dataType.startsWith('conversion_appmarket_');
+  // 应用市场下载链路：按所选区间替换（overwrite=true 交由后端按区间处理）；其余类型整表覆盖写入
+  const isAppmarket = dataType.startsWith(APPMARKET_PREFIX);
+  const appmarketInterval = APPMARKET_INTERVALS.find((i) => i.type === dataType);
+  const writeHint = isAppmarket
+    ? `按区间覆盖写入：仅替换 ${appmarketInterval?.desc ?? ''} 的数据，不影响其它月份（请确保文件仅含本区间）`
+    : '覆盖写入（全量替换）：该表历史数据将被本次文件整体替换，不保留历史';
 
   // 轮询任务状态
   const pollTaskStatus = async (taskId: string): Promise<TaskStatusResponse> => {
@@ -166,7 +170,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
       formData.append('file', file as File);
       formData.append('data_type', dataType);
       formData.append('auto_process', 'true');
-      formData.append('overwrite', String(overwrite));
+      formData.append('overwrite', 'true'); // v2 全部覆盖写入（应用市场由后端按区间处理）
 
       try {
         // feat-local-auth：用 http.upload 自动带 Authorization 头，避免 401
@@ -212,19 +216,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ dataType, onImportSuccess }
   return (
     <div className={styles.uploader}>
       <div className={styles.options}>
-        {isAppmarketPeriod ? (
-          <span className={styles.hint}>
-            按所选区间替换该时段数据（不影响其它月份）；请确保上传文件仅含本区间数据
-          </span>
-        ) : (
-          <Space>
-            <span>全量替换:</span>
-            <Switch checked={overwrite} onChange={setOverwrite} />
-            <span className={styles.hint}>
-              仅应用市场转化明细支持增量追加
-            </span>
-          </Space>
-        )}
+        <span className={styles.hint}>{writeHint}</span>
       </div>
 
       <Dragger {...uploadProps} disabled={uploading} className={styles.dragger}>

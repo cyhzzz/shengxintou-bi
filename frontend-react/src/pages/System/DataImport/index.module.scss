@@ -1,11 +1,19 @@
 @use '../../../styles/mixins' as *;
 
+/**
+ * 数据导入页面
+ * 左右两栏布局：左=类型菜单，右=上传区；上传区始终可见，无需滚动即可触发上传
+ */
+
 .dataImportPage {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-16);
+}
 
-  h3 {
-    margin-bottom: var(--spacer-16);
-  }
+.pageTitle {
+  margin: 0;
 }
 
 .freshnessCard {
@@ -13,14 +21,82 @@
   background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-hover) 100%);
 }
 
-.cardHeader {
-  @include card-section-header;
+.notice {
+  margin: 0;
 }
 
-.cardTitle {
+.body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--spacer-16);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 左侧：类型菜单 */
+.leftPanel {
+  background: var(--bg-content);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacer-16);
+  position: sticky;
+  top: var(--spacer-16);
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+.panelHeader {
+  @include card-section-header;
+  margin-bottom: var(--spacer-12);
+}
+
+.panelTitle {
   @include card-section-title;
 }
 
-.cardDesc {
-  @include card-section-desc;
+/* 右侧：上传区 */
+.rightPanel {
+  background: var(--bg-content);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacer-20);
+}
+
+.uploadHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-12);
+  margin-bottom: var(--spacer-16);
+}
+
+.uploadTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-8);
+  flex-wrap: wrap;
+}
+
+.uploadTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.tableTag {
+  margin-inline-end: 0;
+}
+
+.intervalSegmented {
+  align-self: flex-start;
+}
+
+.uploadDesc {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
 }
