@@ -55,12 +55,17 @@ interface PlanWeeklyPoint {
   企微_有效户率: number;
   开口_新开户率: number;
   不含存量_有效户率: number;
+  消耗: number;
+  展示: number;
+  点击: number;
+  下载: number;
 }
 
 interface PlanItem {
   plan_id: string;
   广告账号: string;
   广告代理商: string;
+  plan_name: string;
   totals: PlanWeeklyPoint;
   weekly: PlanWeeklyPoint[];
 }
@@ -74,7 +79,7 @@ const XhsPlanAnalysisPage: React.FC = () => {
   const [agencies, setAgencies] = useState<string[]>([]);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
   const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0 });
+  const [totals, setTotals] = useState<any>({ total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0, total_spend: 0 });
   const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
   // v3.3.10: 计划详情表 - 按广告账号多选筛选（仅影响详情表，不影响走势/指标卡）
@@ -272,15 +277,17 @@ const XhsPlanAnalysisPage: React.FC = () => {
 
   const exportCsv = (rowsSource: PlanItem[] = planItems) => {
     if (!rowsSource.length) return;
-    const headers = ['广告ID', '广告账号', '广告代理商', '周起始日',
+    const headers = ['广告ID', '计划名称', '广告账号', '广告代理商', '周起始日',
       '企微', '开口', '有效线索', '有效线索(不含存量)', '新开户', '有效户',
+      '消耗', '展示', '点击', '下载',
       '企微→开口%', '企微→有效线索%', '企微→不含存量%', '企微→新开户%', '企微→有效户%', '开口→新开户%', '不含存量→有效户%'];
     const rows: string[] = [];
     rowsSource.forEach((p) => {
       p.weekly.forEach((w) => {
         rows.push([
-          p.plan_id, p['广告账号'], p['广告代理商'] || '', w.week_start,
+          p.plan_id, p.plan_name || '', p['广告账号'], p['广告代理商'] || '', w.week_start,
           w['企微'], w['开口'], w['有效线索'], w['有效线索_不含存量'], w['新开户'], w['有效户'],
+          w['消耗'] || 0, w['展示'] || 0, w['点击'] || 0, w['下载'] || 0,
           w['企微_开口率'], w['企微_有效线索率'], w['企微_不含存量率'],
           w['企微_新开户率'], w['企微_有效户率'], w['开口_新开户率'], w['不含存量_有效户率'],
         ].join(','));
@@ -316,6 +323,10 @@ const XhsPlanAnalysisPage: React.FC = () => {
           { title: '有效线索(不含存量)', dataIndex: '有效线索_不含存量', align: 'right' as const, width: 130, render: (v: number) => v.toLocaleString() },
           { title: '新开户', dataIndex: '新开户', align: 'right' as const, width: 90, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
           { title: '有效户', dataIndex: '有效户', align: 'right' as const, width: 90, render: (v: number) => v.toLocaleString() },
+          { title: '消耗(¥)', dataIndex: '消耗', align: 'right' as const, width: 110, render: (v: number) => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+          { title: '展示', dataIndex: '展示', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
+          { title: '点击', dataIndex: '点击', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
+          { title: '下载', dataIndex: '下载', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
           { title: '企微→开口', dataIndex: '企微_开口率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 80 ? 'green' : v > 50 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
           { title: '企微→新开户', dataIndex: '企微_新开户率', align: 'right' as const, width: 120, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
           { title: '不含存量→有效户', dataIndex: '不含存量_有效户率', align: 'right' as const, width: 140, render: (v: number) => <Tag color={v > 50 ? 'green' : v > 30 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
@@ -402,6 +413,15 @@ const XhsPlanAnalysisPage: React.FC = () => {
               valueColor="var(--color-error)"
               icon={<AimOutlined style={{ color: 'var(--color-error)' }} />}
               description={`整体精准性主指标`}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="总消耗"
+              value={totals.total_spend || 0}
+              formatter="currency"
+              valueColor="var(--color-warning)"
+              icon={<LineChartOutlined style={{ color: 'var(--color-warning)' }} />}
+              description={`计划级消耗（fact_plan_daily，平台=小红书）`}
               showWowChange={false}
             />
           </MetricSection>
@@ -517,6 +537,7 @@ const XhsPlanAnalysisPage: React.FC = () => {
                   <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
                 ) },
                 { title: '广告ID', dataIndex: 'plan_id', width: 160, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+                { title: '计划名称', dataIndex: 'plan_name', width: 200, ellipsis: true, render: (v: string) => sanitizeText(v ? v : '--') },
                 { title: '广告账号', dataIndex: '广告账号', width: 160, ellipsis: true, render: (v: string) => sanitizeText(v) },
                 { title: '代理商', dataIndex: '广告代理商', width: 100, render: (v: string) => v ? <Tag color="cyan">{sanitizeText(v)}</Tag> : '-' },
                 {
@@ -539,6 +560,26 @@ const XhsPlanAnalysisPage: React.FC = () => {
                   title: '有效户', key: 't_youxiao_hu', align: 'right', width: 90,
                   sorter: (a: PlanItem, b: PlanItem) => a.totals['有效户'] - b.totals['有效户'],
                   render: (_: any, r: PlanItem) => r.totals['有效户'].toLocaleString(),
+                },
+                {
+                  title: '消耗(¥)', key: 't_spend', align: 'right', width: 110,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['消耗'] - b.totals['消耗'],
+                  render: (_: any, r: PlanItem) => (r.totals['消耗'] || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                },
+                {
+                  title: '展示', key: 't_imp', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['展示'] - b.totals['展示'],
+                  render: (_: any, r: PlanItem) => (r.totals['展示'] || 0).toLocaleString(),
+                },
+                {
+                  title: '点击', key: 't_clk', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['点击'] - b.totals['点击'],
+                  render: (_: any, r: PlanItem) => (r.totals['点击'] || 0).toLocaleString(),
+                },
+                {
+                  title: '下载', key: 't_dl', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['下载'] - b.totals['下载'],
+                  render: (_: any, r: PlanItem) => (r.totals['下载'] || 0).toLocaleString(),
                 },
                 {
                   title: '企微→新开户', key: 't_rate', align: 'right', width: 130,
@@ -565,7 +606,7 @@ const XhsPlanAnalysisPage: React.FC = () => {
       <FadeInSection delay={1.4} duration={0.8}>
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'fact_conv_content（平台来源=小红书，按 广告ID × 周起始日 聚合）' },
+            { label: '数据源', value: 'fact_conv_content（平台来源=小红书，按 广告ID × 周起始日 聚合）+ fact_plan_daily（计划级 消耗/展示/点击/下载，平台=小红书，按 广告ID=计划ID 关联）' },
             { label: '端点', value: 'POST /api/v1/reports/xhs/plan-analysis' },
             { label: '漏斗阶段', value: '企微 → 开口 → 有效线索 → 有效线索(不含存量) → 新开户 → 有效户（6 阶段）' },
             { label: '存量剔除', value: '业务不变式「内容平台非存量条件」：是否为存量客户 = 0 OR IS NULL（用于「有效线索(不含存量)」「新开户」两阶段）' },

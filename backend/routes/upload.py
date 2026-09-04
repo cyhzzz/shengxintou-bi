@@ -47,7 +47,7 @@ DATA_TYPES = {
     'xhs_note':             '小红书笔记',
     'channel_open':         '开户渠道分析',
     'appmarket_plan_class': '应用市场计划分解',
-    'appmarket_plan_daily': '厂商广告计划维度明细',
+    'plan_daily':           '广告计划维度明细',
     'qingniao_leads':       '抖音青鸟线索通',
 }
 
@@ -420,6 +420,6 @@ def _target_tables(data_type: str):
         'xhs_note':             ['agg_xhs_note'],
         'channel_open':         ['agg_daily_channel_open'],
         'appmarket_plan_class':  ['dim_ad_plan_class'],
-        'appmarket_plan_daily': ['fact_appmarket_plan_daily'],
+        'plan_daily':            ['fact_plan_daily'],
         'qingniao_leads':       ['fact_qingniao_leads'],
     }.get(data_type, [])

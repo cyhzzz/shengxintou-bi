@@ -69,15 +69,15 @@ def get_metadata():
 
 def get_data_status():
     from backend.models_v2 import (AggVendorDaily, AggXhsNote, FactConvContent,
-                                   FactConvAppmarket, AggDailyChannelOpen, FactAppmarketPlanDaily)
+                                   FactConvAppmarket, AggDailyChannelOpen, FactPlanDaily)
     from backend.database import db
     today = date.today()
 
     # group 字段供前端 DataFreshness 按分组渲染；分组对齐数据导入页业务域
     #（投放数据 / 线索数据 / 开户数据），只监控带日期的业务事实/聚合表，维度表无日期不纳入。
     sources = [
-        {'key': 'vendor_daily',            'model': AggVendorDaily,          'date_field': AggVendorDaily.日期,             'name': '厂商广告投放分析', 'group': 'delivery', 'order': 1},
-        {'key': 'fact_appmarket_plan_daily','model': FactAppmarketPlanDaily, 'date_field': FactAppmarketPlanDaily.日期,   'name': '广告计划维度明细', 'group': 'delivery', 'order': 2},
+        {'key': 'vendor_daily',            'model': AggVendorDaily,       'date_field': AggVendorDaily.日期,             'name': '厂商广告投放分析', 'group': 'delivery', 'order': 1},
+        {'key': 'fact_plan_daily',         'model': FactPlanDaily,        'date_field': FactPlanDaily.日期,              'name': '广告计划维度明细', 'group': 'delivery', 'order': 2},
         {'key': 'xhs_note',                'model': AggXhsNote,              'date_field': AggXhsNote.发布时间,             'name': '小红书笔记维度明细', 'group': 'delivery', 'order': 3},
         {'key': 'fact_conv_content',       'model': FactConvContent,         'date_field': FactConvContent.线索日期,        'name': '企微明细',     'group': 'leads',    'order': 1},
         {'key': 'fact_conv_appmarket',     'model': FactConvAppmarket,       'date_field': FactConvAppmarket.下载日期,      'name': 'APP下载明细',  'group': 'leads',    'order': 2},

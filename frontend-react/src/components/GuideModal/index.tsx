@@ -31,7 +31,7 @@ const GUIDE_TITLES: Record<string, string> = {
   'xhs_note_guide.md': '小红书笔记导入指南',
   'channel_open_guide.md': '开户渠道分析导入指南',
   'appmarket_plan_class_guide.md': '应用市场计划分解导入指南',
-  'appmarket_plan_daily_guide.md': '厂商广告计划维度明细导入指南',
+  'plan_daily_guide.md': '广告计划维度明细导入指南',
   // 旧 v1 类型（已 410 Gone，保留映射防止老用户点老入口炸）
   'tencent_ads_guide.md': '腾讯广告数据导入指南（已下线）',
   'douyin_ads_guide.md': '抖音广告数据导入指南（已下线）',
@@ -113,28 +113,28 @@ const GUIDE_CONTENTS: Record<string, string> = {
 仅保留 7 大应用市场（oppo / vivo / 荣耀 / 小米 / 华为 / 鸿蒙 / 苹果），覆盖写入整表。
 `,
 
-  'appmarket_plan_daily_guide.md': `# 厂商广告计划维度明细导入指南
+  'plan_daily_guide.md': `# 广告计划维度明细导入指南
 
 ## 数据来源
 **统一报表平台 → 省心投 → 9.3 厂商广告计划维度明细**
 
-日 × 计划 × 关键词粒度的投放明细，为「广告计划分析」报表提供计划级 消耗/展示/点击/下载 指标。计划ID 与「应用市场计划分解」的 广告分组ID 关联。原样覆盖写入（replace）。
+全互联网渠道计划级日维度（含应用市场 oppo/vivo/荣耀/小米/华为/鸿蒙/苹果 与 小红书等内容平台）。提供计划级 消耗/展示/点击/下载 指标。应用市场侧 计划ID 与「应用市场计划分解」的 广告分组ID 关联；内容平台侧与企微明细的 广告ID 关联。原样覆盖写入（replace）。
 
 ### 表头（按列名匹配，顺序不强制）
 
 | 列名 | 说明 |
 | --- | --- |
 | 日期 | 投放日期（YYYY-MM-DD） |
-| 平台 | 所属应用市场（OPPO/VIVO 大写落库转小写 oppo/vivo） |
+| 平台 | 投放渠道（OPPO/VIVO 大写落库转小写 oppo/vivo；小红书等中文原样） |
 | 厂商名称 | 投放厂商 |
 | 业务模式 | 业务模式（如 APP下载） |
-| 计划ID | 计划唯一 ID（关联 广告分组ID） |
+| 计划ID | 计划唯一 ID |
 | 计划名称 | 计划名称 |
 | 关键词ID / 关键词名称 | 关键词维度 |
 | 展示量 / 点击量 / 下载量 | 投放次数 |
 | 花费 | 消耗金额 |
 
-仅保留 7 大应用市场（oppo / vivo / 荣耀 / 小米 / 华为 / 鸿蒙 / 苹果），覆盖写入整表。
+覆盖写入整表（全渠道，不做平台过滤）。
 `,
 };
 

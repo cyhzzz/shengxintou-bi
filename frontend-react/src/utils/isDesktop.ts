@@ -31,7 +31,7 @@ declare global {
     desktop?: unknown;
     desktopUpdater?: {
       checkStaging: () => Promise<{ ready: boolean; version?: string }>;
-      applyAndRestart: () => Promise<{ ok: boolean; version?: string; error?: string }>;
+      applyAndRestart: () => Promise<{ ok: boolean; version?: string; error?: string; restarting?: boolean }>;
     };
     Capacitor?: { isNative?: () => boolean; getPlatform?: () => string; isNativePlatform?: () => boolean };
     androidBridge?: unknown;

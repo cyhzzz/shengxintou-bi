@@ -3,8 +3,8 @@
  *
  * window.desktopUpdater（v3.9.0）：
  *   - checkStaging(): 查询是否有已下载待应用的完整更新
- *   - applyAndRestart(): 应用完整更新（停 Flask → 替换 → 重启 Flask → 刷新窗口）
- *     resolve(data)：{ ok, version?, error? }
+ *   - applyAndRestart(): 应用完整更新（停 Flask → 替换 → 重启 Electron）
+ *     resolve(data)：{ ok, version?, error?, restarting? }（restarting=true 表示将自动重启应用）
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -16,6 +16,6 @@ contextBridge.exposeInMainWorld('desktop', {
 contextBridge.exposeInMainWorld('desktopUpdater', {
   checkStaging: (): Promise<{ ready: boolean; version?: string }> =>
     ipcRenderer.invoke('updater:check-staging'),
-  applyAndRestart: (): Promise<{ ok: boolean; version?: string; error?: string }> =>
+  applyAndRestart: (): Promise<{ ok: boolean; version?: string; error?: string; restarting?: boolean }> =>
     ipcRenderer.invoke('updater:apply'),
 });

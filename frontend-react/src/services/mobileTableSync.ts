@@ -35,7 +35,7 @@ export const MOBILE_SYNC_TABLES: SyncTableMeta[] = [
   { name: 'dim_ad_plan_class', type: 'dim' },
   { name: 'fact_conv_content', type: 'fact', dateCol: '线索日期' },
   { name: 'fact_conv_appmarket', type: 'fact', dateCol: '下载日期' },
-  { name: 'fact_appmarket_plan_daily', type: 'fact', dateCol: '日期' },
+  { name: 'fact_plan_daily', type: 'fact', dateCol: '日期' },
   { name: 'agg_vendor_daily', type: 'fact', dateCol: '日期' },
   { name: 'agg_xhs_note', type: 'fact', dateCol: '发布时间' },
   { name: 'agg_daily_channel_open', type: 'fact', dateCol: '时间区间' },

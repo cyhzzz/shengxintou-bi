@@ -10,7 +10,7 @@
      → 按 广告计划ID + 周五周 统计下载链路各阶段（下载/激活/开户注册/身份证/银行卡/开户提交/开户成功/广告开户，按设备号去重）
   3. agg_vendor_daily（厂商广告投放分析）
      → 按 平台(应用市场) 直接聚合 消耗（花费）
-  4. fact_appmarket_plan_daily（厂商广告计划维度明细 9.3）
+  4. fact_plan_daily（厂商广告计划维度明细 9.3）
      → 按 计划ID + 周五周 统计 计划级 消耗/展示/点击/下载
 
 页面结构（周度口径统一：上周五 → 本周四）：
@@ -32,7 +32,7 @@
   - 总消耗 = 所选应用市场 agg_vendor_daily.花费（平台=应用市场，计划全渠道花费）之和
   - 总开户成本 = 总消耗 / 总开户（分母为 0 时返回 null，前端展示 '-'）
   - 分计划漏斗各阶段量 = fact_conv_appmarket 按 广告计划ID + 周 统计「去重设备号」；
-    消耗/展示/点击/下载 = fact_appmarket_plan_daily 按 计划ID + 周 求和
+    消耗/展示/点击/下载 = fact_plan_daily 按 计划ID + 周 求和
   - 转化率均为步骤间口径：点击率=点击/展示、下载率=下载/点击、激活率=激活/下载、
     开户注册率=开户注册/激活、身份证上传率=身份证/开户注册、银行卡上传率=银行卡/身份证、
     开户提交率=开户提交/银行卡、开户成功率=开户成功/开户提交、
@@ -43,7 +43,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from sqlalchemy import case, distinct, func
 
-from backend.models_v2 import DimAdPlanClass, FactConvAppmarket, AggVendorDaily, FactAppmarketPlanDaily
+from backend.models_v2 import DimAdPlanClass, FactConvAppmarket, AggVendorDaily, FactPlanDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.dialect_helpers import make_friday_week_start_expr
@@ -55,13 +55,13 @@ ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '�
 
 _META = {
     'version': 'v3.8.2',
-    'source': 'dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily + fact_appmarket_plan_daily',
+    'source': 'dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily + fact_plan_daily',
     'note': '广告计划分析：开户概览 + 按周开户量 + 按周分计划 + 分计划展开（周度=上周五~本周四）',
     'open_condition': '是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1',
-    'spend_source': 'agg_vendor_daily.花费（按 平台=应用市场 聚合）；分计划消耗/展示/点击/下载 = fact_appmarket_plan_daily 按 计划ID 聚合',
+    'spend_source': 'agg_vendor_daily.花费（按 平台=应用市场 聚合）；分计划消耗/展示/点击/下载 = fact_plan_daily 按 计划ID 聚合',
     'open_source': 'fact_conv_appmarket（按 应用市场 聚合，广告开户节点）',
     'week_rule': '上周五 ~ 本周四',
-    'funnel_note': '分计划漏斗量按 设备号去重；计划级消耗/展示/点击/下载取自 fact_appmarket_plan_daily（9.3）；转化率为步骤间口径（点击/展示、下载/点击、激活/下载、…、广告开户/开户成功）',
+    'funnel_note': '分计划漏斗量按 设备号去重；计划级消耗/展示/点击/下载取自 fact_plan_daily（9.3）；转化率为步骤间口径（点击/展示、下载/点击、激活/下载、…、广告开户/开户成功）',
 }
 
 # 广告开户复合条件（与归因转化率报表口径一致）
@@ -195,14 +195,14 @@ def _plan_level_maps(plan_ids, start_date, end_date):
         open_map[int(r.广告计划ID)] = int(r.open_cnt or 0)
 
     spend_q = db.session.query(
-        FactAppmarketPlanDaily.计划ID,
-        func.coalesce(func.sum(FactAppmarketPlanDaily.花费), 0).label('spend'),
-    ).filter(FactAppmarketPlanDaily.计划ID.in_(plan_ids), FactAppmarketPlanDaily.花费 > 0)
+        FactPlanDaily.计划ID,
+        func.coalesce(func.sum(FactPlanDaily.花费), 0).label('spend'),
+    ).filter(FactPlanDaily.计划ID.in_(plan_ids), FactPlanDaily.花费 > 0)
     if start_date:
-        spend_q = spend_q.filter(FactAppmarketPlanDaily.日期 >= start_date)
+        spend_q = spend_q.filter(FactPlanDaily.日期 >= start_date)
     if end_date:
-        spend_q = spend_q.filter(FactAppmarketPlanDaily.日期 <= end_date)
-    spend_q = spend_q.group_by(FactAppmarketPlanDaily.计划ID)
+        spend_q = spend_q.filter(FactPlanDaily.日期 <= end_date)
+    spend_q = spend_q.group_by(FactPlanDaily.计划ID)
     for r in spend_q.all():
         spend_map[int(r.计划ID)] = float(r.spend or 0)
 
@@ -356,26 +356,26 @@ def _plan_week_analysis(markets, start_date, end_date, week_start):
     agg_by, fact_by = {}, {}
 
     if plan_ids:
-        # ---- fact_appmarket_plan_daily：消耗/展示/点击/下载（按 计划ID + 周五周） ----
-        fweek = make_friday_week_start_expr(FactAppmarketPlanDaily.日期).label('week_start')
+        # ---- fact_plan_daily：消耗/展示/点击/下载（按 计划ID + 周五周） ----
+        fweek = make_friday_week_start_expr(FactPlanDaily.日期).label('week_start')
         agg_q = db.session.query(
-            FactAppmarketPlanDaily.计划ID, fweek,
-            func.coalesce(func.sum(FactAppmarketPlanDaily.花费), 0).label('spend'),
-            func.coalesce(func.sum(FactAppmarketPlanDaily.展示量), 0).label('impressions'),
-            func.coalesce(func.sum(FactAppmarketPlanDaily.点击量), 0).label('clicks'),
-            func.coalesce(func.sum(FactAppmarketPlanDaily.下载量), 0).label('downloads'),
+            FactPlanDaily.计划ID, fweek,
+            func.coalesce(func.sum(FactPlanDaily.花费), 0).label('spend'),
+            func.coalesce(func.sum(FactPlanDaily.展示量), 0).label('impressions'),
+            func.coalesce(func.sum(FactPlanDaily.点击量), 0).label('clicks'),
+            func.coalesce(func.sum(FactPlanDaily.下载量), 0).label('downloads'),
         ).filter(
-            FactAppmarketPlanDaily.计划ID.in_(plan_ids),
-            (FactAppmarketPlanDaily.花费 > 0)
-            | (FactAppmarketPlanDaily.展示量 > 0)
-            | (FactAppmarketPlanDaily.点击量 > 0)
-            | (FactAppmarketPlanDaily.下载量 > 0),
+            FactPlanDaily.计划ID.in_(plan_ids),
+            (FactPlanDaily.花费 > 0)
+            | (FactPlanDaily.展示量 > 0)
+            | (FactPlanDaily.点击量 > 0)
+            | (FactPlanDaily.下载量 > 0),
         )
         if start_date:
-            agg_q = agg_q.filter(FactAppmarketPlanDaily.日期 >= start_date)
+            agg_q = agg_q.filter(FactPlanDaily.日期 >= start_date)
         if end_date:
-            agg_q = agg_q.filter(FactAppmarketPlanDaily.日期 <= end_date)
-        agg_q = agg_q.group_by(FactAppmarketPlanDaily.计划ID, fweek)
+            agg_q = agg_q.filter(FactPlanDaily.日期 <= end_date)
+        agg_q = agg_q.group_by(FactPlanDaily.计划ID, fweek)
         for r in agg_q.all():
             agg_by[(int(r.计划ID), _ws_str(r.week_start))] = {
                 'spend': float(r.spend or 0),

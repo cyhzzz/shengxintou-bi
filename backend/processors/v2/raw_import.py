@@ -396,15 +396,15 @@ def handle_appmarket_plan_class(path: str):
     }
 
 
-def handle_appmarket_plan_daily(path: str):
-    """9.3 厂商广告计划维度明细.xlsx -> fact_appmarket_plan_daily（1 行=日×计划×关键词）。
+def handle_plan_daily(path: str):
+    """9.3 厂商广告计划维度明细.xlsx -> fact_plan_daily（1 行=日×计划×关键词）。
 
     列：日期 / 平台 / 厂商名称 / 业务模式 / 计划ID / 计划名称 / 关键词ID /
         关键词名称 / 展示量 / 点击量 / 下载量 / 花费。
 
-    承担「广告计划分析」报表的计划级 消耗/展示/点击/下载 日指标；计划ID 与
-    dim_ad_plan_class.广告分组ID 关联。上游数据原样入库，仅格式层规范：
-    1. 平台归一 .lower()（OPPO/VIVO → oppo/vivo），仅保留 7 大市场白名单
+    全互联网渠道计划级日维度：承担「计划分析/广告计划分析」报表的计划级 消耗/展示/点击/下载
+    日指标。平台列为全渠道（应用市场 7 大 + 小红书等内容平台）。上游数据原样入库，仅格式层规范：
+    1. 平台归一 .lower()（OPPO/VIVO → oppo/vivo，中文如 小红书 保持不变）——**不过滤渠道**
     2. 日期归一 _to_date_str
     3. 计划ID/关键词ID 超长 ID 安全转换（BigInteger / 超界转字符串）
     4. 数值列转 numeric，NaN 落 NULL
@@ -413,15 +413,13 @@ def handle_appmarket_plan_daily(path: str):
     df = _read_excel(path)
     df = _clean_nan(df)
 
-    # 1) 平台归一（小写）+ 白名单过滤
+    # 1) 平台归一（小写）；全渠道保留，不做应用市场白名单过滤
     def _norm_market(v):
         if v is None or (isinstance(v, float) and pd.isna(v)):
             return None
         return str(v).strip().lower()
     if "平台" in df.columns:
         df["平台"] = df["平台"].apply(_norm_market)
-        df = df[df["平台"].isin(ALLOWED_PLATFORMS)].copy()
-        df = df.reset_index(drop=True)
 
     # 2) 日期归一
     if "日期" in df.columns:
@@ -449,8 +447,8 @@ def handle_appmarket_plan_daily(path: str):
     if "id" not in plan_daily_df.columns:
         plan_daily_df.insert(0, "id", range(1, len(plan_daily_df) + 1))
 
-    return {"fact_appmarket_plan_daily": plan_daily_df}, {
-        "row_counts": {"fact_appmarket_plan_daily": len(plan_daily_df)},
+    return {"fact_plan_daily": plan_daily_df}, {
+        "row_counts": {"fact_plan_daily": len(plan_daily_df)},
     }
 
 
@@ -461,7 +459,7 @@ HANDLERS["vendor_daily"] = handle_vendor_daily
 HANDLERS["xhs_note"] = handle_xhs_note
 HANDLERS["channel_open"] = handle_channel_open
 HANDLERS["appmarket_plan_class"] = handle_appmarket_plan_class
-HANDLERS["appmarket_plan_daily"] = handle_appmarket_plan_daily
+HANDLERS["plan_daily"] = handle_plan_daily
 
 
 def handle_qingniao_leads(path: str, batch_tag: str = None):

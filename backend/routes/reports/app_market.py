@@ -10,9 +10,10 @@
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_, case, or_, cast, String, type_coerce
-from backend.models_v2 import FactConvAppmarket
+from backend.models_v2 import FactConvAppmarket, FactPlanDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.routes.reports.app_market_ad_plan import ALLOWED_PLATFORMS as APP_MARKET_PLATFORMS
 
 bp = Blueprint('app_market_report', __name__, url_prefix='/api/v1/reports/app-market')
 
@@ -500,15 +501,70 @@ def app_market_plan_analysis():
         p['totals'] = {**t, **_calc_rates(t['激活APP'], t['开户成功'], t['新开户'], t['有效户'])}
         p['weekly'].sort(key=lambda x: x['week_start'])
     plan_items.sort(key=lambda x: (x['totals']['新开户'], x['totals']['开户成功'], x['totals']['激活APP']), reverse=True)
+
+    # ---- 补计划级 消耗/展示/点击/下载 + 计划名称（数据源 fact_plan_daily，按 广告计划ID=计划ID 关联） ----
+    sd, ed = filters.get('start_date'), filters.get('end_date')
+    plan_daily_fweek = make_friday_week_start_expr(FactPlanDaily.日期).label('week_start')
+    def _plan_daily_query(platforms):
+        q = db.session.query(
+            FactPlanDaily.计划ID, plan_daily_fweek,
+            func.coalesce(func.sum(FactPlanDaily.花费), 0).label('spend'),
+            func.coalesce(func.sum(FactPlanDaily.展示量), 0).label('imp'),
+            func.coalesce(func.sum(FactPlanDaily.点击量), 0).label('clk'),
+            func.coalesce(func.sum(FactPlanDaily.下载量), 0).label('dl'),
+        ).filter(FactPlanDaily.平台.in_(platforms))
+        if sd: q = q.filter(FactPlanDaily.日期 >= sd)
+        if ed: q = q.filter(FactPlanDaily.日期 <= ed)
+        q = q.group_by(FactPlanDaily.计划ID, plan_daily_fweek)
+        return q
+    cover_names = {'消耗': 0.0, '展示': 0, '点击': 0, '下载': 0}
+    def _cover(spend, imp, clk, dl):
+        return {'消耗': round(float(spend or 0), 2), '展示': int(imp or 0),
+                '点击': int(clk or 0), '下载': int(dl or 0)}
+
+    cost_week = {}          # (plan_id, week) -> cover
+    cost_tot = {}           # plan_id -> cover
+    plan_name = {}          # plan_id -> 计划名称
+    cost_week_agg = {}      # week -> cover（跨计划合计）
+    metric_keys = ('消耗', '展示', '点击', '下载')
+    numeric_plan_ids = [int(p['plan_id']) for p in plan_items if p['plan_id'].isdigit()]
+    if numeric_plan_ids:
+        for r in _plan_daily_query(APP_MARKET_PLATFORMS).filter(FactPlanDaily.计划ID.in_(numeric_plan_ids)).all():
+            pid, week = int(r.计划ID), str(r.week_start)[:10]
+            c = _cover(r.spend, r.imp, r.clk, r.dl)
+            cost_week[(pid, week)] = c
+            t = cost_tot.setdefault(pid, dict(cover_names))
+            for k in metric_keys: t[k] += c[k]
+        for r in db.session.query(FactPlanDaily.计划ID, FactPlanDaily.计划名称).filter(
+                FactPlanDaily.计划ID.in_(numeric_plan_ids),
+                FactPlanDaily.计划名称.isnot(None), FactPlanDaily.计划名称 != '',
+                FactPlanDaily.平台.in_(APP_MARKET_PLATFORMS)).distinct().all():
+            plan_name.setdefault(int(r.计划ID), r.计划名称)
+
+    for p in plan_items:
+        pid = int(p['plan_id']) if p['plan_id'].isdigit() else None
+        tl = dict(cost_tot.get(pid, cover_names)) if pid is not None else dict(cover_names)
+        p['plan_name'] = plan_name.get(pid, '') if pid is not None else ''
+        p['totals'] = {**p['totals'], **tl}
+        for wpt in p['weekly']:
+            ws = str(wpt['week_start'])[:10]
+            wc = cost_week.get((pid, ws), dict(cover_names)) if pid is not None else dict(cover_names)
+            wpt['消耗'] = wc['消耗']; wpt['展示'] = wc['展示']; wpt['点击'] = wc['点击']; wpt['下载'] = wc['下载']
+            agg = cost_week_agg.setdefault(ws, dict(cover_names))
+            for k in metric_keys: agg[k] += wc[k]
+
     top_plans = plan_items[:top_n]
 
     # 周度整体走势
     weekly_totals = []
     for week, t in sorted(weekly_agg.items()):
+        ws = week[:10]
+        cw = cost_week_agg.get(ws, dict(cover_names))
         weekly_totals.append({
             'week_start': week,
             **t,
             **_calc_rates(t['激活APP'], t['开户成功'], t['新开户'], t['有效户']),
+            **cw,
         })
 
     # 各应用市场周度获客量（新开户），跨平台对比。
@@ -550,6 +606,10 @@ def app_market_plan_analysis():
         'total_new_open': sum(p['totals']['新开户'] for p in plan_items),
         'total_deposit': sum(p['totals']['入金'] for p in plan_items),
         'total_valid': sum(p['totals']['有效户'] for p in plan_items),
+        'total_spend': round(sum(p['totals']['消耗'] for p in plan_items), 2),
+        'total_impressions': sum(p['totals']['展示'] for p in plan_items),
+        'total_clicks': sum(p['totals']['点击'] for p in plan_items),
+        'total_downloads': sum(p['totals']['下载'] for p in plan_items),
         'total_weeks': len(weekly_totals),
     }
 

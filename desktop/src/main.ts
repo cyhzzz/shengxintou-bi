@@ -136,15 +136,14 @@ function registerUpdaterIpc(): void {
         if (mainWindow) mainWindow.loadURL(FLASK_BASE_URL);
         return { ok: false, error: result.error };
       }
-      // 3. 替换成功：重启 Flask + 刷新窗口（等效"重启应用生效"）
-      flaskChild = startFlask();
-      await waitForFlaskHealthy(60_000);
-      if (mainWindow) {
-        mainWindow.loadURL(FLASK_BASE_URL);
-      } else {
-        createWindow();
-      }
-      return { ok: true, version: result.version };
+      // 3. 替换成功：真正重启 Electron（等效「关闭之后重新打开」）——
+      //    仅刷新窗口会被渲染进程/页面缓存惰性加载旧资源，必须 relaunch 才能加载全新后端与前端。
+      //    延迟 ~400ms 先让渲染端收到回执（restarting=true），再重启应用。
+      setTimeout(() => {
+        app.relaunch();
+        app.quit();
+      }, 400);
+      return { ok: true, version: result.version, restarting: true };
     } catch (err) {
       return { ok: false, error: (err as Error).message };
     }

@@ -597,15 +597,78 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     (b.totals['有效线索_不含存量'] - a.totals['有效线索_不含存量']) ||
     (b.totals['开口'] - a.totals['开口'])
   );
+
+  // ---- 补计划级 消耗/展示/点击/下载 + 计划名称（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
+  // 周起始用与漏斗一致的周一（date("日期",'weekday 0','-6 days')），保证消耗周与漏斗周对齐。
+  type SpendKey = '消耗' | '展示' | '点击' | '下载';
+  const metricKeys: SpendKey[] = ['消耗', '展示', '点击', '下载'];
+  const costWeek: Record<string, Record<SpendKey, number>> = {};
+  const costTot: Record<string, Record<SpendKey, number>> = {};
+  const planName: Record<string, string> = {};
+  const costWeekAgg: Record<string, Record<SpendKey, number>> = {};
+  const coverZero: Record<SpendKey, number> = { 消耗: 0, 展示: 0, 点击: 0, 下载: 0 };
+  const numericPlanIds = plan_items.filter((p: any) => /^\d+$/.test(p.plan_id)).map((p: any) => Number(p.plan_id));
+  if (numericPlanIds.length > 0) {
+    const pdWhere = buildWhere([
+      inClause('计划ID', numericPlanIds.map(String)),
+      { sql: '"平台" = ?', params: ['小红书'] },
+      dateClause('日期', sd, ed),
+    ]);
+    const pdRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, date("日期", 'weekday 0', '-6 days') as week_start,
+         COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions,
+         COALESCE(SUM("点击量"), 0) as clicks, COALESCE(SUM("下载量"), 0) as downloads
+       FROM fact_plan_daily ${pdWhere.clause}
+       GROUP BY "计划ID", week_start`,
+      pdWhere.params
+    );
+    const _cover = (r: Row) => ({
+      消耗: round2(toFloat(r.spend)), 展示: toInt(r.impressions), 点击: toInt(r.clicks), 下载: toInt(r.downloads),
+    });
+    for (const r of pdRows) {
+      const pid = Number(r.plan_id);
+      const ws = String(r.week_start).slice(0, 10);
+      const c = _cover(r);
+      costWeek[`${pid}|${ws}`] = c;
+      const t = costTot[pid] = costTot[pid] || { ...coverZero };
+      for (const k of metricKeys) t[k] += c[k];
+      const agg = costWeekAgg[ws] = costWeekAgg[ws] || { ...coverZero };
+      for (const k of metricKeys) agg[k] += c[k];
+    }
+    const pdNameRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, MAX("计划名称") as name
+       FROM fact_plan_daily
+       WHERE "计划ID" IN (${numericPlanIds.map(() => '?').join(', ')}) AND "平台" = ?
+         AND "计划名称" IS NOT NULL AND "计划名称" != ''
+       GROUP BY "计划ID"`,
+      [...numericPlanIds.map(String), '小红书']
+    );
+    for (const r of pdNameRows) planName[Number(r.plan_id)] = String(r.name || '');
+  }
+  for (const p of plan_items) {
+    const pid = /^\d+$/.test(p.plan_id) ? Number(p.plan_id) : null;
+    const tl = pid !== null ? (costTot[pid] || { ...coverZero }) : { ...coverZero };
+    p.plan_name = pid !== null ? (planName[pid] || '') : '';
+    for (const k of metricKeys) p.totals[k] = tl[k];
+    for (const wpt of p.weekly) {
+      const ws = String(wpt.week_start).slice(0, 10);
+      const wc = pid !== null ? (costWeek[`${pid}|${ws}`] || { ...coverZero }) : { ...coverZero };
+      for (const k of metricKeys) wpt[k] = wc[k];
+    }
+  }
+
   const top_plans = plan_items.slice(0, top_n);
 
   // 整体周度走势
   const weekly_totals = Object.keys(weekly_agg).sort().map(week => {
     const t = weekly_agg[week];
+    const ws = String(week).slice(0, 10);
+    const cw = costWeekAgg[ws] || { ...coverZero };
     return {
       week_start: week,
       ...t,
       ...xhsPlanCalcRates(t['企微'], t['开口'], t['有效线索'], t['有效线索_不含存量'], t['新开户'], t['有效户']),
+      ...cw,
     };
   });
 
@@ -630,6 +693,10 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     total_youxiao_bcq: plan_items.reduce((s, p) => s + p.totals['有效线索_不含存量'], 0),
     total_xinkaihu: plan_items.reduce((s, p) => s + p.totals['新开户'], 0),
     total_youxiao_hu: plan_items.reduce((s, p) => s + p.totals['有效户'], 0),
+    total_spend: round2(plan_items.reduce((s, p) => s + p.totals['消耗'], 0)),
+    total_impressions: plan_items.reduce((s, p) => s + p.totals['展示'], 0),
+    total_clicks: plan_items.reduce((s, p) => s + p.totals['点击'], 0),
+    total_downloads: plan_items.reduce((s, p) => s + p.totals['下载'], 0),
     total_weeks: weekly_totals.length,
   };
 

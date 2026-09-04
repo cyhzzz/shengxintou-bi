@@ -62,11 +62,16 @@ interface PlanWeeklyPoint {
   '激活_有效率': number;
   '开户_新开户率': number;
   '开户_有效率': number;
+  '消耗': number;
+  '展示': number;
+  '点击': number;
+  '下载': number;
 }
 
 interface PlanItem {
   plan_id: string;
   '投放账号': string;
+  plan_name: string;
   totals: PlanWeeklyPoint & { 激活_开户率: number; 激活_新开户率: number; 激活_有效率: number; 开户_新开户率: number; 开户_有效率: number };
   weekly: PlanWeeklyPoint[];
 }
@@ -79,7 +84,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
   const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
   const [weeklyByMarket, setWeeklyByMarket] = useState<any[]>([]);
   const [marketOrder, setMarketOrder] = useState<string[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0 });
+  const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0, total_spend: 0 });
   const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
 
@@ -285,14 +290,16 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
 
   const exportCsv = () => {
     if (!planItems.length) return;
-    const headers = ['广告计划ID', '投放账号', '周起始日', '激活APP', '开户成功', '新开户', '入金', '有效户',
+    const headers = ['广告计划ID', '计划名称', '投放账号', '周起始日', '激活APP', '开户成功', '新开户', '入金', '有效户',
+      '消耗', '展示', '点击', '下载',
       '激活→开户%', '激活→新开户%', '激活→有效%', '开户→新开户%', '开户→有效%'];
     const rows: string[] = [];
     planItems.forEach((p) => {
       p.weekly.forEach((w) => {
         rows.push([
-          p.plan_id, p['投放账号'], w.week_start,
+          p.plan_id, p.plan_name || '', p['投放账号'], w.week_start,
           w['激活APP'], w['开户成功'], w['新开户'], w['入金'], w['有效户'],
+          w['消耗'] || 0, w['展示'] || 0, w['点击'] || 0, w['下载'] || 0,
           w['激活_开户率'], w['激活_新开户率'], w['激活_有效率'],
           w['开户_新开户率'], w['开户_有效率'],
         ].join(','));
@@ -325,6 +332,10 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
           { title: '开户成功', dataIndex: '开户成功', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
           { title: '新开户', dataIndex: '新开户', align: 'right' as const, width: 100, render: (v: number) => <strong style={{ color: 'var(--color-brand)' }}>{v.toLocaleString()}</strong> },
           { title: '有效户', dataIndex: '有效户', align: 'right' as const, width: 100, render: (v: number) => v.toLocaleString() },
+          { title: '消耗(¥)', dataIndex: '消耗', align: 'right' as const, width: 110, render: (v: number) => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+          { title: '展示', dataIndex: '展示', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
+          { title: '点击', dataIndex: '点击', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
+          { title: '下载', dataIndex: '下载', align: 'right' as const, width: 100, render: (v: number) => (v || 0).toLocaleString() },
           { title: '激活→开户', dataIndex: '激活_开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 5 ? 'green' : v > 1 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
           { title: '激活→新开户', dataIndex: '激活_新开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 3 ? 'green' : v > 0.5 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
           { title: '开户→新开户', dataIndex: '开户_新开户率', align: 'right' as const, width: 110, render: (v: number) => <Tag color={v > 80 ? 'green' : v > 50 ? 'gold' : 'default'}>{v.toFixed(2)}%</Tag> },
@@ -412,6 +423,15 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
               valueColor="var(--color-error)"
               icon={<RiseOutlined style={{ color: 'var(--color-error)' }} />}
               description={`整体精准性主指标`}
+              showWowChange={false}
+            />
+            <MetricCard
+              title="总消耗"
+              value={totals.total_spend || 0}
+              formatter="currency"
+              valueColor="var(--color-warning)"
+              icon={<LineChartOutlined style={{ color: 'var(--color-warning)' }} />}
+              description={`计划级消耗（fact_plan_daily）`}
               showWowChange={false}
             />
           </MetricSection>
@@ -518,6 +538,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
                   <Tag color={idx < 3 ? 'gold' : idx < 10 ? 'blue' : 'default'}>{idx + 1}</Tag>
                 ) },
                 { title: '广告计划ID', dataIndex: 'plan_id', width: 160, render: (v: string) => <strong>{sanitizeText(v)}</strong> },
+                { title: '计划名称', dataIndex: 'plan_name', width: 200, ellipsis: true, render: (v: string) => sanitizeText(v ? v : '--') },
                 { title: '投放账号', dataIndex: '投放账号', width: 160, ellipsis: true, render: (v: string) => sanitizeText(v) },
                 {
                   title: '激活APP', key: 't_activate', align: 'right', width: 100,
@@ -539,6 +560,26 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
                   title: '有效户', key: 't_valid', align: 'right', width: 90,
                   sorter: (a: PlanItem, b: PlanItem) => a.totals['有效户'] - b.totals['有效户'],
                   render: (_: any, r: PlanItem) => r.totals['有效户'].toLocaleString(),
+                },
+                {
+                  title: '消耗(¥)', key: 't_spend', align: 'right', width: 110,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['消耗'] - b.totals['消耗'],
+                  render: (_: any, r: PlanItem) => (r.totals['消耗'] || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                },
+                {
+                  title: '展示', key: 't_imp', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['展示'] - b.totals['展示'],
+                  render: (_: any, r: PlanItem) => (r.totals['展示'] || 0).toLocaleString(),
+                },
+                {
+                  title: '点击', key: 't_clk', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['点击'] - b.totals['点击'],
+                  render: (_: any, r: PlanItem) => (r.totals['点击'] || 0).toLocaleString(),
+                },
+                {
+                  title: '下载', key: 't_dl', align: 'right', width: 100,
+                  sorter: (a: PlanItem, b: PlanItem) => a.totals['下载'] - b.totals['下载'],
+                  render: (_: any, r: PlanItem) => (r.totals['下载'] || 0).toLocaleString(),
                 },
                 {
                   title: '激活→新开户', key: 't_rate', align: 'right', width: 120,
@@ -565,9 +606,9 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       <FadeInSection delay={1.4} duration={0.8}>
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）' },
+            { label: '数据源', value: 'fact_conv_appmarket（按 广告计划ID × 周起始日 聚合）+ fact_plan_daily（计划级 消耗/展示/点击/下载，按 计划ID 关联）' },
             { label: '端点', value: 'POST /api/v1/reports/app-market/plan-analysis' },
-            { label: '周度口径', value: '上周五 ~ 本周四（周五为周起始日，按「资金账号创建完成时间」切周：SQLite date(资金账号创建完成时间, \'weekday 4\', \'-6 days\')；横轴标注 MMDD-MMDD）' },
+            { label: '周度口径', value: '上周五 ~ 本周四（周五为周起始日，按「资金账号创建完成时间」切周：SQLite date(资金账号创建完成时间, \'weekday 4\', \'-6 days\')；计划级消耗同口径按 计划ID+周五周 聚合 fact_plan_daily；横轴标注 MMDD-MMDD）' },
             { label: '存量剔除', value: '非互联网引流设备需剔除（与存量客户同理）' },
             { label: '平台筛选', value: 'app_market 单选（不选 = 全部平台汇总），选中后只看该平台内计划' },
           ]}

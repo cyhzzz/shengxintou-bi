@@ -501,13 +501,14 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   const planRows = await querySql<Row>(planSql, where.params);
 
   // 按 plan_key 聚合
-  const planMap: Record<string, { plan_id: string; 投放账号: string; totals: any; weekly: any[] }> = {};
+  const planMap: Record<string, { plan_id: string; 投放账号: string; plan_name: string; totals: any; weekly: any[] }> = {};
   for (const r of planRows) {
     const pk = String(r.plan_key || '未归因');
     if (!planMap[pk]) {
       planMap[pk] = {
         plan_id: pk,
         投放账号: r['投放账号'] || '-',
+        plan_name: '',
         totals: { 激活APP: 0, 开户成功: 0, 新开户: 0, 入金: 0, 有效户: 0 },
         weekly: [],
       };
@@ -536,6 +537,71 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
     t.开户_有效率 = t['开户成功'] > 0 ? round2(t['有效户'] / t['开户成功'] * 100) : 0;
   }
 
+  // ---- 补计划级 消耗/展示/点击/下载 + 计划名称（数据源 fact_plan_daily，按 广告计划ID=计划ID 关联） ----
+  // 周起始用周五周（fridayWeekExpr('日期')），与上方 weekly_totals 的周五周对齐；平台限应用市场 7 大。
+  type SpendKey = '消耗' | '展示' | '点击' | '下载';
+  const metricKeys: SpendKey[] = ['消耗', '展示', '点击', '下载'];
+  const costWeek: Record<string, Record<SpendKey, number>> = {};
+  const costTot: Record<string, Record<SpendKey, number>> = {};
+  const planName: Record<string, string> = {};
+  const costWeekAgg: Record<string, Record<SpendKey, number>> = {};
+  const coverZero: Record<SpendKey, number> = { 消耗: 0, 展示: 0, 点击: 0, 下载: 0 };
+  const numericPlanIds = Object.keys(planMap).filter(k => /^\d+$/.test(k)).map(Number);
+  if (numericPlanIds.length > 0) {
+    const pdWhere = buildWhere([
+      inClause('计划ID', numericPlanIds.map(String)),
+      { sql: `"平台" IN (${AD_PLAN_ALLOWED_PLATFORMS.map(() => '?').join(', ')})`, params: [...AD_PLAN_ALLOWED_PLATFORMS] },
+      dateClause('日期', sd, ed),
+    ]);
+    const pdRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, ${fridayWeekExpr('日期')} as week_start,
+         COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions,
+         COALESCE(SUM("点击量"), 0) as clicks, COALESCE(SUM("下载量"), 0) as downloads
+       FROM fact_plan_daily ${pdWhere.clause}
+       GROUP BY "计划ID", week_start`,
+      pdWhere.params
+    );
+    const _cover = (r: Row) => ({
+      消耗: round2(toFloat(r.spend)), 展示: toInt(r.impressions), 点击: toInt(r.clicks), 下载: toInt(r.downloads),
+    });
+    for (const r of pdRows) {
+      const pid = Number(r.plan_id);
+      const ws = String(r.week_start).slice(0, 10);
+      const c = _cover(r);
+      costWeek[`${pid}|${ws}`] = c;
+      const t = costTot[pid] = costTot[pid] || { ...coverZero };
+      for (const k of metricKeys) t[k] += c[k];
+      const agg = costWeekAgg[ws] = costWeekAgg[ws] || { ...coverZero };
+      for (const k of metricKeys) agg[k] += c[k];
+    }
+    const pdNameRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, MAX("计划名称") as name
+       FROM fact_plan_daily
+       WHERE "计划ID" IN (${numericPlanIds.map(() => '?').join(', ')}) AND "平台" IN (${AD_PLAN_ALLOWED_PLATFORMS.map(() => '?').join(', ')})
+         AND "计划名称" IS NOT NULL AND "计划名称" != ''
+       GROUP BY "计划ID"`,
+      [...numericPlanIds.map(String), ...AD_PLAN_ALLOWED_PLATFORMS]
+    );
+    for (const r of pdNameRows) planName[Number(r.plan_id)] = String(r.name || '');
+  }
+  for (const pk in planMap) {
+    const p = planMap[pk];
+    const pid = /^\d+$/.test(pk) ? Number(pk) : null;
+    const tl = pid !== null ? (costTot[pid] || { ...coverZero }) : { ...coverZero };
+    p.plan_name = pid !== null ? (planName[pid] || '') : '';
+    for (const k of metricKeys) p.totals[k] = tl[k];
+    for (const wpt of p.weekly) {
+      const ws = String(wpt.week_start).slice(0, 10);
+      const wc = pid !== null ? (costWeek[`${pid}|${ws}`] || { ...coverZero }) : { ...coverZero };
+      for (const k of metricKeys) wpt[k] = wc[k];
+    }
+  }
+  for (const wt of weekly_totals as any[]) {
+    const ws = String(wt.week_start).slice(0, 10);
+    const cw = costWeekAgg[ws] || { ...coverZero };
+    for (const k of metricKeys) wt[k] = cw[k];
+  }
+
   const all_plans = Object.values(planMap);
   // Top N 排序（按 新开户 → 开户成功 → 激活APP 降序）
   all_plans.sort((a, b) =>
@@ -559,6 +625,10 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
     total_new_open: all_plans.reduce((s, p) => s + p.totals['新开户'], 0),
     total_deposit: all_plans.reduce((s, p) => s + p.totals['入金'], 0),
     total_valid: all_plans.reduce((s, p) => s + p.totals['有效户'], 0),
+    total_spend: round2(all_plans.reduce((s, p) => s + p.totals['消耗'], 0)),
+    total_impressions: all_plans.reduce((s, p) => s + p.totals['展示'], 0),
+    total_clicks: all_plans.reduce((s, p) => s + p.totals['点击'], 0),
+    total_downloads: all_plans.reduce((s, p) => s + p.totals['下载'], 0),
     total_weeks: weekly_totals.length,
   };
 
@@ -643,7 +713,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
 
 // ============================================================================
 // 应用市场 · 广告计划分析 (reports/app-market/ad-plan-analysis)
-// 结合四个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily(市场级) + fact_appmarket_plan_daily(计划级)
+// 结合四个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily(市场级) + fact_plan_daily(计划级)
 // 复刻 backend/routes/reports/app_market_ad_plan.py（周度口径：上周五~本周四）
 // ============================================================================
 
@@ -788,7 +858,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const psWhere = buildWhere([{ sql: '"花费" > 0', params: [] }, inClause('计划ID', planIdStrs), dateClause('日期', sd, ed)]);
     const psRows = await querySql<Row>(
       `SELECT "计划ID" as plan_id, COALESCE(SUM("花费"), 0) as spend
-       FROM fact_appmarket_plan_daily ${psWhere.clause}
+       FROM fact_plan_daily ${psWhere.clause}
        GROUP BY "计划ID"`,
       psWhere.params
     );
@@ -850,7 +920,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const aggWeekRows = await querySql<Row>(
       `SELECT "计划ID" as plan_id, ${fridayWeekExpr('日期')} as week_start,
          COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks, COALESCE(SUM("下载量"), 0) as downloads
-       FROM fact_appmarket_plan_daily ${aggWeekWhere.clause}
+       FROM fact_plan_daily ${aggWeekWhere.clause}
        GROUP BY "计划ID", week_start`,
       aggWeekWhere.params
     );

@@ -187,8 +187,12 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     try {
       const res = await window.desktopUpdater.applyAndRestart();
       if (res?.ok) {
-        antdMessage.success(`已更新到 v${res.version || ""}，正在刷新...`);
-        setStagingReady({ ready: false });
+        if (res.restarting) {
+          antdMessage.success(`已更新到 v${res.version || ""}，应用将自动重启生效...`);
+        } else {
+          antdMessage.success(`已更新到 v${res.version || ""}，正在刷新...`);
+          setStagingReady({ ready: false });
+        }
       } else {
         antdMessage.error("应用更新失败：" + (res?.error || "未知错误"));
       }

@@ -13,7 +13,7 @@ import { type Row } from './shared';
 
 const FRESHNESS_SOURCES = [
   { key: 'vendor_daily',            table: 'agg_vendor_daily',         dateField: '日期',       name: '厂商广告投放分析', group: 'delivery', order: 1 },
-  { key: 'fact_appmarket_plan_daily', table: 'fact_appmarket_plan_daily', dateField: '日期',   name: '广告计划维度明细', group: 'delivery', order: 2 },
+  { key: 'fact_plan_daily', table: 'fact_plan_daily', dateField: '日期',   name: '广告计划维度明细', group: 'delivery', order: 2 },
   { key: 'xhs_note',                table: 'agg_xhs_note',             dateField: '发布时间',    name: '小红书笔记维度明细', group: 'delivery', order: 3 },
   { key: 'fact_conv_content',       table: 'fact_conv_content',        dateField: '线索日期',      name: '企微明细',     group: 'leads',    order: 1 },
   { key: 'fact_conv_appmarket',     table: 'fact_conv_appmarket',      dateField: '下载日期',      name: 'APP下载明细',  group: 'leads',    order: 2 },

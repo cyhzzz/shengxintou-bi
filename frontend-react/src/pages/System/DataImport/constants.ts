@@ -9,7 +9,7 @@
  *   xhs_note              → agg_xhs_note
  *   channel_open          → agg_daily_channel_open
  *   appmarket_plan_class   → dim_ad_plan_class
- *   appmarket_plan_daily  → fact_appmarket_plan_daily
+ *   plan_daily           → fact_plan_daily
  */
 
 import type { ComponentType, CSSProperties } from 'react';
@@ -41,7 +41,7 @@ export type DataType =
   | 'xhs_note'
   | 'channel_open'
   | 'appmarket_plan_class'
-  | 'appmarket_plan_daily';
+  | 'plan_daily';
 
 // 分组键
 export type DataGroupKey = 'delivery' | 'leads' | 'open' | 'dimension';
@@ -169,11 +169,11 @@ export const DATA_TYPES: DataTypeConfig[] = [
     group: 'dimension',
   },
   {
-    type: 'appmarket_plan_daily',
+    type: 'plan_daily',
     label: '广告计划维度明细',
-    description: '日×计划×关键词 投放消耗/展示/点击/下载明细（9.3）',
-    targetTables: ['fact_appmarket_plan_daily'],
-    guideFile: 'appmarket_plan_daily_guide.md',
+    description: '全渠道计划级日维度：日×计划×关键词 消耗/展示/点击/下载（9.3）',
+    targetTables: ['fact_plan_daily'],
+    guideFile: 'plan_daily_guide.md',
     icon: TableOutlined,
     group: 'delivery',
   },
