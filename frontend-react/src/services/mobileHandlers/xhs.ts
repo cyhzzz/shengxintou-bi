@@ -598,16 +598,28 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     (b.totals['开口'] - a.totals['开口'])
   );
 
-  // ---- 补计划级 消耗/展示/点击/下载 + 计划名称（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
+  // ---- 补计划级 消耗/展示/点击/下载 + 计划名称 + 代理商（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
   // 周起始用与漏斗一致的周一（date("日期",'weekday 0','-6 days')），保证消耗周与漏斗周对齐。
+  // 注意：fact_conv_content.广告ID 常带浮点残留（如 '157763399.0'），去末尾 '.0' 后才能与整数 计划ID 关联；
+  //       名称与代理商（厂商名称=直投/量子/绩牛/美洋）都取自 fact_plan_daily。
+  const planNum = (s: unknown): number | null => {
+    let k = String(s ?? '').trim();
+    if (k.endsWith('.0')) k = k.slice(0, -2);
+    return /^\d+$/.test(k) && Number(k) > 0 ? Number(k) : null;
+  };
   type SpendKey = '消耗' | '展示' | '点击' | '下载';
   const metricKeys: SpendKey[] = ['消耗', '展示', '点击', '下载'];
   const costWeek: Record<string, Record<SpendKey, number>> = {};
   const costTot: Record<string, Record<SpendKey, number>> = {};
-  const planName: Record<string, string> = {};
+  const planMeta: Record<string, { plan_name: string; agency: string }> = {};
   const costWeekAgg: Record<string, Record<SpendKey, number>> = {};
   const coverZero: Record<SpendKey, number> = { 消耗: 0, 展示: 0, 点击: 0, 下载: 0 };
-  const numericPlanIds = plan_items.filter((p: any) => /^\d+$/.test(p.plan_id)).map((p: any) => Number(p.plan_id));
+  const pidOf: Record<string, number> = {};
+  const numericPlanIds: number[] = [];
+  for (const p of plan_items) {
+    const n = planNum(p.plan_id);
+    if (n !== null) { pidOf[p.plan_id] = n; if (!numericPlanIds.includes(n)) numericPlanIds.push(n); }
+  }
   if (numericPlanIds.length > 0) {
     const pdWhere = buildWhere([
       inClause('计划ID', numericPlanIds.map(String)),
@@ -635,20 +647,25 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
       const agg = costWeekAgg[ws] = costWeekAgg[ws] || { ...coverZero };
       for (const k of metricKeys) agg[k] += c[k];
     }
-    const pdNameRows = await querySql<Row>(
-      `SELECT "计划ID" as plan_id, MAX("计划名称") as name
+    const pdMetaRows = await querySql<Row>(
+      `SELECT "计划ID" as plan_id, MAX("计划名称") as name, MAX("厂商名称") as agency
        FROM fact_plan_daily
        WHERE "计划ID" IN (${numericPlanIds.map(() => '?').join(', ')}) AND "平台" = ?
          AND "计划名称" IS NOT NULL AND "计划名称" != ''
        GROUP BY "计划ID"`,
       [...numericPlanIds.map(String), '小红书']
     );
-    for (const r of pdNameRows) planName[Number(r.plan_id)] = String(r.name || '');
+    for (const r of pdMetaRows) planMeta[Number(r.plan_id)] = {
+      plan_name: String(r.name || ''),
+      agency: String(r.agency || ''),
+    };
   }
   for (const p of plan_items) {
-    const pid = /^\d+$/.test(p.plan_id) ? Number(p.plan_id) : null;
+    const pid = Object.prototype.hasOwnProperty.call(pidOf, p.plan_id) ? pidOf[p.plan_id] : null;
     const tl = pid !== null ? (costTot[pid] || { ...coverZero }) : { ...coverZero };
-    p.plan_name = pid !== null ? (planName[pid] || '') : '';
+    const meta = pid !== null ? (planMeta[pid] || { plan_name: '', agency: '' }) : { plan_name: '', agency: '' };
+    p.plan_name = meta.plan_name;
+    if (meta.agency) p['广告代理商'] = meta.agency;   // 用 fact_plan_daily.厂商名称（直投/量子/绩牛/美洋）作为代理商
     for (const k of metricKeys) p.totals[k] = tl[k];
     for (const wpt of p.weekly) {
       const ws = String(wpt.week_start).slice(0, 10);

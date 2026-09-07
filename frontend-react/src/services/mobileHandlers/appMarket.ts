@@ -216,11 +216,11 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
   if (platforms.length > 0) {
     conditions.push(inClause('应用市场', platforms));
   }
-  conditions.push(dateClause('资金账号创建完成时间', sd, ed));
+  conditions.push(dateClause('下载日期', sd, ed));
   const whereClause = buildWhere(conditions.filter(Boolean) as { sql: string; params: unknown[] }[]);
 
-  // 日聚合（SQL 层按资金账号创建完成时间分组求和）
-  const dailySql = `SELECT "资金账号创建完成时间" AS d,
+  // 日聚合（SQL 层按 下载日期 分组求和；下载 cohort，与后端/应用市场漏斗口径一致，避免幸存者偏差）
+  const dailySql = `SELECT "下载日期" AS d,
     COALESCE(SUM("是否激活APP"), 0) AS activate,
     COALESCE(SUM("是否开户注册"), 0) AS register,
     COALESCE(SUM("是否注册身份证"), 0) AS id_card,
@@ -228,7 +228,7 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
     COALESCE(SUM("是否提交开户"), 0) AS submit,
     COALESCE(SUM("是否创建完资金账号"), 0) AS success
     FROM fact_conv_appmarket ${whereClause.clause}
-    GROUP BY "资金账号创建完成时间" ORDER BY "资金账号创建完成时间"`;
+    GROUP BY "下载日期" ORDER BY "下载日期"`;
   const dailyRows = await querySql<Row>(dailySql, whereClause.params);
 
   const WEEKDAY_MAP = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];

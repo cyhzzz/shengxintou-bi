@@ -196,8 +196,16 @@ def xhs_plan_analysis():
         reverse=True,
     )
 
-    # ---- 补计划级 消耗/展示/点击/下载 + 计划名称（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
+    # ---- 补计划级 消耗/展示/点击/下载 + 计划名称 + 代理商（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
     # 周起始用本报表统一的 make_week_start_expr（周一），保证消耗周与漏斗周对齐。
+    # 注意：fact_conv_content.广告ID 常带浮点残留（如 '157763399.0'），去末尾 '.0' 后才能与整数 计划ID 关联；
+    #       名称与代理商（厂商名称=直投/量子/绩牛/美洋）都取自 fact_plan_daily。
+    def _plan_num(s):
+        k = str(s or '').strip()
+        if k.endswith('.0'):
+            k = k[:-2]
+        return int(k) if k.isdigit() and int(k) > 0 else None
+
     plan_daily_fweek = make_week_start_expr(FactPlanDaily.日期).label('week_start')
     cover_names = {'消耗': 0.0, '展示': 0, '点击': 0, '下载': 0}
     def _cover(spend, imp, clk, dl):
@@ -206,12 +214,13 @@ def xhs_plan_analysis():
 
     cost_week = {}          # (plan_id, week) -> cover
     cost_tot = {}           # plan_id -> cover
-    plan_name = {}          # plan_id -> 计划名称
+    plan_meta = {}          # plan_id -> {'plan_name','agency'}（计划名称 + 代理商）
     cost_week_agg = {}      # week -> cover（跨计划合计）
     metric_keys = ('消耗', '展示', '点击', '下载')
     sd, ed = filters.get('start_date'), filters.get('end_date')
-    # 仅对真实数字广告ID计划尝试关联；fallback 到广告账号/未归因的 plan_key 无法匹配 fact_plan_daily.计划ID
-    numeric_plan_ids = [int(p['plan_id']) for p in plan_items if p['plan_id'].isdigit()]
+    # 将计划 key（含 '.0' 浮点残留）归一化为整数 计划ID；哨兵/未归因不可关联
+    pid_of = {p['plan_id']: n for p in plan_items if (n := _plan_num(p['plan_id'])) is not None}
+    numeric_plan_ids = list(dict.fromkeys(pid_of.values()))
     if numeric_plan_ids:
         q_plan = db.session.query(
             FactPlanDaily.计划ID, plan_daily_fweek,
@@ -229,16 +238,27 @@ def xhs_plan_analysis():
             cost_week[(pid, week)] = c
             t = cost_tot.setdefault(pid, dict(cover_names))
             for k in metric_keys: t[k] += c[k]
-        for r in db.session.query(FactPlanDaily.计划ID, FactPlanDaily.计划名称).filter(
-                FactPlanDaily.计划ID.in_(numeric_plan_ids),
-                FactPlanDaily.计划名称.isnot(None), FactPlanDaily.计划名称 != '',
-                FactPlanDaily.平台 == '小红书').distinct().all():
-            plan_name.setdefault(int(r.计划ID), r.计划名称)
+        for r in db.session.query(
+                FactPlanDaily.计划ID,
+                func.max(FactPlanDaily.计划名称).label('plan_name'),
+                func.max(FactPlanDaily.厂商名称).label('agency'),
+        ).filter(
+            FactPlanDaily.计划ID.in_(numeric_plan_ids),
+            FactPlanDaily.平台 == '小红书',
+            FactPlanDaily.计划名称.isnot(None), FactPlanDaily.计划名称 != '',
+        ).group_by(FactPlanDaily.计划ID).all():
+            plan_meta[int(r.计划ID)] = {
+                'plan_name': r.plan_name or '',
+                'agency': r.agency or '',
+            }
 
     for p in plan_items:
-        pid = int(p['plan_id']) if p['plan_id'].isdigit() else None
+        pid = pid_of.get(p['plan_id'])
         tl = dict(cost_tot.get(pid, cover_names)) if pid is not None else dict(cover_names)
-        p['plan_name'] = plan_name.get(pid, '') if pid is not None else ''
+        meta = plan_meta.get(pid, {}) if pid is not None else {}
+        p['plan_name'] = meta.get('plan_name', '')
+        if meta.get('agency'):
+            p['广告代理商'] = meta['agency']   # 用 fact_plan_daily.厂商名称（直投/量子/绩牛/美洋）作为代理商
         p['totals'] = {**p['totals'], **tl}
         for wpt in p['weekly']:
             ws = str(wpt['week_start'])[:10]

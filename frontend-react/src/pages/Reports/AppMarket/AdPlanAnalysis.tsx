@@ -18,7 +18,7 @@
  *   八、ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, Space, Spin, Table, Button, Tooltip, Empty, message, Collapse, Tag, Tabs } from 'antd';
+import { Card, Select, Space, Spin, Table, Button, Tooltip, Empty, message, Collapse, Tag, Tabs, Pagination } from 'antd';
 import {
   DownloadOutlined, ReloadOutlined,
   UserAddOutlined, MoneyCollectOutlined, FundOutlined,
@@ -219,6 +219,58 @@ const clusterTabItems = (data: Record<string, ClusterRow[]>) => [
 // 与后端 ALLOWED_PLATFORMS 对齐：首屏默认全选，避免初次加载前 Select 为空的闪烁
 const INITIAL_MARKETS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
 
+// 分计划分析：单条计划卡片（React.memo 隔离，避免切换周/聚类等无关状态变化导致全员重渲染）。
+// 汇总用单行 Table，周明细用 Collapse（antd 默认展开时才会挂载子表 → 惰性渲染，不展开不产生额外 DOM）。
+const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
+  return (
+    <Card
+      size="small"
+      style={{ marginBottom: 12, borderColor: 'var(--border-default)' }}
+      title={
+        <Space size={8} wrap>
+          <Tag color="blue">{sanitizeText(pl.market)}</Tag>
+          <strong>{sanitizeText(pl.plan_name)}</strong>
+          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+            ID: {pl.plan_id} · 版位: {sanitizeText(pl.placement)} / {sanitizeText(pl.sub_placement)} · 出价: {sanitizeText(pl.bid)}
+          </span>
+        </Space>
+      }
+    >
+      <div style={{ marginBottom: 6, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+        汇总（所选日期区间合计 · 广告开户成本 = 消耗 ÷ 广告开户量）
+      </div>
+      <Table
+        size="small"
+        rowKey="__summary__"
+        dataSource={[{ ...pl.summary } as FunnelMetrics]}
+        columns={funnelMetricColumns}
+        pagination={false}
+        scroll={{ x: 'max-content' }}
+      />
+      <Collapse
+        ghost
+        style={{ marginTop: 4 }}
+        items={[
+          {
+            key: `weeks-${pl.plan_id}`,
+            label: '按周展开（上周五 ~ 本周四）',
+            children: (
+              <Table
+                size="small"
+                rowKey="week_start"
+                dataSource={pl.weeks}
+                columns={weekRowsColumns}
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+              />
+            ),
+          },
+        ]}
+      />
+    </Card>
+  );
+});
+
 const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const [markets, setMarkets] = useState<string[]>(INITIAL_MARKETS);
   const [selected, setSelected] = useState<string[]>(INITIAL_MARKETS);
@@ -231,6 +283,9 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
   const [planWeekDetail, setPlanWeekDetail] = useState<PlanWeekDetail[]>([]);
   const [loading, setLoading] = useState(false);
+  // 分计划分析：只渲染当前页卡片，避免一次挂载上百张 antd Table 造成首屏卡顿
+  const [planPage, setPlanPage] = useState(1);
+  const PLAN_PAGE_SIZE = 10;
   const { dateRange, resetDateRange } = useFilterStore();
 
   const load = async () => {
@@ -338,6 +393,18 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     () => planWeekDetail.filter((p) => activeMarkets.has(p.market)),
     [planWeekDetail, activeMarkets],
   );
+
+  // 计划列表数量变化（如上/下所有市场）时，若当前页码越界则回退到最后一页，避免展示空页
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(displayedPlanWeekDetail.length / PLAN_PAGE_SIZE));
+    setPlanPage((p) => (p > lastPage ? lastPage : p));
+  }, [displayedPlanWeekDetail.length]);
+
+  // ---- 分计划分析：分页（每次仅渲染 PLAN_PAGE_SIZE 张卡片，配合 React.memo 的 PlanCard 控制 DOM 数量） ----
+  const paginatedPlans = useMemo(() => {
+    const start = (planPage - 1) * PLAN_PAGE_SIZE;
+    return displayedPlanWeekDetail.slice(start, start + PLAN_PAGE_SIZE);
+  }, [displayedPlanWeekDetail, planPage]);
 
   // ---- 按周分计划分析：由 displayedPlanWeekDetail 按所选周派生 ----
   const selectedWeekPlans = useMemo(() => {
@@ -604,54 +671,23 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             {displayedPlanWeekDetail.length === 0 ? (
               <Empty description={loading ? '加载中...' : '所选市场暂无计划分解数据'} />
             ) : (
-              displayedPlanWeekDetail.map((pl) => (
-                <Card
-                  key={pl.plan_id}
-                  size="small"
-                  style={{ marginBottom: 12, borderColor: 'var(--border-default)' }}
-                  title={
-                    <Space size={8} wrap>
-                      <Tag color="blue">{sanitizeText(pl.market)}</Tag>
-                      <strong>{sanitizeText(pl.plan_name)}</strong>
-                      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
-                        ID: {pl.plan_id} · 版位: {sanitizeText(pl.placement)} / {sanitizeText(pl.sub_placement)} · 出价: {sanitizeText(pl.bid)}
-                      </span>
-                    </Space>
-                  }
-                >
-                  <div style={{ marginBottom: 6, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
-                    汇总（所选日期区间合计 · 广告开户成本 = 消耗 ÷ 广告开户量）
-                  </div>
-                  <Table
-                    size="small"
-                    rowKey="__summary__"
-                    dataSource={[{ ...pl.summary } as FunnelMetrics]}
-                    columns={funnelMetricColumns}
-                    pagination={false}
-                    scroll={{ x: 'max-content' }}
-                  />
-                  <Collapse
-                    ghost
-                    style={{ marginTop: 4 }}
-                    items={[
-                      {
-                        key: `weeks-${pl.plan_id}`,
-                        label: '按周展开（上周五 ~ 本周四）',
-                        children: (
-                          <Table
-                            size="small"
-                            rowKey="week_start"
-                            dataSource={pl.weeks}
-                            columns={weekRowsColumns}
-                            pagination={false}
-                            scroll={{ x: 'max-content' }}
-                          />
-                        ),
-                      },
-                    ]}
-                  />
-                </Card>
-              ))
+              <div style={{ marginBottom: 12, color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                每页 {PLAN_PAGE_SIZE} 条，仅渲染当前页卡片以提升加载性能；其余页在切换到对应页码时才挂载。
+              </div>
+            )}
+            {paginatedPlans.map((pl) => (
+              <PlanCard key={pl.plan_id} pl={pl} />
+            ))}
+            {displayedPlanWeekDetail.length > PLAN_PAGE_SIZE && (
+              <Pagination
+                current={planPage}
+                pageSize={PLAN_PAGE_SIZE}
+                total={displayedPlanWeekDetail.length}
+                onChange={setPlanPage}
+                showSizeChanger={false}
+                showTotal={(t) => `共 ${t} 个计划`}
+                style={{ marginTop: 12 }}
+              />
             )}
           </Card>
         </FadeInSection>

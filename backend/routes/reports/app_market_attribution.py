@@ -88,9 +88,9 @@ def _build_query(platforms, start_date, end_date):
     if platforms:
         q = q.filter(FactConvAppmarket.应用市场.in_(platforms))
     if start_date:
-        q = q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
+        q = q.filter(FactConvAppmarket.下载日期 >= start_date)
     if end_date:
-        q = q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
+        q = q.filter(FactConvAppmarket.下载日期 <= end_date)
     return q
 
 
@@ -143,16 +143,16 @@ def _aggregate(platforms, start_date, end_date):
     """
     stage_cols = _stage_columns()
 
-    # ---- 每日聚合 ----
+    # ---- 每日聚合（按 下载日期 做下载 cohort，与 app_market 漏斗口径一致；避免按开户完成时间切出的幸存者偏差） ----
     daily_q = _build_query(platforms, start_date, end_date)
     daily_q = daily_q.with_entities(
-        FactConvAppmarket.资金账号创建完成时间,
+        FactConvAppmarket.下载日期,
         *stage_cols,
-    ).group_by(FactConvAppmarket.资金账号创建完成时间).order_by(FactConvAppmarket.资金账号创建完成时间)
+    ).group_by(FactConvAppmarket.下载日期).order_by(FactConvAppmarket.下载日期)
 
     daily_records = []
     for row in daily_q.all():
-        date_str = row.资金账号创建完成时间
+        date_str = row.下载日期
         try:
             d = datetime.strptime(date_str, '%Y-%m-%d').date()
         except (ValueError, TypeError):
@@ -163,8 +163,8 @@ def _aggregate(platforms, start_date, end_date):
         rec['week_start'] = _week_start(d).isoformat()
         daily_records.append(rec)
 
-    # ---- 周聚合 ----
-    week_expr = make_week_start_expr(FactConvAppmarket.资金账号创建完成时间).label('week_start')
+    # ---- 周聚合（按 下载日期 的周起始） ----
+    week_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
     weekly_q = _build_query(platforms, start_date, end_date)
     weekly_q = weekly_q.with_entities(
         week_expr,
