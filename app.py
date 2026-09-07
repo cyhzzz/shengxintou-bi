@@ -488,6 +488,25 @@ def ensure_database_exists():
                 except Exception as _e:
                     logger.warning(f"auto_vacuum 切换失败（可忽略，老库需手动跑 scripts/vacuum_db.py）: {_e}")
 
+            # v4.1.x：广告计划分析聚合性能 —— 为 fact_conv_appmarket 加复合索引，加速
+            # 「按 应用市场 + 资金账号创建完成时间」与「按 广告计划ID + 资金账号创建完成时间」
+            # 的分组聚合（广告计划分析报表对这张大表做多次 group by 及 COUNT(DISTINCT 设备号)）。
+            # CREATE INDEX IF NOT EXISTS 幂等，SQLite / Postgres 均可执行，对已存在库也生效。
+            try:
+                from sqlalchemy import text as _idx_text
+                with db.engine.begin() as _conn:
+                    _conn.execute(_idx_text(
+                        'CREATE INDEX IF NOT EXISTS ix_fact_conv_appmarket_market_acct_time '
+                        'ON fact_conv_appmarket("应用市场", "资金账号创建完成时间")'
+                    ))
+                    _conn.execute(_idx_text(
+                        'CREATE INDEX IF NOT EXISTS ix_fact_conv_appmarket_plan_acct_time '
+                        'ON fact_conv_appmarket("广告计划ID", "资金账号创建完成时间")'
+                    ))
+                logger.info("✓ fact_conv_appmarket 复合索引已就绪（market/plan × 资金账号创建完成时间）")
+            except Exception as _idx_e:
+                logger.warning(f"fact_conv_appmarket 索引创建失败（不影响启动，报表可能偏慢）: {_idx_e}")
+
             # v3.3.0: 主播直播类型映射同步（JSON 权威源 → DB 缓存，每次启动都 upsert）
             # v3.3.10: 同步失败时记录 ERROR 级别日志 + 二次校验表是否为空，避免静默失败导致
             #          直播获客报表全 0 而用户毫无察觉

@@ -608,7 +608,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 <Card
                   key={pl.plan_id}
                   size="small"
-                  style={{ marginBottom: 12, borderColor: 'var(--color-border)' }}
+                  style={{ marginBottom: 12, borderColor: 'var(--border-default)' }}
                   title={
                     <Space size={8} wrap>
                       <Tag color="blue">{sanitizeText(pl.market)}</Tag>

@@ -209,7 +209,7 @@ def _plan_level_maps(plan_ids, start_date, end_date):
     return open_map, spend_map
 
 
-def _overview_and_breakdown(markets, start_date, end_date):
+def _overview_and_breakdown(markets, start_date, end_date, plans):
     """计算 开户概览 + 计划分析（明细/版位/市场聚合）。"""
     open_map = _market_open_map(markets, start_date, end_date)
     spend_map = _market_spend_map(markets, start_date, end_date)
@@ -235,7 +235,6 @@ def _overview_and_breakdown(markets, start_date, end_date):
         })
     by_market.sort(key=lambda x: -(x['open_count'] or 0))
 
-    plans = _load_plans(markets)
     plan_ids = list({p['plan_id'] for p in plans})
     po_map, ps_map = _plan_level_maps(plan_ids, start_date, end_date)
 
@@ -342,7 +341,7 @@ def _weekly_open(markets, start_date, end_date):
     return out
 
 
-def _plan_week_analysis(markets, start_date, end_date, week_start):
+def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
     """按周分计划分析 + 分计划展开（周五起始周）。
 
     返回 (weeks, selected_week, week_plans, plan_week_detail)：
@@ -351,7 +350,6 @@ def _plan_week_analysis(markets, start_date, end_date, week_start):
       - week_plans: 所选周的各计划指标行（按该周消耗降序）
       - plan_week_detail: 各计划的汇总 + 逐周明细（周降序），计划按汇总消耗降序
     """
-    plans = _load_plans(markets)
     plan_ids = list({p['plan_id'] for p in plans})
     agg_by, fact_by = {}, {}
 
@@ -497,12 +495,15 @@ def ad_plan_analysis():
     markets = _resolve_markets(platforms)
     available = list(ALLOWED_PLATFORMS)
 
+    # 一次性加载计划分解维度，供 开户概览/计划分析 与 按周分计划/分计划 共用，避免重复查询
+    plans = _load_plans(markets)
+
     overview, plan_detail, by_placement, by_market = _overview_and_breakdown(
-        markets, start_date, end_date
+        markets, start_date, end_date, plans
     )
     weekly_open = _weekly_open(markets, start_date, end_date)
     weeks, selected_week, week_plans, plan_week_detail = _plan_week_analysis(
-        markets, start_date, end_date, week_start
+        markets, start_date, end_date, week_start, plans
     )
 
     return jsonify({
