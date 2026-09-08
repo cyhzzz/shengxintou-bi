@@ -193,6 +193,28 @@ class ApiSmokeTest(unittest.TestCase):
             '/reports/weekly/data (dates)')
         self.assertIn('current_week', data)
 
+    # v4.2.x 周报详细版（本周 + 全年累计，三维细分）
+    def test_33_weekly_detail_by_week(self):
+        payload = {'report_year': 2026, 'report_week': 23}
+        data = self._ok(
+            self._post('/api/v1/reports/weekly/detail', payload),
+            '/reports/weekly/detail (week)')
+        self.assertIn('period', data)
+        self.assertIn('current_week', data)
+        self.assertIn('year_to_date', data)
+        cw = data['current_week']
+        for key in ('app_market', 'content_platform', 'live'):
+            self.assertIn(key, cw, f'current_week 缺少 {key}')
+            self.assertIsInstance(cw[key], list)
+
+    def test_34_weekly_detail_by_dates(self):
+        payload = {'start_date': '2026-06-01', 'end_date': '2026-06-07'}
+        data = self._ok(
+            self._post('/api/v1/reports/weekly/detail', payload),
+            '/reports/weekly/detail (dates)')
+        ytd = data['year_to_date']
+        self.assertIn('app_market', ytd)
+
     # ============================================================
     #  全渠道报告 / 应用市场报告
     # ============================================================

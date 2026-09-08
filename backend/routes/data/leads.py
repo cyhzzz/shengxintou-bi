@@ -118,32 +118,13 @@ def get_filter_options():
     })
 
 
-@bp.route('/leads-detail/anchor-clusters', methods=['POST'])
-@handle_exceptions
-def get_anchor_clusters():
-    """Bug 6: 主播聚类
+def _compute_anchor_cluster_items(sd, ed, platforms_filter, agencies_filter, live_types_filter):
+    """主播聚类核心（按 (平台,主播) 聚合，复合来源均分），供 /anchor-clusters 与周报详细版共用。
 
-    解析 客户来源 字段，识别 [平台]引流-[主播名字] 模式，按 (平台, 主播) 聚合。
-    例: 视频号引流-姚立琦 -> (视频号, 姚立琦)
-        抖音引流-赵茜 -> (抖音, 赵茜)
-        财联社引流-谭记恩 -> (财联社, 谭记恩)
-        广告投放-新客权益 -> (广告投放, 新客权益) (非引流类，跳过)
-
-    返回: 每个主播的线索数 / 开口 / 开户 / 有效户 / 总资产
+    返回已排序的 items 全量列表（不去重 top_n），口径与 /anchor-clusters 完全一致，
+    避免周报详细版与主播聚类报表因各自实现而数值漂移。
     """
     import re
-    from sqlalchemy import case
-
-    data = request.get_json() or {}
-    filters = data.get('filters') or {}
-    top_n = int(data.get('top_n', 50))
-
-    sd = filters.get('start_date')
-    ed = filters.get('end_date')
-    platforms_filter = filters.get('platforms') or []
-    agencies_filter = filters.get('agencies') or []
-    # 直播类型筛选（分析师/投顾IP/投顾配合做带货/带货直播）
-    live_types_filter = filters.get('live_types') or []
 
     # 主播聚类正则: (平台)引流-(主播名)
     # 复合来源如 "视频号引流-姚立琦,视频号引流-蒋亦凡" 需按分隔符拆成多个主播归因。
@@ -371,6 +352,34 @@ def get_anchor_clusters():
         items = [i for i in items if set(i['live_types']) & wanted]
 
     items.sort(key=lambda x: (x['leads'], x['new_opened']), reverse=True)
+    return items
+
+
+@bp.route('/leads-detail/anchor-clusters', methods=['POST'])
+@handle_exceptions
+def get_anchor_clusters():
+    """Bug 6: 主播聚类
+
+    解析 客户来源 字段，识别 [平台]引流-[主播名字] 模式，按 (平台, 主播) 聚合。
+    例: 视频号引流-姚立琦 -> (视频号, 姚立琦)
+        抖音引流-赵茜 -> (抖音, 赵茜)
+        财联社引流-谭记恩 -> (财联社, 谭记恩)
+        广告投放-新客权益 -> (广告投放, 新客权益) (非引流类，跳过)
+
+    返回: 每个主播的线索数 / 开口 / 开户 / 有效户 / 总资产
+    """
+    data = request.get_json() or {}
+    filters = data.get('filters') or {}
+    top_n = int(data.get('top_n', 50))
+
+    sd = filters.get('start_date')
+    ed = filters.get('end_date')
+    platforms_filter = filters.get('platforms') or []
+    agencies_filter = filters.get('agencies') or []
+    # 直播类型筛选（分析师/投顾IP/投顾配合做带货/带货直播）
+    live_types_filter = filters.get('live_types') or []
+
+    items = _compute_anchor_cluster_items(sd, ed, platforms_filter, agencies_filter, live_types_filter)
 
     totals = {
         'total_anchors': len(items),

@@ -7,8 +7,8 @@
  * - 加互联网渠道占公司开户占比（互联网引流 / 全渠道类别）
  * - 6 指标：消耗金额 / 品牌曝光 / 线索数 / 开户数 / 新增有效户数 / 新增客户资产
  */
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Button, Select, message, Spin } from 'antd';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { Button, Select, message, Spin, Segmented } from 'antd';
 import {
   FilePdfOutlined,
   FileImageOutlined,
@@ -86,6 +86,97 @@ interface WeeklyData {
     valid: { target: number; actual: number; rate: number };
     assets: { target: number; actual: number; rate: number };
   };
+}
+
+// ============ v4.2.x 周报详细版（按渠道分类下钻） ============
+type ReportMode = 'overview' | 'detail';
+
+interface AppMarketPlan {
+  plan_id: string | null;
+  plan_name: string | null;
+  versions: string[];
+  sub_versions: string[];
+  bids: string[];
+  spend: number;
+  impressions: number;
+  clicks: number;
+  open_count: number;
+  open_cost: number | null;
+}
+
+interface AppMarketPlatform {
+  platform: string;
+  spend: number;
+  open_count: number;
+  open_cost: number | null;
+  top_plans: AppMarketPlan[];
+}
+
+interface ContentPlan {
+  plan_id: string | null;
+  plan_name: string | null;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  open_count: number;
+}
+
+interface ContentFactory {
+  factory: string;
+  spend: number;
+  open_count: number;
+  plans: ContentPlan[];
+}
+
+interface ContentPlatform {
+  platform: string;
+  lead_count: number;
+  open_count: number;
+  factories: ContentFactory[];
+}
+
+interface LiveAnchor {
+  anchor_name: string;
+  live_type: string | null;
+  leads: number;
+  new_leads: number;
+  mouth: number;
+  opened: number;
+  new_opened: number;
+  valid: number;
+  new_valid: number;
+  assets: number;
+  new_assets: number;
+}
+
+interface LocalLifeItem {
+  platform: string;
+  open_count: number;
+}
+
+type WeeklyOpenRow = Record<string, number | string>;
+
+interface DetailScope {
+  app_market: AppMarketPlatform[];
+  content_platform: ContentPlatform[];
+  live: LiveAnchor[];
+  local_life: LocalLifeItem[];
+  app_market_weekly: WeeklyOpenRow[];
+  content_weekly: WeeklyOpenRow[];
+  live_weekly: WeeklyOpenRow[];
+}
+
+interface WeeklyDetailData {
+  period: {
+    start_date: string;
+    end_date: string;
+    report_year: number;
+    report_week: number;
+    report_name: string;
+    report_sequence: number;
+  };
+  current_week: DetailScope;
+  year_to_date: DetailScope;
 }
 
 // 核心指标定义（v3.3.10：开户数拆 3 行 — 应用市场 / 其他渠道 / 合计）
@@ -174,15 +265,563 @@ function KpiRing({ label, rate }: { label: string; rate: number }) {
   );
 }
 
+// ============ 周报详细版海报（按渠道分类下钻，本周 + 全年累计） ============
+// ============================ 周报详细版 · 可视化原语 ============================
+// 过滤零数据：只为「本周/全年真实有流量」的对象渲染，避免空数据/零值占位
+const _appHasPlanVal = (p: AppMarketPlan) => p.open_count > 0 || p.spend > 0;
+const _appHasPlat = (p: AppMarketPlatform) => p.open_count > 0 || p.spend > 0;
+const _ctHasPlat = (p: ContentPlatform) =>
+  p.lead_count > 0 ||
+  p.factories.some((f) => f.open_count > 0 || f.plans.some((pl) => pl.spend > 0));
+const _hasAnchor = (a: LiveAnchor) => a.leads > 0;
+
+// KPI 小卡片条
+function PosterKpi({ items }: { items: Array<{ label: string; value: string }> }) {
+  return (
+    <div className={styles.kpiStrip}>
+      {items.map((it) => (
+        <div className={styles.kpiChip} key={it.label}>
+          <div className={styles.kpiValue}>{it.value}</div>
+          <div className={styles.kpiLabel}>{it.label}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface StackSeriesItem {
+  name: string;
+  data: number[];
+  color?: string;
+}
+
+// 详细版堆叠柱状图（x=分类，多系列垂直堆叠，样式参照概览版堆叠图：axis shadow + stack + 紧凑网格）
+function StackBars({
+  categories,
+  series,
+  height = 170,
+  rotate,
+}: {
+  categories: string[];
+  series: StackSeriesItem[];
+  height?: number;
+  rotate?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const instRef = useRef<echarts.EChartsType | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (instRef.current) {
+      instRef.current.dispose();
+      instRef.current = null;
+    }
+    const chart = echarts.init(el);
+    instRef.current = chart;
+    chart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { show: false },
+      grid: { top: 14, left: 40, right: 18, bottom: 26, containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: { fontSize: 9, rotate: rotate ?? (categories.length > 7 ? 24 : 0) },
+      },
+      yAxis: { type: 'value', axisLabel: { fontSize: 9 } },
+      series: series.map((s) => ({
+        name: s.name,
+        type: 'bar',
+        stack: 'total',
+        barMaxWidth: 28,
+        emphasis: { focus: 'series' },
+        data: s.data,
+        itemStyle: { color: s.color },
+      })),
+    } as EChartsOption);
+
+    const onR = () => chart.resize();
+    window.addEventListener('resize', onR);
+    return () => {
+      window.removeEventListener('resize', onR);
+      chart.dispose();
+      instRef.current = null;
+    };
+  }, [categories, series, rotate]);
+
+  return <div ref={ref} style={{ width: '100%', height }} />;
+}
+
+// 堆叠图系列基色（RGB 三元组）：应用市场=蓝 / 内容平台=红 / 直播=靛蓝，与云图板块基色一致
+const BLUE_BASE: [number, number, number] = [25, 118, 210];
+const RED_BASE: [number, number, number] = [192, 57, 43];
+const INDIGO_BASE: [number, number, number] = [63, 81, 181];
+const MAX_STACK_SERIES = 5; // 堆叠系列最多保留 Top N，其余并入「其他」，避免柱体堆叠过碎
+
+// 从基色生成 n 个由亮到暗的系列色（浅=小数值在前，深=大数值在后）
+function palette(base: [number, number, number], n: number): string[] {
+  const arr: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const k = 1 - (0.62 * i) / Math.max(1, n - 1);
+    const [r, g, b] = base.map((x) => Math.round(x * k));
+    arr.push(`rgb(${r},${g},${b})`);
+  }
+  return arr;
+}
+
+// 把「分类 → 细分段{name,value}」聚合为堆叠图输入：
+// 合并各分类下的段名，按总值取 Top N，其余并入「其他」系列，保证每根柱颜色层级清晰
+function buildStacked(
+  categories: string[],
+  segFor: (cat: string) => Array<{ name: string; value: number }>
+): { categories: string[]; series: StackSeriesItem[] } {
+  const segTotal: Record<string, number> = {};
+  const segByCat: Record<string, Record<string, number>> = {};
+  for (const c of categories) {
+    segByCat[c] = segByCat[c] || {};
+    for (const s of segFor(c)) {
+      segByCat[c][s.name] = (segByCat[c][s.name] || 0) + s.value;
+      segTotal[s.name] = (segTotal[s.name] || 0) + s.value;
+    }
+  }
+  const ranked = Object.entries(segTotal).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const top = ranked.slice(0, MAX_STACK_SERIES);
+  const restNames = new Set(ranked.slice(MAX_STACK_SERIES).map(([n]) => n));
+  const keep = top.map(([name]) => name);
+  if (restNames.size) keep.push('其他');
+  const series: StackSeriesItem[] = keep.map((name) => ({
+    name,
+    data: categories.map((c) => {
+      const m = segByCat[c] || {};
+      if (name === '其他') {
+        let sum = 0;
+        for (const rn of restNames) sum += m[rn] || 0;
+        return sum;
+      }
+      return m[name] || 0;
+    }),
+  }));
+  return { categories, series };
+}
+
+// 分周开户序列（周次×细分）转堆叠图输入：
+// x=周次，系列=当前横坐标对象（平台/主播），值=开户数；复用 buildStacked 的 TopN + 其他聚合
+function weeklyStacked(
+  rows: WeeklyOpenRow[],
+  colorBase: [number, number, number]
+): { categories: string[]; series: StackSeriesItem[] } {
+  const categories = rows.map((r) => String(r.week));
+  const { series } = buildStacked(categories, (wk) => {
+    const row = rows.find((r) => String(r.week) === wk)!;
+    return Object.entries(row)
+      .filter(([k]) => k !== 'week')
+      .map(([name, value]) => ({ name, value: Number(value || 0) }));
+  });
+  const colored = series.map((s, i) => ({ ...s, color: palette(colorBase, series.length)[i] }));
+  return { categories, series: colored };
+}
+
+// 全年分周开户堆叠图（x=周次，系列=平台/主播，值=开户数），仅在全量数据存在时渲染
+function WeeklyChart({
+  rows,
+  colorBase,
+  height,
+}: {
+  rows: WeeklyOpenRow[];
+  colorBase: [number, number, number];
+  height?: number;
+}) {
+  if (!rows.length) return null;
+  const { categories, series } = weeklyStacked(rows, colorBase);
+  if (!series.length) return null;
+  return <StackBars categories={categories} series={series} rotate={24} height={height} />;
+}
+
+// 把分周开户序列按「系列名」聚合为全年合计（与分周堆叠图严格同源同口径）。
+// 背景：主播复合来源均分存在 round 舍入，全年一次聚合 ≠ 逐周聚合求和，
+// 云图/KPI 若用全年明细口径会与分周堆叠图对不齐，故统一从分周序列聚合。
+function aggregateWeekly(rows: WeeklyOpenRow[]): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const r of rows || []) {
+    for (const [k, v] of Object.entries(r)) {
+      if (k === 'week') continue;
+      const n = Number(v || 0);
+      if (n > 0) m[k] = (m[k] || 0) + n;
+    }
+  }
+  return m;
+}
+
+// ============================ 周报详细版 · 开户来源云图（echarts treemap） ============================
+// 板块=渠道（应用市场/内容平台/直播），个股=版位/厂商/主播；色块面积与颜色均由开户数驱动。
+function _trunc(n: string, m: number) {
+  return n && n.length > m ? `${n.slice(0, m)}…` : n;
+}
+
+// 各渠道板块基色（RGB 三元组）：应用市场=蓝系 / 内容平台=红系 / 直播=靛蓝系 / 本地生活=绿系
+const SECTOR_RGB: Record<string, [number, number, number]> = {
+  '应用市场': [25, 118, 210],
+  '内容平台': [192, 57, 43],
+  '直播': [63, 81, 181],
+  '本地生活': [46, 125, 50],
+};
+
+// 按占比把板块基色调深浅：ratio 0→基色原亮，1→加深约 55%
+function _shade(rgb: [number, number, number], ratio: number): string {
+  const k = 1 - 0.55 * Math.max(0, Math.min(1, ratio));
+  const [r, g, b] = rgb.map((x) => Math.round(x * k));
+  return `rgb(${r},${g},${b})`;
+}
+
+// 给板块下叶子递归补 value + 上色，返回带价值信息的树
+function _tintLeaf(sec: { rgb: [number, number, number] }, nodes: any[], max: number): any[] {
+  return nodes.map((n) => {
+    if (n.children && n.children.length) {
+      const kids = _tintLeaf(sec, n.children, max);
+      const v = kids.reduce((s, k) => s + (k.value || 0), 0);
+      return { name: n.name, value: v, children: kids, itemStyle: { color: _shade(sec.rgb, 0.22) } };
+    }
+    const v = n.value || 0;
+    return { name: n.name, value: v, itemStyle: { color: _shade(sec.rgb, max ? v / max : 0) } };
+  });
+}
+
+function buildCloudTree(scope: DetailScope, liveWeeklyAgg?: Record<string, number>): any[] {
+  // 板块按固定顺序输出（内容平台 → 应用市场 → 直播 → 本地生活，与概览版图例一致），
+  // 配合 buildCloudOption 的 sort:false 让「本周 / 全年」两张云图板块排布一致（不随数值排序漂移）
+  const sectors: any[] = [];
+
+  // 内容平台（小红书/腾讯/抖音/yj/云极/快手）：渠道 -> 平台 -> 厂商（非直播口径，直播独立板块）
+  const contentChildren = scope.content_platform
+    .map((pf) => {
+      const facs = pf.factories.filter((f) => f.open_count > 0).map((f) => ({ name: f.factory, value: f.open_count }));
+      if (!facs.length) return null;
+      return { name: pf.platform, value: facs.reduce((s, x) => s + x.value, 0), children: facs };
+    })
+    .filter(Boolean) as any[];
+  if (contentChildren.length) sectors.push({ name: '内容平台', rgb: SECTOR_RGB['内容平台'], children: contentChildren });
+
+  // 应用市场：渠道 -> 平台 -> 版位（计划往版位聚合，不展示计划名称）
+  const appPlats = scope.app_market.filter(_appHasPlat);
+  const appChildren = appPlats
+    .map((pf) => {
+      const placementMap: Record<string, number> = {};
+      for (const p of pf.top_plans) {
+        if (!_appHasPlanVal(p)) continue;
+        const placements = p.versions && p.versions.some((v) => v && v !== '未分类')
+          ? p.versions
+          : ['未分类'];
+        for (const v of placements) placementMap[v] = (placementMap[v] || 0) + p.open_count;
+      }
+      const leaves = Object.entries(placementMap).filter(([, v]) => v > 0).map(([name, v]) => ({ name, value: v }));
+      if (!leaves.length) return null;
+      return { name: pf.platform, value: leaves.reduce((s, x) => s + x.value, 0), children: leaves };
+    })
+    .filter(Boolean) as any[];
+  if (appChildren.length) sectors.push({ name: '应用市场', rgb: SECTOR_RGB['应用市场'], children: appChildren });
+
+  // 直播：渠道 -> 主播。口径与下方分周堆叠图严格一致：仅取非存量新开户数（new_opened）。
+  // 全年云图传入 liveWeeklyAgg（由分周序列聚合而来，逐周求和），保证云图合计 = 堆叠图合计
+  // （复合来源均分的 round 舍入使「全年一次聚合」与「逐周求和」存在系统性差异，不可混用）。
+  const liveChildren = liveWeeklyAgg
+    ? Object.entries(liveWeeklyAgg)
+        .filter(([, v]) => v > 0)
+        .map(([name, value]) => ({ name, value }))
+    : scope.live
+        .filter((a) => a.new_opened > 0)
+        .map((a) => ({ name: a.anchor_name || '—', value: a.new_opened }));
+  if (liveChildren.length) sectors.push({ name: '直播', rgb: SECTOR_RGB['直播'], children: liveChildren });
+
+  // 本地生活（高德）：独立板块
+  const localLifeChildren = (scope.local_life || [])
+    .filter((x) => x.open_count > 0)
+    .map((x) => ({ name: x.platform, value: x.open_count }));
+  if (localLifeChildren.length) sectors.push({ name: '本地生活', rgb: SECTOR_RGB['本地生活'], children: localLifeChildren });
+
+  // 上色：叶子统一取同板块内最大 value 归一化深浅，深=贡献高；板块基色区分渠道
+  return sectors.map((sec) => {
+    const leafVals: number[] = [];
+    const collect = (nodes: any[]) => nodes.forEach((n) => {
+      if (n.children && n.children.length) collect(n.children);
+      else if (n.value) leafVals.push(n.value);
+    });
+    collect(sec.children);
+    const max = Math.max(1, ...leafVals);
+    const value = sec.children.reduce((s: number, c: any) => s + (c.value || 0), 0);
+    return { name: sec.name, value, children: _tintLeaf(sec, sec.children, max), itemStyle: { color: _shade(sec.rgb, 0.14) } };
+  });
+}
+
+function buildCloudOption(tree: any[]): EChartsOption {
+  const total = tree.reduce((s, sec) => s + (sec.value || 0), 0);
+  return {
+    tooltip: {
+      formatter: (p: any) => {
+        const d = p.data || {};
+        return `${d.name || ''}<br/><b>开户 ${fmtNum(d.value)}</b>${total ? ` · 占 ${_safePct(d.value, total)}` : ''}`;
+      },
+    },
+    series: [
+      {
+        type: 'treemap',
+        roam: false,
+        nodeClick: false,
+        breadcrumb: { show: false },
+        // 板块顺序固定为 data 顺序（内容平台→应用市场→直播→本地生活），不随数值降序重排，
+        // 保证「本周 / 全年」两张云图同一板块位置一致，排版对齐
+        sort: false,
+        top: 4, left: 4, right: 4, bottom: 4,
+        label: {
+          show: true,
+          formatter: (p: any) => _trunc(p.name, 6),
+          fontSize: 9,
+          color: '#fff',
+        },
+        upperLabel: {
+          show: true,
+          height: 16,
+          fontSize: 9,
+          fontWeight: 600,
+          color: '#1a1a1a',
+          padding: [2, 4],
+        },
+        itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 },
+        // 颜色由 buildCloudTree 按「板块基色 + 个股占比深浅」显式赋值，不再用全局 colorMappingBy 染色
+        levels: [
+          { itemStyle: { borderColor: '#fff', borderWidth: 2, gapWidth: 2 }, upperLabel: { height: 18 } },
+          { itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 } },
+          { itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 } },
+        ],
+        data: tree,
+        animationDurationUpdate: 300,
+        animationEasing: 'cubicOut',
+      },
+    ],
+  };
+}
+
+function _safePct(num: number, den: number) {
+  if (!den) return '0%';
+  return `${Math.round((num / den) * 100)}%`;
+}
+
+// 开户来源云图（echarts treemap）；yearly=true 时直播板块改用分周序列聚合，与堆叠图对齐
+function HeroCloudMap({ scope, title, yearly }: { scope: DetailScope; title: string; yearly?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<echarts.EChartsType | null>(null);
+
+  const tree = useMemo(
+    () => buildCloudTree(scope, yearly ? aggregateWeekly(scope.live_weekly || []) : undefined),
+    [scope, yearly]
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!chartRef.current) chartRef.current = echarts.init(el);
+    chartRef.current.setOption(buildCloudOption(tree), true);
+  }, [tree]);
+
+  useEffect(() => {
+    const onR = () => chartRef.current?.resize();
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
+
+  useEffect(() => () => {
+    chartRef.current?.dispose();
+    chartRef.current = null;
+  }, []);
+
+  if (!tree.length) return null;
+  return (
+    <div className={styles.cloudBlock}>
+      <div className={styles.dSubTitle}>{title}</div>
+      <div ref={ref} className={styles.cloudMap} />
+    </div>
+  );
+}
+
+// ============================ 应用市场：平台消耗排行 ============================
+// yearly=true 时渲染「全年分周开户堆叠图」（分周序列为全年口径，仅在全年累计块渲染一次）
+function AppMktSection({ scope, yearly }: { scope: DetailScope; yearly?: boolean }) {
+  const platforms = scope.app_market.filter(_appHasPlat);
+  if (platforms.length === 0) return null;
+
+  const totalSpend = platforms.reduce((s, p) => s + p.spend, 0);
+  const totalOpen = platforms.reduce((s, p) => s + p.open_count, 0);
+
+  return (
+    <div className={styles.vBlock}>
+      <PosterKpi
+        items={[
+          { label: '消耗', value: fmtMoney(totalSpend) },
+          { label: '开户', value: fmtNum(totalOpen) },
+          { label: '获客成本', value: totalOpen ? fmtMoney(totalSpend / totalOpen) : '—' },
+        ]}
+      />
+      {yearly && (
+        <div className={styles.vCol}>
+          <div className={styles.vColTitle}>全年开户数 · 按平台分周堆叠</div>
+          <WeeklyChart rows={scope.app_market_weekly || []} colorBase={BLUE_BASE} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================ 内容平台：线索/开户 KPI + 分周开户堆叠 ============================
+function ContentSection({ scope, yearly }: { scope: DetailScope; yearly?: boolean }) {
+  const platforms = scope.content_platform.filter(_ctHasPlat);
+  if (platforms.length === 0) return null;
+  const totalLead = platforms.reduce((s, p) => s + p.lead_count, 0);
+  const totalOpen = platforms.reduce((s, p) => s + p.open_count, 0);
+  const convRate = totalLead ? (totalOpen / totalLead) * 100 : 0;
+
+  return (
+    <div className={styles.vBlock}>
+      <PosterKpi
+        items={[
+          ...platforms.map((p) => ({ label: `${p.platform}线索`, value: fmtNum(p.lead_count) })),
+          { label: '线索合计', value: fmtNum(totalLead) },
+          { label: '开户合计', value: fmtNum(totalOpen) },
+          { label: '开户转化率', value: `${convRate.toFixed(1)}%` },
+        ]}
+      />
+      {yearly && (
+        <div className={styles.vCol}>
+          <div className={styles.vColTitle}>全年开户数 · 按平台分周堆叠</div>
+          <WeeklyChart rows={scope.content_weekly || []} colorBase={RED_BASE} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================ 直播：主播 开户排行 ============================
+function LiveSection({ scope, yearly }: { scope: DetailScope; yearly?: boolean }) {
+  const anchors = scope.live.filter(_hasAnchor);
+  if (anchors.length === 0) return null;
+  // 开户合计与分周堆叠图同源：全年块用分周序列聚合（round 舍入下 ≠ 全年一次聚合），
+  // 本周块用本周明细（与分周序列中本周那行口径一致）
+  const totalOpened = yearly
+    ? Object.values(aggregateWeekly(scope.live_weekly || [])).reduce((s, v) => s + v, 0)
+    : anchors.reduce((s, a) => s + a.new_opened, 0);
+  const totalValid = anchors.reduce((s, a) => s + a.new_valid, 0);
+  const totalAssets = anchors.reduce((s, a) => s + a.new_assets, 0);
+
+  return (
+    <div className={styles.vBlock}>
+      <PosterKpi
+        items={[
+          { label: '主播数', value: fmtNum(anchors.length) },
+          { label: '开户合计', value: fmtNum(totalOpened) },
+          { label: '有效户合计', value: fmtNum(totalValid) },
+          { label: '新增资产', value: `¥${fmtLarge(totalAssets)}` },
+        ]}
+      />
+      {yearly && (
+        <div className={styles.vCol}>
+          <div className={styles.vColTitle}>全年开户数 · 按主播分周堆叠</div>
+          <WeeklyChart rows={scope.live_weekly || []} colorBase={INDIGO_BASE} height={210} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/*
+ * （旧版三张明细表已废弃，见 git 历史）
+ * function DetailAppMarketTable/DetailContentTable/DetailLiveTable
+ */
+
+function DetailPoster({ data }: { data: WeeklyDetailData }) {
+  const { period, current_week, year_to_date } = data;
+  const hasApp = (s: DetailScope) => s.app_market.some(_appHasPlat);
+  const hasContent = (s: DetailScope) => s.content_platform.some(_ctHasPlat);
+  const hasLive = (s: DetailScope) => s.live.some(_hasAnchor);
+
+  return (
+    <>
+      {/* 刊头 */}
+      <header className={styles.masthead}>
+        <div className={styles.kicker}>WEEKLY REPORT · DETAIL · 互联网渠道</div>
+        <h1 className={styles.headline}>互联网渠道周报 · 详细</h1>
+        <div className={styles.dateline}>
+          {fmtDate(period.start_date)} — {fmtDate(period.end_date)} · {period.report_name}
+        </div>
+      </header>
+
+      {/* 0. 开户来源云图（板块=渠道，个股=版位/厂商/主播；面积+颜色=开户数；板块顺序固定对齐） */}
+      {(buildCloudTree(current_week).length > 0 || buildCloudTree(year_to_date).length > 0) && (
+        <section className={styles.layerCard}>
+          <div className={styles.layerHeader}>
+            <span className={styles.layerTitle}>开户来源云图</span>
+            <span className={styles.layerTag}>面积与颜色 = 开户数 · 深色=贡献高</span>
+          </div>
+          <HeroCloudMap scope={current_week} title="本周开户来源" />
+          <HeroCloudMap scope={year_to_date} title="全年开户来源" yearly />
+        </section>
+      )}
+
+      {/* 1. 应用市场：消耗/开户/获客成本 + 全年分周开户堆叠 */}
+      {(hasApp(current_week) || hasApp(year_to_date)) && (
+        <section className={styles.layerCard}>
+          <div className={styles.layerHeader}>
+            <span className={styles.layerTitle}>应用市场 · 平台获客</span>
+            <span className={styles.layerTag}>开户·按资金账号创建完成时间</span>
+          </div>
+          <div className={styles.dSubTitle}>本周</div>
+          <AppMktSection scope={current_week} />
+          <div className={styles.dSubTitle}>全年累计</div>
+          <AppMktSection scope={year_to_date} yearly />
+        </section>
+      )}
+
+      {/* 2. 内容平台：线索/开户 KPI + 全年分周开户堆叠 */}
+      {(hasContent(current_week) || hasContent(year_to_date)) && (
+        <section className={styles.layerCard}>
+          <div className={styles.layerHeader}>
+            <span className={styles.layerTitle}>内容平台 · 线索与开户</span>
+            <span className={styles.layerTag}>线索 · 企微数 / 开户 · 非直播口径</span>
+          </div>
+          <div className={styles.dSubTitle}>本周</div>
+          <ContentSection scope={current_week} />
+          <div className={styles.dSubTitle}>全年累计</div>
+          <ContentSection scope={year_to_date} yearly />
+        </section>
+      )}
+
+      {/* 3. 直播：主播开户/有效户/资产 KPI + 全年分周开户堆叠 */}
+      {(hasLive(current_week) || hasLive(year_to_date)) && (
+        <section className={styles.layerCard}>
+          <div className={styles.layerHeader}>
+            <span className={styles.layerTitle}>直播 · 主播获客</span>
+            <span className={styles.layerTag}>复合来源按主播数均分 · 非存量新客</span>
+          </div>
+          <div className={styles.dSubTitle}>本周</div>
+          <LiveSection scope={current_week} />
+          <div className={styles.dSubTitle}>全年累计</div>
+          <LiveSection scope={year_to_date} yearly />
+        </section>
+      )}
+    </>
+  );
+}
+
 const ReportGeneration: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption | null>(null);
   const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
   const [weeklyData, setWeeklyData] = useState<WeeklyData | null>(null);
+  const [detailData, setDetailData] = useState<WeeklyDetailData | null>(null);
+  const [mode, setMode] = useState<ReportMode>('overview');
+  const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [periodsLoading, setPeriodsLoading] = useState(true);
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
 
   const posterRef = useRef<HTMLDivElement>(null);
+  const posterDetailRef = useRef<HTMLDivElement>(null);
   const opensChartRef = useRef<HTMLDivElement>(null);
   const yearlyChartRef = useRef<HTMLDivElement>(null);
   const opensChartInstanceRef = useRef<EChartsType | null>(null);
@@ -238,6 +877,39 @@ const ReportGeneration: React.FC = () => {
   useEffect(() => {
     loadWeekOptions();
   }, [loadWeekOptions]);
+
+  // 记录 detailData 对应的报告期，避免切换 Tab 时重复请求
+  const detailForRef = useRef<string | null>(null);
+
+  // 加载周报详细版数据
+  const loadDetailData = useCallback(async (period: PeriodOption) => {
+    if (!period) return;
+    try {
+      setDetailLoading(true);
+      const resp = await http.post<WeeklyDetailData>('/reports/weekly/detail', {
+        report_year: period.report_year,
+        report_week: period.report_week,
+      });
+      if (resp.success && resp.data) {
+        setDetailData(resp.data);
+        detailForRef.current = period.value;
+      } else {
+        message.error(resp.error || '生成周报详细版失败');
+      }
+    } catch (error) {
+      console.error('生成周报详细版失败:', error);
+      message.error('生成周报详细版失败');
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  // 切换详细版 Tab 时，若当前报告期的详细数据尚未加载则补拉
+  useEffect(() => {
+    if (mode === 'detail' && selectedPeriod && (!detailData || detailForRef.current !== selectedPeriod.value)) {
+      loadDetailData(selectedPeriod);
+    }
+  }, [mode, selectedPeriod, detailData, loadDetailData]);
 
   // 渲染开户数 · 本周内按日堆叠柱状图
   useEffect(() => {
@@ -353,9 +1025,13 @@ const ReportGeneration: React.FC = () => {
   // 动态加载 jspdf
   const loadJsPdf = async () => (await import('jspdf')).jsPDF;
 
+  // 当前 Tab 对应海报容器与导出名称后缀
+  const activePosterRef = mode === 'detail' ? posterDetailRef : posterRef;
+  const exportSuffix = mode === 'detail' ? '详细版' : '';
+
   // 导出 PNG
   const handleExportPNG = async () => {
-    if (!posterRef.current) {
+    if (!activePosterRef.current) {
       message.error('海报容器未找到');
       return;
     }
@@ -365,7 +1041,7 @@ const ReportGeneration: React.FC = () => {
       //   html2canvas 在 Android WebView 下对 inline-flex / flex gap 支持不完善，
       //   导致周报表格列与文字重叠；modern-screenshot 基于 SVG foreignObject，
       //   使用浏览器原生渲染，对现代 CSS 完整支持。
-      const canvas = await captureElement(posterRef.current!, {
+      const canvas = await captureElement(activePosterRef.current!, {
         scale: 2,
         backgroundColor: '#ffffff',
       });
@@ -374,7 +1050,7 @@ const ReportGeneration: React.FC = () => {
       }
       const imageUrl = canvas.toDataURL('image/png');
       // v3.5.5：统一走 saveBlobFile，移动端写 Documents 目录避免 WebView 拦截 <a download>
-      const fileName = `互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.png`;
+      const fileName = `互联网渠道周报${exportSuffix}_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.png`;
       const savedUri = await saveBlobFile({ filename: fileName, data: imageUrl });
       message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : 'PNG 导出成功');
     } catch (error) {
@@ -387,7 +1063,7 @@ const ReportGeneration: React.FC = () => {
 
   // 导出 PDF
   const handleExportPDF = async () => {
-    if (!posterRef.current) {
+    if (!activePosterRef.current) {
       message.error('海报容器未找到');
       return;
     }
@@ -395,7 +1071,7 @@ const ReportGeneration: React.FC = () => {
     try {
       const jsPDF = await loadJsPdf();
       // v3.5.8：改用 modern-screenshot 替代 html2canvas（同 handleExportPNG）
-      const canvas = await captureElement(posterRef.current!, {
+      const canvas = await captureElement(activePosterRef.current!, {
         scale: 2,
         backgroundColor: '#ffffff',
       });
@@ -414,7 +1090,7 @@ const ReportGeneration: React.FC = () => {
       });
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       // v3.5.5：移动端 pdf.save() 走 <a download> 会被 WebView 拦截，改用 datauristring + saveBlobFile
-      const fileName = `互联网渠道周报_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.pdf`;
+      const fileName = `互联网渠道周报${exportSuffix}_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}.pdf`;
       const pdfDataUrl = pdf.output('datauristring');
       const savedUri = await saveBlobFile({ filename: fileName, data: pdfDataUrl });
       message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : 'PDF 导出成功');
@@ -500,6 +1176,14 @@ const ReportGeneration: React.FC = () => {
               报告预览
             </span>
           </div>
+          <Segmented
+            options={[
+              { label: '概览', value: 'overview' },
+              { label: '详细', value: 'detail' },
+            ]}
+            value={mode}
+            onChange={(v) => setMode(v as ReportMode)}
+          />
         </div>
 
         <div className={styles.previewCanvas}>
@@ -508,6 +1192,34 @@ const ReportGeneration: React.FC = () => {
               <Spin size="large" />
               <span>正在生成周报...</span>
             </div>
+          ) : mode === 'detail' ? (
+            detailLoading && !detailData ? (
+              <div className={styles.previewPlaceholder}>
+                <Spin size="large" />
+                <span>正在生成周报详细版...</span>
+              </div>
+            ) : detailData ? (
+              <div className={styles.reportScroll}>
+                <div ref={posterDetailRef} className={styles.reportPageDetail}>
+                  <DetailPoster data={detailData} />
+                </div>
+                <footer className={styles.reportFooter}>
+                  <div className={styles.footerLabel}>Notes · 数据说明</div>
+                  <ul>
+                    <li>开户来源云图：板块=渠道（内容平台→应用市场→直播→本地生活，顺序固定），个股=厂商/版位/主播/渠道；面积与颜色=开户数；本地生活=高德单独一类；直播板块仅统计非存量新开户（与主播分周堆叠图口径一致）</li>
+                    <li>应用市场：云图/消耗/获客成本按 平台→广告计划 聚合，开户按【资金账号创建完成时间】过滤（是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1）；全年分周堆叠图 x=周次、系列=平台、值=开户数（agg_daily_channel_open 互联网引流口径）；两底表（开户成功 vs 资金账号创建完成）存在少量天然差异</li>
+                    <li>内容平台（小红书/腾讯/抖音/yj/云极/快手）：线索=企微数（fact_conv_content），云图/KPI 开户消耗来自 agg_vendor_daily 且仅取非直播（业务模式 != '直播'）；分周堆叠图为渠道名口径（含直播场景开户，直播另列板块），故堆叠图合计略大于云图非直播口径</li>
+                    <li>直播：主播聚类，复合来源按匹配主播数均分（与主播聚类明细口径一致），开户/有效户/资产均取非存量（新客方向）；全年分周堆叠图 x=周次、系列=主播（Top5+其他）、值=开户数</li>
+                    <li>本周为报告期（上周五至本周四），全年累计为年初至周末；分周堆叠图仅在全年累计块渲染（全年口径，本周块只看 KPI）</li>
+                  </ul>
+                </footer>
+              </div>
+            ) : (
+              <div className={styles.previewPlaceholder}>
+                <FilePdfOutlined style={{ fontSize: 64, color: 'var(--color-text-tertiary)' }} />
+                <span>选择报告期自动生成周报详细版</span>
+              </div>
+            )
           ) : weeklyData ? (
             <div className={styles.reportScroll}>
               <div ref={posterRef} className={styles.reportPage}>

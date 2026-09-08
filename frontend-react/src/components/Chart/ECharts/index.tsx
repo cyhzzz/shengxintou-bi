@@ -13,7 +13,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import * as echarts from 'echarts/core';
 import type { EChartsType } from 'echarts/core';
 import type { EChartsOption } from 'echarts';
-import { LineChart, BarChart, PieChart, RadarChart } from 'echarts/charts';
+import { LineChart, BarChart, PieChart, RadarChart, TreemapChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
@@ -31,7 +31,7 @@ import styles from './index.module.scss';
 
 // 注册所有用到的图表、组件、渲染器、特性（多次调用幂等，会被 tree-shake 优化）
 echarts.use([
-  LineChart, BarChart, PieChart, RadarChart,
+  LineChart, BarChart, PieChart, RadarChart, TreemapChart,
   TitleComponent, TooltipComponent, GridComponent, LegendComponent,
   DataZoomComponent, VisualMapComponent, AxisPointerComponent, AriaComponent,
   CanvasRenderer,

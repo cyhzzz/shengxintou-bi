@@ -20,7 +20,7 @@ import { handleXhsNotesList, handleXhsNotesFilterOptions, handleXhsNotesOperatio
 import { handleEmployeeConversionAnalysis, handleEmployeeConversionWeekly, handleEmployeeConversionAnalysisChannelOverview, handleEmployeeConversionFilterOptions } from './mobileHandlers/employee';
 import { handleKosWeekly, handleKosWeeklyFilterOptions } from './mobileHandlers/kos';
 import { handleDataFreshness } from './mobileHandlers/freshness';
-import { handleWeeklyPeriods, handleWeeklyData } from './mobileHandlers/weekly';
+import { handleWeeklyPeriods, handleWeeklyData, handleWeeklyDetail } from './mobileHandlers/weekly';
 import { handleMetadata } from './mobileHandlers/metadata';
 
 // v3.6.4：由 vite.config.ts define 注入的 version.json 内容（构建时确定）
@@ -153,6 +153,8 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
       return handleWeeklyPeriods();
     case 'reports/weekly/data':
       return handleWeeklyData(body);
+    case 'reports/weekly/detail':
+      return handleWeeklyDetail(body);
 
     // v3.6.4：版本信息（关于页），由 vite define 在构建时注入，无需数据库查询
     case 'version/local':

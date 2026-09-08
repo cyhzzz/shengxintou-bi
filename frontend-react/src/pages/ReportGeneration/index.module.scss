@@ -217,6 +217,165 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* v4.2.x 周报详细版海报（更宽，容纳细分表格多列） */
+.reportPageDetail {
+  width: 720px;
+  background: #fafaf8;
+  padding: 24px 28px 32px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1a1a1a;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 详细版 本周/全年 小节标题 */
+.dSubTitle {
+  font-size: 10px;
+  font-weight: 600;
+  color: #0052d9;
+  letter-spacing: 0.08em;
+  margin: 10px 0 6px;
+}
+
+.dEmpty {
+  font-size: 11px;
+  color: #bfbfbf;
+  padding: 10px 4px;
+}
+
+/* 详细版细分表格 */
+.dTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+
+  th {
+    text-align: right;
+    padding: 7px 5px;
+    font-weight: 600;
+    color: #8c8c8c;
+    border-bottom: 1px solid #d9d9d9;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  td {
+    text-align: right;
+    padding: 7px 5px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #404040;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    &:first-child {
+      text-align: left;
+    }
+  }
+
+  tbody tr:hover {
+    background: #f7f7f7;
+  }
+}
+
+.dName {
+  font-weight: 500;
+  color: #1a1a1a;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dNum {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.dColPlatform { width: 60px; }
+.dColDim { width: 56px; }
+.dColNum { width: 70px; }
+
+/* 详细版可视化（v4.2.x 图表化改造：KPI 卡片 + 横向条形图） */
+.kpiStrip {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+.kpiChip {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.kpiValue {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0052d9;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.kpiLabel {
+  font-size: 9px;
+  color: #8c8c8c;
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+
+.vBlock {
+  margin-bottom: 4px;
+}
+
+.vTwoCol {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  margin-top: 2px;
+}
+
+.vCol {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.vColTitle {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8c8c8c;
+  margin: 4px 0 8px;
+  text-transform: uppercase;
+}
+
+.vSubTitle {
+  font-size: 10px;
+  font-weight: 600;
+  color: #404040;
+  margin: 12px 0 6px;
+}
+
+/* 开户来源云图（echarts treemap） */
+.cloudBlock {
+  margin-bottom: 4px;
+}
+
+.cloudMap {
+  width: 100%;
+  height: 280px;
+}
+
 /* 刊头 */
 .masthead {
   margin-bottom: 0;

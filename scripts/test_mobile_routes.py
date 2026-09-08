@@ -159,6 +159,17 @@ tests = [
         'params': [],
     },
     {
+        # 周报详细版（移动端 handleWeeklyDetail）：验证本地生活板块（高德按渠道名称取数，
+        # agg_daily_channel_open 中高德渠道类别实为互联网引流）与分周开户堆叠所需底表数据
+        'name': 'reports/weekly/detail',
+        'sql': '''SELECT "渠道名称",
+            COALESCE(SUM("开户成功人数"), 0) as opens
+          FROM agg_daily_channel_open
+          WHERE "渠道类别" = '互联网引流' AND "时间区间" >= ? AND "时间区间" <= ?
+          GROUP BY "渠道名称" ORDER BY "渠道名称"''',
+        'params': ['2026-01-01', '2026-12-31'],
+    },
+    {
         'name': 'kos-weekly',
         'sql': '''SELECT
             f.id AS id,

@@ -4,7 +4,8 @@
  * 由 mobileRouteHandler.ts 按报表域拆分而来，SQL 口径与 Flask 后端保持一致。
  */
 import { querySql } from '../mobileSqlite';
-import { toInt, toFloat, type Row } from './shared';
+import { toInt, toFloat, round2, dateClause, inClause, buildWhere, type Row } from './shared';
+import { handleAnchorClusters } from './leads';
 // ============================================================================
 // 周报（reports/weekly/*）— 移植自 backend/routes/weekly_reports.py
 // ============================================================================
@@ -398,5 +399,326 @@ export async function handleWeeklyData(body: any): Promise<any> {
     channels,
     internet_ratio,
     kpi,
+  };
+}
+
+// ============================================================================
+// 周报详细版（v4.2.x）：在"总数+走势"概览基础上，按渠道分类下钻细分
+//   应用市场 -> 平台 -> 广告计划 -> 版位/子版位/出价
+//   内容平台(小红书/腾讯/抖音) -> 平台 -> 厂商 -> 计划
+//   直播 -> 主播（复用 handleAnchorClusters，复合来源均分）
+//   移植自 backend/routes/weekly_reports.py（_app_market_detail/_content_platform_detail/_live_detail）
+// ============================================================================
+const WEEKLY_APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
+/** 内容平台渠道名称集合（与后端 CONTENT_PLATFORMS 一致；财联社归直播场景） */
+const WEEKLY_CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', 'yj', '云极', '快手'];
+// 广告开户复合条件（与 appMarket.ts AD_ACCOUNT_COND 一致，与后端 _AD_ACCOUNT_COND 一致）
+const WEEKLY_AD_ACCOUNT_COND = `"是否创建完资金账号" = 1 AND "渠道类型" = '互联网引流' AND "是否新开户" = 1`;
+
+/** 解析周次范围（与 handleWeeklyData 相同的周次规则；无效返回 null） */
+function resolveWeekRange(body: any): {
+  sd: string; ed: string; report_year: number; report_week: number;
+  report_name: string; report_sequence: number;
+} | null {
+  const report_year = body?.report_year;
+  const report_week = body?.report_week;
+  const start_date = body?.start_date;
+  const end_date = body?.end_date;
+  if (report_year && report_week) {
+    const yearNum = toInt(report_year);
+    const weekNum = toInt(report_week);
+    const fridays = getAllFridaysInYear(yearNum);
+    if (weekNum - 1 >= fridays.length) return null;
+    const wi = getWeekInfo(fridays[weekNum - 1]);
+    return { sd: wi.start_date, ed: wi.end_date, report_year: yearNum, report_week: weekNum, report_name: wi.report_name, report_sequence: wi.report_sequence };
+  }
+  if (start_date && end_date) {
+    const sd = String(start_date);
+    const wNum = toInt(sd.slice(5, 7));
+    return { sd, ed: String(end_date), report_year: toInt(sd.slice(0, 4)), report_week: wNum, report_name: `${sd.slice(0, 4)}年第${wNum}周`, report_sequence: wNum };
+  }
+  return null;
+}
+
+/** 应用市场 -> 平台 -> 广告计划（版位/子版位/出价） */
+async function mobileAppMarketDetail(sd: string, ed: string): Promise<any[]> {
+  const platformIn = inClause('平台', WEEKLY_APP_MARKET_PLATFORMS)!;
+  const planWhere = buildWhere([platformIn, dateClause('日期', sd, ed)]);
+  const planRows = await querySql<Row>(
+    `SELECT "计划ID" as plan_id, "平台" as platform, "计划名称" as plan_name,
+       COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks
+     FROM fact_plan_daily ${planWhere.clause}
+     GROUP BY "计划ID", "平台", "计划名称"`,
+    planWhere.params
+  );
+  const planIds: number[] = [];
+  const planBy: Record<number, any> = {};
+  for (const r of planRows) {
+    const pid = toInt(r.plan_id);
+    if (planBy[pid]) continue;
+    planIds.push(pid);
+    planBy[pid] = {
+      platform: r.platform, plan_name: r.plan_name,
+      spend: toFloat(r.spend), impressions: toInt(r.impressions), clicks: toInt(r.clicks),
+      versions: new Set<string>(), sub_versions: new Set<string>(), bids: new Set<string>(),
+    };
+  }
+  // 版位/子版位/出价（dim_ad_plan_class 关联广告分组ID）
+  if (planIds.length > 0) {
+    const idStrs = planIds.map(String);
+    const pcWhere = buildWhere([inClause('广告分组ID', idStrs)]);
+    const pcRows = await querySql<Row>(
+      `SELECT "广告分组ID" as plan_id, "版位" as placement, "子版位" as sub_placement, "出价" as bid
+       FROM dim_ad_plan_class ${pcWhere.clause}`,
+      pcWhere.params
+    );
+    for (const r of pcRows) {
+      const pc = planBy[toInt(r.plan_id)];
+      if (!pc) continue;
+      if (r.placement) pc.versions.add(String(r.placement));
+      if (r.sub_placement) pc.sub_versions.add(String(r.sub_placement));
+      if (r.bid) pc.bids.add(String(r.bid));
+    }
+  }
+  // 各计划广告开户（资金账号创建完成时间）
+  const openMap: Record<number, number> = {};
+  if (planIds.length > 0) {
+    const ow = buildWhere([inClause('广告计划ID', planIds.map(String)), dateClause('资金账号创建完成时间', sd, ed)]);
+    const orRows = await querySql<Row>(
+      `SELECT "广告计划ID" as plan_id, COALESCE(SUM(CASE WHEN ${WEEKLY_AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_cnt
+       FROM fact_conv_appmarket ${ow.clause} GROUP BY "广告计划ID"`,
+      ow.params
+    );
+    for (const r of orRows) openMap[toInt(r.plan_id)] = toInt(r.open_cnt);
+  }
+  const plans: any[] = [];
+  for (const pid of planIds) {
+    const info = planBy[pid];
+    const oc = openMap[pid] || 0;
+    const spend = info.spend;
+    plans.push({
+      plan_id: String(pid),
+      plan_name: info.plan_name,
+      platform: info.platform,
+      versions: info.versions.size ? Array.from(info.versions).sort() : ['未分类'],
+      sub_versions: info.sub_versions.size ? Array.from(info.sub_versions).sort() : ['未分类'],
+      bids: info.bids.size ? Array.from(info.bids).sort() : ['未分类'],
+      spend: round2(spend), impressions: info.impressions, clicks: info.clicks,
+      open_count: oc, open_cost: oc ? round2(spend / oc) : null,
+    });
+  }
+  plans.sort((a, b) => (b.open_count - a.open_count) || (b.spend - a.spend));
+
+  const byPlatform: Record<string, any> = {};
+  for (const p of plans) {
+    if (!byPlatform[p.platform]) byPlatform[p.platform] = { platform: p.platform, spend: 0, open_count: 0, plans: [] };
+    byPlatform[p.platform].spend += p.spend;
+    byPlatform[p.platform].open_count += p.open_count;
+    byPlatform[p.platform].plans.push(p);
+  }
+  const result: any[] = [];
+  for (const pf of WEEKLY_APP_MARKET_PLATFORMS) {
+    const agg = byPlatform[pf];
+    if (!agg) continue;
+    result.push({
+      platform: pf,
+      spend: round2(agg.spend),
+      open_count: agg.open_count,
+      open_cost: agg.open_count ? round2(agg.spend / agg.open_count) : null,
+      top_plans: agg.plans.slice(0, 10),
+    });
+  }
+  result.sort((a, b) => (b.open_count - a.open_count) || (b.spend - a.spend));
+  return result;
+}
+
+/** 内容平台(小红书/腾讯/抖音) -> 平台 -> 厂商 -> 计划 */
+async function mobileContentPlatformDetail(sd: string, ed: string): Promise<any[]> {
+  const pfWhere = buildWhere([inClause('平台', WEEKLY_CONTENT_PLATFORMS), dateClause('日期', sd, ed)]);
+  // 1) 厂商级 开户/花费（agg_vendor_daily 权威底表，内容平台非直播：业务模式 != '直播'）
+  const aggWhere = buildWhere([
+    inClause('平台', WEEKLY_CONTENT_PLATFORMS),
+    dateClause('日期', sd, ed),
+  ]);
+  const aggRows = await querySql<Row>(
+    `SELECT "平台" as platform, "厂商" as factory,
+       COALESCE(SUM("开户人数"), 0) as open_count, COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${aggWhere.clause}
+       AND "业务模式" IS NOT NULL AND "业务模式" != '直播'
+     GROUP BY "平台", "厂商"`,
+    aggWhere.params
+  );
+
+  // 2) 计划级 消耗/展示/点击（fact_plan_daily，按 厂商名称 挂到对应厂商）
+  const rows = await querySql<Row>(
+    `SELECT "平台" as platform, "厂商名称" as factory, "计划ID" as plan_id, "计划名称" as plan_name,
+       COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions, COALESCE(SUM("点击量"), 0) as clicks
+     FROM fact_plan_daily ${pfWhere.clause}
+     GROUP BY "平台", "厂商名称", "计划ID", "计划名称"`,
+    pfWhere.params
+  );
+  // 内容平台线索量（fact_conv_content，1 行=1 企微）
+  const leadMap: Record<string, number> = {};
+  const lcWhere = buildWhere([inClause('平台来源', WEEKLY_CONTENT_PLATFORMS), dateClause('线索日期', sd, ed)]);
+  const lcRows = await querySql<Row>(
+    `SELECT "平台来源" as platform, COUNT(id) as leads FROM fact_conv_content ${lcWhere.clause} GROUP BY "平台来源"`,
+    lcWhere.params
+  );
+  for (const r of lcRows) leadMap[r.platform] = toInt(r.leads);
+
+  // 归集计划：平台+厂商名称 -> plans
+  const plansByFactory: Record<string, any[]> = {};
+  for (const r of rows) {
+    const pf = String(r.platform || '未分类');
+    const fy = String(r.factory || '未归因');
+    const key = `${pf}\u0000${fy}`;
+    if (!plansByFactory[key]) plansByFactory[key] = [];
+    plansByFactory[key].push({
+      plan_id: r.plan_id != null ? String(r.plan_id) : null,
+      plan_name: r.plan_name,
+      spend: round2(toFloat(r.spend)), impressions: toInt(r.impressions), clicks: toInt(r.clicks),
+      open_count: 0, // 无计划维度开户，统一走厂商级底表口径
+    });
+  }
+
+  const byPlatform: Record<string, any> = {};
+  for (const r of aggRows) {
+    const pf = String(r.platform || '未分类');
+    const factoryName = String(r.factory || '未归因');
+    if (!byPlatform[pf]) byPlatform[pf] = { platform: pf, factMap: {} };
+    const key = `${pf}\u0000${factoryName}`;
+    const plans = (plansByFactory[key] || []).sort((a: any, b: any) => b.spend - a.spend).slice(0, 10);
+    byPlatform[pf].factMap[factoryName] = {
+      factory: factoryName,
+      spend: round2(toFloat(r.spend)),
+      open_count: toInt(r.open_count),
+      plans,
+    };
+  }
+  const result: any[] = [];
+  for (const pf of WEEKLY_CONTENT_PLATFORMS) {
+    const p = byPlatform[pf];
+    if (!p) continue;
+    const factories = Object.values(p.factMap) as any[];
+    factories.sort((a: any, b: any) => (b.open_count - a.open_count) || (b.spend - a.spend));
+    result.push({
+      platform: pf, lead_count: leadMap[pf] || 0,
+      open_count: factories.reduce((s: number, f: any) => s + f.open_count, 0),
+      factories,
+    });
+  }
+  return result;
+}
+
+/** 直播 -> 主播（复用 handleAnchorClusters，复合来源均分，口径与 /anchor-clusters 一致；top_n 500 ≥ 后端 200 截断） */
+async function mobileLiveDetail(sd: string, ed: string): Promise<any[]> {
+  const res = await handleAnchorClusters({
+    filters: { start_date: sd, end_date: ed, platforms: [], agencies: [], live_types: [] },
+    top_n: 500,
+  });
+  const items = (res.items || []) as any[];
+  return items.map((i) => ({
+    anchor_name: i.anchor,
+    live_type: i.live_type,
+    leads: i.leads,
+    new_leads: i.new_leads,
+    mouth: i.mouth,
+    opened: i.opened,
+    new_opened: i.new_opened,
+    valid: i.valid,
+    new_valid: i.new_valid,
+    assets: i.assets,
+    new_assets: i.new_assets,
+  }));
+}
+
+/** 本地生活（高德）开户数据 — 独立板块（agg_daily_channel_open，渠道名称=高德，与后端 LOCAL_LIFE_CHANNELS 一致） */
+async function mobileLocalLifeDetail(sd: string, ed: string): Promise<any[]> {
+  const rows = await querySql<Row>(
+    `SELECT "渠道名称" as platform, COALESCE(SUM("开户成功人数"), 0) as open_count
+     FROM agg_daily_channel_open
+     WHERE "渠道名称" IN ('高德') AND "时间区间" >= ? AND "时间区间" <= ?
+     GROUP BY "渠道名称"`,
+    [sd, ed]
+  );
+  return rows.map((r) => ({ platform: r.platform || '高德', open_count: toInt(r.open_count) }));
+}
+
+/** 按周次聚合各渠道开户数（agg_daily_channel_open, 互联网引流），与后端 _weekly_opens_by_channels 一致 */
+async function mobileWeeklyOpensByChannels(weekList: { week: string; sd: string; ed: string }[], channels: string[]): Promise<any[]> {
+  const result: any[] = [];
+  for (const w of weekList) {
+    const inExpr = inClause('渠道名称', channels)!;
+    const where = buildWhere([inExpr, dateClause('时间区间', w.sd, w.ed)]);
+    const rows = await querySql<Row>(
+      `SELECT "渠道名称" as channel, COALESCE(SUM("开户成功人数"), 0) as opens
+       FROM agg_daily_channel_open
+       WHERE "渠道类别" = '互联网引流' ${where.clause.replace(/^WHERE\s*/i, '')}
+       GROUP BY "渠道名称"`,
+      where.params
+    );
+    const row: Record<string, number | string> = { week: w.week };
+    for (const r of rows) row[r.channel] = toInt(r.opens);
+    result.push(row);
+  }
+  return result;
+}
+
+/** 按周次聚合主播开户数（复用 handleAnchorClusters，复合来源均分），与后端 _live_weekly 全量口径一致 */
+async function mobileLiveWeekly(weekList: { week: string; sd: string; ed: string }[]): Promise<any[]> {
+  const result: any[] = [];
+  for (const w of weekList) {
+    const res = await handleAnchorClusters({
+      filters: { start_date: w.sd, end_date: w.ed, platforms: [], agencies: [], live_types: [] },
+      top_n: 500,
+    });
+    const row: Record<string, number | string> = { week: w.week };
+    for (const i of (res.items || ([] as any[]))) {
+      if (toInt(i.new_opened) > 0) row[i.anchor] = toInt(i.new_opened);
+    }
+    result.push(row);
+  }
+  return result;
+}
+
+/** POST /reports/weekly/detail — 周报详细版（本周 + 全年累计，三维细分） */
+export async function handleWeeklyDetail(body: any): Promise<any> {
+  const week = resolveWeekRange(body);
+  if (!week) {
+    const yr = toInt(body?.report_year);
+    const rw = toInt(body?.report_week);
+    throw new Error(`无效的周次: ${yr}年第${rw}周`);
+  }
+  const { sd, ed, report_year, report_week, report_name, report_sequence } = week;
+  const year_start = `${report_year}-01-01`;
+
+  // 构建周次列表（与 handleWeeklyData 相同的周次规则）
+  const edRaw = new Date(ed);
+  const fridays = getAllFridaysInYear(edRaw.getFullYear());
+  const weekList: { week: string; sd: string; ed: string }[] = [];
+  for (let i = 0; i < fridays.length; i++) {
+    const wi = getWeekInfo(fridays[i]);
+    if (wi.start_date > ed) continue;
+    const wed = wi.end_date > ed ? ed : wi.end_date;
+    weekList.push({ week: `W${String(i + 1).padStart(2, '0')}`, sd: wi.start_date, ed: wed });
+  }
+  const app_market_weekly = await mobileWeeklyOpensByChannels(weekList, WEEKLY_APP_MARKET_PLATFORMS);
+  const content_weekly = await mobileWeeklyOpensByChannels(weekList, WEEKLY_CONTENT_PLATFORMS);
+  const live_weekly = await mobileLiveWeekly(weekList);
+
+  const scoped = async (sdi: string, edi: string) => ({
+    app_market: await mobileAppMarketDetail(sdi, edi),
+    content_platform: await mobileContentPlatformDetail(sdi, edi),
+    live: await mobileLiveDetail(sdi, edi),
+    local_life: await mobileLocalLifeDetail(sdi, edi),
+    app_market_weekly,
+    content_weekly,
+    live_weekly,
+  });
+
+  return {
+    period: { start_date: sd, end_date: ed, report_year, report_week, report_name, report_sequence },
+    current_week: await scoped(sd, ed),
+    year_to_date: await scoped(year_start, ed),
   };
 }
