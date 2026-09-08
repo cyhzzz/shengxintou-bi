@@ -644,22 +644,31 @@ async function mobileLocalLifeDetail(sd: string, ed: string): Promise<any[]> {
   return rows.map((r) => ({ platform: r.platform || '高德', open_count: toInt(r.open_count) }));
 }
 
-/** 按周次聚合各渠道开户数（agg_daily_channel_open, 互联网引流），与后端 _weekly_opens_by_channels 一致 */
+/** 按周次聚合各渠道开户数（agg_daily_channel_open, 互联网引流），与后端 _weekly_opens_by_channels 一致。
+ * 一次查询全年（日期×渠道）行后在 JS 端做周映射，避免逐周 30+ 次往返查询拖慢移动端。 */
 async function mobileWeeklyOpensByChannels(weekList: { week: string; sd: string; ed: string }[], channels: string[]): Promise<any[]> {
-  const result: any[] = [];
-  for (const w of weekList) {
-    const inExpr = inClause('渠道名称', channels)!;
-    const where = buildWhere([inExpr, dateClause('时间区间', w.sd, w.ed)]);
-    const rows = await querySql<Row>(
-      `SELECT "渠道名称" as channel, COALESCE(SUM("开户成功人数"), 0) as opens
-       FROM agg_daily_channel_open
-       WHERE "渠道类别" = '互联网引流' ${where.clause.replace(/^WHERE\s*/i, '')}
-       GROUP BY "渠道名称"`,
-      where.params
-    );
-    const row: Record<string, number | string> = { week: w.week };
-    for (const r of rows) row[r.channel] = toInt(r.opens);
-    result.push(row);
+  if (!weekList.length) return [];
+  const lo = weekList[0].sd;
+  const hi = weekList[weekList.length - 1].ed;
+  // 固定条件（渠道类别）与动态条件统一交给 buildWhere 拼接，避免手工拼 SQL 漏 AND
+  // （同一渠道名称在「互联网引流 / 自然流入」等多个渠道类别下都有数据，漏掉类别过滤会多算）
+  const catCond = { sql: `"渠道类别" = '互联网引流'`, params: [] as unknown[] };
+  const where = buildWhere([catCond, inClause('渠道名称', channels)!, dateClause('时间区间', lo, hi)]);
+  const rows = await querySql<Row>(
+    `SELECT "时间区间" as date, "渠道名称" as channel, COALESCE(SUM("开户成功人数"), 0) as opens
+     FROM agg_daily_channel_open ${where.clause}
+     GROUP BY "时间区间", "渠道名称"`,
+    where.params
+  );
+  const result: Record<string, number | string>[] = weekList.map((w) => ({ week: w.week }));
+  for (const r of rows) {
+    for (let i = 0; i < weekList.length; i++) {
+      const w = weekList[i];
+      if (w.sd <= r.date && r.date <= w.ed) {
+        result[i][r.channel] = toInt(r.opens);
+        break; // 周区间连续不重叠，命中即止
+      }
+    }
   }
   return result;
 }
