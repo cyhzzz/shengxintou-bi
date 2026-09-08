@@ -826,6 +826,9 @@ import threading as _threading_v341
 _thread_v341 = _threading_v341.Thread(target=_startup_check_webdav_sync, daemon=True)
 _thread_v341.start()
 
+# 后台自动更新调度（桌面版 frozen 自动启用；开发版/环境变量可关闭）。self-guard 幂等。
+system.start_auto_update_scheduler()
+
 # React Router SPA 兜底路由
 # 通过 before_request 钩子处理，确保在所有其他路由之后检查
 from flask import request, send_from_directory

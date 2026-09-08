@@ -546,7 +546,19 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   const planName: Record<string, string> = {};
   const costWeekAgg: Record<string, Record<SpendKey, number>> = {};
   const coverZero: Record<SpendKey, number> = { 消耗: 0, 展示: 0, 点击: 0, 下载: 0 };
-  const numericPlanIds = Object.keys(planMap).filter(k => /^\d+$/.test(k)).map(Number);
+  // 广告计划ID 常带浮点残留（如 '157763.0'），去末尾 '.0' 后才能与整数 计划ID 关联（与 xhs.ts 一致）；
+  // 否则对 '...0' 的 === /^\d+$/ 为 false，计划名称/消耗匹配不到。
+  const planNum = (s: string): number | null => {
+    let k = String(s ?? '').trim();
+    if (k.endsWith('.0')) k = k.slice(0, -2);
+    return /^\d+$/.test(k) && Number(k) > 0 ? Number(k) : null;
+  };
+  const pidOf: Record<string, number> = {};
+  const numericPlanIds: number[] = [];
+  for (const pk of Object.keys(planMap)) {
+    const n = planNum(pk);
+    if (n !== null) { pidOf[pk] = n; if (!numericPlanIds.includes(n)) numericPlanIds.push(n); }
+  }
   if (numericPlanIds.length > 0) {
     const pdWhere = buildWhere([
       inClause('计划ID', numericPlanIds.map(String)),
@@ -586,7 +598,7 @@ export async function handleAppMarketPlanAnalysis(body: any): Promise<any> {
   }
   for (const pk in planMap) {
     const p = planMap[pk];
-    const pid = /^\d+$/.test(pk) ? Number(pk) : null;
+    const pid = pidOf[pk] ?? null;
     const tl = pid !== null ? (costTot[pid] || { ...coverZero }) : { ...coverZero };
     p.plan_name = pid !== null ? (planName[pid] || '') : '';
     for (const k of metricKeys) p.totals[k] = tl[k];

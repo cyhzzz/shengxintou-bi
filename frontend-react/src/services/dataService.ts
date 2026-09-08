@@ -218,6 +218,27 @@ export const dataService = {
   }>> => {
     return http.get('/system/full-update/status', { task_id: taskId });
   },
+  // v4.1.3：后台自动更新状态（桌面版定时扫描+静默下载+自动重试）
+  getAutoUpdateStatus: async (): Promise<ApiResponse<{
+    enabled: boolean;
+    local_version?: string;
+    remote_version?: string;
+    has_update?: boolean;
+    reachable?: boolean;
+    last_check_at?: string;
+    last_check_error?: string;
+    status?: string;
+    task_id?: string | null;
+    progress?: number;
+    message?: string;
+    error?: string;
+    attempts?: number;
+    next_retry_at?: string | null;
+    staging_ready?: boolean;
+    staging_version?: string;
+  }>> => {
+    return http.get('/system/auto-update/status', {});
+  },
   getVersion: async (): Promise<ApiResponse<{
     version: string;
     release_date: string;

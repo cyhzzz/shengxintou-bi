@@ -65,6 +65,18 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
   const [fullUpdateTaskId, setFullUpdateTaskId] = useState<string | null>(null);
   const [stagingReady, setStagingReady] = useState<{ ready: boolean; version?: string }>({ ready: false });
   const [applyingFullUpdate, setApplyingFullUpdate] = useState(false);
+  // v4.1.3：后台自动更新状态（定时扫描 + 静默下载 + 自动重试）
+  const [autoUpdate, setAutoUpdate] = useState<{
+    enabled?: boolean;
+    has_update?: boolean;
+    status?: string;
+    progress?: number;
+    message?: string;
+    error?: string;
+    staging_ready?: boolean;
+    staging_version?: string;
+    remote_version?: string;
+  } | null>(null);
 
   const dataFreshnessRef = useRef<DataFreshnessIndicatorRef>(null);
   const {
@@ -378,6 +390,30 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // v4.1.3：后台自动更新状态轮询（桌面版）——展示「后台扫描/下载中/已就绪/失败」等状态
+  const pollAutoUpdate = async () => {
+    try {
+      const r = await dataService.getAutoUpdateStatus();
+      if (r.success && r.data) setAutoUpdate(r.data);
+    } catch {
+      /* 静默：非桌面版或后端未实现时不打扰 */
+    }
+  };
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    pollAutoUpdate();
+    const timer = setInterval(async () => {
+      if (cancelled) return;
+      await pollAutoUpdate();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
   return (
     <>
       <Tooltip
@@ -517,6 +553,22 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                       {featureFlags.showGithubSyncButton && (
                         isDesktopClient() ? (
                           <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                            {autoUpdate?.enabled && hasUpdate && (
+                              <div className={styles.autoUpdateBanner}>
+                                {autoUpdate.status === "running" && (
+                                  <Tag color="processing" icon={<SyncOutlined spin />}>后台自动下载中 {autoUpdate.progress ?? 0}%</Tag>
+                                )}
+                                {autoUpdate.status === "completed" && autoUpdate.staging_ready && (
+                                  <Tag color="green" icon={<CheckCircleOutlined />}>更新包已自动就绪（v{autoUpdate.staging_version || remoteVersion}）</Tag>
+                                )}
+                                {autoUpdate.status === "failed" && (
+                                  <Tag color="warning" icon={<SyncOutlined />}>自动下载失败，后台将按退避自动重试</Tag>
+                                )}
+                                {!["running", "completed", "failed"].includes(autoUpdate.status ?? "") && (
+                                  <Tag color="blue">后台已启用自动检测新版本</Tag>
+                                )}
+                              </div>
+                            )}
                             {hasUpdate && (
                               stagingReady.ready ? (
                                 <Button

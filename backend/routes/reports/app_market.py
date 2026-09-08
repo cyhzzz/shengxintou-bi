@@ -527,7 +527,15 @@ def app_market_plan_analysis():
     plan_name = {}          # plan_id -> 计划名称
     cost_week_agg = {}      # week -> cover（跨计划合计）
     metric_keys = ('消耗', '展示', '点击', '下载')
-    numeric_plan_ids = [int(p['plan_id']) for p in plan_items if p['plan_id'].isdigit()]
+    # 广告计划ID 常带浮点残留（如 '157763.0'），去末尾 '.0' 后才能与整数 计划ID 关联
+    # （与 xhs_plan_analysis 一致；否则 isdigit 为 False，计划名称/消耗匹配不到）。
+    def _plan_num(s):
+        k = str(s or '').strip()
+        if k.endswith('.0'):
+            k = k[:-2]
+        return int(k) if k.isdigit() and int(k) > 0 else None
+    pid_of = {p['plan_id']: n for p in plan_items if (n := _plan_num(p['plan_id'])) is not None}
+    numeric_plan_ids = list(dict.fromkeys(pid_of.values()))
     if numeric_plan_ids:
         for r in _plan_daily_query(APP_MARKET_PLATFORMS).filter(FactPlanDaily.计划ID.in_(numeric_plan_ids)).all():
             pid, week = int(r.计划ID), str(r.week_start)[:10]
@@ -542,7 +550,7 @@ def app_market_plan_analysis():
             plan_name.setdefault(int(r.计划ID), r.计划名称)
 
     for p in plan_items:
-        pid = int(p['plan_id']) if p['plan_id'].isdigit() else None
+        pid = pid_of.get(p['plan_id'])
         tl = dict(cost_tot.get(pid, cover_names)) if pid is not None else dict(cover_names)
         p['plan_name'] = plan_name.get(pid, '') if pid is not None else ''
         p['totals'] = {**p['totals'], **tl}

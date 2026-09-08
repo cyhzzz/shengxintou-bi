@@ -45,6 +45,7 @@ MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
     '/system/self-update',
     '/system/frontend-update',  # v3.7.0 前端热更新（仅桌面版 Flask 后端，移动端走 Capacitor Updater）
     '/system/full-update',      # v3.9.0 完整静默更新（仅桌面版 Electron 后端，移动端走重装 APK）
+    '/system/auto-update',      # v4.1.3 后台自动更新（仅桌面版 Electron，移动端走重装 APK）
     '/system/data-sync',  # Supabase 同步（已封存）
     '/data-sync',         # Supabase 同步（蓝图 url_prefix=/api/v1/data-sync）
     '/data-reconciliation',  # 抖音青鸟对账（仅桌面端）

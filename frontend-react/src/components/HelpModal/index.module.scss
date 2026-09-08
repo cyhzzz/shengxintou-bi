@@ -154,3 +154,11 @@
 .updateBtn {
   margin-top: var(--spacer-12);
 }
+
+.autoUpdateBanner {
+  margin-top: var(--spacer-8);
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-brand);
+}

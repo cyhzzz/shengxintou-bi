@@ -150,8 +150,37 @@ function registerUpdaterIpc(): void {
   });
 }
 
+/**
+ * 后台静默升级：启动时自动应用已下载的完整更新包。
+ *
+ * 背景：桌面版自动更新在后端后台下载 full-update.zip 并解压到
+ * resources/.update-staging/，等待重启生效。这里在 Electron 启动时
+ * （Flask 尚未 spawn，旧 server.exe 已随上次退出结束）自动把 staging 应用到
+ * resources，实现「下次打开客户端即新版」的静默升级，无需用户点按钮。
+ *
+ * 安全性：applyFullUpdate 会先校验 staging 完整性，任一步失败回滚并保留 staging，
+ * 下次启动重试；无待应用更新（无 staging）时即 no-op。
+ */
+function applyStagedUpdateIfReady(): void {
+  try {
+    const root = resolveResourcesRoot();
+    const staging = path.join(root, '.update-staging');
+    if (!fs.existsSync(path.join(staging, 'server', 'server.exe'))) return; // 无待应用更新包
+    console.log('[Updater] 检测到已下载的完整更新包，启动时自动应用...');
+    const result = applyFullUpdate(root);
+    if (result.ok) {
+      console.log(`[Updater] 已自动应用更新包 → v${result.version}（本会话即为新版）`);
+    } else {
+      console.error('[Updater] 启动时自动应用失败（保留 staging，下次启动自动重试）:', result.error);
+    }
+  } catch (e) {
+    console.error('[Updater] 启动时自动应用异常（忽略，正常启动）:', e);
+  }
+}
+
 app.whenReady().then(() => {
   registerUpdaterIpc();
+  applyStagedUpdateIfReady(); // 后台静默更新 → 下次启动自动生效（此时 Flask 未启动，替换安全）
   bootstrap();
 });
 
