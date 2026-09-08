@@ -141,9 +141,24 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - `/api/v1/system/self-update/*`（自更新，仅桌面端）
 - `/api/v1/system/frontend-update/*`（v3.7.0 前端热更新，仅桌面端）
 - `/api/v1/system/full-update/*`（完整静默更新，仅桌面端 Electron，移动端走重装 APK）
+- `/api/v1/system/auto-update/*`（后台自动更新，仅桌面端 Electron，移动端走重装 APK）
 - `/api/v1/system/data-sync/*`（Supabase 同步，仅桌面端，且 Supabase 功能已封存）
 - `/api/v1/data-reconciliation/*`（抖音青鸟对账，仅桌面端，移动端 features 禁用）
 - `/api/v1/account-mapping*`（账号映射管理，仅桌面端，移动端 features 禁用）
 - `/api/v1/config/*`（系统配置，仅桌面端）
 
 `check_api_contract.py` 通过 `MOBILE_IGNORED_PREFIXES` 白名单识别这些例外，不报 drift。`KNOWN_DRIFT` 记录历史遗留的未实现端点（待逐步补齐），新增端点不允许加入此列表。
+
+### 7.1 full-update 打包边界与静默升级最终效果
+
+**`full-update.zip` 不含 Electron 壳，只含运行时资源**：
+
+- 内容：服务端（`server/server.exe` + Flaskserver 相关依赖）、前端 `frontend-react/dist`、配置/模板等配套资源。
+- **不含**：Electron 主进程、`electron-builder` 打包出的安装器或壳程序本身。
+- 应用位置：Electron 启动时用 `applyStagedUpdateIfReady()` 把暂存包替换到 `resources` 资源目录，不重装壳。
+
+**静默升级（后台自动更新）的最终效果边界**：
+
+- **修改后端 Python 路由 / 数据 / 前端页面样式** → 下次启动客户端即为新版，**彻底免手点**（后台扫描发现新版本 → 静默下载 → 指数退避自动重试 → 下次打开自动应用）。
+- **修改 Electron 壳 / 桌面端主进程 / 打包配置 / `package.json`（如新增原生依赖、窗口行为、更新逻辑本身）** → `full-update.zip` **无法承载**，仍必须全量重装安装器（用户下载新版 installer 覆盖安装），这部分不能免手点。
+- 因此"以后的升级彻底免手点"成立的前提是：变更只落在服务端 / 前端资源层；一旦涉及壳层改动，仍需重装。发版前若本版本改动触达 `desktop/` 源码或 `electron-builder.yml`，必须提示用户走全新安装，而不能只靠 `full-update.zip`。
