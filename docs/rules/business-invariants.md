@@ -173,7 +173,7 @@
 
 - 主播表保持一页呈现时使用 `pagination={false}`，不要因默认分页隐藏主播。
 
-- **复合来源线索均分**：线索的 `客户来源` 可能出现多个主播（如 `抖音引流-周乐意,抖音引流-杨毅`）。anchor 聚合（`anchor-clusters`、`anchor-weekly-analysis`）必须按匹配主播数均分线索、开口、开户、资产等所有指标，避免同一线索被累加到每个主播造成总数虚增。关键实现：`backend/routes/data/leads.py` 与 `frontend-react/src/services/mobileRouteHandler.ts`（SQL/算法必须完全一致）。
+- **复合来源线索均分**：线索的 `客户来源` 可能出现多个主播（如 `抖音引流-周乐意,抖音引流-杨毅`）。anchor 聚合（`anchor-clusters`、`anchor-weekly-analysis`）必须按匹配主播数均分线索、开口、开户、资产等所有指标，避免同一线索被累加到每个主播造成总数虚增。关键实现：`backend/routes/data/leads.py` 与 `frontend-react/src/services/mobileRouteHandler.ts`（SQL/算法必须完全一致，由 `scripts/check_api_contract.py` ALGO_MARKERS 门禁强制）。
 
 ## 7. 主播直播类型
 
@@ -286,3 +286,17 @@
 ## 11. 数据安全（分发产物与数据可见性）
 
 业务口径不变式之上，另有**最高风险安全红线**独立约束"数据在打包、发布、数据库初始化链路上的可见性"：APK/EXE/frontend-dist.zip 一律只内置表结构空库，真实业务库禁止进入分发产物与 Release 资产，仅由用户自行配置 WebDAV 从坚果云拉取；历史含数据 Release 资产必须清理；仓库保持 PUBLIC（不靠私有化兜底）。完整规则见 [`docs/rules/security-data-leak.md`](security-data-leak.md)。涉及打包、发布或数据库初始化的改动必须先读。
+
+## 12. 周报详细版 BI 临时性合并口径（BI 侧临时决策，2026-09 起）
+
+BI 侧对周报详细版做的临时性合并调整。这是 BI 的临时决策而非长期口径：若 BI 取消合并，两端必须同步回滚，不得只改一端。权威实现为 `backend/routes/weekly_reports.py` ↔ `frontend-react/src/services/mobileHandlers/weekly.ts`，由 `scripts/check_api_contract.py` 的 ALGO_MARKERS 门禁强制两端一致（平台名归一 / 厂商归并 / 直播线索剔除三组标记，计数不一致即失败）。
+
+- **平台名归一**：`yj → 云极`（别名映射，其余平台名原样输出）。
+
+- **厂商白名单归并**：仅小红书/抖音/腾讯三个平台启用厂商白名单，白名单外厂商一律归并为「未归因」；另有全局合并名单（哇棒、风声、众联、kiwi）在所有平台统一并入「未归因」。
+
+- **内容平台剔除直播线索**：内容平台的线索数、开户数剔除「直播模式」线索（按 `dim_anchor_live_type` token 判定线索来源）；直播数据在周报中单独成块展示，不得重复计入上方汇总。
+
+- **应用市场各计划补口径**：激活量 = `COUNT(DISTINCT 设备号)`（与 `conversion_appmarket` 追加去重键一致，按「设备号 + 下载日期」去重）；客户资产 = 广告开户口径 `SUM(总资产)`，过滤用「资金账号创建完成时间」（不是下载日期）。
+
+- **本地生活渠道**：本地生活 = 渠道名称 IN (`高德`)；分周开户不限渠道类别（category 传空 = 不限）。
