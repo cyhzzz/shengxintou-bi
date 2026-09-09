@@ -103,6 +103,13 @@ const darkTheme = {
     colorError: '#ea574c',
     colorInfo: '#4c88ff',
 
+    // 灰黑体系显式对齐 tokens.css（#0d1117 页面底 / #161b22 容器底），与报表区统一；
+    // 不再依赖 darkAlgorithm 派生背景，避免表格/弹窗/下拉等组件偏蓝
+    colorBgBase: '#0d1117',
+    colorBgLayout: '#0d1117',
+    colorBgContainer: '#161b22',
+    colorBgElevated: '#1c2128',
+
     borderRadius: 8,
     borderRadiusLG: 12,
     borderRadiusSM: 4,
@@ -134,7 +141,21 @@ const darkTheme = {
     Card: {
       borderRadiusLG: 12,
     },
+    Table: {
+      headerBg: '#161b22', // 与 var(--bg-content) 对齐，避免派生偏蓝表头
+      headerColor: '#a1a1a1', // 与 --color-text-secondary 对齐
+      rowHoverBg: 'rgba(255, 255, 255, 0.06)',
+      borderColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    Layout: {
+      headerBg: '#161b22',
+      bodyBg: '#0d1117',
+      siderBg: '#161b22',
+    },
     Menu: {
+      itemBg: 'transparent',
+      itemHoverBg: 'rgba(255, 255, 255, 0.06)',
+      itemSelectedBg: 'rgba(106, 159, 255, 0.15)',
       itemHoverColor: '#6a9fff',
       itemSelectedColor: '#6a9fff',
     },

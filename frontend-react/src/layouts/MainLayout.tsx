@@ -318,14 +318,26 @@ export default function MainLayout() {
         {/* Sidebar Logo - Matching original frontend */}
         <div className={styles.sidebarHeader}>
           <div className={styles.logoContainer}>
-            {/* v3.3.10: 收起时换方形 LOGO（256×255），避免横版 logo 被报表区域截断成半个 */}
+            {/* v3.3.10: 收起时换方形 LOGO（256×255），避免横版 logo 被报表区域截断成半个；夜间模式用反白稿 */}
             <img
-              src={`${import.meta.env.BASE_URL}icons/${collapsed ? 'LOGO-square.png' : 'LOGO.svg'}`}
+              src={`${import.meta.env.BASE_URL}icons/${
+                themeMode === 'dark'
+                  ? collapsed
+                    ? 'LOGO-square-white.png'
+                    : 'LOGO-white.png'
+                  : collapsed
+                    ? 'LOGO-square.png'
+                    : 'LOGO.svg'
+              }`}
               className={styles.logoIcon}
               alt="申万宏源"
             />
             {!collapsed && (
-              <img src={`${import.meta.env.BASE_URL}icons/省心投.svg`} className={styles.logoTextIcon} alt="省心投" />
+              <img
+                src={`${import.meta.env.BASE_URL}icons/${themeMode === 'dark' ? '省心投-white.svg' : '省心投.svg'}`}
+                className={styles.logoTextIcon}
+                alt="省心投"
+              />
             )}
           </div>
         </div>

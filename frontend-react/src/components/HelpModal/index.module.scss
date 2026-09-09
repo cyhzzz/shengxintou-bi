@@ -4,15 +4,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacer-8);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background-color var(--transition-normal);
-  background: transparent;
-  border: none;
+  transition: background-color var(--transition-normal), color var(--transition-fast);
 
-  &:hover {
-    background-color: var(--bg-hover);
+  // 提升特异性覆盖 antd Button 默认尺寸与底色，观感对齐日夜切换按钮
+  &:global(.ant-btn) {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+  }
+
+  // 覆盖 antd text 按钮的 hover/active/focus 交互态（去黑框），统一为浅背景浮现
+  &:global(.ant-btn-text):hover:not(:disabled):not(.ant-btn-disabled),
+  &:global(.ant-btn-text):active:not(:disabled):not(.ant-btn-disabled),
+  &:global(.ant-btn-text):focus-visible {
+    background: var(--bg-hover);
+    color: var(--color-text-primary);
+    outline: none;
+    box-shadow: none;
   }
 }
 

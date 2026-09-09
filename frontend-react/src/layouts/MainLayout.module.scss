@@ -152,17 +152,17 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--bg-content);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-primary);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-normal), color var(--transition-fast);
 
   &:hover {
     background: var(--bg-hover);
-    border-color: var(--border-strong);
   }
 }
 
