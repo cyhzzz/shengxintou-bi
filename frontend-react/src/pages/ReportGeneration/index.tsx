@@ -212,6 +212,15 @@ function fmtLarge(n: number | null | undefined): string {
   return fmtNum(n);
 }
 
+// 堆叠图 axis tooltip：过滤 0 值系列（数据里的 0 只是堆叠占位，悬浮展示无意义），全为 0 时不出悬浮
+function compactStackTooltip(params: any): string {
+  const list = (Array.isArray(params) ? params : [params]).filter((p: any) => p.value != null && Number(p.value) !== 0);
+  if (!list.length) return '';
+  const head = list[0].axisValueLabel || list[0].name;
+  const rows = list.map((p: any) => `${p.marker} ${p.seriesName}&nbsp;&nbsp;<b>${fmtNum(p.value)}</b>`);
+  return [head, ...rows].join('<br/>');
+}
+
 // 格式化金额
 function fmtMoney(n: number | null | undefined): string {
   if (!n) return '¥0';
@@ -327,7 +336,7 @@ function StackBars({
     chart.setOption({
       // 静态海报禁用入场动画：导出截图按当下画布内容抓取，动画起始帧柱子高度为 0 会被拍成空白
       animation: false,
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: compactStackTooltip },
       legend: { show: false },
       grid: { top: 14, left: 40, right: 18, bottom: 26, containLabel: true },
       xAxis: {
@@ -1007,7 +1016,7 @@ const ReportGeneration: React.FC = () => {
     const colorMap = buildChannelColorMap(channels);
 
     const option: EChartsOption = {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: compactStackTooltip },
       legend: { show: false },
       grid: { top: 8, left: 36, right: 16, bottom: 24, containLabel: true },
       xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 9, rotate: dates.length > 7 ? 30 : 0 } },
@@ -1051,7 +1060,7 @@ const ReportGeneration: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
-        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+        formatter: compactStackTooltip,
       },
       legend: { show: false },
       grid: { left: '3%', right: '4%', bottom: '8%', top: '5%', containLabel: true },
