@@ -10,15 +10,16 @@ v3.1.31 起纯数据化改造：所有数据实时聚合，不依赖 weekly_repo
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta, date as _date
 import logging
+import re
 
 from backend.database import db
 from backend.models_v2 import (
     AggVendorDaily, AggDailyChannelOpen, FactConvContent,
-    FactConvAppmarket, FactPlanDaily, DimAdPlanClass,
+    FactConvAppmarket, FactPlanDaily, DimAdPlanClass, DimAnchorLiveType,
 )
 from backend.utils.weekly_utils import get_week_info, generate_week_options, validate_week_period, get_all_fridays_in_year
 from backend.utils.decorators import handle_exceptions
-from sqlalchemy import func, and_, case
+from sqlalchemy import func, and_, case, distinct
 # 复用主播聚类核心（复合来源均分口径与 /anchor-clusters 严格一致），避免两处实现漂移
 from backend.routes.data.leads import _compute_anchor_cluster_items
 
@@ -368,6 +369,8 @@ def get_weekly_data():
 APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 # 内容平台：小红书/腾讯/抖音/yj/云极/快手；财联社不在此列（财联社数据均为直播场景，由直播聚合覆盖，避免重复计数）
 CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', 'yj', '云极', '快手']
+# 展示用内容平台列表：yj 与 云极 为同一平台的两种上游命名，查询保留双名，展示统一归并为「云极」
+CONTENT_PLATFORMS_DISPLAY = ['小红书', '腾讯', '抖音', '云极', '快手']
 # 本地生活渠道（独立板块，当前仅高德）
 LOCAL_LIFE_CHANNELS = ('高德',)
 # 广告开户复合条件（与 app_market_ad_plan.py / app_market_attribution.py 一致）
@@ -376,6 +379,62 @@ _AD_ACCOUNT_COND = (
     & (FactConvAppmarket.渠道类型 == '互联网引流')
     & (FactConvAppmarket.是否新开户 == 1)
 )
+# 平台名归一：yj/云极 统一展示为「云极」（BI 侧临时口径，上游统一命名后可移除；仅查询层展示，不动底表）
+_PLATFORM_ALIAS = {'yj': '云极'}
+# 内容平台厂商白名单：白名单平台仅列内厂商独立展示，其余统一并入「未归因」；
+# 未配置白名单的平台（云极/快手）不做归并。仅查询层展示口径，不动底表；上游数据修正后可移除。
+_FACTORY_WHITELIST = {
+    '小红书': {'绩牛', '量子', '美洋', '开始故事', '群众互动', '直投'},
+    '抖音': {'量子', '风声', '众联', '蛋白'},
+    '腾讯': {'众联', '两把刷子', '直投'},
+}
+# 无白名单平台（云极/快手）的全局归并集：上游归属异常厂商并入「未归因」（沿用此前全局口径）
+_GLOBAL_FACTORY_MERGE = {'哇棒', '风声', '众联', 'kiwi'}
+
+
+def _norm_platform(name):
+    """平台名归一：yj/云极 统一为「云极」。"""
+    p = (name or '').strip()
+    return _PLATFORM_ALIAS.get(p.lower(), p)
+
+
+def _norm_factory(platform, name):
+    """厂商名归一：白名单平台列外厂商并入「未归因」；无白名单平台按全局归并集处理。"""
+    n = (name or '').strip()
+    allowed = _FACTORY_WHITELIST.get(platform)
+    if allowed is not None:
+        return n if n in allowed else '未归因'
+    return '未归因' if n.lower() in _GLOBAL_FACTORY_MERGE else (n or '未归因')
+
+
+# 直播线索识别（客户来源口径）— 与 leads.py _compute_anchor_cluster_items 的匹配逻辑保持一致：
+# 客户来源按 [,，;；、] 拆分后，任一段命中「(平台)引流-主播」正则或 dim_anchor_live_type
+# 纯人名 token（is_active），即归为直播线索。直播线索在 _live_detail 板块单独统计，
+# 内容平台线索数须排除，避免两板块重复计数。
+_ANCHOR_SRC_PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
+_ANCHOR_SRC_SPLIT = re.compile(r"[,，;；、]+")
+
+
+def _load_live_plain_tokens():
+    """加载 dim_anchor_live_type 中 is_active 的纯人名 token（不含 引流-/直播带货-）。"""
+    rows = db.session.query(
+        DimAnchorLiveType.source_token, DimAnchorLiveType.is_active,
+    ).all()
+    return {
+        r.source_token for r in rows
+        if r.is_active and '引流-' not in r.source_token and '直播带货-' not in r.source_token
+    }
+
+
+def _is_live_lead_source(src, plain_tokens):
+    """判断客户来源是否命中直播线索口径（主播聚类可识别），复刻主播聚类匹配逻辑。"""
+    for part in _ANCHOR_SRC_SPLIT.split((src or '').strip()):
+        segment = part.strip()
+        if not segment:
+            continue
+        if _ANCHOR_SRC_PATTERN.match(segment) or segment in plain_tokens:
+            return True
+    return False
 
 
 def _resolve_week_range(data):
@@ -466,12 +525,44 @@ def _app_market_detail(sd, ed):
         for r in oc_rows:
             open_map[int(r.广告计划ID)] = int(r.open_cnt or 0)
 
+    # 各计划下载激活（下载日期口径；量 = 去重设备号，与计划漏斗激活量口径一致）
+    act_map = {}
+    if plan_ids:
+        act_rows = db.session.query(
+            FactConvAppmarket.广告计划ID,
+            func.count(distinct(FactConvAppmarket.设备号)).label('act_cnt'),
+        ).filter(and_(
+            FactConvAppmarket.广告计划ID.in_(plan_ids),
+            FactConvAppmarket.是否激活APP == 1,
+            FactConvAppmarket.下载日期 >= sd,
+            FactConvAppmarket.下载日期 <= ed,
+        )).group_by(FactConvAppmarket.广告计划ID).all()
+        for r in act_rows:
+            act_map[int(r.广告计划ID)] = int(r.act_cnt or 0)
+
+    # 各计划客户资产（广告开户口径行 SUM(总资产)：与 open_map 同一批复合条件行）
+    asset_map = {}
+    if plan_ids:
+        asset_rows = db.session.query(
+            FactConvAppmarket.广告计划ID,
+            func.coalesce(func.sum(FactConvAppmarket.总资产), 0).label('assets'),
+        ).filter(and_(
+            FactConvAppmarket.广告计划ID.in_(plan_ids),
+            _AD_ACCOUNT_COND,
+            FactConvAppmarket.资金账号创建完成时间 >= sd,
+            FactConvAppmarket.资金账号创建完成时间 <= ed,
+        )).group_by(FactConvAppmarket.广告计划ID).all()
+        for r in asset_rows:
+            asset_map[int(r.广告计划ID)] = float(r.assets or 0)
+
     # 组装 平台 -> 计划 列表
     plans = []
     for pid, info in plan_by_id.items():
         pc = plan_class.get(pid, {})
         spend = info['spend']
         oc = open_map.get(pid, 0)
+        act = act_map.get(pid, 0)
+        asset = asset_map.get(pid, 0.0)
         plans.append({
             'plan_id': str(pid),
             'platform': info['platform'],
@@ -484,16 +575,20 @@ def _app_market_detail(sd, ed):
             'clicks': info['clicks'],
             'open_count': oc,
             'open_cost': round(spend / oc, 2) if oc else None,
+            'activated': act,
+            'assets': round(asset, 2),
         })
     plans.sort(key=lambda x: (x['open_count'], x['spend']), reverse=True)
 
     # 平台级汇总
     by_platform = {}
     for p in plans:
-        by_platform.setdefault(p['platform'], {'plans': [], 'spend': 0.0, 'open_count': 0})
+        by_platform.setdefault(p['platform'], {'plans': [], 'spend': 0.0, 'open_count': 0, 'activated': 0, 'assets': 0.0})
         by_platform[p['platform']]['plans'].append(p)
         by_platform[p['platform']]['spend'] += p['spend']
         by_platform[p['platform']]['open_count'] += p['open_count']
+        by_platform[p['platform']]['activated'] += p['activated']
+        by_platform[p['platform']]['assets'] += p['assets']
 
     result = []
     for pf in APP_MARKET_PLATFORMS:
@@ -505,6 +600,8 @@ def _app_market_detail(sd, ed):
             'spend': round(agg['spend'], 2),
             'open_count': agg['open_count'],
             'open_cost': round(agg['spend'] / agg['open_count'], 2) if agg['open_count'] else None,
+            'activated': agg['activated'],
+            'assets': round(agg['assets'], 2),
             'top_plans': agg['plans'][:10],
         })
     result.sort(key=lambda x: (x['open_count'], x['spend']), reverse=True)
@@ -516,6 +613,8 @@ def _content_platform_detail(sd, ed):
 
     开户数/花费：厂商×日底表 agg_vendor_daily 权威口径，仅取非直播（业务模式 != '直播'）；
     直播渠道(业务模式='直播')单独在 _live_detail 处理，避免重复计数。
+    线索数：fact_conv_content 排除直播线索（客户来源命中主播聚类口径，见 _is_live_lead_source），
+    与 _live_detail 主播板块不重不漏。
     计划级仅附 fact_plan_daily 的 消耗/展示/点击（底表为厂商×日粒度，无计划维度）。
     """
     # 1) 厂商级 开户/花费（agg_vendor_daily 权威底表，内容平台非直播）
@@ -552,7 +651,8 @@ def _content_platform_detail(sd, ed):
 
     plans_by_factory = {}
     for r in plan_rows:
-        key = (r.平台, r.厂商名称 or '未归因')
+        np = _norm_platform(r.平台)
+        key = (np, _norm_factory(np, r.厂商名称))
         plans_by_factory.setdefault(key, []).append({
             'plan_id': str(r.计划ID) if r.计划ID is not None else None,
             'plan_name': r.计划名称,
@@ -563,35 +663,46 @@ def _content_platform_detail(sd, ed):
         })
 
     # 内容平台线索量（fact_conv_content，1 行=1 企微）
+    # v4.x 口径：排除直播线索（客户来源命中主播聚类口径），直播线索在 _live_detail 单独板块统计
     lead_counts = {}
     if CONTENT_PLATFORMS:
+        plain_tokens = _load_live_plain_tokens()
         lc_rows = db.session.query(
             FactConvContent.平台来源,
+            FactConvContent.客户来源,
             func.coalesce(func.count(FactConvContent.id), 0).label('leads'),
         ).filter(and_(
             FactConvContent.线索日期 >= sd,
             FactConvContent.线索日期 <= ed,
             FactConvContent.平台来源.in_(CONTENT_PLATFORMS),
-        )).group_by(FactConvContent.平台来源).all()
+        )).group_by(FactConvContent.平台来源, FactConvContent.客户来源).all()
         for r in lc_rows:
-            lead_counts[r.平台来源] = int(r.leads or 0)
+            if _is_live_lead_source(r.客户来源, plain_tokens):
+                continue
+            # yj 归并入云极后可能产生同名键，累加避免覆盖
+            np = _norm_platform(r.平台来源)
+            lead_counts[np] = lead_counts.get(np, 0) + int(r.leads or 0)
 
     by_platform = {}
     for r in agg_rows:
-        pf = r.平台 or '未分类'
-        factory_name = r.厂商 or '未归因'
+        pf = _norm_platform(r.平台) or '未分类'
+        factory_name = _norm_factory(pf, r.厂商)
         platform = by_platform.setdefault(pf, {'platform': pf, 'factories': {}})
-        plans = plans_by_factory.get((pf, factory_name), [])
-        plans.sort(key=lambda x: x['spend'], reverse=True)
-        platform['factories'][factory_name] = {
-            'factory': factory_name,
-            'spend': round(float(r.spend or 0), 2),
-            'open_count': int(r.open_count or 0),
-            'plans': plans[:10],
-        }
+        # 多个上游厂商并入同名（如「未归因」）时需累加而非覆盖
+        fac = platform['factories'].setdefault(
+            factory_name, {'factory': factory_name, 'spend': 0.0, 'open_count': 0})
+        fac['spend'] += float(r.spend or 0)
+        fac['open_count'] += int(r.open_count or 0)
+
+    for platform in by_platform.values():
+        for fac in platform['factories'].values():
+            plans = plans_by_factory.get((platform['platform'], fac['factory']), [])
+            plans.sort(key=lambda x: x['spend'], reverse=True)
+            fac['spend'] = round(fac['spend'], 2)
+            fac['plans'] = plans[:10]
 
     result = []
-    for pf in CONTENT_PLATFORMS:
+    for pf in CONTENT_PLATFORMS_DISPLAY:
         if pf not in by_platform:
             continue
         platform = by_platform[pf]
@@ -632,26 +743,31 @@ def _live_detail(sd, ed):
     return out
 
 
-def _weekly_opens_by_channels(week_list, channels):
-    """按周次聚合各渠道开户数（agg_daily_channel_open 权威底表，仅互联网引流）。
+def _weekly_opens_by_channels(week_list, channels, category='互联网引流'):
+    """按周次聚合各渠道开户数（agg_daily_channel_open 权威底表）。
 
     week_list 为 /data 构建的周次列表（[{week, sd, ed}]）；返回
     [{week, 渠道1: opens, 渠道2: opens, ...}]，用于各渠道分周开户堆叠图。
+    category 传 None 时不限渠道类别（本地生活高德的渠道类别实为「互联网引流」，按名称过滤即可）。
     """
     result = []
     for w in week_list:
-        rows = db.session.query(
-            AggDailyChannelOpen.渠道名称,
-            func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
-        ).filter(and_(
-            AggDailyChannelOpen.渠道类别 == '互联网引流',
+        conds = [
             AggDailyChannelOpen.渠道名称.in_(channels),
             AggDailyChannelOpen.时间区间 >= w['sd'],
             AggDailyChannelOpen.时间区间 <= w['ed'],
-        )).group_by(AggDailyChannelOpen.渠道名称).all()
+        ]
+        if category:
+            conds.insert(0, AggDailyChannelOpen.渠道类别 == category)
+        rows = db.session.query(
+            AggDailyChannelOpen.渠道名称,
+            func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
+        ).filter(and_(*conds)).group_by(AggDailyChannelOpen.渠道名称).all()
         row = {'week': w['week']}
         for r in rows:
-            row[r.渠道名称] = int(r.opens or 0)
+            # yj 归并入云极后可能产生同名键，累加避免覆盖
+            key = _norm_platform(r.渠道名称)
+            row[key] = row.get(key, 0) + int(r.opens or 0)
         result.append(row)
     return result
 
@@ -724,6 +840,7 @@ def get_weekly_detail():
     app_market_weekly = _weekly_opens_by_channels(week_list, APP_MARKET_PLATFORMS)
     content_weekly = _weekly_opens_by_channels(week_list, CONTENT_PLATFORMS)
     live_weekly = _live_weekly(week_list)
+    local_life_weekly = _weekly_opens_by_channels(week_list, LOCAL_LIFE_CHANNELS, category=None)
 
     def _scoped(sd_i, ed_i):
         return {
@@ -734,6 +851,7 @@ def get_weekly_detail():
             'app_market_weekly': app_market_weekly,
             'content_weekly': content_weekly,
             'live_weekly': live_weekly,
+            'local_life_weekly': local_life_weekly,
         }
 
     return jsonify({
