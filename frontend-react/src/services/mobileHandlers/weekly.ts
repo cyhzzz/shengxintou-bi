@@ -414,6 +414,68 @@ const WEEKLY_APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为
 const WEEKLY_CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', 'yj', '云极', '快手'];
 // 广告开户复合条件（与 appMarket.ts AD_ACCOUNT_COND 一致，与后端 _AD_ACCOUNT_COND 一致）
 const WEEKLY_AD_ACCOUNT_COND = `"是否创建完资金账号" = 1 AND "渠道类型" = '互联网引流' AND "是否新开户" = 1`;
+// 展示用内容平台列表：yj 与 云极 为同一平台的两种上游命名，查询保留双名，展示统一归并为「云极」（与后端 CONTENT_PLATFORMS_DISPLAY 一致）
+const WEEKLY_CONTENT_PLATFORMS_DISPLAY = ['小红书', '腾讯', '抖音', '云极', '快手'];
+// 本地生活渠道（与后端 LOCAL_LIFE_CHANNELS 一致）
+const WEEKLY_LOCAL_LIFE_CHANNELS = ['高德'];
+// 平台名归一：yj/云极 统一为「云极」（BI 侧临时口径，上游统一命名后可移除；仅查询层展示，不动底表；与后端 _PLATFORM_ALIAS 一致）
+const WEEKLY_PLATFORM_ALIAS: Record<string, string> = { yj: '云极' };
+// 内容平台厂商白名单：白名单平台仅列内厂商独立展示，其余统一并入「未归因」；
+// 未配置白名单的平台（云极/快手）不做归并。仅查询层展示口径，不动底表（与后端 _FACTORY_WHITELIST 一致）
+const WEEKLY_FACTORY_WHITELIST: Record<string, Set<string>> = {
+  小红书: new Set(['绩牛', '量子', '美洋', '开始故事', '群众互动', '直投']),
+  抖音: new Set(['量子', '风声', '众联', '蛋白']),
+  腾讯: new Set(['众联', '两把刷子', '直投']),
+};
+// 无白名单平台（云极/快手）的全局归并集：上游归属异常厂商并入「未归因」（与后端 _GLOBAL_FACTORY_MERGE 一致）
+const WEEKLY_GLOBAL_FACTORY_MERGE = new Set(['哇棒', '风声', '众联', 'kiwi']);
+
+/** 平台名归一：yj/云极 统一为「云极」（与后端 _norm_platform 一致） */
+function normWeeklyPlatform(name: unknown): string {
+  const p = String(name ?? '').trim();
+  return WEEKLY_PLATFORM_ALIAS[p.toLowerCase()] ?? p;
+}
+
+/** 厂商名归一：白名单平台列外厂商并入「未归因」；无白名单平台按全局归并集处理（与后端 _norm_factory 一致） */
+function normWeeklyFactory(platform: string, name: unknown): string {
+  const n = String(name ?? '').trim();
+  const allowed = WEEKLY_FACTORY_WHITELIST[platform];
+  if (allowed) return allowed.has(n) ? n : '未归因';
+  return WEEKLY_GLOBAL_FACTORY_MERGE.has(n.toLowerCase()) ? '未归因' : (n || '未归因');
+}
+
+// 直播线索识别（客户来源口径）— 与主播聚类匹配逻辑保持一致：
+// 客户来源按 [,，;；、] 拆分后，任一段命中「(平台)引流-主播」正则或 dim_anchor_live_type
+// 纯人名 token（is_active），即归为直播线索。直播线索在直播板块单独统计，
+// 内容平台线索数须排除，避免两板块重复计数（与后端 _ANCHOR_SRC_PATTERN/_ANCHOR_SRC_SPLIT 一致）。
+const WEEKLY_ANCHOR_SRC_PATTERN = /^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$/;
+const WEEKLY_ANCHOR_SRC_SPLIT = /[,，;；、]+/;
+
+/** 加载 dim_anchor_live_type 中 is_active 的纯人名 token（不含 引流-/直播带货-；与后端 _load_live_plain_tokens 一致） */
+async function loadWeeklyLivePlainTokens(): Promise<Set<string>> {
+  const tokens = new Set<string>();
+  try {
+    const rows = await querySql<Row>(`SELECT source_token, is_active FROM dim_anchor_live_type`);
+    for (const r of rows) {
+      const tok = String(r.source_token || '');
+      if (r.is_active && !tok.includes('引流-') && !tok.includes('直播带货-')) tokens.add(tok);
+    }
+  } catch {
+    // dim_anchor_live_type 表缺失或为空，退化为无纯人名 token 模式
+  }
+  return tokens;
+}
+
+/** 判断客户来源是否命中直播线索口径（主播聚类可识别；与后端 _is_live_lead_source 一致） */
+function isWeeklyLiveLeadSource(src: unknown, plainTokens: Set<string>): boolean {
+  const parts = String(src ?? '').trim().split(WEEKLY_ANCHOR_SRC_SPLIT);
+  for (const part of parts) {
+    const segment = part.trim();
+    if (!segment) continue;
+    if (WEEKLY_ANCHOR_SRC_PATTERN.test(segment) || plainTokens.has(segment)) return true;
+  }
+  return false;
+}
 
 /** 解析周次范围（与 handleWeeklyData 相同的周次规则；无效返回 null） */
 function resolveWeekRange(body: any): {
@@ -491,10 +553,36 @@ async function mobileAppMarketDetail(sd: string, ed: string): Promise<any[]> {
     );
     for (const r of orRows) openMap[toInt(r.plan_id)] = toInt(r.open_cnt);
   }
+  // 各计划下载激活（下载日期口径；量 = 去重设备号，与计划漏斗激活量口径一致）
+  const actMap: Record<number, number> = {};
+  if (planIds.length > 0) {
+    const aw = buildWhere([inClause('广告计划ID', planIds.map(String)), dateClause('下载日期', sd, ed)]);
+    const aRows = await querySql<Row>(
+      `SELECT "广告计划ID" as plan_id, COUNT(DISTINCT "设备号") as act_cnt
+       FROM fact_conv_appmarket ${aw.clause} AND "是否激活APP" = 1
+       GROUP BY "广告计划ID"`,
+      aw.params
+    );
+    for (const r of aRows) actMap[toInt(r.plan_id)] = toInt(r.act_cnt);
+  }
+  // 各计划客户资产（广告开户口径行 SUM(总资产)：与 open_map 同一批复合条件行）
+  const assetMap: Record<number, number> = {};
+  if (planIds.length > 0) {
+    const asw = buildWhere([inClause('广告计划ID', planIds.map(String)), dateClause('资金账号创建完成时间', sd, ed)]);
+    const asRows = await querySql<Row>(
+      `SELECT "广告计划ID" as plan_id, COALESCE(SUM("总资产"), 0) as assets
+       FROM fact_conv_appmarket ${asw.clause} AND ${WEEKLY_AD_ACCOUNT_COND}
+       GROUP BY "广告计划ID"`,
+      asw.params
+    );
+    for (const r of asRows) assetMap[toInt(r.plan_id)] = toFloat(r.assets);
+  }
   const plans: any[] = [];
   for (const pid of planIds) {
     const info = planBy[pid];
     const oc = openMap[pid] || 0;
+    const act = actMap[pid] || 0;
+    const asset = assetMap[pid] || 0;
     const spend = info.spend;
     plans.push({
       plan_id: String(pid),
@@ -505,15 +593,18 @@ async function mobileAppMarketDetail(sd: string, ed: string): Promise<any[]> {
       bids: info.bids.size ? Array.from(info.bids).sort() : ['未分类'],
       spend: round2(spend), impressions: info.impressions, clicks: info.clicks,
       open_count: oc, open_cost: oc ? round2(spend / oc) : null,
+      activated: act, assets: round2(asset),
     });
   }
   plans.sort((a, b) => (b.open_count - a.open_count) || (b.spend - a.spend));
 
   const byPlatform: Record<string, any> = {};
   for (const p of plans) {
-    if (!byPlatform[p.platform]) byPlatform[p.platform] = { platform: p.platform, spend: 0, open_count: 0, plans: [] };
+    if (!byPlatform[p.platform]) byPlatform[p.platform] = { platform: p.platform, spend: 0, open_count: 0, activated: 0, assets: 0, plans: [] };
     byPlatform[p.platform].spend += p.spend;
     byPlatform[p.platform].open_count += p.open_count;
+    byPlatform[p.platform].activated += p.activated;
+    byPlatform[p.platform].assets += p.assets;
     byPlatform[p.platform].plans.push(p);
   }
   const result: any[] = [];
@@ -525,6 +616,8 @@ async function mobileAppMarketDetail(sd: string, ed: string): Promise<any[]> {
       spend: round2(agg.spend),
       open_count: agg.open_count,
       open_cost: agg.open_count ? round2(agg.spend / agg.open_count) : null,
+      activated: agg.activated,
+      assets: round2(agg.assets),
       top_plans: agg.plans.slice(0, 10),
     });
   }
@@ -558,19 +651,27 @@ async function mobileContentPlatformDetail(sd: string, ed: string): Promise<any[
     pfWhere.params
   );
   // 内容平台线索量（fact_conv_content，1 行=1 企微）
+  // v4.x 口径：排除直播线索（客户来源命中主播聚类口径），直播线索在直播板块单独统计
   const leadMap: Record<string, number> = {};
+  const plainTokens = await loadWeeklyLivePlainTokens();
   const lcWhere = buildWhere([inClause('平台来源', WEEKLY_CONTENT_PLATFORMS), dateClause('线索日期', sd, ed)]);
   const lcRows = await querySql<Row>(
-    `SELECT "平台来源" as platform, COUNT(id) as leads FROM fact_conv_content ${lcWhere.clause} GROUP BY "平台来源"`,
+    `SELECT "平台来源" as platform, "客户来源" as lead_source, COUNT(id) as leads
+     FROM fact_conv_content ${lcWhere.clause} GROUP BY "平台来源", "客户来源"`,
     lcWhere.params
   );
-  for (const r of lcRows) leadMap[r.platform] = toInt(r.leads);
+  for (const r of lcRows) {
+    if (isWeeklyLiveLeadSource(r.lead_source, plainTokens)) continue;
+    // yj 归并入云极后可能产生同名键，累加避免覆盖
+    const np = normWeeklyPlatform(r.platform);
+    leadMap[np] = (leadMap[np] || 0) + toInt(r.leads);
+  }
 
   // 归集计划：平台+厂商名称 -> plans
   const plansByFactory: Record<string, any[]> = {};
   for (const r of rows) {
-    const pf = String(r.platform || '未分类');
-    const fy = String(r.factory || '未归因');
+    const pf = normWeeklyPlatform(r.platform);
+    const fy = normWeeklyFactory(pf, r.factory);
     const key = `${pf}\u0000${fy}`;
     if (!plansByFactory[key]) plansByFactory[key] = [];
     plansByFactory[key].push({
@@ -583,20 +684,26 @@ async function mobileContentPlatformDetail(sd: string, ed: string): Promise<any[
 
   const byPlatform: Record<string, any> = {};
   for (const r of aggRows) {
-    const pf = String(r.platform || '未分类');
-    const factoryName = String(r.factory || '未归因');
+    const pf = normWeeklyPlatform(r.platform) || '未分类';
+    const factoryName = normWeeklyFactory(pf, r.factory);
     if (!byPlatform[pf]) byPlatform[pf] = { platform: pf, factMap: {} };
-    const key = `${pf}\u0000${factoryName}`;
-    const plans = (plansByFactory[key] || []).sort((a: any, b: any) => b.spend - a.spend).slice(0, 10);
-    byPlatform[pf].factMap[factoryName] = {
-      factory: factoryName,
-      spend: round2(toFloat(r.spend)),
-      open_count: toInt(r.open_count),
-      plans,
-    };
+    // 多个上游厂商并入同名（如「未归因」）时需累加而非覆盖
+    if (!byPlatform[pf].factMap[factoryName]) byPlatform[pf].factMap[factoryName] = { factory: factoryName, spend: 0, open_count: 0 };
+    const fac = byPlatform[pf].factMap[factoryName];
+    fac.spend += toFloat(r.spend);
+    fac.open_count += toInt(r.open_count);
+  }
+  // 二次遍历：计划按（归一后平台, 归一后厂商名）挂到对应厂商，取消耗 Top10
+  for (const platform of Object.values(byPlatform) as any[]) {
+    for (const fac of Object.values(platform.factMap) as any[]) {
+      const key = `${platform.platform}\u0000${fac.factory}`;
+      const plans = (plansByFactory[key] || []).sort((a: any, b: any) => b.spend - a.spend).slice(0, 10);
+      fac.spend = round2(fac.spend);
+      fac.plans = plans;
+    }
   }
   const result: any[] = [];
-  for (const pf of WEEKLY_CONTENT_PLATFORMS) {
+  for (const pf of WEEKLY_CONTENT_PLATFORMS_DISPLAY) {
     const p = byPlatform[pf];
     if (!p) continue;
     const factories = Object.values(p.factMap) as any[];
@@ -634,26 +741,27 @@ async function mobileLiveDetail(sd: string, ed: string): Promise<any[]> {
 
 /** 本地生活（高德）开户数据 — 独立板块（agg_daily_channel_open，渠道名称=高德，与后端 LOCAL_LIFE_CHANNELS 一致） */
 async function mobileLocalLifeDetail(sd: string, ed: string): Promise<any[]> {
+  const llWhere = buildWhere([inClause('渠道名称', WEEKLY_LOCAL_LIFE_CHANNELS), dateClause('时间区间', sd, ed)]);
   const rows = await querySql<Row>(
     `SELECT "渠道名称" as platform, COALESCE(SUM("开户成功人数"), 0) as open_count
-     FROM agg_daily_channel_open
-     WHERE "渠道名称" IN ('高德') AND "时间区间" >= ? AND "时间区间" <= ?
+     FROM agg_daily_channel_open ${llWhere.clause}
      GROUP BY "渠道名称"`,
-    [sd, ed]
+    llWhere.params
   );
   return rows.map((r) => ({ platform: r.platform || '高德', open_count: toInt(r.open_count) }));
 }
 
 /** 按周次聚合各渠道开户数（agg_daily_channel_open, 互联网引流），与后端 _weekly_opens_by_channels 一致。
  * 一次查询全年（日期×渠道）行后在 JS 端做周映射，避免逐周 30+ 次往返查询拖慢移动端。 */
-async function mobileWeeklyOpensByChannels(weekList: { week: string; sd: string; ed: string }[], channels: string[]): Promise<any[]> {
+async function mobileWeeklyOpensByChannels(weekList: { week: string; sd: string; ed: string }[], channels: string[], category: string | null = '互联网引流'): Promise<any[]> {
   if (!weekList.length) return [];
   const lo = weekList[0].sd;
   const hi = weekList[weekList.length - 1].ed;
-  // 固定条件（渠道类别）与动态条件统一交给 buildWhere 拼接，避免手工拼 SQL 漏 AND
+  // 固定条件（渠道类别，category=null 时不限类别）与动态条件统一交给 buildWhere 拼接，避免手工拼 SQL 漏 AND
   // （同一渠道名称在「互联网引流 / 自然流入」等多个渠道类别下都有数据，漏掉类别过滤会多算）
-  const catCond = { sql: `"渠道类别" = '互联网引流'`, params: [] as unknown[] };
-  const where = buildWhere([catCond, inClause('渠道名称', channels)!, dateClause('时间区间', lo, hi)]);
+  const conds: ({ sql: string; params: unknown[] } | null)[] = [inClause('渠道名称', channels), dateClause('时间区间', lo, hi)];
+  if (category) conds.unshift({ sql: `"渠道类别" = '${category}'`, params: [] });
+  const where = buildWhere(conds);
   const rows = await querySql<Row>(
     `SELECT "时间区间" as date, "渠道名称" as channel, COALESCE(SUM("开户成功人数"), 0) as opens
      FROM agg_daily_channel_open ${where.clause}
@@ -665,7 +773,9 @@ async function mobileWeeklyOpensByChannels(weekList: { week: string; sd: string;
     for (let i = 0; i < weekList.length; i++) {
       const w = weekList[i];
       if (w.sd <= r.date && r.date <= w.ed) {
-        result[i][r.channel] = toInt(r.opens);
+        // yj 归并入云极后可能产生同名键，累加避免覆盖
+        const key = normWeeklyPlatform(r.channel);
+        result[i][key] = (toInt(result[i][key]) || 0) + toInt(r.opens);
         break; // 周区间连续不重叠，命中即止
       }
     }
@@ -714,6 +824,8 @@ export async function handleWeeklyDetail(body: any): Promise<any> {
   const app_market_weekly = await mobileWeeklyOpensByChannels(weekList, WEEKLY_APP_MARKET_PLATFORMS);
   const content_weekly = await mobileWeeklyOpensByChannels(weekList, WEEKLY_CONTENT_PLATFORMS);
   const live_weekly = await mobileLiveWeekly(weekList);
+  // 本地生活分周开户：category=null 不限渠道类别（高德按渠道名称过滤即可），与后端一致
+  const local_life_weekly = await mobileWeeklyOpensByChannels(weekList, WEEKLY_LOCAL_LIFE_CHANNELS, null);
 
   const scoped = async (sdi: string, edi: string) => ({
     app_market: await mobileAppMarketDetail(sdi, edi),
@@ -723,6 +835,7 @@ export async function handleWeeklyDetail(body: any): Promise<any> {
     app_market_weekly,
     content_weekly,
     live_weekly,
+    local_life_weekly,
   });
 
   return {

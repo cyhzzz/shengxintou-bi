@@ -94,6 +94,24 @@ ALGO_MARKERS: List[Dict[str, str]] = [
         'backend_pattern': r'div = max\(n, 1\)',
         'mobile_pattern': r'div = Math\.max\(n, 1\)',
     },
+    {
+        'name': '周报·平台名归一（yj→云极）',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_norm_platform\(',
+        'mobile_pattern': r'normWeeklyPlatform\(',
+    },
+    {
+        'name': '周报·厂商白名单归并（未归因）',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_norm_factory\(',
+        'mobile_pattern': r'normWeeklyFactory\(',
+    },
+    {
+        'name': '周报·内容平台剔除直播线索',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_is_live_lead_source\(',
+        'mobile_pattern': r'isWeeklyLiveLeadSource\(',
+    },
 ]
 
 
