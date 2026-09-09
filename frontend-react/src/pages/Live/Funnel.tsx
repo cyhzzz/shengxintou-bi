@@ -25,6 +25,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { FadeInSection } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import { http } from '@/services/http';
 import styles from './Funnel.module.scss';
 
@@ -255,7 +256,7 @@ const LiveFunnelPage: React.FC = () => {
       data: periods.map((p) => totals[p]?.new_opened ?? 0),
     };
     return {
-      tooltip: { trigger: 'axis', valueFormatter: (v: any) => Number(v || 0).toLocaleString() },
+      tooltip: { trigger: 'axis', formatter: compactStackTooltip },
       legend: { bottom: 0, type: 'scroll' },
       grid: { left: '3%', right: '4%', bottom: '12%', top: '10%', containLabel: true },
       xAxis: { type: 'category', data: periods, axisLabel: { rotate: trendGranularity === 'daily' ? 30 : 0 } },

@@ -34,6 +34,7 @@ import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -128,7 +129,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' },
-        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+        formatter: compactStackTooltip,
       },
       legend: { bottom: 0, type: 'scroll' },
       grid: { left: '3%', right: '6%', bottom: '12%', top: '12%', containLabel: true },
@@ -255,7 +256,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' },
-        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+        formatter: compactStackTooltip,
       },
       legend: { bottom: 0, type: 'scroll' },
       grid: { left: '3%', right: '4%', bottom: '16%', top: '10%', containLabel: true },

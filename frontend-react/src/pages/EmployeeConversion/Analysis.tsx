@@ -23,6 +23,7 @@ import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
 import { http } from '@/services/http';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './Analysis.module.scss';
 
 interface TrendItem {
@@ -156,7 +157,7 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const conversionTrendOption: EChartsOption = useMemo(() => {
     if (!conversionTrendItems.length) return {};
     return {
-      tooltip: { trigger: 'axis', valueFormatter: (v: any) => Number(v || 0).toLocaleString() },
+      tooltip: { trigger: 'axis', formatter: compactStackTooltip },
       legend: { data: ['线索量', '开户量', '有效户'], bottom: 0 },
       grid: { left: '3%', right: '4%', bottom: '10%', top: '10%', containLabel: true },
       xAxis: { type: 'category', data: conversionTrendItems.map((t) => t.period), axisLabel: { rotate: 30 } },

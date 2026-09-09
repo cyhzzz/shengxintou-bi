@@ -21,6 +21,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
 import { pickEChartsColor } from '@/utils/echartsColors';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import {
   CHANNEL_CATEGORY_MAP,
   sortChannelsByCategory,
@@ -223,7 +224,7 @@ const AgencyAnalysisPage: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } },
-        valueFormatter: (v: any) => Number(v || 0).toLocaleString(),
+        formatter: compactStackTooltip,
       },
       legend: { data: sortedPlatforms, bottom: 0, type: 'scroll' },
       grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },

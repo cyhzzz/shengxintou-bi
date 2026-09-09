@@ -40,6 +40,7 @@ import { FadeInSection } from '@/components';
 import metricStyles from '@/components/MetricCard/MetricCard.module.scss';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -227,7 +228,7 @@ const OmniChannelPage: React.FC = () => {
   const trendChartOption: EChartsOption = useMemo(() => {
     const { dates, series } = chartData;
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, formatter: compactStackTooltip },
       legend: { top: 0, type: 'scroll' },
       grid: { left: 60, right: 30, top: 40, bottom: 50 },
       xAxis: {

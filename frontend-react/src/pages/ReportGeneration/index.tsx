@@ -30,6 +30,7 @@ import {
   CATEGORY_REP_COLORS,
 } from '@/utils/channelColors';
 import { saveBlobFile, buildMobileSaveMessage, captureElement } from '@/utils/saveBlob';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
 // 类型定义
@@ -210,15 +211,6 @@ function fmtLarge(n: number | null | undefined): string {
   if (!n) return '0';
   if (n >= 10000) return (n / 10000).toFixed(2) + '万';
   return fmtNum(n);
-}
-
-// 堆叠图 axis tooltip：过滤 0 值系列（数据里的 0 只是堆叠占位，悬浮展示无意义），全为 0 时不出悬浮
-function compactStackTooltip(params: any): string {
-  const list = (Array.isArray(params) ? params : [params]).filter((p: any) => p.value != null && Number(p.value) !== 0);
-  if (!list.length) return '';
-  const head = list[0].axisValueLabel || list[0].name;
-  const rows = list.map((p: any) => `${p.marker} ${p.seriesName}&nbsp;&nbsp;<b>${fmtNum(p.value)}</b>`);
-  return [head, ...rows].join('<br/>');
 }
 
 // 格式化金额

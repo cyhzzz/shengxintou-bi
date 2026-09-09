@@ -118,7 +118,7 @@ const CostAnalysisPage: React.FC = () => {
         formatter: (params: any) => {
           let total = 0;
           const lines = params
-            .filter((p: any) => p.seriesName !== '合计')
+            .filter((p: any) => p.seriesName !== '合计' && Number(p.value) !== 0)
             .map((p: any) => {
               total += p.value;
               return `${p.marker} ${p.seriesName}: ¥${(p.value / 10000).toFixed(2)}万`;
@@ -203,7 +203,7 @@ const CostAnalysisPage: React.FC = () => {
         formatter: (params: any) => {
           let total = 0;
           const lines = params
-            .filter((p: any) => p.seriesName !== '合计')
+            .filter((p: any) => p.seriesName !== '合计' && Number(p.value) !== 0)
             .map((p: any) => {
               total += p.value;
               return `${p.marker} ${p.seriesName}: ¥${(p.value / 10000).toFixed(2)}万`;

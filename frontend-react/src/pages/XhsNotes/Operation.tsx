@@ -33,6 +33,7 @@ import { FadeInSection } from '@/components';
 import { DateRangePicker } from '@/components/Filter';
 import { postXhsOperationAnalysis } from '@/types/api';
 import { metadataService } from '@/services/metadataService';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import type {
   XhsOperationAnalysisData,
   XhsCreatorContentItem,
@@ -632,9 +633,11 @@ const XhsNotesOperationPage: React.FC = () => {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
         formatter: (params: any) => {
+          const rows = params.filter((p: any) => p.value != null && Number(p.value) !== 0);
+          if (!rows.length) return '';
           const week = params[0]?.axisValue || '';
           let result = `<div style="font-weight: 600; margin-bottom: 8px; font-size: 13px; color: #1a1a1a;">${week}</div>`;
-          params.forEach((p: any) => {
+          rows.forEach((p: any) => {
             result += `<div style="margin: 5px 0;">
               <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${p.color}; margin-right: 8px;"></span>
               <span style="color: #5a5c66;">${p.seriesName}:</span>
@@ -773,6 +776,7 @@ const XhsNotesOperationPage: React.FC = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
+        formatter: compactStackTooltip,
       },
       legend: {
         data: matrix.producers,

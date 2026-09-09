@@ -12,6 +12,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection } from '@/components';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
+import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
 const { RangePicker } = DatePicker;
@@ -101,7 +102,7 @@ const AppMarketComparisonPage: React.FC = () => {
     const months: string[] = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.month))).sort() as string[];
     const markets: string[] = Array.from(new Set((data?.by_month_market || []).map((r: any) => r.app_market))).sort() as string[];
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: compactStackTooltip },
       legend: { top: 0, type: 'scroll' },
       grid: { left: 60, right: 20, top: 30, bottom: 40 },
       xAxis: { type: 'category', data: months, axisLabel: { rotate: 30 } },
