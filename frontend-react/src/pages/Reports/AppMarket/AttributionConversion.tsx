@@ -2,11 +2,11 @@
  * 应用市场 · 归因转化率分析（v3.8.1）
  * 数据源: fact_conv_appmarket 数据库表（1 行=1 APP 下载）
  * 按周（周一~周日）聚合各步骤转化率：
- *   激活 → 开户注册 → 身份证 → 银行卡 → 提交开户 → 开户成功
+ *   激活 → 开户注册 → 身份证 → 银行卡 → 提交开户 → 开户成功 → 广告开户
  *
  * 布局：
  *   1. 筛选器（FilterBar 日期范围 + 平台单选）
- *   2. 周度转化率趋势折线图（5 个独立量程，支持按应用市场筛选）
+ *   2. 周度转化率趋势折线图（6 个独立量程，支持按应用市场筛选）
  *   3. 归因转化率明细（按周折叠，可展开查看每日，降序排列）
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
@@ -49,6 +49,8 @@ interface DailyRow {
   rate_idcard_bankcard: number;
   rate_bankcard_submit: number;
   rate_submit_success: number;
+  ad_account: number;
+  rate_success_adaccount: number;
 }
 
 interface WeeklyRow {
@@ -65,6 +67,8 @@ interface WeeklyRow {
   rate_idcard_bankcard: number;
   rate_bankcard_submit: number;
   rate_submit_success: number;
+  ad_account: number;
+  rate_success_adaccount: number;
 }
 
 // 树形表格行：周合计为父行，每日数据为子行
@@ -85,6 +89,8 @@ interface TableRow {
   rate_idcard_bankcard: number;
   rate_bankcard_submit: number;
   rate_submit_success: number;
+  ad_account: number;
+  rate_success_adaccount: number;
   children?: TableRow[];
 }
 
@@ -119,6 +125,8 @@ function buildTreeData(daily: DailyRow[], weekly: WeeklyRow[]): TableRow[] {
         rate_idcard_bankcard: d.rate_idcard_bankcard,
         rate_bankcard_submit: d.rate_bankcard_submit,
         rate_submit_success: d.rate_submit_success,
+        ad_account: d.ad_account,
+        rate_success_adaccount: d.rate_success_adaccount,
       }));
 
     return {
@@ -138,6 +146,8 @@ function buildTreeData(daily: DailyRow[], weekly: WeeklyRow[]): TableRow[] {
       rate_idcard_bankcard: w.rate_idcard_bankcard,
       rate_bankcard_submit: w.rate_bankcard_submit,
       rate_submit_success: w.rate_submit_success,
+      ad_account: w.ad_account,
+      rate_success_adaccount: w.rate_success_adaccount,
       children: dailyChildren,
     };
   });
@@ -215,26 +225,38 @@ const AttributionConversionPage: React.FC = () => {
     return `${params[0].axisValue}<br/>${lines.join('<br/>')}`;
   };
 
-  // 5 个步骤定义（各自独立 Y 轴量程）
+  // 6 个步骤定义（各自独立 Y 轴量程，量程按数据动态计算）
   const rateSteps = [
-    { name: '激活→开户注册', key: 'rate_activate_register', color: '#E15759', yMin: null, yMax: null },
-    { name: '开户注册→身份证', key: 'rate_register_idcard', color: '#4E79A7', yMin: 0, yMax: 0.5 },
-    { name: '身份证→银行卡', key: 'rate_idcard_bankcard', color: '#59A14F', yMin: 0.3, yMax: 0.8 },
-    { name: '银行卡→提交开户', key: 'rate_bankcard_submit', color: '#F28E2B', yMin: 0.8, yMax: 1.0 },
-    { name: '提交开户→开户成功', key: 'rate_submit_success', color: '#B07AA1', yMin: 0.7, yMax: 1.0 },
+    { name: '激活→开户注册', key: 'rate_activate_register', color: '#E15759' },
+    { name: '开户注册→身份证', key: 'rate_register_idcard', color: '#4E79A7' },
+    { name: '身份证→银行卡', key: 'rate_idcard_bankcard', color: '#59A14F' },
+    { name: '银行卡→提交开户', key: 'rate_bankcard_submit', color: '#F28E2B' },
+    { name: '提交开户→开户成功', key: 'rate_submit_success', color: '#B07AA1' },
+    { name: '开户成功→广告开户', key: 'rate_success_adaccount', color: '#76B7B2' },
   ];
 
   // 生成单条折线图的 option（每个步骤独立量程 + 数据标注）
+  // Y 轴上下限动态计算：上限 = 最大值 + 10%，下限 = 最低值 - 10%（限制在比率区间 [0,1]）
   const buildChartOption = useCallback((step: typeof rateSteps[number]): EChartsOption => {
     if (!sortedWeekly.length) return {};
+    const values = sortedWeekly.map((w: WeeklyRow) => w[step.key as keyof WeeklyRow] as number);
+    const dataMax = Math.max(...values);
+    const dataMin = Math.min(...values);
+    let yMax = Math.min(1, +(dataMax * 1.1).toFixed(4));
+    let yMin = Math.max(0, +(dataMin * 0.9).toFixed(4));
+    // 防止数据过平时量程退化：保证至少 10% 的显示窗口
+    if (yMax - yMin < 0.1) {
+      const mid = (dataMax + dataMin) / 2;
+      yMax = Math.min(1, +(mid + 0.05).toFixed(4));
+      yMin = Math.max(0, +(mid - 0.05).toFixed(4));
+    }
     const yAxis: any = {
       type: 'value',
+      min: yMin,
+      max: yMax,
       axisLabel: { formatter: (v: number) => `${Math.round(v * 100)}%` },
-      interval: 0.1, // 格子按 10% 划分
       splitLine: { show: true, lineStyle: { type: 'dashed', color: '#e8e8e8' } },
     };
-    if (step.yMin !== null) yAxis.min = step.yMin;
-    if (step.yMax !== null) yAxis.max = step.yMax;
     return {
       tooltip: { trigger: 'axis', formatter: tooltipFormatter },
       grid: { left: 55, right: 20, top: 15, bottom: 28 },
@@ -266,7 +288,7 @@ const AttributionConversionPage: React.FC = () => {
     };
   }, [sortedWeekly, weeks]);
 
-  // 5 个图表 option
+  // 6 个图表 option
   const chartOptions = useMemo(
     () => rateSteps.map((s) => buildChartOption(s)),
     [buildChartOption]
@@ -307,6 +329,7 @@ const AttributionConversionPage: React.FC = () => {
     { title: '银行卡', dataIndex: 'bank_card', key: 'bank_card', width: 80, align: 'center' as const },
     { title: '提交开户', dataIndex: 'submit', key: 'submit', width: 90, align: 'center' as const },
     { title: '开户成功', dataIndex: 'success', key: 'success', width: 90, align: 'center' as const },
+    { title: '广告开户', dataIndex: 'ad_account', key: 'ad_account', width: 90, align: 'center' as const },
     {
       title: '激活→开户注册',
       dataIndex: 'rate_activate_register',
@@ -360,6 +383,18 @@ const AttributionConversionPage: React.FC = () => {
       dataIndex: 'rate_submit_success',
       key: 'rate_submit_success',
       width: 140,
+      align: 'center' as const,
+      render: (v: number, row: TableRow) => (
+        <span style={{ color: rateColor(v), fontWeight: row.rowType === 'weekly' ? 'bold' : 'normal' }}>
+          {fmtRate(v)}
+        </span>
+      ),
+    },
+    {
+      title: '开户成功→广告开户',
+      dataIndex: 'rate_success_adaccount',
+      key: 'rate_success_adaccount',
+      width: 150,
       align: 'center' as const,
       render: (v: number, row: TableRow) => (
         <span style={{ color: rateColor(v), fontWeight: row.rowType === 'weekly' ? 'bold' : 'normal' }}>
@@ -482,7 +517,7 @@ const AttributionConversionPage: React.FC = () => {
             sources={[
               { label: '数据源', value: 'fact_conv_appmarket 数据库表（1 行=1 APP 下载）' },
               { label: '端点', value: 'POST /api/v1/reports/app-market/attribution-conversion' },
-              { label: '口径', value: '按下载日期做下载 cohort（与应用市场漏斗口径一致，避免按开户完成时间切出的幸存者偏差），统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分' },
+              { label: '口径', value: '按下载日期做下载 cohort（与应用市场漏斗口径一致，避免按开户完成时间切出的幸存者偏差），统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分。"开户成功→广告开户"为复合节点：是否创建完资金账号=是 且 渠道类型=互联网引流 且 是否新开户=是' },
               { label: '移动端', value: '已支持（mobileRouteHandler 同步实现）' },
             ]}
           />
