@@ -226,7 +226,8 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
     COALESCE(SUM("是否注册身份证"), 0) AS id_card,
     COALESCE(SUM("是否注册银行卡"), 0) AS bank_card,
     COALESCE(SUM("是否提交开户"), 0) AS submit,
-    COALESCE(SUM("是否创建完资金账号"), 0) AS success
+    COALESCE(SUM("是否创建完资金账号"), 0) AS success,
+    COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) AS ad_account
     FROM fact_conv_appmarket ${whereClause.clause}
     GROUP BY "下载日期" ORDER BY "下载日期"`;
   const dailyRows = await querySql<Row>(dailySql, whereClause.params);
@@ -251,21 +252,24 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
       bank_card: toInt(r.bank_card),
       submit: toInt(r.submit),
       success: toInt(r.success),
+      ad_account: toInt(r.ad_account),
     };
     rec['rate_activate_register'] = _rate4(rec.register, rec.activate);
     rec['rate_register_idcard'] = _rate4(rec.id_card, rec.register);
     rec['rate_idcard_bankcard'] = _rate4(rec.bank_card, rec.id_card);
     rec['rate_bankcard_submit'] = _rate4(rec.submit, rec.bank_card);
     rec['rate_submit_success'] = _rate4(rec.success, rec.submit);
+    rec['rate_success_adaccount'] = _rate4(rec.ad_account, rec.success);
     daily_data.push(rec);
 
-    const wk = weekMap[ws] || { activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0 };
+    const wk = weekMap[ws] || { activate: 0, register: 0, id_card: 0, bank_card: 0, submit: 0, success: 0, ad_account: 0 };
     wk.activate += rec.activate;
     wk.register += rec.register;
     wk.id_card += rec.id_card;
     wk.bank_card += rec.bank_card;
     wk.submit += rec.submit;
     wk.success += rec.success;
+    wk.ad_account += rec.ad_account;
     weekMap[ws] = wk;
   }
 
@@ -280,12 +284,14 @@ export async function handleAppMarketAttributionConversion(body: any): Promise<a
         bank_card: w.bank_card,
         submit: w.submit,
         success: w.success,
+        ad_account: w.ad_account,
       };
       rec['rate_activate_register'] = _rate4(rec.register, rec.activate);
       rec['rate_register_idcard'] = _rate4(rec.id_card, rec.register);
       rec['rate_idcard_bankcard'] = _rate4(rec.bank_card, rec.id_card);
       rec['rate_bankcard_submit'] = _rate4(rec.submit, rec.bank_card);
       rec['rate_submit_success'] = _rate4(rec.success, rec.submit);
+      rec['rate_success_adaccount'] = _rate4(rec.ad_account, rec.success);
       return rec;
     })
     .sort((a, b) => a.week_start.localeCompare(b.week_start));
