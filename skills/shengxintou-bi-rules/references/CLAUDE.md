@@ -27,15 +27,7 @@
 
 ## 2. 首次进入仓库
 
-AI clone 或首次进入仓库时，先直接运行一键 setup，不逐项询问是否安装：
-
-| 平台 | 命令 |
-| --- | --- |
-| Windows | `scripts\setup.bat` |
-| macOS / Linux / WSL / Git Bash | `bash scripts/setup.sh` |
-| 跨平台兜底 | `python scripts/setup.py` 或 `npm run setup` |
-
-前置要求是 PATH 中已有 Python 3.9+ 和 Node.js 20+；脚本负责 `.venv`、依赖、前端构建和 `.env` 初始化。若当前会话已成功执行 setup，不重复运行。
+首次进入直接运行一键 setup，不逐项询问：Windows `scripts\setup.bat`；macOS/Linux/WSL/Git Bash `bash scripts/setup.sh`；兜底 `python scripts/setup.py` 或 `npm run setup`。前置 PATH 需 Python 3.9+ 与 Node.js 20+，脚本负责 `.venv`、依赖、前端构建、`.env` 初始化；本会话已成功 setup 则不重复运行。
 
 ## 3. 产品与数据边界
 
