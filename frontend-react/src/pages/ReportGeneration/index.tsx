@@ -12,6 +12,7 @@ import { Button, Select, message, Spin, Segmented } from 'antd';
 import {
   FilePdfOutlined,
   FileImageOutlined,
+  Html5Outlined,
   SettingOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
@@ -29,7 +30,8 @@ import {
   buildChannelColorMap,
   CATEGORY_REP_COLORS,
 } from '@/utils/channelColors';
-import { saveBlobFile, buildMobileSaveMessage, captureElement } from '@/utils/saveBlob';
+import { saveBlobFile, saveHtmlFile, buildMobileSaveMessage, captureElement, withZoomReset } from '@/utils/saveBlob';
+import { elementToSelfContainedHtml } from '@/utils/exportHtml';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
@@ -236,6 +238,31 @@ function fmtWow(n: number | null | undefined): { text: string; positive: boolean
   return { text: `${sign}${n.toFixed(2)}%`, positive: n >= 0 };
 }
 
+// ============================ 周报页语义色板 ============================
+// 周报页局部语义色 token 汇总；全局色序列（echartsColors / PLATFORM_COLORS / channelColors）
+// 不属于周报页管辖，保持不动。
+// ⚠ channelColors.ts 的 #c0392b（本地生活）/ #27ae60（内容平台）是渠道品牌色，与涨跌色
+//   同值不同义，禁止混用；index.module.scss .wowSup 的涨跌/不可比灰与下方常量一一对应，
+//   改色需两处同步。
+const WOW_UP = '#c0392b';    // 涨（红，中国股市惯例；= scss .wowSup[data-positive='up']）
+const WOW_DOWN = '#27ae60';  // 跌（绿；= scss .wowSup[data-positive='down']）
+const WOW_NA = '#b9bdc9';    // 环比不可比 / 上周为 0（= scss .wowSup[data-positive='na']）
+
+// KpiRing 达成率四档色：≥100 达标 / ≥75 正常 / ≥50 预警 / <50 告警（仅色值 token 化，环形不动）
+const KPI_LEVEL_COLORS = {
+  pass: '#27ae60',
+  normal: '#0052d9',
+  warn: '#d97706',
+  alert: '#c0392b',
+} as const;
+
+function kpiLevelColor(rate: number): string {
+  if (rate >= 100) return KPI_LEVEL_COLORS.pass;
+  if (rate >= 75) return KPI_LEVEL_COLORS.normal;
+  if (rate >= 50) return KPI_LEVEL_COLORS.warn;
+  return KPI_LEVEL_COLORS.alert;
+}
+
 // v3.1.35 微型 KPI 环形图（SVG，尺寸 ~44x32，与原 layerTag 灰字占用空间相近）
 function KpiRing({ label, rate }: { label: string; rate: number }) {
   // rate 为百分比，>100 时截断到 100 用于画环
@@ -243,7 +270,7 @@ function KpiRing({ label, rate }: { label: string; rate: number }) {
   const r = 10;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - pct / 100);
-  const color = rate >= 100 ? '#27ae60' : rate >= 75 ? '#0052d9' : rate >= 50 ? '#d97706' : '#c0392b';
+  const color = kpiLevelColor(rate);
   return (
     <div className={styles.kpiRing}>
       <svg width="28" height="28" viewBox="0 0 28 28">
@@ -269,6 +296,97 @@ function KpiRing({ label, rate }: { label: string; rate: number }) {
       </div>
     </div>
   );
+}
+
+// ============================ 概览版 · 环比增减图（G10 Diverging Bar） ============================
+// v4.3.0：本周 vs 上周环比一览，涨红跌绿（与核心指标表 wowSup 角标同色语义）；
+// 上周为 0 / 无数据时环比不可比，画中性灰短条 + 「—」。
+// 只取非 sub 行指标（开户数两个分项与合计重复，表中已完整呈现，图上不重复占行）。
+const WOW_METRICS: Array<{ key: keyof MetricSet; label: string }> = METRICS
+  .filter((m) => m.rowType !== 'sub')
+  .map(({ key, label }) => ({ key, label }));
+
+function WowBars({ wow }: { wow: { [K in keyof MetricSet]: number | null } }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const instRef = useRef<echarts.EChartsType | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (instRef.current) {
+      instRef.current.dispose();
+      instRef.current = null;
+    }
+    const chart = echarts.init(el);
+    instRef.current = chart;
+
+    const rows = WOW_METRICS.map((m) => ({ label: m.label, v: wow[m.key] }));
+    const maxAbs = Math.max(1, ...rows.map((r) => (r.v === null ? 0 : Math.abs(r.v))));
+
+    chart.setOption({
+      // 静态海报禁用入场动画：导出截图按当下画布内容抓取，动画首帧会被拍成空白（同 StackBars）
+      animation: false,
+      tooltip: {
+        trigger: 'item',
+        formatter: (p: any) => {
+          const na = p.data && p.data.na;
+          const val = p.data && p.data.raw;
+          const wowText = na ? '上周无数据，环比不可比' : `环比 ${val > 0 ? '+' : ''}${Number(val).toFixed(2)}%`;
+          return `${p.name}<br/><b>${wowText}</b>`;
+        },
+      },
+      grid: { top: 6, left: 4, right: 4, bottom: 0, containLabel: true },
+      // 0 轴居中，两侧留 28% 余量放数值标签（负值标签在条远端左侧，正值在右侧）
+      xAxis: { type: 'value', show: false, min: -maxAbs * 1.28, max: maxAbs * 1.28 },
+      yAxis: {
+        type: 'category',
+        data: rows.map((r) => r.label),
+        inverse: true, // 第一项在顶部，与核心指标表行序一致
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { fontSize: 10, color: '#1a1a1a' },
+      },
+      series: [
+        {
+          type: 'bar',
+          barMaxWidth: 10,
+          data: rows.map((r) => ({
+            value: r.v === null ? 0 : r.v,
+            raw: r.v,
+            na: r.v === null,
+            itemStyle: {
+              color: r.v === null ? WOW_NA : r.v >= 0 ? WOW_UP : WOW_DOWN,
+              borderRadius: (r.v === null || r.v >= 0) ? [0, 3, 3, 0] : [3, 0, 0, 3],
+            },
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            fontSize: 9,
+            fontFamily: "'JetBrains Mono', 'SF Mono', monospace",
+            color: '#4a4f5e',
+            formatter: (p: any) =>
+              p.data && p.data.na ? '—' : `${p.value > 0 ? '+' : ''}${Number(p.value).toFixed(1)}%`,
+          },
+          // 逐条动态标签朝向：正值放条右端、负值放条左端（远端），避免标签堆在中缝
+          labelLayout: (p: any) => {
+            const v = p.data && p.data.raw;
+            return p.data && p.data.na ? {} : { moveOverlap: 'shiftY', position: v >= 0 ? 'right' : 'left' };
+          },
+        },
+      ],
+    } as EChartsOption);
+
+    const onR = () => chart.resize();
+    window.addEventListener('resize', onR);
+    return () => {
+      window.removeEventListener('resize', onR);
+      chart.dispose();
+      instRef.current = null;
+    };
+  }, [wow]);
+
+  return <div ref={ref} style={{ width: '100%', height: 190 }} />;
 }
 
 // ============ 周报详细版海报（按渠道分类下钻，本周 + 全年累计） ============
@@ -489,7 +607,6 @@ function _tintLeaf(sec: { rgb: [number, number, number] }, nodes: any[], max: nu
 function buildCloudTree(scope: DetailScope, liveWeeklyAgg?: Record<string, number>): any[] {
   // 四个板块恒定输出（children 可为空），配合 buildCloudOption 的固定四象限布局，
   // 保证「本周 / 全年」两张云图同一板块永远在同一位置，可直接对照（空板块画占位块）
-  // 板块内 children 按开户数降序，大块靠前，视觉顺序稳定
 
   // 内容平台（小红书/腾讯/抖音/云极/快手，yj 已归并入云极）：渠道 -> 平台 -> 厂商（非直播口径，直播独立板块）
   const contentChildren = scope.content_platform
@@ -584,39 +701,19 @@ function buildCloudOption(sectors: any[]): EChartsOption {
       const empty = !sec.children || !sec.children.length;
       // 空板块画纯白占位块（不显示任何文字），仅保持四象限位置感与两图可对照
       const root = empty
-        ? {
-            name: sec.name,
-            value: 1,
-            placeholder: true,
-            itemStyle: { color: '#ffffff', borderColor: '#ffffff', borderWidth: 1 },
-            label: { show: false },
-          }
+        ? { name: sec.name, value: 1, placeholder: true,
+            itemStyle: { color: '#ffffff', borderColor: '#ffffff', borderWidth: 1 }, label: { show: false } }
         : { name: sec.name, value: sec.value, children: sec.children, itemStyle: sec.itemStyle };
       return {
-        type: 'treemap',
-        roam: false,
-        nodeClick: false,
-        breadcrumb: { show: false },
+        type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false },
         // 板块内顺序固定为 data 顺序（已按开户数降序），不随 treemap 默认排序重排
         sort: false,
         ...rect,
         // 每个板块一个独立 treemap（单根节点带 children，根节点 upperLabel 即板块名）
         data: [root],
-        label: {
-          show: true,
-          formatter: (p: any) => (p.data && p.data.placeholder ? p.name : _trunc(p.name, 6)),
-          fontSize: 9,
-          color: '#fff',
-        },
-        upperLabel: {
-          show: true,
-          height: 16,
-          fontSize: 9,
-          fontWeight: 600,
-          color: '#1a1a1a',
-          padding: [2, 4],
-          formatter: (p: any) => (p.name ? `${p.name} ${fmtNum(p.value)}` : ''),
-        },
+        label: { show: true, formatter: (p: any) => (p.data && p.data.placeholder ? p.name : _trunc(p.name, 6)), fontSize: 9, color: '#fff' },
+        upperLabel: { show: true, height: 16, fontSize: 9, fontWeight: 600, color: '#1a1a1a', padding: [2, 4],
+          formatter: (p: any) => (p.name ? `${p.name} ${fmtNum(p.value)}` : '') },
         itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 },
         // 颜色由 buildCloudTree 按「板块基色 + 个股占比深浅」显式赋值，不再用全局 colorMappingBy 染色
         levels: [
@@ -625,8 +722,7 @@ function buildCloudOption(sectors: any[]): EChartsOption {
           { itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 } },
           { itemStyle: { borderColor: '#fff', borderWidth: 1, gapWidth: 1 } },
         ],
-        animationDurationUpdate: 300,
-        animationEasing: 'cubicOut',
+        animationDurationUpdate: 300, animationEasing: 'cubicOut',
       };
     }),
   };
@@ -900,7 +996,7 @@ const ReportGeneration: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [periodsLoading, setPeriodsLoading] = useState(true);
-  const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null);
+  const [exporting, setExporting] = useState<'png' | 'pdf' | 'html' | null>(null);
 
   const posterRef = useRef<HTMLDivElement>(null);
   const posterDetailRef = useRef<HTMLDivElement>(null);
@@ -1184,6 +1280,28 @@ const ReportGeneration: React.FC = () => {
     }
   };
 
+  // 导出单文件 HTML（自包含快照：表格为真实 HTML 可选中复制，图表内联 PNG dataURL；
+  // 零脚本零外链，微信/文件管理器直接打开，移动端需先复位 zoom 保证计算样式 1:1）
+  const handleExportHTML = async () => {
+    if (!activePosterRef.current) {
+      message.error('海报容器未找到');
+      return;
+    }
+    setExporting('html');
+    try {
+      const reportTitle = `互联网渠道周报${exportSuffix}_${selectedPeriod?.report_year}W${selectedPeriod?.report_week}`;
+      const html = await withZoomReset(async () => elementToSelfContainedHtml(activePosterRef.current!, reportTitle));
+      const fileName = `${reportTitle}.html`;
+      const savedUri = await saveHtmlFile({ filename: fileName, html });
+      message.success(savedUri ? buildMobileSaveMessage(fileName, savedUri) : 'HTML 导出成功');
+    } catch (error) {
+      console.error('导出 HTML 失败:', error);
+      message.error(`导出 HTML 失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* 左侧控制面板 */}
@@ -1241,6 +1359,15 @@ const ReportGeneration: React.FC = () => {
                 block
               >
                 导出 PDF
+              </Button>
+              <Button
+                icon={<Html5Outlined />}
+                onClick={handleExportHTML}
+                loading={exporting === 'html'}
+                disabled={!weeklyData}
+                block
+              >
+                导出 HTML
               </Button>
             </div>
           </div>
@@ -1364,6 +1491,15 @@ const ReportGeneration: React.FC = () => {
                       })}
                     </tbody>
                   </table>
+                </section>
+
+                {/* 1.5 环比增减：本周 vs 上周（涨红跌绿，与核心指标表 wowSup 角标同色语义） */}
+                <section className={styles.layerCard}>
+                  <div className={styles.layerHeader}>
+                    <span className={styles.layerTitle}>环比增减 · 本周 vs 上周</span>
+                    <span className={styles.layerTag}>上周无数据则不可比</span>
+                  </div>
+                  <WowBars wow={weeklyData.week_over_week} />
                 </section>
 
                 {/* 2. 互联网渠道占公司开户占比 */}

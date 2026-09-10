@@ -85,7 +85,8 @@ class HttpClient {
     if ((isMobileClient() || isPwaClient()) && fullUrl.includes('/api/v1/')) {
       try {
         const body = config.body ? JSON.parse(config.body as string) : {};
-        const data = await mobileRouteHandler(fullUrl, body);
+        // v4.2.6：透传 HTTP method，供 handler 区分同路径不同方法（如 GET/PUT system/llm-config）
+        const data = await mobileRouteHandler(fullUrl, body, config.method);
         return { success: true, data: data as T };
       } catch (error) {
         const msg = error instanceof Error ? error.message : '本地查询失败';

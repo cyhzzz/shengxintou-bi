@@ -128,7 +128,7 @@ export async function saveBlobFile({ filename, data }: SaveOptions): Promise<str
 
   // 文件名安全化：Capacitor Filesystem 对中文/特殊符号兼容性较差，统一转 ASCII
   // 保留扩展名，主体用时间戳 + 原文件名 hash
-  const ext = (filename.toLowerCase().match(/\.(png|pdf|jpg|jpeg|webp)$/) || ['', 'png'])[1];
+  const ext = (filename.toLowerCase().match(/\.(png|pdf|jpg|jpeg|webp|html)$/) || ['', 'png'])[1];
   const safeName = `report_${Date.now()}.${ext}`;
 
   if (isMobileClient()) {
@@ -145,7 +145,7 @@ export async function saveBlobFile({ filename, data }: SaveOptions): Promise<str
   }
 
   // Web/Desktop：浏览器 <a download>
-  const mimeType = ext === 'pdf' ? 'application/pdf' : 'image/png';
+  const mimeType = ext === 'pdf' ? 'application/pdf' : ext === 'html' ? 'text/html' : 'image/png';
   const link = document.createElement('a');
   link.href = `data:${mimeType};base64,${base64}`;
   link.download = filename;
@@ -160,4 +160,19 @@ export async function saveBlobFile({ filename, data }: SaveOptions): Promise<str
  */
 export function buildMobileSaveMessage(originalFilename: string, savedUri: string): string {
   return `${originalFilename} 已保存到 Documents 目录（${savedUri}），可用系统文件管理器查看`;
+}
+
+/**
+ * 保存自包含单文件 HTML（UTF-8 文本）
+ *
+ * TextEncoder 编码后分块转 base64：移动端 Filesystem（不指定 encoding =
+ * base64 解码写二进制）写入的即 UTF-8 字节；Web 端 data URL 标记 text/html。
+ */
+export async function saveHtmlFile({ filename, html }: { filename: string; html: string }): Promise<string> {
+  const bytes = new TextEncoder().encode(html);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return saveBlobFile({ filename, data: btoa(binary) });
 }

@@ -782,7 +782,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 环比角标：小字 + 淡色，弱化视觉（中国股市惯例：上升红、下降绿） */
+/* 环比角标：小字 + 淡色，弱化视觉（中国股市惯例：上升红、下降绿）
+   色值与 index.tsx「周报页语义色板」WOW_UP/WOW_DOWN/WOW_NA 一一对应，改色需两处同步 */
 .wowSup {
   font-family: 'JetBrains Mono', 'SF Mono', monospace;
   font-size: 9px;
@@ -799,7 +800,7 @@
   }
 
   &[data-positive='na'] {
-    color: #bfbfbf;
+    color: #b9bdc9;
   }
 }
 

@@ -41,7 +41,7 @@ export interface FeatureFlags {
   showAppMarketAttribution: boolean;
   /** 侧边栏「数据体检」菜单（智能诊断引擎，数据健康度按月体检，规则引擎只读聚合） */
   showIntelligentDiagnosis: boolean;
-  /** 侧边栏「AI 分析报告」菜单（v4.2.0：LLM 跨月趋势分析，首期不覆盖移动端） */
+  /** 侧边栏「AI 分析报告」菜单（v4.2.0 LLM 跨月趋势分析；v4.2.6 移动端开放，mobileRouteHandler 已实现） */
   showIntelligentAnalysis: boolean;
 }
 
@@ -95,8 +95,9 @@ const mobileFlags: FeatureFlags = {
   showAppMarketAttribution: true,
   // v4.1.9：移动端开放智能诊断（已移植到 mobileRouteHandler /reports/diagnosis，本地 SQLite 只读聚合）
   showIntelligentDiagnosis: true,
-  // v4.2.0：首期不覆盖移动端（依赖 Flask 后端 API 与本机 LLM 配置文件，mobileRouteHandler 未实现）
-  showIntelligentAnalysis: false,
+  // v4.2.6：移动端开放 AI 分析报告（mobileRouteHandler 已实现 /reports/llm-analysis 与 /system/llm-config*，
+  // LLM 请求走全局 fetch（安卓端已被 CapacitorHttp 接管，直连免 CORS），配置存本机 localStorage）
+  showIntelligentAnalysis: true,
 };
 
 /**

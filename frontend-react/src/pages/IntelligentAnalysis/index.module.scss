@@ -125,3 +125,21 @@
     color: var(--color-text-secondary);
   }
 }
+
+// P2-B 证据卡：折叠面板（默认收起）+ 面板内多组小表
+.evidenceCollapse {
+  margin-bottom: var(--spacer-12);
+}
+
+.evidenceStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-16);
+}
+
+.evidenceGroupTitle {
+  margin-bottom: var(--spacer-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+}

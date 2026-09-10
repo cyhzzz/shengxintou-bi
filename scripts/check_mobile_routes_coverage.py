@@ -5,6 +5,9 @@
 检测：
   - case 总数 vs 测试用例数
   - 每个 case 路径是否在 test_mobile_routes.py 中有对应测试（按 basename 匹配）
+  - handler 返回值不得带 success 响应包装（http.ts 已统一包装）
+
+无 SQL 查询的 case（纯前端本地逻辑）列入 NO_SQL_CASES 豁免，需注明理由。
 
 退出码：
   0 = 全部 case 都有测试覆盖
@@ -80,8 +83,20 @@ KNOWN_UNTESTED: Dict[str, str] = {
     'reports/weekly/periods': 'low',
     'reports/weekly/data': 'medium',
     'metadata': 'low',
-    # v3.6.4：返回构建时注入的 __APP_VERSION_INFO__，不走 SQL 查询，无需/无法在 SQL 测试框架中覆盖
-    'version/local': 'low',
+}
+
+# 无 SQL 查询的 case：纯前端本地逻辑，不走数据库，无法也无需在 SQL 测试框架中覆盖。
+# 允许新增，但必须注明理由（v4.2.6 起引入此类别，此前仅 KNOWN_UNTESTED）
+# 格式：{case 路径: 理由}
+NO_SQL_CASES: Dict[str, str] = {
+    # v3.6.4：返回构建时注入的 __APP_VERSION_INFO__，不走 SQL 查询
+    'version/local': '构建时注入 __APP_VERSION_INFO__，无 SQL 查询',
+    # v4.2.6：LLM 配置存本机 localStorage，无 SQL
+    'system/llm-config': '配置存本机 localStorage，无 SQL 查询',
+    # v4.2.6：前端 fetch 直连 LLM Provider，无 SQL
+    'system/llm-config/test': 'fetch 直连 LLM Provider，无 SQL 查询',
+    # v4.2.6：取数复用 reports/diagnosis 链路（已有测试覆盖），自身无 SQL
+    'reports/llm-analysis': '复用 reports/diagnosis 取数链路，自身无 SQL 查询',
 }
 
 
@@ -189,7 +204,14 @@ def main() -> int:
             untested.add(case)
 
     known_untested = untested & set(KNOWN_UNTESTED.keys())
-    new_untested = untested - set(KNOWN_UNTESTED.keys())
+    no_sql_cases = untested & set(NO_SQL_CASES.keys())
+    new_untested = untested - set(KNOWN_UNTESTED.keys()) - set(NO_SQL_CASES.keys())
+
+    if no_sql_cases:
+        print(f'--- 无 SQL 查询 case（{len(no_sql_cases)} 个，列入 NO_SQL_CASES，不影响 CI） ---')
+        for case in sorted(no_sql_cases):
+            print(f'  {case:<50}  {NO_SQL_CASES.get(case, "")}')
+        print()
 
     if known_untested:
         print(f'--- 已知未测试（{len(known_untested)} 个，记录在 KNOWN_UNTESTED，不影响 CI） ---')

@@ -328,6 +328,7 @@ def run_analysis(month=None, force=False):
                 'model': model,
                 'generated_at': cached.get('generated_at', ''),
                 'cached': True,
+                'evidence': business,
             }, None
     try:
         content, _ = call_chat(cfg, [
@@ -343,4 +344,5 @@ def run_analysis(month=None, force=False):
         'model': model,
         'generated_at': datetime.now().isoformat(timespec='seconds'),
         'cached': False,
+        'evidence': business,
     }, None

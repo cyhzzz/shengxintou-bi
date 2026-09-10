@@ -106,6 +106,10 @@ frontend-react/.playwright/
 # superpowers（技能相关，不入主仓）
 docs/superpowers/
 
+# RedSkill 商店安装的技能（个人本地工具，不入库；项目规则分发技能除外）
+skills/*
+!skills/shengxintou-bi-rules/
+
 # ===== 根目录的其他目录（不包含在开发代码中）=====
 ../../版本输出/
 ../../temp/

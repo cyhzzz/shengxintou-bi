@@ -556,12 +556,98 @@ export interface LlmConfigPayload {
   model?: string;
   timeout_seconds?: number;
 }
+// ---- LLM 分析证据卡：backend/utils/llm_evidence 三包随响应返回，供人工核验 AI 结论 ----
+export interface EvidenceVendorSide {
+  cost: number;
+  leads: number;
+  opened: number;
+  valid: number;
+  accounts: number;
+  eff_accounts: number;
+  app_downloads: number;
+  app_activations: number;
+  asset: number;
+  revenue: number;
+  open_rate: number | null;
+  lead_cost: number | null;
+  account_cost: number | null;
+  eff_account_cost: number | null;
+}
+export interface EvidenceVendorRow {
+  vendor: string;
+  current: EvidenceVendorSide;
+  prev3: EvidenceVendorSide;
+  platforms_current: Array<{ platform: string } & EvidenceVendorSide>;
+}
+export interface EvidenceNoteSnapshot {
+  type: string;
+  published: string;
+  impressions: number;
+  ctr: number | null;
+  adds: number;
+  add_cost: number | null;
+  accounts: number;
+  cost: number | null;
+}
+export interface EvidenceNotePack {
+  watch_top: Array<{
+    note: string;
+    opened: number;
+    leads: number;
+    valid: number;
+    accounts: number;
+    snapshot: EvidenceNoteSnapshot | null;
+  }>;
+  declining: Array<{ note: string; prev3_avg_opened: number; current_opened: number; snapshot: EvidenceNoteSnapshot | null }>;
+  stop_candidates: Array<{ note: string; cost: number | null; impressions: number; ctr: number | null; adds: number; accounts: number }>;
+  content_types: Array<{ type: string; notes: number; impressions: number; avg_ctr: number | null; dm: number; adds: number; accounts: number; cost: number | null }>;
+  new_notes: Array<{ note: string; type: string; published: string; impressions: number; ctr: number | null; adds: number; accounts: number; cost: number | null }>;
+  snapshot_note_count: number;
+  conversion_tracked_note_count: number;
+}
+export interface EvidenceAppmarketSide {
+  downloads: number;
+  activated: number;
+  registered: number;
+  funded: number;
+  opened_accounts: number;
+  new_accounts: number;
+  deposited: number;
+  eff_accounts: number;
+  asset: number;
+  revenue: number;
+  activation_rate: number | null;
+  new_account_rate: number | null;
+  asset_per_new_account: number | null;
+  revenue_per_new_account: number | null;
+}
+export interface EvidencePlacementRow {
+  store: string;
+  placement: string;
+  downloads: number;
+  new_accounts: number;
+  asset: number;
+  revenue: number;
+}
+export interface EvidenceAppmarketPack {
+  stores: Array<{ store: string; current: EvidenceAppmarketSide; prev3: EvidenceAppmarketSide }>;
+  placement_potential: EvidencePlacementRow[];
+  placement_watchlist: EvidencePlacementRow[];
+  plans_top: Array<{ store: string; plan: string; downloads: number; new_accounts: number }>;
+}
+export interface LlmEvidence {
+  vendor: EvidenceVendorRow[] | null;
+  note: EvidenceNotePack | null;
+  appmarket: EvidenceAppmarketPack | null;
+}
 export interface LlmAnalysisResult {
   content: string;
   months_used: string[];
   model: string;
   generated_at: string;
   cached: boolean;
+  /** 业务证据摘要（老缓存响应无此字段；单包取数失败对应包为 null） */
+  evidence?: LlmEvidence;
 }
 export const dataServiceLlm = {
   // 查看配置（api_key 永远脱敏）

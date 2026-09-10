@@ -18,6 +18,7 @@ import { FadeInSection } from '@/components';
 import { ReportFooter } from '@/components/ReportFooter';
 import { dataServiceLlm } from '@/services/dataService';
 import type { LlmAnalysisResult } from '@/services/dataService';
+import EvidenceCards from './EvidenceCards';
 import LlmConfigModal from './LlmConfigModal';
 import styles from './index.module.scss';
 
@@ -129,6 +130,7 @@ const IntelligentAnalysisPage: React.FC = () => {
                 <span className={styles.metaText}>趋势窗口：{result.months_used?.join(' → ')}</span>
                 <span className={styles.metaText}>生成时间：{result.generated_at}</span>
               </div>
+              <EvidenceCards evidence={result.evidence} />
               <div className={styles.markdown}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                   {result.content}
@@ -156,9 +158,10 @@ const IntelligentAnalysisPage: React.FC = () => {
       <ReportFooter
         sources={[
           { label: '数据接口', value: 'POST /api/v1/reports/llm-analysis（手动触发，body: {month?, force?}）' },
-          { label: 'LLM 配置', value: 'PUT /api/v1/system/llm-config（OpenAI 协议，存本机 USER_DATA_DIR/llm_config.json，api_key 脱敏）' },
+          { label: 'LLM 配置', value: 'PUT /api/v1/system/llm-config（OpenAI 协议；桌面/Web 存 USER_DATA_DIR，移动端存本机 localStorage，api_key 脱敏）' },
           { label: '分析取数', value: '目标月 + 前 3 个月的智能诊断信号（backend/utils/diagnosis），无信号月份自动剔除' },
           { label: '输出口径', value: '内置 prompt 强制含「跨月趋势对比」章节；结果按（信号哈希 + 模型 + prompt 版本）缓存于本机 llm_analysis_cache' },
+          { label: '证据卡', value: '响应附业务证据摘要（厂商经营/小红书笔记/应用市场，来自 backend/utils/llm_evidence 三包，同时为 LLM user prompt 输入），供人工核验 AI 结论' },
         ]}
       />
 

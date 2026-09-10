@@ -23,6 +23,7 @@ import { handleDataFreshness } from './mobileHandlers/freshness';
 import { handleDiagnosis } from './mobileHandlers/diagnosis';
 import { handleWeeklyPeriods, handleWeeklyData, handleWeeklyDetail } from './mobileHandlers/weekly';
 import { handleMetadata } from './mobileHandlers/metadata';
+import { handleLlmConfigGet, handleLlmConfigSave, handleLlmConfigTest, handleLlmAnalysis } from './mobileHandlers/llmAnalysis';
 
 // v3.6.4：由 vite.config.ts define 注入的 version.json 内容（构建时确定）
 // 移动端/PWA 端关于页的 version/local 端点直接返回此对象
@@ -43,9 +44,10 @@ function extractApiPath(url: string): string {
 /**
  * 移动端路由处理器入口
  *
- * 将前端 API 请求 URL + body 映射到本地 SQLite 查询，返回与 Flask 后端一致的 data 结构。
+ * 将前端 API 请求 URL + body 映射到本地查询，返回与 Flask 后端一致的 data 结构。
+ * v4.2.6：新增 method 参数，供同路径多方法端点区分（如 GET/PUT system/llm-config）。
  */
-export async function mobileRouteHandler(url: string, body: any): Promise<any> {
+export async function mobileRouteHandler(url: string, body: any, method?: string): Promise<any> {
   const path = extractApiPath(url);
 
   switch (path) {
@@ -168,6 +170,15 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     // v4.1.9：智能辅助诊断（数据健康度按月体检，与后端 /reports/diagnosis 同口径）
     case 'reports/diagnosis':
       return handleDiagnosis(url);
+
+    // v4.2.6：AI 分析报告（LLM 配置存本机 localStorage，分析复用 diagnosis 数据链路 + fetch 直连 LLM，
+    // 与后端 /system/llm-config*、/reports/llm-analysis 同口径）
+    case 'system/llm-config':
+      return (method || 'GET').toUpperCase() === 'PUT' ? handleLlmConfigSave(body) : handleLlmConfigGet();
+    case 'system/llm-config/test':
+      return handleLlmConfigTest(body);
+    case 'reports/llm-analysis':
+      return handleLlmAnalysis(url, body);
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);
