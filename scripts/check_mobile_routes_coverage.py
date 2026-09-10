@@ -95,8 +95,6 @@ NO_SQL_CASES: Dict[str, str] = {
     'system/llm-config': '配置存本机 localStorage，无 SQL 查询',
     # v4.2.6：前端 fetch 直连 LLM Provider，无 SQL
     'system/llm-config/test': 'fetch 直连 LLM Provider，无 SQL 查询',
-    # v4.2.6：取数复用 reports/diagnosis 链路（已有测试覆盖），自身无 SQL
-    'reports/llm-analysis': '复用 reports/diagnosis 取数链路，自身无 SQL 查询',
 }
 
 

@@ -227,6 +227,108 @@ tests = [
           GROUP BY substr("下载日期", 1, 7)''',
         'params': ['2026-06', '2026-07', '2026-08'],
     },
+    {
+        # v4.2.6 AI 分析 business.vendor（handleLlmAnalysis → llmEvidence）：
+        # 厂商×平台×月统一漏斗超集聚合，与后端 llm_evidence.fetch_vendor_monthly 对齐
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT substr("日期", 1, 7) AS month,
+            COALESCE(NULLIF("厂商", ''), '未归因') AS vendor,
+            COALESCE(NULLIF("平台", ''), '未知') AS platform,
+            SUM("花费") AS cost,
+            SUM("线索数") AS leads,
+            SUM("开口人数") AS opened,
+            SUM("有效线索数") AS valid,
+            SUM("开户人数") AS accounts,
+            SUM("有效户人数") AS eff_accounts,
+            SUM("APP下载数") AS app_downloads,
+            SUM("APP激活人数") AS app_activations,
+            SUM("客户资产") AS asset,
+            SUM("客户创收") AS revenue
+          FROM agg_vendor_daily
+          WHERE substr("日期", 1, 7) IN (?, ?, ?, ?)
+          GROUP BY substr("日期", 1, 7), COALESCE(NULLIF("厂商", ''), '未归因'), COALESCE(NULLIF("平台", ''), '未知')''',
+        'params': ['2026-06', '2026-07', '2026-08', '2026-09'],
+    },
+    {
+        # v4.2.6 AI 分析 business.note 转化侧：笔记×月非存量聚合
+        # （存量剔除在有效线索之后由 build 层处理，SQL 与后端 fetch_note_conversion_monthly 对齐）
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT COALESCE(NULLIF("笔记ID", ''), '未标注') AS note_id,
+            MAX("笔记名称") AS note_name,
+            substr("线索日期", 1, 7) AS month,
+            COUNT(*) AS leads,
+            SUM(CASE WHEN ("是否为存量客户" IS NULL OR "是否为存量客户" = 0) AND "是否客户开口" = 1 THEN 1 ELSE 0 END) AS opened,
+            SUM(CASE WHEN ("是否为存量客户" IS NULL OR "是否为存量客户" = 0) AND "是否有效线索" = 1 THEN 1 ELSE 0 END) AS valid,
+            SUM(CASE WHEN ("是否为存量客户" IS NULL OR "是否为存量客户" = 0) AND "是否开户" = 1 THEN 1 ELSE 0 END) AS accounts
+          FROM fact_conv_content
+          WHERE substr("线索日期", 1, 7) IN (?, ?, ?, ?)
+            AND ("是否为存量客户" IS NULL OR "是否为存量客户" = 0)
+            AND "笔记ID" IS NOT NULL AND "笔记ID" != ''
+          GROUP BY COALESCE(NULLIF("笔记ID", ''), '未标注'), substr("线索日期", 1, 7)''',
+        'params': ['2026-06', '2026-07', '2026-08', '2026-09'],
+    },
+    {
+        # v4.2.6 AI 分析 business.note 投放侧：agg_xhs_note 累计快照，
+        # 与后端 llm_evidence.fetch_note_snapshot 对齐
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT "笔记ID" AS note_id, "笔记标题" AS title, "内容类型" AS type,
+            "发布时间" AS published, "总展现量" AS impressions, "总点击率" AS ctr,
+            "私信进线人数" AS dm, "企微成功添加人数" AS adds, "加微成本" AS add_cost,
+            "开户人数" AS accounts, "消费金额" AS cost
+          FROM agg_xhs_note''',
+        'params': [],
+    },
+    {
+        # v4.2.6 AI 分析 business.appmarket：商店×月漏斗（强制互联网引流，
+        # 新开户为末段指标不过滤），与后端 llm_evidence.fetch_appmarket_store_monthly 对齐
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT COALESCE(LOWER(NULLIF("应用市场", '')), '未知') AS store,
+            substr("下载日期", 1, 7) AS month,
+            COUNT(*) AS downloads,
+            SUM(CASE WHEN "是否激活APP" = 1 THEN 1 ELSE 0 END) AS activated,
+            SUM(CASE WHEN "是否开户注册" = 1 THEN 1 ELSE 0 END) AS registered,
+            SUM(CASE WHEN "是否创建完资金账号" = 1 THEN 1 ELSE 0 END) AS funded,
+            SUM(CASE WHEN "是否开户成功" = 1 THEN 1 ELSE 0 END) AS opened_accounts,
+            SUM(CASE WHEN "是否新开户" = 1 THEN 1 ELSE 0 END) AS new_accounts,
+            SUM(CASE WHEN "是否入金" = 1 THEN 1 ELSE 0 END) AS deposited,
+            SUM(CASE WHEN "是否有效户" = 1 THEN 1 ELSE 0 END) AS eff_accounts,
+            SUM("总资产") AS asset,
+            SUM("累计创收") AS revenue
+          FROM fact_conv_appmarket
+          WHERE substr("下载日期", 1, 7) IN (?, ?, ?, ?) AND "渠道类型" = '互联网引流'
+          GROUP BY COALESCE(LOWER(NULLIF("应用市场", '')), '未知'), substr("下载日期", 1, 7)''',
+        'params': ['2026-06', '2026-07', '2026-08', '2026-09'],
+    },
+    {
+        # v4.2.6 AI 分析 business.appmarket 版位潜力：当月商店×版位 JOIN 维表，
+        # 与后端 llm_evidence.fetch_appmarket_placement 对齐
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT COALESCE(LOWER(NULLIF(f."应用市场", '')), '未知') AS store,
+            COALESCE(NULLIF(d."版位", ''), '未分类') AS placement,
+            COUNT(*) AS downloads,
+            SUM(CASE WHEN f."是否新开户" = 1 THEN 1 ELSE 0 END) AS new_accounts,
+            SUM(f."总资产") AS asset,
+            SUM(f."累计创收") AS revenue
+          FROM fact_conv_appmarket f
+          INNER JOIN dim_ad_plan_class d ON f."广告计划ID" = d."广告分组ID"
+          WHERE substr(f."下载日期", 1, 7) = ? AND f."渠道类型" = '互联网引流'
+          GROUP BY COALESCE(LOWER(NULLIF(f."应用市场", '')), '未知'), COALESCE(NULLIF(d."版位", ''), '未分类')''',
+        'params': ['2026-08'],
+    },
+    {
+        # v4.2.6 AI 分析 business.appmarket 计划 TOP：当月商店×广告分组 JOIN 维表，
+        # 与后端 llm_evidence.fetch_appmarket_plans_top 对齐
+        'name': 'reports/llm-analysis',
+        'sql': '''SELECT COALESCE(LOWER(NULLIF(f."应用市场", '')), '未知') AS store,
+            COALESCE(NULLIF(d."广告分组名称", ''), '未命名计划') AS plan,
+            COUNT(*) AS downloads,
+            SUM(CASE WHEN f."是否新开户" = 1 THEN 1 ELSE 0 END) AS new_accounts
+          FROM fact_conv_appmarket f
+          INNER JOIN dim_ad_plan_class d ON f."广告计划ID" = d."广告分组ID"
+          WHERE substr(f."下载日期", 1, 7) = ? AND f."渠道类型" = '互联网引流'
+          GROUP BY COALESCE(LOWER(NULLIF(f."应用市场", '')), '未知'), COALESCE(NULLIF(d."广告分组名称", ''), '未命名计划')''',
+        'params': ['2026-08'],
+    },
 ]
 
 if __name__ == '__main__':

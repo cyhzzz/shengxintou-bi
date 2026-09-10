@@ -3,14 +3,15 @@
  *
  * - 配置存本机 localStorage（移动端无 USER_DATA_DIR；PWA 端禁用 Capacitor 插件，
  *   Android 端 fetch 已被 CapacitorHttp 接管，直连 LLM Provider 免 CORS）
- * - 分析复用 diagnosis 数据链路（runDiagnosis × 目标月与前 3 月）；business 证据包
- *   首期传 null（后端 llm_evidence 三包不移植，SYSTEM_PROMPT 明示 null 子包跳过解读不编造）
+ * - 分析复用 diagnosis 数据链路（runDiagnosis × 目标月与前 3 月）；business 三包
+ *   （vendor/note/appmarket）由 llmEvidence.ts 同口径移植，随 prompt 传入、随响应 evidence 透传
  * - SYSTEM_PROMPT / PROMPT_VERSION 与后端 llm.py 两端同步维护：修改任一侧必须同步另一侧，
  *   否则两端报告口径漂移且缓存失效行为不一致
  * - 错误处理：throw Error(消息)，由 http.ts 移动端包装为失败响应；消息文本与后端一致，
  *   且不含 'not implemented' / 'database' / 'connection' 等错误替换触发词
  */
 import { runDiagnosis, type DiagnosisResult } from './diagnosis';
+import { buildBusinessEvidence, type BusinessEvidence } from './llmEvidence';
 
 const CONFIG_STORAGE_KEY = 'sxt_mobile_llm_config';
 const CACHE_STORAGE_PREFIX = 'sxt_mobile_llm_cache_';
@@ -281,9 +282,9 @@ async function collectTrendData(month?: string): Promise<[string, DiagnosisResul
   return [base, results];
 }
 
-// business 证据包首期为 null：null 子包按 SYSTEM_PROMPT 规则跳过解读、不编造
-function buildUserPrompt(results: DiagnosisResult[]): string {
-  return JSON.stringify({ diagnosis: results.map(slimResult), business: null });
+// business 证据包由 llmEvidence.ts 同口径构建；null 子包按 SYSTEM_PROMPT 规则跳过解读、不编造
+function buildUserPrompt(results: DiagnosisResult[], business: BusinessEvidence): string {
+  return JSON.stringify({ diagnosis: results.map(slimResult), business });
 }
 
 // ==== 结果缓存（localStorage 版 load_cache / save_cache，键 = prompt sha1 + model）====
@@ -333,7 +334,8 @@ async function runAnalysis(month?: string, force = false): Promise<Record<string
   const [target, results] = await collectTrendData(month);
   if (!results.length) throw new Error('目标月及前 3 个月均无诊断数据，无法生成分析');
   const monthsUsed = results.map((r) => r.month);
-  const userPrompt = buildUserPrompt(results);
+  const business = await buildBusinessEvidence(target);
+  const userPrompt = buildUserPrompt(results, business);
   // 缓存键覆盖整个 user prompt：诊断信号变化即触发失效
   const signalsHash = await sha1Hex(userPrompt);
   const model = cfg.model || '';
@@ -346,7 +348,7 @@ async function runAnalysis(month?: string, force = false): Promise<Record<string
         model,
         generated_at: cached.generated_at || '',
         cached: true,
-        evidence: null,
+        evidence: business,
       };
     }
   }
@@ -361,7 +363,7 @@ async function runAnalysis(month?: string, force = false): Promise<Record<string
     model,
     generated_at: localNowIsoSeconds(),
     cached: false,
-    evidence: null,
+    evidence: business,
   };
 }
 
