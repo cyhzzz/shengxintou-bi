@@ -68,22 +68,11 @@ const menuItems: MenuProps['items'] = [
     icon: <FunnelPlotOutlined />,
     label: '转化漏斗',
   },
+  // v4.1.9: 厂商分析
   {
     key: '/agency-analysis',
     icon: <BarChartOutlined />,
     label: '厂商分析',
-  },
-  // v4.1.9: 智能诊断（数据健康度按月体检）
-  {
-    key: '/diagnosis',
-    icon: <MedicineBoxOutlined />,
-    label: '智能诊断',
-  },
-  // v4.2.0: 智能分析（LLM 跨月趋势对比叙述）
-  {
-    key: '/intelligent-analysis',
-    icon: <ThunderboltOutlined />,
-    label: '智能分析',
   },
   { type: 'divider' },
   // ===== 第二段：业务专题 =====
@@ -159,6 +148,18 @@ const menuItems: MenuProps['items'] = [
     icon: <FilePdfOutlined />,
     label: '报告生成',
   },
+  // v4.1.9: 数据体检（智能诊断引擎，数据健康度按月体检；v4.2.0 移至报告生成下方、AI 分析报告上方）
+  {
+    key: '/diagnosis',
+    icon: <MedicineBoxOutlined />,
+    label: '数据体检',
+  },
+  // v4.2.0: AI 分析报告（LLM 跨月趋势对比叙述，取数即数据体检信号；桌面/Web 版，首期不覆盖移动端）
+  {
+    key: '/intelligent-analysis',
+    icon: <ThunderboltOutlined />,
+    label: 'AI 分析报告',
+  },
   {
     key: 'system',
     icon: <SettingOutlined />,
@@ -201,7 +202,7 @@ export default function MainLayout() {
       if (it.key === '/diagnosis' && !featureFlags.showIntelligentDiagnosis) {
         return null;
       }
-      // v4.2.0：过滤智能分析（首期不覆盖移动端）
+      // v4.2.0：过滤 AI 分析报告（首期不覆盖移动端）
       if (it.key === '/intelligent-analysis' && !featureFlags.showIntelligentAnalysis) {
         return null;
       }

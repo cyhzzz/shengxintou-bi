@@ -258,7 +258,7 @@ def run_analysis(month=None, force=False):
     """智能分析主入口：跨月取数 → 缓存 → LLM；返回 (data, (code, message) | None)"""
     cfg = load_config()
     if not cfg or not cfg.get('api_key'):
-        return None, ('LLM_NOT_CONFIGURED', '尚未配置 LLM，请先在「智能分析」页点击「LLM 配置」完成设置')
+        return None, ('LLM_NOT_CONFIGURED', '尚未配置 LLM，请先在「AI 分析报告」页点击「LLM 配置」完成设置')
     target, results = collect_trend_data(month)
     if not results:
         return None, ('INVALID_PARAMETER', '目标月及前 3 个月均无诊断数据，无法生成分析')

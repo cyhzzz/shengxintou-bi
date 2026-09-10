@@ -1,11 +1,11 @@
 /**
- * 智能分析（v4.2.0）
+ * AI 分析报告（智能分析，v4.2.0；v4.2.0 菜单更名并移至「报告生成」下方）
  *
  * 数据源: POST /api/v1/reports/llm-analysis（手动触发）。
  * 取数: 目标月 + 前 3 个月的智能诊断信号（backend/utils/diagnosis 规则引擎），
  *   使用内置 prompt（强制含「跨月趋势对比」章节）交由 OpenAI 协议 LLM 生成 Markdown 分析。
  * LLM Provider 在「LLM 配置」弹窗配置（存后端 USER_DATA_DIR/llm_config.json 本机文件）。
- * 结果按（信号哈希 + 模型）缓存，信号未变时秒回；「重新生成」强制绕过缓存。
+ * 结果按（信号哈希 + 模型 + prompt 版本）缓存，信号未变时秒回；「重新生成」强制绕过缓存。
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, App, Button, Card, DatePicker, Empty, Popconfirm, Space, Spin, Tag } from 'antd';
@@ -121,7 +121,7 @@ const IntelligentAnalysisPage: React.FC = () => {
             <Card
               size="small"
               className={styles.resultCard}
-              title={`智能分析报告 · ${result.months_used?.[result.months_used.length - 1] || ''}`}
+              title={`AI 分析报告 · ${result.months_used?.[result.months_used.length - 1] || ''}`}
             >
               <div className={styles.metaBar}>
                 {result.cached ? <Tag color="blue">缓存命中</Tag> : <Tag color="processing">新生成</Tag>}
@@ -158,7 +158,7 @@ const IntelligentAnalysisPage: React.FC = () => {
           { label: '数据接口', value: 'POST /api/v1/reports/llm-analysis（手动触发，body: {month?, force?}）' },
           { label: 'LLM 配置', value: 'PUT /api/v1/system/llm-config（OpenAI 协议，存本机 USER_DATA_DIR/llm_config.json，api_key 脱敏）' },
           { label: '分析取数', value: '目标月 + 前 3 个月的智能诊断信号（backend/utils/diagnosis），无信号月份自动剔除' },
-          { label: '输出口径', value: '内置 prompt 强制含「跨月趋势对比」章节；结果按（信号哈希 + 模型）缓存于本机 llm_analysis_cache' },
+          { label: '输出口径', value: '内置 prompt 强制含「跨月趋势对比」章节；结果按（信号哈希 + 模型 + prompt 版本）缓存于本机 llm_analysis_cache' },
         ]}
       />
 

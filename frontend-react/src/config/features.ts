@@ -39,9 +39,9 @@ export interface FeatureFlags {
   showKosWeekly: boolean;
   /** 侧边栏「应用市场 · 归因转化率」菜单（移动端已开放，mobileRouteHandler 已实现） */
   showAppMarketAttribution: boolean;
-  /** 侧边栏「智能诊断」菜单（数据健康度按月体检，规则引擎只读聚合） */
+  /** 侧边栏「数据体检」菜单（智能诊断引擎，数据健康度按月体检，规则引擎只读聚合） */
   showIntelligentDiagnosis: boolean;
-  /** 侧边栏「智能分析」菜单（v4.2.0：LLM 跨月趋势分析，首期不覆盖移动端） */
+  /** 侧边栏「AI 分析报告」菜单（v4.2.0：LLM 跨月趋势分析，首期不覆盖移动端） */
   showIntelligentAnalysis: boolean;
 }
 

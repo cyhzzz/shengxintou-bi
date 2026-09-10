@@ -1,5 +1,5 @@
 /**
- * 智能诊断（v4.1.9）
+ * 智能诊断引擎（v4.1.9；v4.2.0 菜单名更名「数据体检」，与 LLM 分析页区分）
  *
  * 数据源: GET /api/v1/reports/diagnosis（backend/utils/diagnosis 规则引擎，只读聚合）。
  * 页面结构: 月份筛选 → 总体健康概览（MetricSection/MetricCard）→ 底表快照对齐（Table）
