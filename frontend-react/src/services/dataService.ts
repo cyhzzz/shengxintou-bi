@@ -495,6 +495,50 @@ export interface DiagnosisResult {
   snapshot_dates: DiagnosisSnapshotDate[];
   summary: DiagnosisSummary;
   items: DiagnosisItem[];
+  content_evidence?: ContentEvidence | null;
+}
+
+export interface ContentEvidencePlatformMonthly {
+  platform: string;
+  month: string;
+  leads: number;
+  open_rate: number | null;
+  zero_interaction_rate: number | null;
+  prev3_open_rate: number | null;
+  prev3_zero_interaction_rate: number | null;
+}
+
+export interface ContentEvidenceDaily {
+  platform: string;
+  date: string;
+  leads: number;
+  open_rate: number | null;
+  zero_interaction_rate: number | null;
+}
+
+export interface ContentEvidenceXun {
+  platform: string;
+  xun: '上旬' | '中旬' | '下旬';
+  leads: number;
+  open_rate: number | null;
+  zero_interaction_rate: number | null;
+}
+
+export interface ContentEvidenceRecovery {
+  window: string;
+  dates: string[];
+  open_rate: number | null;
+  prev3_open_rate: number | null;
+  recovered: boolean;
+}
+
+export interface ContentEvidence {
+  month: string;
+  baseline_months: string[];
+  platform_monthly: ContentEvidencePlatformMonthly[];
+  daily: ContentEvidenceDaily[];
+  xun: ContentEvidenceXun[];
+  recovery: ContentEvidenceRecovery;
 }
 
 // v4.2.0: LLM 智能分析（OpenAI 协议；配置存后端 USER_DATA_DIR/llm_config.json 本机文件）

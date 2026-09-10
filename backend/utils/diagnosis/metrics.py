@@ -42,6 +42,80 @@ def _content_flag_sum(column):
     return func.sum(case((and_(CONTENT_NON_STOCK, column == 1), 1), else_=0))
 
 
+def ratio(numerator, denominator):
+    """公共比率计算：分母为空/0 返回 None，结果保留 4 位小数"""
+    if not denominator:
+        return None
+    return round(numerator / denominator, 4)
+
+
+def _content_zero_interaction_sum():
+    return func.sum(case(
+        (and_(CONTENT_NON_STOCK, or_(FactConvContent.互动次数.is_(None), FactConvContent.互动次数 == 0)), 1),
+        else_=0,
+    ))
+
+
+_PLATFORM_EXPR = func.coalesce(func.nullif(FactConvContent.平台来源, ''), '未知')
+
+
+def fetch_content_platform_daily(month):
+    rows = db.session.query(
+        _PLATFORM_EXPR.label('platform'),
+        FactConvContent.线索日期.label('date'),
+        func.count().label('leads'),
+        _content_flag_sum(FactConvContent.是否客户开口).label('opened'),
+        _content_flag_sum(FactConvContent.是否有效线索).label('valid'),
+        _content_zero_interaction_sum().label('zero'),
+    ).filter(
+        func.substr(FactConvContent.线索日期, 1, 7) == month,
+        CONTENT_NON_STOCK,
+    ).group_by(_PLATFORM_EXPR, FactConvContent.线索日期).all()
+    result = []
+    for row in rows:
+        parsed = parse_date(row.date)
+        if not parsed:
+            continue
+        result.append({
+            'platform': row.platform,
+            'date': parsed,
+            'leads': int(row.leads or 0),
+            'opened': int(row.opened or 0),
+            'valid': int(row.valid or 0),
+            'zero': int(row.zero or 0),
+        })
+    result.sort(key=lambda item: (item['platform'], item['date']))
+    return result
+
+
+def fetch_content_platform_monthly(months):
+    month_expr = func.substr(FactConvContent.线索日期, 1, 7)
+    rows = db.session.query(
+        _PLATFORM_EXPR.label('platform'),
+        month_expr.label('month'),
+        func.count().label('leads'),
+        _content_flag_sum(FactConvContent.是否客户开口).label('opened'),
+        _content_flag_sum(FactConvContent.是否有效线索).label('valid'),
+        _content_zero_interaction_sum().label('zero'),
+    ).filter(
+        month_expr.in_(months),
+        CONTENT_NON_STOCK,
+    ).group_by(_PLATFORM_EXPR, month_expr).all()
+    result = [
+        {
+            'platform': row.platform,
+            'month': row.month,
+            'leads': int(row.leads or 0),
+            'opened': int(row.opened or 0),
+            'valid': int(row.valid or 0),
+            'zero': int(row.zero or 0),
+        }
+        for row in rows
+    ]
+    result.sort(key=lambda item: (item['platform'], item['month']))
+    return result
+
+
 def fetch_snapshot_dates():
     today = date.today()
     result = []
@@ -71,6 +145,7 @@ def fetch_content_monthly(months):
         func.count().label('total'),
         _content_flag_sum(FactConvContent.是否客户开口).label('opened'),
         _content_flag_sum(FactConvContent.是否有效线索).label('valid'),
+        _content_zero_interaction_sum().label('zero'),
         func.sum(case((FactConvContent.是否为存量客户 == 1, 1), else_=0)).label('stock'),
     ).filter(month_expr.in_(months)).group_by(month_expr).all()
     result = {}
@@ -79,6 +154,7 @@ def fetch_content_monthly(months):
             'total': int(row.total or 0),
             'opened': int(row.opened or 0),
             'valid': int(row.valid or 0),
+            'zero': int(row.zero or 0),
             'stock': int(row.stock or 0),
         }
     return result
@@ -90,6 +166,7 @@ def fetch_content_daily(month):
         func.count().label('total'),
         _content_flag_sum(FactConvContent.是否客户开口).label('opened'),
         _content_flag_sum(FactConvContent.是否有效线索).label('valid'),
+        _content_zero_interaction_sum().label('zero'),
     ).filter(
         func.substr(FactConvContent.线索日期, 1, 7) == month,
     ).group_by(FactConvContent.线索日期).all()
@@ -103,6 +180,7 @@ def fetch_content_daily(month):
             'total': int(row.total or 0),
             'opened': int(row.opened or 0),
             'valid': int(row.valid or 0),
+            'zero': int(row.zero or 0),
         })
     result.sort(key=lambda item: item['date'])
     return result
@@ -154,6 +232,45 @@ def fetch_appmarket_monthly(months):
             'account_created': int(row.account_created or 0),
             'devices': int(row.devices or 0),
             'new_accounts': int(row.new_accounts or 0),
-            'new_assets': float(row.new_assets or 0.0),
-        }
+        'new_assets': float(row.new_assets or 0.0),
+    }
     return result
+
+
+XUN_ORDER = {'上旬': 0, '中旬': 1, '下旬': 2}
+
+
+def xun_of_day(day):
+    """旬级划分：1-10 上旬 / 11-20 中旬 / 21-月末 下旬"""
+    if day <= 10:
+        return '上旬'
+    if day <= 20:
+        return '中旬'
+    return '下旬'
+
+
+def summarize_xun_rows(rows):
+    """按 (平台来源, 旬) 聚合逐日行，输出按平台与旬序排列的旬级列表"""
+    buckets = {}
+    for row in rows:
+        key = (row['platform'], xun_of_day(row['date'].day))
+        bucket = buckets.setdefault(key, {'leads': 0, 'opened': 0, 'zero': 0})
+        bucket['leads'] += row['leads']
+        bucket['opened'] += row['opened']
+        bucket['zero'] += row['zero']
+    result = [
+        {
+            'platform': platform,
+            'xun': xun,
+            'leads': bucket['leads'],
+            'open_rate': ratio(bucket['opened'], bucket['leads']),
+            'zero_interaction_rate': ratio(bucket['zero'], bucket['leads']),
+        }
+        for (platform, xun), bucket in buckets.items()
+    ]
+    result.sort(key=lambda item: (item['platform'], XUN_ORDER[item['xun']]))
+    return result
+
+
+def fetch_content_xun_breakdown(month):
+    return summarize_xun_rows(fetch_content_platform_daily(month))

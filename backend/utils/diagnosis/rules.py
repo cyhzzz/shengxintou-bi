@@ -54,6 +54,15 @@ def _make_item(item_id, chain, level, title, detail, evidence, suggestion):
     }
 
 
+def _zero_rate_text(cur_zero, cur_total, prev_zero, prev_total, prev_label):
+    """零互动占比对比文本；任一比率无法计算时返回空串（不打扰原 evidence）"""
+    cur_rate = _rate(cur_zero, cur_total)
+    prev_rate = _rate(prev_zero, prev_total)
+    if cur_rate is None or prev_rate is None:
+        return ''
+    return f'；零互动占比 {cur_rate:.1%}（{prev_label} {prev_rate:.1%}）'
+
+
 def rule_snapshot_freshness(ctx):
     stale_error = []
     stale_warn = []
@@ -157,6 +166,13 @@ def rule_open_rate_collapse(ctx):
     baseline = _rate(opened, total)
     if not baseline:
         return None
+    baseline_months = ctx.get('baseline_months') or []
+    content_monthly = ctx.get('content_monthly') or {}
+    base_zero = sum((content_monthly.get(key) or {}).get('zero', 0) for key in baseline_months)
+    base_total = sum((content_monthly.get(key) or {}).get('total', 0) for key in baseline_months)
+    zero_text = _zero_rate_text(
+        sum(row.get('zero', 0) for row in window), total, base_zero, base_total, '前 3 月基线',
+    )
     threshold = baseline * COLLAPSE_RATIO
     failing = []
     for row in window:
@@ -186,11 +202,14 @@ def rule_open_rate_collapse(ctx):
     if len(longest) > len(shown):
         rates += f" 等 {len(longest)} 天"
     return _make_item(
-        'open_rate_collapse', 'xhs', 'error',
+        'open_rate_collapse',
+        'xhs',
+        'error',
         '开口率连续塌陷',
-        f'评估窗内开口率连续 {len(longest)} 个自然日低于当月基线的 {COLLAPSE_RATIO:.0%}，通常为上游开口状态回写缺失或投放素材异常',
-        f"当月基线 {baseline:.1%}，塌陷区间 {longest[0]['date'].isoformat()} 至 {longest[-1]['date'].isoformat()}；{rates}",
-        '先核对上游 ETL 是否漏更「是否客户开口」状态，再与投放确认素材与链路',
+        f'评估窗内开口率连续 {len(longest)} 个自然日低于当月基线的 {COLLAPSE_RATIO:.0%}；'
+        '具体归因（上游数据回写缺失 vs 素材运营问题）见分平台证据表或 AI 分析报告',
+        f"当月基线 {baseline:.1%}，塌陷区间 {longest[0]['date'].isoformat()} 至 {longest[-1]['date'].isoformat()}；{rates}{zero_text}",
+        '查看分平台证据表或生成 AI 分析报告判定疑似原因；同时核对上游 ETL 的「互动次数 / 是否客户开口」回写是否完整',
     )
 
 
@@ -207,11 +226,12 @@ def rule_open_rate_level(ctx):
     level = 'error' if ratio < OPEN_MOM_ERROR else 'warn'
     if cur_rate < OPEN_ABS_LOW and ratio < 1:
         level = 'error'
+    zero_text = _zero_rate_text(cur.get('zero', 0), cur['total'], prev.get('zero', 0), prev['total'], '上期同窗口')
     return _make_item(
         'open_rate_level', 'xhs', level,
         '开口率环比明显下降',
         f'成熟观察窗（快照日 −{MATURITY_DAYS} 天，与上月同窗口对齐）开口率为上期的 {ratio:.0%}（阈值 warn <{OPEN_MOM_WARN:.0%} / error <{OPEN_MOM_ERROR:.0%}）',
-        f"本期 {cur_rate:.1%}（{cur['total']} 条线索） vs 上期同窗口 {prev_rate:.1%}（{prev['total']} 条线索）",
+        f"本期 {cur_rate:.1%}（{cur['total']} 条线索） vs 上期同窗口 {prev_rate:.1%}（{prev['total']} 条线索）{zero_text}",
         '结合 open_rate_collapse 与上游回写情况判断是数据问题还是真实转化恶化',
     )
 
@@ -224,11 +244,15 @@ def rule_valid_lead_quality(ctx):
     drop = (prev - cur) / prev
     if drop <= VALID_DROP_WARN:
         return None
+    zero_text = _zero_rate_text(
+        ctx['cur_mature'].get('zero', 0), ctx['cur_mature']['total'],
+        ctx['prev_window'].get('zero', 0), ctx['prev_window']['total'], '上期同窗口',
+    )
     return _make_item(
         'valid_lead_quality', 'xhs', 'warn',
         '有效线索量环比下降',
         f'成熟观察窗内有效线索较上月同窗口下降 {drop:.0%}（阈值 >{VALID_DROP_WARN:.0%}）',
-        f'本期 {cur} 条 vs 上期同窗口 {prev} 条',
+        f'本期 {cur} 条 vs 上期同窗口 {prev} 条{zero_text}',
         '区分上游标记缺失与真实线索质量下滑；必要时抽样核对原始明细',
     )
 

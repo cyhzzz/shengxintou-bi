@@ -31,26 +31,44 @@ DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 DEFAULT_TIMEOUT = 60
 TREND_MONTHS = 4
 
-SYSTEM_PROMPT = (
-    '你是一名券商财富管理场景下的广告投放与开户转化分析专家。'
-    '用户提供的是「省心投 BI」智能诊断规则引擎对连续几个月投放数据的体检结果（JSON）：'
-    '信号分三类链路——内容平台（xhs，线索→客户开口→有效线索→开户）、'
-    '应用市场（appmarket，互联网引流：下载→激活→注册→完资金账号→新开户）、'
-    '全局健康度（global）；每条信号含分级（error/warn/info）、标题、明细、数据证据与修复建议。\n'
-    '分析要求：\n'
-    '1. 严格基于给定 JSON 推理，不得编造数据；引用结论时必须附带具体数值证据。\n'
-    '2. 遵循「量级 × 成本 × 质量」诊断框架，区分内容平台与应用市场（互联网引流）双链路，不混算。\n'
-    '3. 遵守证券投顾合规约束：不得输出向不特定公众推荐具体证券、承诺收益等违规表述；'
-    '建议聚焦投放运营动作（素材、计划、出价、落地页、时段、承接链路等）。\n'
-    '4. 必须包含「跨月趋势对比」章节：逐链路对比各月关键指标与信号分级变化，'
-    '明确指出持续恶化、持续改善或新出现的趋势。\n'
-    '5. 用简体中文输出 Markdown，章节结构固定为：\n'
-    '## 总体判断\n## 跨月趋势对比\n## 分链路解读（内容平台 / 应用市场）\n## 关键风险信号\n## 行动建议\n'
-    '其中「行动建议」按优先级排序，每条注明针对的月份与对应信号。'
-)
+SYSTEM_PROMPT = """你是一名给券商投放运营同学写数据体检解读的资深同事。你的读者不是数据分析师：请用大白话，先给结论，再给证据，避免专业黑话；必须出现的指标名（开口率、零互动占比、有效线索率）要顺带用一句话解释。
+
+你会收到两部分输入：
+1. items：自动体检规则产出的异常清单，每条含 chain（链路）、level（warn/error）、title（标题）、detail（详情）、evidence（数值证据）、suggestion（建议）。
+2. content_evidence（仅最后一个月提供）：内容平台证据包，键含义——
+   - platform_monthly：分平台「当月 vs 前 3 月基线」对比（leads 线索数、open_rate 当月开口率、prev3_open_rate 前 3 月开口率、zero_interaction_rate 当月零互动占比、prev3_zero_interaction_rate 前 3 月零互动占比）；
+   - daily：分平台逐日线索数与开口率；
+   - xun：平台 × 旬（上旬 1-10 日 / 中旬 11-20 日 / 下旬 21-月末）走势；
+   - recovery：目标月最后 5 个有数据自然日的开口率是否恢复到前 3 月基线的八成（recovered=true 表示已恢复）。
+   「零互动」指线索的互动次数为空或 0：通常是上游平台没有把互动数据回写回来，不一定是真的没人互动。
+
+归因判断规则（引擎只提供数据，结论由你给出，必须加「疑似」二字）：
+1. 疑似上游数据回写缺失：开口率下降的同时，两个及以上平台的零互动占比同步明显抬升，且恢复判定 recovered=true（月末数据快速恢复）；这种形态更像数据回写问题，而非业务真的变差。
+2. 疑似素材或运营问题：只有单个平台恶化、零互动占比没有同步抬升、且月末持续无恢复。
+3. 证据互相矛盾或不足：不要强行下结论，把疑问写进「需要人工核对的事项」。
+
+置信度只允许三档：高 / 中 / 低，每处归因必须说明主要依据（引用具体数值）。
+
+铁律：
+- 所有归因结论必须以「疑似」开头，不得写成确定性事实。
+- 引用任何数字必须来自输入数据，禁止编造或推算输入中不存在的数字。
+- 内容合规：遵守证券行业宣传规范，不给投资建议，不承诺收益。
+- 行动建议面向投放运营同学（素材、投放、跟单核对），按优先级排序，注明对应月份与信号。
+
+输出使用 Markdown，固定包含以下章节（按顺序）：
+## 总体判断
+第一句用大白话给出本月最重要的一个结论（例：「8 月内容平台开口率下降，大概率是数据回写问题，不是开户真的变差」），再展开 2-3 句。
+## 分链路解读（内容平台 / 应用市场）
+每个链路三段式：一句白话判断 → 最多 2 条数值证据 → 归因方向与置信度。
+## 跨月趋势对比
+逐链路对比最近三个月走势，指出拐点月份与对应信号。
+## 需要人工核对的事项
+列出无法从数据确认、需要人工核对的疑问（如上游 ETL 回写、平台口径变化）。
+## 行动建议
+按优先级列出 3-5 条，注明对应月份与信号，落实到投放运营可执行的动作。"""
 
 # v4.2.0: prompt 结构性变更时递增；缓存命中需校验，避免旧缓存掩盖新 prompt 效果
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3
 
 
 class LlmRequestError(Exception):
@@ -180,14 +198,44 @@ def call_chat(cfg, messages, max_tokens=None, allow_empty_content=False):
     return content or '', int((time.time() - started) * 1000)
 
 
-def _slim_result(result):
+EVIDENCE_MONTHLY_LIMIT = 12
+EVIDENCE_DAILY_LIMIT = 200
+EVIDENCE_XUN_LIMIT = 200
+
+
+def _slim_evidence(evidence):
+    """证据包瘦身：截断大数组防止 payload 爆炸；非 dict 返回 None"""
+    if not isinstance(evidence, dict):
+        return None
+    slim = dict(evidence)
+    slim['platform_monthly'] = (evidence.get('platform_monthly') or [])[:EVIDENCE_MONTHLY_LIMIT]
+    slim['daily'] = (evidence.get('daily') or [])[:EVIDENCE_DAILY_LIMIT]
+    slim['xun'] = (evidence.get('xun') or [])[:EVIDENCE_XUN_LIMIT]
+    return slim
+
+
+def _slim_result(result, include_evidence=False):
     keys = ('id', 'chain', 'level', 'title', 'detail', 'evidence', 'suggestion')
-    return {
+    slim = {
         'month': result.get('month'),
         'snapshot_dates': result.get('snapshot_dates'),
         'summary': result.get('summary'),
-        'items': [{k: item.get(k) for k in keys} for item in result.get('items', [])],
+        'items': [
+            {key: item.get(key) for key in keys}
+            for item in (result.get('items') or [])
+        ],
     }
+    if include_evidence and result.get('content_evidence') is not None:
+        slim['content_evidence'] = _slim_evidence(result['content_evidence'])
+    return slim
+
+
+def _slim_results(results):
+    """仅最后一个月携带证据（证据为当月视角，历史月证据不进 payload）"""
+    return [
+        _slim_result(result, include_evidence=(index == len(results) - 1))
+        for index, result in enumerate(results)
+    ]
 
 
 def collect_trend_data(month=None):
@@ -209,12 +257,13 @@ def collect_trend_data(month=None):
 
 
 def _signals_hash(results):
-    payload = json.dumps([_slim_result(r) for r in results], ensure_ascii=False, sort_keys=True)
-    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+    return hashlib.sha1(
+        json.dumps(_slim_results(results), ensure_ascii=False, sort_keys=True).encode('utf-8')
+    ).hexdigest()
 
 
 def build_user_prompt(results):
-    return json.dumps([_slim_result(r) for r in results], ensure_ascii=False, indent=2)
+    return json.dumps(_slim_results(results), ensure_ascii=False)
 
 
 def _cache_path(month):

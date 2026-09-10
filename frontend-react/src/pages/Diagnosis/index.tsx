@@ -8,7 +8,7 @@
  * 月份语义体检不适用 FilterBar（其绑定全局日期范围），遵循既有特殊报表例外自建月选择器。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Card, DatePicker, Empty, Space, Spin, Table, Tag } from 'antd';
+import { Button, Card, Collapse, DatePicker, Empty, Space, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   BookOutlined,
@@ -27,7 +27,8 @@ import { FadeInSection } from '@/components';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { dataServiceReports } from '@/services/dataService';
-import type { DiagnosisItem, DiagnosisResult } from '@/services/dataService';
+import type { ContentEvidencePlatformMonthly, ContentEvidenceXun, DiagnosisItem, DiagnosisResult } from '@/services/dataService';
+import { sanitizeText } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
 
 type LevelKey = DiagnosisItem['level'];
@@ -56,7 +57,7 @@ const STATUS_TAG_COLOR: Record<StatusKey, string> = {
 const CHAIN_META: Record<DiagnosisItem['chain'], { name: string; icon: React.ReactNode }> = {
   appmarket: { name: '应用市场', icon: <MobileOutlined /> },
   global: { name: '全局数据', icon: <GlobalOutlined /> },
-  xhs: { name: '内容平台（小红书）', icon: <BookOutlined /> },
+  xhs: { name: '内容平台', icon: <BookOutlined /> },
 };
 
 const CHAIN_ORDER: DiagnosisItem['chain'][] = ['appmarket', 'global', 'xhs'];
@@ -78,6 +79,28 @@ const snapshotColumns: ColumnsType<DiagnosisResult['snapshot_dates'][number]> = 
       if (v === null || v === undefined) return '-';
       const color = v > 7 ? 'var(--color-error)' : v > 3 ? 'var(--color-warning)' : undefined;
       return <span style={color ? { color, fontWeight: 600 } : undefined}>{v}</span>;
+    },
+  },
+];
+
+const formatPercent = (value: number | null | undefined) =>
+  value === null || value === undefined ? '-' : `${(value * 100).toFixed(1)}%`;
+
+const evidenceColumns: ColumnsType<ContentEvidencePlatformMonthly> = [
+  { title: '平台', dataIndex: 'platform', render: (value: string) => sanitizeText(value) },
+  { title: '当月线索数', dataIndex: 'leads' },
+  { title: '当月开口率', dataIndex: 'open_rate', render: formatPercent },
+  { title: '当月零互动占比', dataIndex: 'zero_interaction_rate', render: formatPercent },
+  { title: '前3月开口率', dataIndex: 'prev3_open_rate', render: formatPercent },
+  { title: '前3月零互动占比', dataIndex: 'prev3_zero_interaction_rate', render: formatPercent },
+  {
+    title: '开口率变化(pp)',
+    key: 'delta',
+    render: (_, record) => {
+      if (record.open_rate === null || record.prev3_open_rate === null) return '-';
+      const delta = (record.open_rate - record.prev3_open_rate) * 100;
+      const color = delta > 0 ? 'var(--color-success)' : delta < 0 ? 'var(--color-error)' : undefined;
+      return <span style={color ? { color } : undefined}>{`${delta > 0 ? '+' : ''}${delta.toFixed(1)}`}</span>;
     },
   },
 ];
@@ -120,6 +143,34 @@ const DiagnosisPage: React.FC = () => {
     (chain: DiagnosisItem['chain']) => data?.summary?.chains?.[chain] || null,
     [data],
   );
+
+  const evidence = data?.content_evidence || null;
+
+  const evidenceSummary = useMemo(() => {
+    if (!evidence) return '';
+    const grouped = new Map<string, ContentEvidenceXun[]>();
+    for (const row of evidence.xun || []) {
+      const rows = grouped.get(row.platform) || [];
+      rows.push(row);
+      grouped.set(row.platform, rows);
+    }
+    const parts = Array.from(grouped.entries()).map(([platform, rows]) => {
+      const rates = rows
+        .slice(0, 3)
+        .map((row) => `${row.xun} ${formatPercent(row.open_rate)}`)
+        .join(' → ');
+      return `${sanitizeText(platform)}：${rates}`;
+    });
+    if (evidence.recovery) {
+      const { window, open_rate, prev3_open_rate, recovered } = evidence.recovery;
+      parts.push(
+        recovered
+          ? `月末（${sanitizeText(window)}）开口率 ${formatPercent(open_rate)}，已接近前 3 月基线 ${formatPercent(prev3_open_rate)} 的八成`
+          : `月末（${sanitizeText(window)}）开口率 ${formatPercent(open_rate)}，尚未恢复到前 3 月基线 ${formatPercent(prev3_open_rate)} 的八成`,
+      );
+    }
+    return parts.join('；');
+  }, [evidence]);
 
   const chainCards = useMemo(
     () =>
@@ -176,10 +227,39 @@ const DiagnosisPage: React.FC = () => {
                 })}
               </div>
             )}
+            {chain === 'xhs' && evidence && (
+              <div style={{ marginTop: 12 }}>
+                <Collapse
+                  size="small"
+                  items={[
+                    {
+                      key: 'content-evidence',
+                      label: '查看分平台证据（当月 vs 前 3 月基线）',
+                      children: (
+                        <>
+                          <Table
+                            rowKey="platform"
+                            size="small"
+                            columns={evidenceColumns}
+                            dataSource={evidence.platform_monthly}
+                            pagination={false}
+                          />
+                          {evidenceSummary && (
+                            <div style={{ marginTop: 8, color: 'var(--color-text-secondary)' }}>
+                              {evidenceSummary}
+                            </div>
+                          )}
+                        </>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            )}
           </Card>
         );
       }),
-    [items, chainCount],
+    [items, chainCount, evidence, evidenceSummary],
   );
 
   return (
@@ -280,6 +360,7 @@ const DiagnosisPage: React.FC = () => {
                 { label: '规则引擎', value: 'backend/utils/diagnosis（metrics 取数 → rules 评估 → engine 汇总）' },
                 { label: '数据口径', value: '按月体检的只读聚合，不输出任何客户明细行；缺省 month 自动取库内最新月份' },
                 { label: '快照对齐', value: '底表最新数据日用于识别上游回写缺失（如个别底表滞后导致的当月异常）' },
+                { label: '证据口径', value: '内容平台证据表为非存量线索聚合（当月 vs 前 3 月基线，含抖音/腾讯/小红书等全部平台来源）；疑似归因判断由 AI 分析报告输出' },
               ]}
             />
           </>
