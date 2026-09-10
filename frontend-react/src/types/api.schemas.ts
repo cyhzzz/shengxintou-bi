@@ -100,17 +100,6 @@ export type CoreMetricsResponseAllOf = {
 
 export type CoreMetricsResponse = SuccessResponse & CoreMetricsResponseAllOf;
 
-export type DashboardAccountsResponseAllOfData = {
-  /** 账号列表 */
-  accounts?: string[];
-};
-
-export type DashboardAccountsResponseAllOf = {
-  data?: DashboardAccountsResponseAllOfData;
-};
-
-export type DashboardAccountsResponse = SuccessResponse & DashboardAccountsResponseAllOf;
-
 /**
  * 指标类型
  */
@@ -595,27 +584,6 @@ export interface EmployeeConversionWeeklyResponse extends Omit<SuccessResponse, 
   data?: EmployeeConversionWeeklyData;
 }
 
-export type PostDashboardAccountsBodyFiltersPlatformsItem = typeof PostDashboardAccountsBodyFiltersPlatformsItem[keyof typeof PostDashboardAccountsBodyFiltersPlatformsItem];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const PostDashboardAccountsBodyFiltersPlatformsItem = {
-  腾讯: '腾讯',
-  抖音: '抖音',
-  小红书: '小红书',
-} as const;
-
-export type PostDashboardAccountsBodyFilters = {
-  /** 平台筛选 */
-  platforms?: PostDashboardAccountsBodyFiltersPlatformsItem[];
-  /** 代理商筛选 */
-  agencies?: string[];
-};
-
-export type PostDashboardAccountsBody = {
-  filters?: PostDashboardAccountsBodyFilters;
-};
-
 export type PostDashboardCoreMetricsBodyPlatformsItem = typeof PostDashboardCoreMetricsBodyPlatformsItem[keyof typeof PostDashboardCoreMetricsBodyPlatformsItem];
 
 
@@ -676,37 +644,6 @@ export type PostDashboardTrendDataBody = {
   /** 指标类型 */
   metric_type?: PostDashboardTrendDataBodyMetricType;
 };
-
-export type GetTrendDailyParams = {
-/**
- * 开始日期 (YYYY-MM-DD)
- */
-start_date: string;
-/**
- * 结束日期 (YYYY-MM-DD)
- */
-end_date: string;
-/**
- * 平台筛选
- */
-platforms?: string[];
-/**
- * 指标列表
- */
-metrics?: GetTrendDailyMetricsItem[];
-};
-
-export type GetTrendDailyMetricsItem = typeof GetTrendDailyMetricsItem[keyof typeof GetTrendDailyMetricsItem];
-
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const GetTrendDailyMetricsItem = {
-  cost: 'cost',
-  impressions: 'impressions',
-  clicks: 'clicks',
-  leads: 'leads',
-  opened_accounts: 'opened_accounts',
-} as const;
 
 export type GetAgencyAnalysisParams = {
 start_date?: string;

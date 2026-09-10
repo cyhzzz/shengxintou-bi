@@ -161,20 +161,9 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIsInstance(data, dict)
         self.assertGreater(len(data), 0, 'trend-data 返回空')
 
-    def test_02_dashboard_accounts(self):
-        data = self._ok(
-            self._post('/api/v1/dashboard/accounts', self._dash_payload()),
-            '/dashboard/accounts')
-        # 可能返回 list 或 dict（带分页）
-        self.assertIsInstance(data, (list, dict))
-
     # ============================================================
-    #  趋势 / 转化漏斗 / 厂商分析 / 成本分析
+    #  转化漏斗 / 厂商分析 / 成本分析
     # ============================================================
-
-    def test_20_trend(self):
-        data = self._ok(self._post('/api/v1/trend', self._dash_payload()), '/trend')
-        self.assertIsInstance(data, dict)
 
     def test_22_conversion_funnel_split(self):
         data = self._ok(
@@ -474,12 +463,6 @@ class ApiSmokeTest(unittest.TestCase):
             self._post('/api/v1/employee-conversion/analysis', payload),
             '/employee-conversion/analysis')
         self.assertIsInstance(data, dict)
-
-    def test_51_employee_conversion_employees(self):
-        data = self._ok(
-            self.client.get('/api/v1/employee-conversion/employees'),
-            '/employee-conversion/employees')
-        self.assertIsInstance(data, list)
 
     def test_52_leads_detail_filter_options(self):
         data = self._ok(

@@ -159,7 +159,17 @@ KFS = K（KOL/KOC 种草）+ F（Feeds 信息流放大）+ S（Search 搜索收�
 | 获客成本多少 | 成本 | `agg_vendor_daily` / `fact_plan_daily` 对比漏斗结果 | 消费与转化口径对账见 [`business-invariants.md`](business-invariants.md) |
 | 渠道开户结构 | 渠道类别 | `agg_daily_channel_open`（互联网引流/合作机构/自然流入/员工开户） | 四类业务口径不可混算 |
 
-## 6. 术语表
+## 6. LLM 智能分析
+
+「AI 分析报告」页手动触发 LLM 对近 4 个月诊断信号做跨月趋势叙述。改动该功能前先对齐以下边界：
+
+- **数据流**：诊断引擎（`backend/utils/diagnosis/`）产出信号 → `backend/utils/llm.py` 取目标月 + 前 3 个月信号 → 内置 prompt（强制五段结构，含跨月趋势对比章节）→ OpenAI 协议调用 → 前端 Markdown 渲染。
+- **出网内容边界**：发给外部 LLM 的只有聚合诊断信号（渠道/成本/转化率摘要，`_slim_result` 裁剪后的字段），**不含客户明细、手机号、资产明细**；新增喂给 LLM 的数据时必须维持该边界，禁止把行级明细拼进 prompt。
+- **配置与密钥安全**：LLM 配置（base_url/api_key/model/超时）仅存本机 `USER_DATA_DIR/llm_config.json`（已 gitignore）；api_key 永不回传明文（GET 脱敏、PUT 留空沿用），不进数据库、不进任何分发产物。
+- **缓存失效**：缓存键 = 信号 sha256 + 模型 + `PROMPT_VERSION`；改 prompt 必须递增 `llm.py` 的 `PROMPT_VERSION`，否则旧缓存命中、新 prompt 永不生效。
+- **取数口径**：prompt 内链路结构（内容平台：线索→开口→有效线索→开户；应用市场：下载→激活→注册→完资金账号→新开户）与 [`business-invariants.md`](business-invariants.md) 漏斗口径保持一致，改漏斗定义时同步 prompt。
+
+## 7. 术语表
 
 | 术语 | 含义 |
 | --- | --- |
@@ -178,7 +188,7 @@ KFS = K（KOL/KOC 种草）+ F（Feeds 信息流放大）+ S（Search 搜索收�
 | 有效户 | 满足入金等深度条件的账户（项目口径见 [`business-invariants.md`](business-invariants.md)） |
 | 归因 | 把转化结果分配给触点/渠道的方法；本项目以上游 ETL 预计算口径为准，分析层不做二次归因 |
 
-## 7. 维护约定
+## 8. 维护约定
 
 - 本文件是领域知识参考，不是业务口径权威源；口径冲突以 [`business-invariants.md`](business-invariants.md) 与 `backend/models_v2.py` 实际字段为准。
 - 智能辅助分析类新需求（计划诊断、笔记评估、代理商比较、版位分析、渠道分配）在 TECH_SPEC 中引用本文件第 5 节作为数据支撑对齐依据。

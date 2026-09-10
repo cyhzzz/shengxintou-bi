@@ -12,7 +12,6 @@ import type {
   AgencyAnalysisResponse,
   ConversionFunnelResponse,
   CoreMetricsResponse,
-  DashboardAccountsResponse,
   DashboardTrendDataResponse,
   EmployeeConversionAnalysisResponse,
   EmployeeConversionFilterOptionsResponse,
@@ -20,16 +19,13 @@ import type {
   GetAgencyAnalysisParams,
   GetConversionFunnelParams,
   GetLeadsDetailParams,
-  GetTrendDailyParams,
   GetXhsNotesListParams,
   LeadsDetailResponse,
   MetadataResponse,
-  PostDashboardAccountsBody,
   PostDashboardCoreMetricsBody,
   PostDashboardTrendDataBody,
   PostUploadBody,
   SuccessResponse,
-  TrendResponse,
   UploadResponse,
   XhsNotesListResponse,
   XhsOperationAnalysisData
@@ -40,21 +36,6 @@ import { customMutator } from '../services/orvalMutator';
 
 
   /**
- * 获取数据概览报表的账号列表，支持按平台和代理商筛选
- * @summary 获取账号列表
- */
-export const postDashboardAccounts = (
-    postDashboardAccountsBody: PostDashboardAccountsBody,
- ) => {
-      return customMutator<DashboardAccountsResponse>(
-      {url: `/dashboard/accounts`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: postDashboardAccountsBody
-    },
-      );
-    }
-  
-/**
  * 获取数据概览核心指标，包含投入、曝光、点击、线索、开户、资产等数据
 
 指标分类：
@@ -93,20 +74,6 @@ export const postDashboardTrendData = (
       {url: `/dashboard/trend-data`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: postDashboardTrendDataBody
-    },
-      );
-    }
-  
-/**
- * 获取指定日期范围内的日级趋势数据
- * @summary 获取日级趋势数据
- */
-export const getTrendDaily = (
-    params: GetTrendDailyParams,
- ) => {
-      return customMutator<TrendResponse>(
-      {url: `/trend/daily`, method: 'GET',
-        params
     },
       );
     }
@@ -255,10 +222,8 @@ export const getMetadata = (
       );
     }
   
-export type PostDashboardAccountsResult = NonNullable<Awaited<ReturnType<typeof postDashboardAccounts>>>
 export type PostDashboardCoreMetricsResult = NonNullable<Awaited<ReturnType<typeof postDashboardCoreMetrics>>>
 export type PostDashboardTrendDataResult = NonNullable<Awaited<ReturnType<typeof postDashboardTrendData>>>
-export type GetTrendDailyResult = NonNullable<Awaited<ReturnType<typeof getTrendDaily>>>
 export type GetAgencyAnalysisResult = NonNullable<Awaited<ReturnType<typeof getAgencyAnalysis>>>
 export type GetConversionFunnelResult = NonNullable<Awaited<ReturnType<typeof getConversionFunnel>>>
 export type GetLeadsDetailResult = NonNullable<Awaited<ReturnType<typeof getLeadsDetail>>>
@@ -305,17 +270,6 @@ export const postEmployeeConversionWeekly = (
 }
 
 /**
- * 获取员工列表
- * @summary 员工列表
- */
-export const getEmployeeConversionEmployees = () => {
-  return customMutator<{ success: boolean; data?: string[] }>(
-    {url: `/employee-conversion/employees`, method: 'GET'
-  },
-  );
-}
-
-/**
  * 获取筛选选项
  * @summary 筛选选项
  */
@@ -328,7 +282,6 @@ export const getEmployeeConversionFilterOptions = () => {
 
 export type PostEmployeeConversionAnalysisResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionAnalysis>>>
 export type PostEmployeeConversionWeeklyResult = NonNullable<Awaited<ReturnType<typeof postEmployeeConversionWeekly>>>
-export type GetEmployeeConversionEmployeesResult = NonNullable<Awaited<ReturnType<typeof getEmployeeConversionEmployees>>>
 export type GetEmployeeConversionFilterOptionsResult = NonNullable<Awaited<ReturnType<typeof getEmployeeConversionFilterOptions>>>
 
 // ============================================

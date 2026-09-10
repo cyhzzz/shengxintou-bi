@@ -70,12 +70,10 @@ WEEKLY_OVERRIDE: Dict[str, str] = {
 # 已知 drift：历史遗留的未实现端点，记录在此供后续逐步补齐
 # 新增 drift 不允许加入此列表，必须在 mobileRouteHandler 补实现
 # 格式：{端点路径: 补实现优先级（high/medium/low）}
+# v4.2.0 死代码清理：dashboard/accounts、employee-conversion/employees、trend、trend/daily
+# 端点已从后端整体移除，drift 条目随之删除
 KNOWN_DRIFT: Dict[str, str] = {
-    'dashboard/accounts': 'medium',            # Dashboard 账户列表
     'data-freshness': 'low',                  # 数据更新时间显示
-    'employee-conversion/employees': 'medium', # 员工下拉选项
-    'trend': 'medium',                        # 趋势主接口
-    'trend/daily': 'medium',                  # 日趋势
 }
 
 # mobileRouteHandler 中 case 路径与后端路由的别名映射

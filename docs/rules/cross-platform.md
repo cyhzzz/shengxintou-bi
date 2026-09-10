@@ -146,6 +146,8 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - `/api/v1/data-reconciliation/*`（抖音青鸟对账，仅桌面端，移动端 features 禁用）
 - `/api/v1/account-mapping*`（账号映射管理，仅桌面端，移动端 features 禁用）
 - `/api/v1/config/*`（系统配置，仅桌面端）
+- `/api/v1/system/llm-config*`（LLM Provider 配置与测试连接，仅桌面/Web，首期不覆盖移动端）
+- `/api/v1/reports/llm-analysis`（LLM 跨月趋势分析，仅桌面/Web，首期不覆盖移动端）
 
 `check_api_contract.py` 通过 `MOBILE_IGNORED_PREFIXES` 白名单识别这些例外，不报 drift。`KNOWN_DRIFT` 记录历史遗留的未实现端点（待逐步补齐），新增端点不允许加入此列表。
 

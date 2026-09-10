@@ -10,7 +10,7 @@ v2.1 调整：
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_, case
-from backend.models_v2 import AggVendorDaily, DimAccount
+from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls
@@ -314,15 +314,3 @@ def get_dashboard_trend_data():
             'note': '前端可用 sums 字段自计算任意 derived 指标，零 round-trip 切换 metric_type',
         }
     })
-
-
-@bp.route('/dashboard/accounts', methods=['POST'])
-@handle_exceptions
-def get_dashboard_accounts():
-    data = request.get_json() or {}
-    platforms = data.get('platforms') or []
-    q = db.session.query(func.coalesce(DimAccount.main_account_name, DimAccount.sub_account_name)).distinct()
-    if platforms:
-        q = q.filter(DimAccount.platform.in_([str(p) for p in platforms]))
-    rows = [r[0] for r in q.all() if r[0]]
-    return jsonify({'success': True, 'data': {'accounts': sorted(set(rows))}})

@@ -9,7 +9,6 @@ from flask import Blueprint
 # 导入所有子模块
 from . import query
 from . import dashboard
-from . import trend
 from . import agency_analysis
 from . import xhs_notes
 from . import cost_analysis
@@ -27,7 +26,6 @@ from . import xhs_kos_weekly
 __all__ = [
     'query',
     'dashboard',
-    'trend',
     'agency_analysis',
     'xhs_notes',
     'cost_analysis',

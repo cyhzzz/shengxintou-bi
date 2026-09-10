@@ -49,7 +49,7 @@
 | `backend/routes/data/` | Dashboard、漏斗、线索、厂商、员工、小红书、对账等查询蓝图 |
 | `backend/routes/reports/` | 全渠道和应用市场专题报表 |
 | `backend/routes/system/` | Git 自更新、数据同步（SQLite ↔ PG 双向同步） |
-| `backend/utils/` | 异常装饰器、代理商映射、WebDAV 和周报工具 |
+| `backend/utils/` | 异常装饰器、代理商映射、WebDAV、周报工具、诊断引擎（`diagnosis/`）与 LLM 分析（`llm.py`） |
 
 ### API 与 SPA
 

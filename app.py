@@ -663,7 +663,6 @@ from backend.routes.reports import llm_analysis as llm_analysis_report_blueprint
 from backend.routes.data import (
     query,
     dashboard,
-    trend,
     agency_analysis,
     xhs_notes,
     cost_analysis,
@@ -688,7 +687,6 @@ app.register_blueprint(auth_bp, url_prefix=API_PREFIX)
 # 注册所有拆分后的数据模块Blueprint
 app.register_blueprint(query.bp, url_prefix=API_PREFIX)
 app.register_blueprint(dashboard.bp, url_prefix=API_PREFIX)
-app.register_blueprint(trend.bp, url_prefix=API_PREFIX)
 app.register_blueprint(agency_analysis.bp, url_prefix=API_PREFIX)
 app.register_blueprint(xhs_notes.bp, url_prefix=API_PREFIX)
 app.register_blueprint(cost_analysis.bp, url_prefix=API_PREFIX)

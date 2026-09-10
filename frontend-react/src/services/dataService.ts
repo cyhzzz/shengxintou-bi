@@ -3,7 +3,7 @@
  * 提供数据查询相关接口
  */
 import { http } from './http';
-import type { ApiResponse, SummaryData, TrendData, AgencyAnalysisData, LeadsDetailData, DashboardCoreMetricsData, DashboardTrendData } from '@/types';
+import type { ApiResponse, SummaryData, AgencyAnalysisData, LeadsDetailData, DashboardCoreMetricsData, DashboardTrendData } from '@/types';
 
 // 筛选条件接口
 export interface FilterParams {
@@ -34,18 +34,6 @@ export const dataService = {
   // 获取汇总数据
   getSummary: async (filters?: FilterParams): Promise<ApiResponse<SummaryData>> => {
     return http.post('/summary', { filters });
-  },
-
-  /**
-   * @deprecated v3.3.9 起未使用，保留接口待后续清理
-   */
-  // 获取趋势数据
-  getTrend: async (
-    filters?: FilterParams,
-    metrics?: string[],
-    granularity?: 'daily' | 'weekly' | 'monthly'
-  ): Promise<ApiResponse<TrendData>> => {
-    return http.post('/trend', { filters, metrics, granularity });
   },
 
   /**

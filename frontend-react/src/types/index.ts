@@ -180,11 +180,8 @@ export interface ApiResponse<T = Record<string, unknown>> {
   message?: string;
 }
 
-/** 汇总数据（后端 /summary 返回结构，运行时由调用方按需断言） */
+/** 汇总数据（后端 /summary 返回结构） */
 export type SummaryData = Record<string, unknown>;
-
-/** 趋势数据（后端 /trend 返回结构） */
-export type TrendData = Record<string, unknown>;
 
 /** 代理商分析数据 */
 export type AgencyAnalysisData = Record<string, unknown>;

@@ -97,12 +97,6 @@ def get_weekly_data():
     })
 
 
-@bp.route('/employee-conversion/employees', methods=['GET'])
-@handle_exceptions
-def get_employees():
-    return jsonify({'success': True, 'data': get_employee_list()})
-
-
 @bp.route('/employee-conversion/filter-options', methods=['GET'])
 @handle_exceptions
 def get_filter_options():
