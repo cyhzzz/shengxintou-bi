@@ -1,9 +1,10 @@
 {
-    "version": "4.2.6",
-    "release_date": "2026-09-10",
+    "version": "4.2.7",
+    "release_date": "2026-09-11",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v4.2.7 修复移动端/PWA AI 分析报告 business 证据包为 null 导致 LLM 无法开始经营解读：mobileRouteHandler llm-analysis 新增 llmEvidence.ts，同口径移植后端 llm_evidence.py 三包（厂商经营 agg_vendor_daily 当月 vs 前 3 月、小红书笔记转化侧+投放侧分层、应用市场漏斗+版位+计划 TOP），随 prompt 传入、随响应 evidence 透传（缓存键含 payload 旧缓存自动失效），单包失败降级不阻塞；测试脚本同步 6 条真实 SQL 对账用例，coverage 豁免移除纳入强制对账",
         "v4.2.6 周报图表 lieflat 专项 + 移动端开放 AI 分析报告：周报概览版 KPI 区新增环比增减 Diverging Bar（涨/跌/不可比三态语义色，零值不渲染）；周报页局部语义色板整理（涨跌色与 KPI 四档 token，全局 echarts 序列不动）；周报详细版导出新增单文件 HTML 格式（页面 DOM 快照 + 图表 canvas 转 dataURL，零外部依赖，与 PNG/PDF 并列）；AI 分析报告响应新增「图表证据卡」（evidence 证据包随响应透传、老缓存自动兼容，前端三面板：厂商经营/小红书笔记分层/应用市场漏斗）；移动端/PWA 端解除「AI 分析报告」菜单隐藏，mobileRouteHandler 新增 llm-config 读写/测试连接/llm-analysis 三端点（配置存本机 localStorage、LLM 请求 fetch 直连 Provider 免 CORS、诊断取数复用 reports/diagnosis 链路，SYSTEM_PROMPT 与后端 llm.py 两端同步维护，业务证据包首期 null 按 prompt 规则跳过解读不编造），跨端对账白名单移除改纳对账、coverage 脚本新增 NO_SQL_CASES 无 SQL 豁免类别；详细版开户来源云图曾实验 nested treemap 单 series 自布局，因四板块位置随数值浮动不再固定对齐而回滚，保持 4-series 固定四象限版",
         "v4.2.5 修复两线发版分叉：并入此前遗漏的「应用市场·广告计划分析·周度开户成本副坐标」功能（源自同事单独发的 v4.3.1，未并入 main）——后端新增 _weekly_spend 按周五起始周聚合 agg_vendor_daily.花费、ad_plan_analysis 返回 weekly_spend，Web 广告计划分析页开户量柱状图新增副坐标「周度开户成本」折线（双 Y 轴，tooltip 展示开户量/消耗/成本），移动端 handler 同步返回 weekly_spend 保持跨端契约一致，消耗与开户量按同一周五起始周+同日期区间对齐；同步清理两线各自发版造成的错误远端高版本 release/tag（v4.3.0/v4.3.1），版本线收敛回 4.2.x",
         "v4.2.4 AI 分析报告「经营化升级」（迭代 v4.2.3 的 AI 报告功能）：报告重心从数据体检转为投放经营解读——新增业务证据包 backend/utils/llm_evidence.py（复用现有表无新数据源）：厂商经营 agg_vendor_daily（量子/绩牛等）当月 vs 前 3 月漏斗与 线索/开户/有效户成本 派生含当月平台拆分（实测 14 家）；小红书笔记分层 fact_conv_content 转化侧月度走势 + agg_xhs_note 投放侧快照（值得关注 TOP10 / 衰退笔记＝前3月月均开口≥10且当月≤30% / 停投候选＝消费≥1000且加微≤2 / 内容类型选题聚合 / 当月新笔记）；应用市场 fact_conv_appmarket JOIN dim_ad_plan_class 商店级+商店×版位漏斗+计划TOP（含户均资产/创收客群质量）；SYSPROMPT 升 v4 输出章节重排为经营导向（总体判断含一句可信度 / 内容平台经营解读-厂商对比与笔记选题 / 应用市场经营解读-渠道版位计划与客群 / 跨月趋势 / 人工核对集中数据问题 / 行动建议投放动作优先）；口径红线对齐（应用市场仅互联网引流、新开户为漏斗末段不做 WHERE、内容平台非存量）；PROMPT_VERSION 升 4 旧缓存失效、缓存键覆盖整个 payload 使业务数据变化也触发重生成；新增 3 组聚合口径单测（厂商排序与成本/笔记分层与衰退/应用市场渠道过滤与版位），全量回归 143/143 通过，8 月实跑验证经营解读效果",
