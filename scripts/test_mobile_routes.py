@@ -196,6 +196,37 @@ tests = [
           INNER JOIN agg_xhs_note a ON a."笔记ID" = f."笔记ID"''',
         'params': [],
     },
+    {
+        # v4.1.9 智能辅助诊断（移动端 handleDiagnosis）：内容平台分月聚合
+        # （非存量口径叠加开口/有效计数，存量单独计数），与后端 metrics.fetch_content_monthly 对齐
+        'name': 'reports/diagnosis',
+        'sql': '''SELECT substr("线索日期", 1, 7) AS month,
+            COUNT(*) AS total,
+            SUM(CASE WHEN ("是否为存量客户" IS NULL OR "是否为存量客户" = 0) AND "是否客户开口" = 1 THEN 1 ELSE 0 END) AS opened,
+            SUM(CASE WHEN ("是否为存量客户" IS NULL OR "是否为存量客户" = 0) AND "是否有效线索" = 1 THEN 1 ELSE 0 END) AS valid,
+            SUM(CASE WHEN "是否为存量客户" = 1 THEN 1 ELSE 0 END) AS stock
+          FROM fact_conv_content
+          WHERE substr("线索日期", 1, 7) IN (?, ?, ?)
+          GROUP BY substr("线索日期", 1, 7)''',
+        'params': ['2026-06', '2026-07', '2026-08'],
+    },
+    {
+        # v4.1.9 智能辅助诊断（移动端 handleDiagnosis）：应用市场分月聚合
+        # （强制互联网引流 + 独立设备去重 + 新开户总资产），与后端 metrics.fetch_appmarket_monthly 对齐
+        'name': 'reports/diagnosis-appmarket',
+        'sql': '''SELECT substr("下载日期", 1, 7) AS month,
+            COUNT(*) AS downloads,
+            SUM(CASE WHEN "是否激活APP" = 1 THEN 1 ELSE 0 END) AS activated,
+            SUM(CASE WHEN "是否开户注册" = 1 THEN 1 ELSE 0 END) AS registered,
+            SUM(CASE WHEN "是否创建完资金账号" = 1 THEN 1 ELSE 0 END) AS account_created,
+            COUNT(DISTINCT "设备号") AS devices,
+            SUM(CASE WHEN "是否新开户" = 1 THEN 1 ELSE 0 END) AS new_accounts,
+            SUM(CASE WHEN "是否新开户" = 1 THEN "总资产" ELSE 0 END) AS new_assets
+          FROM fact_conv_appmarket
+          WHERE substr("下载日期", 1, 7) IN (?, ?, ?) AND "渠道类型" = '互联网引流'
+          GROUP BY substr("下载日期", 1, 7)''',
+        'params': ['2026-06', '2026-07', '2026-08'],
+    },
 ]
 
 if __name__ == '__main__':

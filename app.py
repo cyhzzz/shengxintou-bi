@@ -634,6 +634,8 @@ def health_check():
 from backend.routes import metadata, upload, config, webdav_backup, version
 from backend.routes.system import self_update as system
 from backend.routes.system import data_sync
+# v4.2.0: LLM Provider 配置（OpenAI 协议，USER_DATA_DIR 本机文件）
+from backend.routes.system import llm_config
 
 # feat-cloud-supabase：鉴权蓝图（必须在所有 app.register_blueprint 之前 import）
 from backend.auth import bp as auth_bp, init_auth
@@ -652,6 +654,10 @@ from backend.routes.reports import app_market_ad_plan as app_market_ad_plan_blue
 from backend.routes.reports import omni_channel as omni_channel_report_blueprint
 # v3.3.10: 小红书计划分析（仿应用市场 /plan-analysis，数据源 fact_conv_content）
 from backend.routes.reports import xhs_plan_analysis as xhs_plan_analysis_report_blueprint
+# v4.1.9: 智能辅助诊断（数据健康度按月体检，规则引擎 backend/utils/diagnosis）
+from backend.routes.reports import diagnosis as diagnosis_report_blueprint
+# v4.2.0: LLM 智能分析（跨月诊断信号 + 内置 prompt → OpenAI 协议 LLM）
+from backend.routes.reports import llm_analysis as llm_analysis_report_blueprint
 
 # 导入拆分后的数据模块
 from backend.routes.data import (
@@ -714,6 +720,11 @@ app.register_blueprint(app_market_ad_plan_blueprint.bp)
 app.register_blueprint(omni_channel_report_blueprint.bp)
 # v3.3.10: 小红书计划分析（URL prefix 已在蓝图定义: /api/v1/reports/xhs）
 app.register_blueprint(xhs_plan_analysis_report_blueprint.bp)
+# v4.1.9: 智能辅助诊断（URL prefix 已在蓝图定义: /api/v1/reports/diagnosis）
+app.register_blueprint(diagnosis_report_blueprint.bp)
+# v4.2.0: LLM 配置与智能分析（URL prefix 已在蓝图定义）
+app.register_blueprint(llm_config.bp)
+app.register_blueprint(llm_analysis_report_blueprint.bp)
 
 # ============================================================================
 # 鉴权中间件注册（feat-cloud-supabase）

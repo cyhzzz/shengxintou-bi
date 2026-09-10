@@ -147,6 +147,7 @@ frontend-react/src/utils/isDesktop.ts + main.tsx              isMobileClient 三
 | --- | --- |
 | 理解架构、增加模块/路由 | `docs/rules/overview.md` |
 | 修改漏斗、开户、资产、主播、对账 | `docs/rules/business-invariants.md` |
+| 投放分析、渠道诊断、智能辅助分析需求 | `docs/rules/ad-domain-knowledge.md` |
 | 修改 Flask、模型、导入、API、SQLite、WebDAV | `docs/rules/backend.md` |
 | 修改 React、组件、筛选、类型、样式 | `docs/rules/frontend.md` |
 | 跨端兼容（API/路由/featureFlag/SQL 同步） | `docs/rules/cross-platform.md` |

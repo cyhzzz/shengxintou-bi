@@ -17,7 +17,12 @@ import os
 import sys
 import unittest
 import json
+import shutil
+import tempfile
 from datetime import datetime
+from unittest import mock
+
+import requests
 
 # 确保项目根目录在 sys.path 中
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,6 +34,8 @@ import logging
 logging.disable(logging.CRITICAL)
 
 from app import app  # noqa: E402
+import config  # noqa: E402
+from backend.utils import llm as llm_mod  # noqa: E402
 
 SAMPLE_START = '2026-06-01'
 SAMPLE_END = '2026-06-30'
@@ -36,6 +43,27 @@ SAMPLE_END = '2026-06-30'
 
 def _is_blank(v):
     return v is None or v == '' or v == [] or v == {}
+
+
+# v4.2.0: LLM 智能分析测试夹具（隔离 USER_DATA_DIR，mock 诊断与上游 LLM）
+_LLM_DIAG_TEMPLATE = {
+    'month': '',
+    'snapshot_dates': {'xhs': '2026-06-30', 'appmarket': '2026-06-30'},
+    'summary': {'overall': 'warn', 'counts': {'error': 0, 'warn': 1, 'info': 0}},
+    'items': [{
+        'id': 'xhs_cvr_drop', 'chain': 'xhs', 'level': 'warn',
+        'title': '线索→开户转化率环比下降',
+        'detail': '目标月转化率低于前 3 月均值',
+        'evidence': '线索 1000，开户 21',
+        'suggestion': '优化表单承接链路',
+    }],
+}
+
+
+def _fake_diagnosis(month):
+    result = json.loads(json.dumps(_LLM_DIAG_TEMPLATE))
+    result['month'] = month
+    return result
 
 
 class ApiSmokeTest(unittest.TestCase):
@@ -505,6 +533,148 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIn('default_week_start', data)
         self.assertIn('default_week_end', data)
         self.assertIn('roster', data)
+
+    # ============================================================
+    #  v4.1.9: 智能辅助诊断
+    # ============================================================
+
+    def test_58_diagnosis_report(self):
+        # 缺省 month 自动取库内最新月份；只读聚合不返回任何明细行
+        data = self._ok(
+            self.client.get('/api/v1/reports/diagnosis'),
+            '/reports/diagnosis')
+        self.assertIsInstance(data, dict)
+        for k in ('month', 'generated_at', 'snapshot_dates', 'summary', 'items'):
+            self.assertIn(k, data, f'diagnosis 缺少字段 {k}')
+        self.assertIn('overall', data['summary'])
+        self.assertIsInstance(data['items'], list)
+        if data['items']:
+            item = data['items'][0]
+            for k in ('id', 'chain', 'level', 'title', 'detail', 'evidence', 'suggestion'):
+                self.assertIn(k, item, f'items[0] 缺少字段 {k}')
+
+    def test_59_diagnosis_valid_month(self):
+        data = self._ok(
+            self.client.get('/api/v1/reports/diagnosis?month=2026-08'),
+            '/reports/diagnosis?month=2026-08')
+        self.assertEqual(data.get('month'), '2026-08')
+        self.assertIn('summary', data)
+
+    def test_59b_diagnosis_invalid_month_400(self):
+        resp = self.client.get('/api/v1/reports/diagnosis?month=2099-13')
+        self.assertEqual(resp.status_code, 400,
+                         f'非法 month 应 400: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertIsInstance(body, dict)
+        self.assertFalse(body.get('success', True))
+
+    # ============================================================
+    #  v4.2.0: LLM 智能分析（配置脱敏 + 手动触发分析 + 缓存）
+    # ============================================================
+
+    def _llm_sandbox(self):
+        """隔离 USER_DATA_DIR 到临时目录，不碰真实 llm_config.json 与缓存"""
+        tmp = tempfile.mkdtemp(prefix='llm_test_')
+        patcher = mock.patch.object(config, 'USER_DATA_DIR', tmp)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+
+    def test_60_llm_config_get_unconfigured(self):
+        self._llm_sandbox()
+        data = self._ok(self.client.get('/api/v1/system/llm-config'), '/system/llm-config')
+        self.assertFalse(data['configured'])
+        self.assertIn('base_url', data)
+        self.assertIn('timeout_seconds', data)
+
+    def test_60b_llm_config_put_mask_and_keep_key(self):
+        self._llm_sandbox()
+        payload = {
+            'base_url': 'https://api.example.com/v1',
+            'api_key': 'sk-test1234567890abcd',
+            'model': 'gpt-4o-mini',
+            'timeout_seconds': 30,
+        }
+        resp = self.client.put('/api/v1/system/llm-config',
+                               data=json.dumps(payload), content_type='application/json')
+        data = self._ok(resp, 'PUT /system/llm-config')
+        self.assertTrue(data['configured'])
+        # AC-2: 配置视图永远脱敏，明文 key 不得回传
+        self.assertEqual(data['api_key_masked'], 'sk-***abcd')
+        self.assertNotIn(payload['api_key'], json.dumps(data))
+        # AC-1: PUT 留空 api_key / model → 沿用已存值
+        resp2 = self.client.put('/api/v1/system/llm-config', data=json.dumps({
+            'base_url': 'https://relay.example.com/v1',
+        }), content_type='application/json')
+        data2 = self._ok(resp2, 'PUT /system/llm-config (api_key 留空)')
+        self.assertEqual(data2['base_url'], 'https://relay.example.com/v1')
+        self.assertEqual(data2['model'], 'gpt-4o-mini')
+        self.assertEqual(data2['api_key_masked'], 'sk-***abcd')
+        data3 = self._ok(self.client.get('/api/v1/system/llm-config'), '/system/llm-config')
+        self.assertEqual(data3['model'], 'gpt-4o-mini')
+        self.assertNotIn(payload['api_key'], json.dumps(data3))
+
+    def test_60c_llm_analysis_unconfigured_400(self):
+        self._llm_sandbox()
+        resp = self._post('/api/v1/reports/llm-analysis', {})
+        self.assertEqual(resp.status_code, 400,
+                         f'未配置应 400: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertEqual(body.get('error'), 'LLM_NOT_CONFIGURED')
+
+    def test_60d_llm_analysis_mock_success_and_cache(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        fake_resp = mock.Mock(status_code=200)
+        fake_resp.json.return_value = {
+            'choices': [{'message': {'content': '## 总体判断\n## 跨月趋势对比\n连续改善'}}],
+        }
+        with mock.patch.object(llm_mod, 'run_diagnosis', side_effect=_fake_diagnosis), \
+                mock.patch.object(llm_mod.requests, 'post', return_value=fake_resp) as post_mock:
+            data = self._ok(
+                self._post('/api/v1/reports/llm-analysis', {'month': '2026-06'}),
+                '/reports/llm-analysis')
+            # AC-4: 跨月窗口 = 目标月 + 前 3 个月，时间升序
+            self.assertEqual(data['months_used'],
+                             ['2026-03', '2026-04', '2026-05', '2026-06'])
+            self.assertFalse(data['cached'])
+            self.assertIn('跨月趋势对比', data['content'])
+            # 内置 prompt（system 角色）强制包含跨月趋势对比章节
+            sent = post_mock.call_args.kwargs['json']['messages']
+            self.assertEqual(sent[0]['role'], 'system')
+            self.assertIn('跨月趋势对比', sent[0]['content'])
+            # 相同信号再次触发 → 缓存命中，上游只调用一次
+            data2 = self._ok(
+                self._post('/api/v1/reports/llm-analysis', {'month': '2026-06'}),
+                '/reports/llm-analysis')
+            self.assertTrue(data2['cached'])
+            self.assertEqual(data2['content'], data['content'])
+            self.assertEqual(post_mock.call_count, 1)
+
+    def test_60e_llm_analysis_invalid_month_400(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        resp = self._post('/api/v1/reports/llm-analysis', {'month': '2099-13'})
+        self.assertEqual(resp.status_code, 400,
+                         f'非法 month 应 400: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertEqual(body.get('error'), 'INVALID_PARAMETER')
+
+    def test_60f_llm_analysis_upstream_failure_502(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        with mock.patch.object(llm_mod, 'run_diagnosis', side_effect=_fake_diagnosis), \
+                mock.patch.object(llm_mod.requests, 'post',
+                                  side_effect=requests.RequestException('connect timeout')):
+            resp = self._post('/api/v1/reports/llm-analysis', {'month': '2026-06'})
+        self.assertEqual(resp.status_code, 502,
+                         f'上游失败应 502: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertEqual(body.get('error'), 'LLM_REQUEST_FAILED')
+
+    def test_60g_system_prompt_trend_section(self):
+        # 输出定位：system prompt 强制包含「跨月趋势对比」章节
+        self.assertIn('跨月趋势对比', llm_mod.SYSTEM_PROMPT)
 
     # ============================================================
     #  v3.3.0: 主播聚类 live_type（映射表由 JSON 同步到 DB，无独立 CRUD API）

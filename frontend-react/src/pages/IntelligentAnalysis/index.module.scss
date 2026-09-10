@@ -1,0 +1,127 @@
+/**
+ * 智能分析页样式（v4.2.0）
+ *
+ * 依赖全局 mixins（card-base / filter-group / filter-label）与 tokens.css 设计变量；
+ * 月份语义不适用 FilterBar（其绑定全局日期范围），本页筛选卡片为既有特殊报表例外
+ * （见 index.tsx docstring）。
+ */
+@use '../../styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+}
+
+.filterCard {
+  margin-bottom: var(--spacer-16);
+
+  @include card-base;
+}
+
+.filterGroup {
+  @include filter-group;
+}
+
+.filterLabel {
+  @include filter-label;
+}
+
+.alert {
+  margin-bottom: var(--spacer-16);
+}
+
+.resultCard {
+  margin-top: var(--spacer-16);
+
+  @include card-base;
+}
+
+.metaBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-8) var(--spacer-16);
+  align-items: center;
+  margin-bottom: var(--spacer-12);
+}
+
+.metaText {
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+// LLM 输出的 Markdown 渲染（GFM：表格 / 列表 / 代码块）
+.markdown {
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.8;
+
+  h2 {
+    margin: var(--spacer-16) 0 var(--spacer-8);
+    font-size: 16px;
+    font-weight: var(--font-weight-semibold);
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  h3 {
+    margin: var(--spacer-12) 0 var(--spacer-4);
+    font-size: 14px;
+    font-weight: var(--font-weight-semibold);
+  }
+
+  p {
+    margin: var(--spacer-4) 0;
+  }
+
+  ul,
+  ol {
+    margin: var(--spacer-4) 0;
+    padding-left: 22px;
+  }
+
+  li {
+    margin: var(--spacer-4) 0;
+  }
+
+  table {
+    width: 100%;
+    margin: var(--spacer-8) 0;
+    border-collapse: collapse;
+
+    th,
+    td {
+      padding: 6px 10px;
+      border: 1px solid var(--border-default);
+      text-align: left;
+    }
+  }
+
+  code {
+    padding: 1px 5px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-family-mono);
+    font-size: var(--text-sm);
+  }
+
+  pre {
+    padding: var(--spacer-12);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+
+    code {
+      padding: 0;
+      background: transparent;
+    }
+  }
+
+  blockquote {
+    margin: var(--spacer-8) 0;
+    padding: var(--spacer-4) var(--spacer-12);
+    border-left: 3px solid var(--border-default);
+    color: var(--color-text-secondary);
+  }
+}

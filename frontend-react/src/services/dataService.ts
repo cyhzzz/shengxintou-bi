@@ -469,6 +469,85 @@ export const dataServiceReports = {
   }) => {
     return http.post('/reports/app-market/ad-plan-analysis', params);
   },
+  // v4.1.9 智能辅助诊断（数据健康度按月体检，只读聚合）
+  getIntelligentDiagnosis: async (params?: { month?: string }) => {
+    return http.get('/reports/diagnosis', params);
+  },
+};
+
+// 智能辅助诊断 v4.1.9（与 backend/utils/diagnosis/engine.py 输出契约对齐）
+export interface DiagnosisSnapshotDate {
+  key: string;
+  name: string;
+  latest: string | null;
+  days_ago: number | null;
+}
+export interface DiagnosisChainSummary {
+  error: number;
+  warn: number;
+  info: number;
+  status: 'ok' | 'info' | 'warn' | 'error';
+}
+export interface DiagnosisSummary {
+  overall: 'ok' | 'info' | 'warn' | 'error';
+  chains: Record<string, DiagnosisChainSummary>;
+}
+export interface DiagnosisItem {
+  id: string;
+  chain: 'xhs' | 'appmarket' | 'global';
+  level: 'error' | 'warn' | 'info';
+  title: string;
+  detail: string;
+  evidence: string;
+  suggestion: string;
+}
+export interface DiagnosisResult {
+  month: string;
+  generated_at: string;
+  snapshot_dates: DiagnosisSnapshotDate[];
+  summary: DiagnosisSummary;
+  items: DiagnosisItem[];
+}
+
+// v4.2.0: LLM 智能分析（OpenAI 协议；配置存后端 USER_DATA_DIR/llm_config.json 本机文件）
+export interface LlmConfigView {
+  configured: boolean;
+  base_url: string;
+  api_key_masked: string;
+  model: string;
+  timeout_seconds: number;
+}
+export interface LlmConfigPayload {
+  base_url?: string;
+  /** 留空表示沿用已存值（后端约定） */
+  api_key?: string;
+  model?: string;
+  timeout_seconds?: number;
+}
+export interface LlmAnalysisResult {
+  content: string;
+  months_used: string[];
+  model: string;
+  generated_at: string;
+  cached: boolean;
+}
+export const dataServiceLlm = {
+  // 查看配置（api_key 永远脱敏）
+  getConfig: async (): Promise<ApiResponse<LlmConfigView>> => {
+    return http.get('/system/llm-config');
+  },
+  // 保存配置（api_key 留空 = 保留原值）
+  saveConfig: async (payload: LlmConfigPayload): Promise<ApiResponse<LlmConfigView>> => {
+    return http.put('/system/llm-config', payload);
+  },
+  // 连通性测试（优先用表单当前值，缺省回落已存配置）
+  testConfig: async (payload: LlmConfigPayload): Promise<ApiResponse<{ ok: boolean; latency_ms: number }>> => {
+    return http.post('/system/llm-config/test', payload);
+  },
+  // 生成分析（长耗时：上游 LLM 超时上限 600s，前端放宽到 600s 覆盖）
+  runAnalysis: async (params: { month?: string; force?: boolean } = {}): Promise<ApiResponse<LlmAnalysisResult>> => {
+    return http.post('/reports/llm-analysis', params, { timeout: 600000 });
+  },
 };
 
 

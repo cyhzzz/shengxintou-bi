@@ -19,6 +19,10 @@ const PUBLIC_ROUTES: { name: string; path: string }[] = [
   { name: '线索明细', path: '/leads-detail' },
   { name: '主播聚类', path: '/anchor-clusters' },
   { name: '厂商分析', path: '/agency-analysis' },
+  // v4.1.9：智能诊断（数据健康度按月体检，桌面/Web/移动端均注册）
+  { name: '智能诊断', path: '/diagnosis' },
+  // v4.2.0：智能分析（LLM 跨月趋势对比；showIntelligentAnalysis=true 时注册，桌面/Web 端覆盖）
+  { name: '智能分析', path: '/intelligent-analysis' },
   { name: '小红书-列表', path: '/xhs-notes/list' },
   { name: '小红书-运营', path: '/xhs-notes/operation' },
   // v3.3.10：小红书计划分析（与菜单 key 对齐）

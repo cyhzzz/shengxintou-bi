@@ -84,6 +84,10 @@ const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
 // v3.8.0: 分支KOS转化周报（小红书二级菜单，featureFlags.showKosWeekly 控制注册）
 const XhsKosWeeklyPage = lazy(() => import('@/pages/XhsNotes/KosWeekly'));
+// v4.1.9: 智能诊断（数据健康度按月体检）
+const DiagnosisPage = lazy(() => import('@/pages/Diagnosis'));
+// v4.2.0: 智能分析（LLM 跨月趋势对比；showIntelligentAnalysis 控制注册）
+const IntelligentAnalysisPage = lazy(() => import('@/pages/IntelligentAnalysis'));
 
 // v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
 // v3.6.2：PWA 端也使用 HashRouter（部署在 /app/ 子路径，BrowserRouter 需 basename，
@@ -103,6 +107,12 @@ const mainChildren = [
   { path: 'leads-detail', element: withSuspense(LeadsDetailPage) },
   { path: 'anchor-clusters', element: withSuspense(AnchorClusterPage) },
   { path: 'agency-analysis', element: withSuspense(AgencyAnalysisPage) },
+  // v4.1.9: 智能诊断（双端 flags 均开放，无条件注册）
+  { path: 'diagnosis', element: withSuspense(DiagnosisPage) },
+  // v4.2.0: 智能分析（仅桌面/Web 开发版注册；移动端首期不覆盖，避免 URL 直访触发未实现的 mobile API）
+  ...(featureFlags.showIntelligentAnalysis
+    ? [{ path: 'intelligent-analysis', element: withSuspense(IntelligentAnalysisPage) }]
+    : []),
   {
     path: 'xhs-notes',
     children: [

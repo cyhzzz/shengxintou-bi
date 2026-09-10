@@ -1,0 +1,117 @@
+/**
+ * 智能诊断页样式（v4.1.9）
+ *
+ * 依赖全局 mixins（card-base / filter-group / filter-label）与 tokens.css 设计变量；
+ * 月份语义体检不适用 FilterBar（其绑定全局日期范围），本页筛选卡片为既有特殊报表例外
+ * （见 index.tsx docstring）。
+ */
+@use '../../styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+}
+
+.filterCard {
+  margin-bottom: var(--spacer-16);
+
+  @include card-base;
+}
+
+.filterGroup {
+  @include filter-group;
+}
+
+.filterLabel {
+  @include filter-label;
+}
+
+.tableCard {
+  margin-top: var(--spacer-16);
+
+  @include card-base;
+}
+
+.chainSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-16);
+  margin-top: var(--spacer-16);
+}
+
+.chainCard {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+}
+
+.chainTitle {
+  display: inline-flex;
+  gap: var(--spacer-8);
+  align-items: center;
+}
+
+.chainEmpty {
+  display: flex;
+  gap: var(--spacer-8);
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacer-16) 0;
+  color: var(--color-text-secondary);
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-12);
+}
+
+.itemBlock {
+  padding: var(--spacer-12) var(--spacer-16);
+  background: var(--bg-content);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.itemHeader {
+  display: flex;
+  gap: var(--spacer-8);
+  align-items: center;
+}
+
+.itemLevel {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  font-weight: var(--font-weight-semibold);
+}
+
+.itemTitle {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.itemDetail {
+  margin-top: var(--spacer-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.itemEvidence {
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  margin-top: var(--spacer-8);
+  font-family: var(--font-family-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.itemSuggestion {
+  margin-top: var(--spacer-8);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}

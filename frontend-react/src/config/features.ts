@@ -39,6 +39,10 @@ export interface FeatureFlags {
   showKosWeekly: boolean;
   /** 侧边栏「应用市场 · 归因转化率」菜单（移动端已开放，mobileRouteHandler 已实现） */
   showAppMarketAttribution: boolean;
+  /** 侧边栏「智能诊断」菜单（数据健康度按月体检，规则引擎只读聚合） */
+  showIntelligentDiagnosis: boolean;
+  /** 侧边栏「智能分析」菜单（v4.2.0：LLM 跨月趋势分析，首期不覆盖移动端） */
+  showIntelligentAnalysis: boolean;
 }
 
 /**
@@ -66,6 +70,9 @@ const desktopAndWebFlags: FeatureFlags = {
   showDataReconciliation: true,
   showKosWeekly: true,
   showAppMarketAttribution: true,
+  showIntelligentDiagnosis: true,
+  // v4.2.0: 智能分析（LLM 跨月趋势对比，桌面/Web 开发版开放）
+  showIntelligentAnalysis: true,
 };
 
 /** 移动版配置（Capacitor Android） */
@@ -86,6 +93,10 @@ const mobileFlags: FeatureFlags = {
   showKosWeekly: true,
   // v3.8.1：移动端开放应用市场归因转化率（已移植到 mobileRouteHandler）
   showAppMarketAttribution: true,
+  // v4.1.9：移动端开放智能诊断（已移植到 mobileRouteHandler /reports/diagnosis，本地 SQLite 只读聚合）
+  showIntelligentDiagnosis: true,
+  // v4.2.0：首期不覆盖移动端（依赖 Flask 后端 API 与本机 LLM 配置文件，mobileRouteHandler 未实现）
+  showIntelligentAnalysis: false,
 };
 
 /**

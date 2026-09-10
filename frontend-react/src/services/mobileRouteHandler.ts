@@ -20,6 +20,7 @@ import { handleXhsNotesList, handleXhsNotesFilterOptions, handleXhsNotesOperatio
 import { handleEmployeeConversionAnalysis, handleEmployeeConversionWeekly, handleEmployeeConversionAnalysisChannelOverview, handleEmployeeConversionFilterOptions } from './mobileHandlers/employee';
 import { handleKosWeekly, handleKosWeeklyFilterOptions } from './mobileHandlers/kos';
 import { handleDataFreshness } from './mobileHandlers/freshness';
+import { handleDiagnosis } from './mobileHandlers/diagnosis';
 import { handleWeeklyPeriods, handleWeeklyData, handleWeeklyDetail } from './mobileHandlers/weekly';
 import { handleMetadata } from './mobileHandlers/metadata';
 
@@ -163,6 +164,10 @@ export async function mobileRouteHandler(url: string, body: any): Promise<any> {
     // v3.7.3：数据新鲜度（关于页数据状态），与后端 metadata.get_data_status 对齐
     case 'data-freshness':
       return handleDataFreshness();
+
+    // v4.1.9：智能辅助诊断（数据健康度按月体检，与后端 /reports/diagnosis 同口径）
+    case 'reports/diagnosis':
+      return handleDiagnosis(url);
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);

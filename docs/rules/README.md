@@ -19,6 +19,7 @@
 | --- | --- | --- |
 | 理解整体架构、增加模块或路由 | [`overview.md`](overview.md) | `app.py`、`backend/routes/`、`frontend-react/src/router/index.tsx` |
 | 修改漏斗、开户、资产或主播口径 | [`business-invariants.md`](business-invariants.md) | `backend/routes/data/cost_analysis.py`、`backend/routes/reports/app_market.py`、`backend/routes/data/leads.py` |
+| 投放分析、渠道诊断、智能辅助分析需求 | [`ad-domain-knowledge.md`](ad-domain-knowledge.md) | `backend/models_v2.py`、`backend/routes/reports/` |
 | 修改模型、导入、API、SQLite、WebDAV | [`backend.md`](backend.md) | `backend/models_v2.py`、`backend/processors/v2/raw_import.py`、`backend/routes/` |
 | 修改 React 页面、组件、筛选、类型或样式 | [`frontend.md`](frontend.md) | `frontend-react/src/` |
 | 跨端兼容（API/路由/featureFlag/SQL 同步） | [`cross-platform.md`](cross-platform.md) | `frontend-react/src/services/mobileRouteHandler.ts`、`frontend-react/src/config/features.ts`、`scripts/check_*.py` |

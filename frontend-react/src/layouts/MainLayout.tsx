@@ -31,6 +31,8 @@ import {
   DollarOutlined,
   RiseOutlined,
   FileDoneOutlined,
+  MedicineBoxOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { HelpModal } from '@/components';
 import MobileSyncButton from '@/components/MobileSyncButton';
@@ -70,6 +72,18 @@ const menuItems: MenuProps['items'] = [
     key: '/agency-analysis',
     icon: <BarChartOutlined />,
     label: '厂商分析',
+  },
+  // v4.1.9: 智能诊断（数据健康度按月体检）
+  {
+    key: '/diagnosis',
+    icon: <MedicineBoxOutlined />,
+    label: '智能诊断',
+  },
+  // v4.2.0: 智能分析（LLM 跨月趋势对比叙述）
+  {
+    key: '/intelligent-analysis',
+    icon: <ThunderboltOutlined />,
+    label: '智能分析',
   },
   { type: 'divider' },
   // ===== 第二段：业务专题 =====
@@ -181,6 +195,14 @@ export default function MainLayout() {
       const it = item as any;
       // 过滤报告生成
       if (it.key === '/report-generation' && !featureFlags.showReportGeneration) {
+        return null;
+      }
+      // v4.1.9：过滤智能诊断
+      if (it.key === '/diagnosis' && !featureFlags.showIntelligentDiagnosis) {
+        return null;
+      }
+      // v4.2.0：过滤智能分析（首期不覆盖移动端）
+      if (it.key === '/intelligent-analysis' && !featureFlags.showIntelligentAnalysis) {
         return null;
       }
       // 过滤系统配置子菜单

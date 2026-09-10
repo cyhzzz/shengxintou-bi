@@ -54,6 +54,8 @@ MOBILE_IGNORED_PREFIXES: Tuple[str, ...] = (
     '/config',            # 系统配置（仅桌面端）
     '/weekly-report/poster',  # 海报预览/导出（仅桌面端）
     '/external-data-analysis',  # 外部数据分析（移动端无此页面）
+    '/system/llm-config',       # v4.2.0 LLM Provider 配置与测试（仅桌面/开发版，首期不覆盖移动端）
+    '/reports/llm-analysis',    # v4.2.0 LLM 智能分析（首期不覆盖移动端）
     '/employees',         # query.py 旧员工列表接口（已被 employee-conversion/employees 替代）
     '/query',             # query.py 通用查询接口（旧）
     '/summary',           # query.py 通用摘要接口（旧；不影响 reports/*/summary）
