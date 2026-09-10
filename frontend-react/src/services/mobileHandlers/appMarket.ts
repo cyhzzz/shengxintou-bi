@@ -926,6 +926,20 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     return { market: r.market, week_start: ws, week_end: _adWeekEnd(ws), open_count: toInt(r.open_count) };
   });
 
+  // ---- 按周消耗（周五起始周），per-market：与 weekly_open 同口径对齐（同一周五起始周 + 同一日期区间）----
+  // 消耗口径与开户概览一致：agg_vendor_daily.花费 按 平台 + 日期 的周五起始周聚合（platformWhere 已含 平台/花费>0/日期区间）
+  const weeklySpendRows = await querySql<Row>(
+    `SELECT "平台" as market, ${fridayWeekExpr('日期')} as week_start,
+       COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台", week_start ORDER BY "平台", week_start`,
+    platformWhere.params
+  );
+  const weekly_spend = weeklySpendRows.map(r => {
+    const ws = String(r.week_start).slice(0, 10);
+    return { market: r.market, week_start: ws, week_end: _adWeekEnd(ws), spend: round2(toFloat(r.spend)) };
+  });
+
   // ---- 按周分计划 + 分计划展开 ----
   const aggBy: Record<string, { spend: number; impressions: number; clicks: number; downloads: number }> = {};
   const factBy: Record<string, { activate: number; register: number; id_card: number; bank_card: number; submit: number; success: number; ad_account: number }> = {};
@@ -1043,6 +1057,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     by_placement,
     by_market,
     weekly_open,
+    weekly_spend,
     weeks,
     selected_week: selected,
     week_plans,

@@ -56,7 +56,7 @@ ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '�
 _META = {
     'version': 'v3.8.2',
     'source': 'dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily + fact_plan_daily',
-    'note': '广告计划分析：开户概览 + 按周开户量 + 按周分计划 + 分计划展开（周度=上周五~本周四）',
+    'note': '广告计划分析：开户概览 + 按周开户量（含周度开户成本副坐标）+ 按周分计划 + 分计划展开（周度=上周五~本周四）',
     'open_condition': '是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1',
     'spend_source': 'agg_vendor_daily.花费（按 平台=应用市场 聚合）；分计划消耗/展示/点击/下载 = fact_plan_daily 按 计划ID 聚合',
     'open_source': 'fact_conv_appmarket（按 应用市场 聚合，广告开户节点）',
@@ -341,6 +341,38 @@ def _weekly_open(markets, start_date, end_date):
     return out
 
 
+def _weekly_spend(markets, start_date, end_date):
+    """按周（上周五~本周四）的消耗（per-market，便于前端按所选市场聚合）。
+
+    消耗口径与「总消耗」一致：agg_vendor_daily.花费 按 平台=应用市场 聚合。
+    周起始 = make_friday_week_start_expr(AggVendorDaily.日期)，与开户量（资金账号创建完成时间）同为
+    周五起始周，保证「周度开户成本 = 消耗 ÷ 开户量」按同一周五起始周与同一日期区间对齐（日期统一）。
+    """
+    if not markets:
+        return []
+    fweek = make_friday_week_start_expr(AggVendorDaily.日期).label('week_start')
+    q = db.session.query(
+        AggVendorDaily.平台.label('market'),
+        fweek,
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('spend'),
+    ).filter(AggVendorDaily.平台.in_(markets), AggVendorDaily.花费 > 0)
+    if start_date:
+        q = q.filter(AggVendorDaily.日期 >= start_date)
+    if end_date:
+        q = q.filter(AggVendorDaily.日期 <= end_date)
+    q = q.group_by(AggVendorDaily.平台, fweek).order_by(AggVendorDaily.平台, fweek)
+    out = []
+    for r in q.all():
+        ws = _ws_str(r.week_start)
+        out.append({
+            'market': r.market,
+            'week_start': ws,
+            'week_end': _week_end(ws),
+            'spend': round(float(r.spend or 0), 2),
+        })
+    return out
+
+
 def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
     """按周分计划分析 + 分计划展开（周五起始周）。
 
@@ -502,6 +534,7 @@ def ad_plan_analysis():
         markets, start_date, end_date, plans
     )
     weekly_open = _weekly_open(markets, start_date, end_date)
+    weekly_spend = _weekly_spend(markets, start_date, end_date)
     weeks, selected_week, week_plans, plan_week_detail = _plan_week_analysis(
         markets, start_date, end_date, week_start, plans
     )
@@ -516,6 +549,7 @@ def ad_plan_analysis():
             'by_placement': by_placement,
             'by_market': by_market,
             'weekly_open': weekly_open,
+            'weekly_spend': weekly_spend,
             'weeks': weeks,
             'selected_week': selected_week,
             'week_plans': week_plans,

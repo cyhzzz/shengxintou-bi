@@ -69,6 +69,13 @@ interface WeeklyOpenPoint {
   open_count: number;
 }
 
+interface WeeklySpendPoint {
+  market?: string;
+  week_start: string;
+  week_end: string;
+  spend: number;
+}
+
 interface ClusterRow {
   dim: string;
   消耗: number;
@@ -278,6 +285,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const [planDetail, setPlanDetail] = useState<PlanDetailRow[]>([]);
   const [byMarket, setByMarket] = useState<AggRow[]>([]);
   const [weeklyOpen, setWeeklyOpen] = useState<WeeklyOpenPoint[]>([]);
+  const [weeklySpend, setWeeklySpend] = useState<WeeklySpendPoint[]>([]);
   const [weeks, setWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string | undefined>(undefined);
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
@@ -307,6 +315,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
         setPlanDetail(d.plan_detail || []);
         setByMarket(d.by_market || []);
         setWeeklyOpen(d.weekly_open || []);
+        setWeeklySpend(d.weekly_spend || []);
         setWeeks(d.weeks || []);
         setSelectedWeek(d.selected_week || undefined);
         setClusterWeek(d.selected_week || undefined);
@@ -388,6 +397,21 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     return [...acc.values()].sort((a, b) => (a.week_start > b.week_start ? 1 : -1));
   }, [weeklyOpen, activeMarkets]);
 
+  // ---- 按周消耗（柱状图副坐标）：weekly_spend 是 per-market，按 activeMarkets 周内求和 ----
+  // 消耗周起始 = agg_vendor_daily.日期 的周五起始周，与开户量（资金账号创建完成时间）同为周五起始周，
+  // 按周标签对齐即可保证「周度开户成本 = 消耗 ÷ 开户量」的口径统一。
+  const displayedWeeklySpend: WeeklySpendPoint[] = useMemo(() => {
+    if (!weeklySpend.length) return [];
+    const acc = new Map<string, { week_start: string; week_end: string; spend: number }>();
+    for (const w of weeklySpend) {
+      if (!w.market || !activeMarkets.has(w.market)) continue;
+      const e = acc.get(w.week_start) || { week_start: w.week_start, week_end: w.week_end, spend: 0 };
+      e.spend = Math.round((e.spend + w.spend) * 100) / 100;
+      acc.set(w.week_start, e);
+    }
+    return [...acc.values()].sort((a, b) => (a.week_start > b.week_start ? 1 : -1));
+  }, [weeklySpend, activeMarkets]);
+
   // ---- 分计划展开（按所选应用市场筛选） ----
   const displayedPlanWeekDetail: PlanWeekDetail[] = useMemo(
     () => planWeekDetail.filter((p) => activeMarkets.has(p.market)),
@@ -461,36 +485,83 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     };
   }, [displayedPlanWeekDetail, clusterWeek]);
 
-  // ---- 按周开户量柱状图（上周五~本周四，图上显示数值；数据来自客户端筛选后的 displayedWeeklyOpen） ----
-  const openChartOption: EChartsOption = useMemo(() => {
-    if (!displayedWeeklyOpen.length) return {};
-    const labels = displayedWeeklyOpen.map((w) => weekLabel(w.week_start, w.week_end));
+  // ---- 按周开户量柱状图 + 周度开户成本（副坐标折线）
+  // 开户量（左轴，柱）来自 displayedWeeklyOpen；周度开户成本 = 消耗 ÷ 开户量（右轴，线）来自 displayedWeeklySpend。
+  // 二者均按周五起始周（开户量=资金账号创建完成时间周，消耗=agg_vendor_daily.日期周）与同一日期区间筛选，口径统一。
+  const weeklyChartOption: EChartsOption = useMemo(() => {
+    if (!displayedWeeklyOpen.length && !displayedWeeklySpend.length) return {};
+    // 合并两周集合（同一周五起始周标签对齐）
+    const weekSet = new Set<string>();
+    displayedWeeklyOpen.forEach((w) => weekSet.add(w.week_start));
+    displayedWeeklySpend.forEach((w) => weekSet.add(w.week_start));
+    const weeks = [...weekSet].sort();
+    const openMap = new Map(displayedWeeklyOpen.map((w) => [w.week_start, w.open_count]));
+    const spendMap = new Map(displayedWeeklySpend.map((w) => [w.week_start, w.spend]));
+    const labels = weeks.map((ws) => weekLabel(ws));
+    const openData = weeks.map((ws) => openMap.get(ws) || 0);
+    const costData = weeks.map((ws) => {
+      const oc = openMap.get(ws) || 0;
+      const sp = spendMap.get(ws) || 0;
+      return oc > 0 ? Math.round((sp / oc) * 100) / 100 : null;
+    });
     return {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
         formatter: (params: any) => {
           const i = params?.[0]?.dataIndex ?? -1;
-          const w = displayedWeeklyOpen[i];
-          if (!w) return '';
-          return `${w.week_start} ~ ${w.week_end}<br/>开户量：<strong>${w.open_count.toLocaleString()}</strong>`;
+          const ws = weeks[i];
+          if (!ws) return '';
+          const oc = openMap.get(ws) || 0;
+          const sp = spendMap.get(ws) || 0;
+          const cost = oc > 0 ? fmtMoney(Math.round((sp / oc) * 100) / 100) : '-';
+          return `${ws} ~ ${weekLabel(ws).split('~')[1] ?? ''}<br/>开户量：<strong>${oc.toLocaleString()}</strong><br/>消耗：<strong>${fmtMoney(sp)}</strong><br/>周度开户成本：<strong>${cost}</strong>`;
         },
       },
-      grid: { left: '3%', right: '4%', bottom: '14%', top: '10%', containLabel: true },
+      legend: { data: ['开户量', '周度开户成本'], top: 0 },
+      grid: { left: '3%', right: '4%', bottom: '14%', top: '12%', containLabel: true },
       xAxis: { type: 'category', data: labels, axisLabel: { rotate: 30, fontSize: 11 } },
-      yAxis: [{ type: 'value', name: '开户量' }],
+      yAxis: [
+        { type: 'value', name: '开户量', position: 'left' },
+        {
+          type: 'value',
+          name: '周度开户成本 (元)',
+          position: 'right',
+          axisLabel: { formatter: (v: number) => `¥${v}` },
+          splitLine: { show: false },
+        },
+      ],
       series: [
         {
           name: '开户量',
           type: 'bar',
-          data: displayedWeeklyOpen.map((w) => w.open_count),
+          yAxisIndex: 0,
+          data: openData,
           itemStyle: { color: pickEChartsColor(0), opacity: 0.85, borderRadius: [4, 4, 0, 0] },
           barMaxWidth: 42,
           label: { show: true, position: 'top', fontSize: 11, formatter: (p: any) => Number(p.value || 0).toLocaleString() },
         },
+        {
+          name: '周度开户成本',
+          type: 'line',
+          yAxisIndex: 1,
+          data: costData,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 7,
+          itemStyle: { color: pickEChartsColor(1) },
+          lineStyle: { width: 2 },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 11,
+            color: pickEChartsColor(1),
+            formatter: (p: any) => (p.value == null ? '' : fmtMoney(p.value)),
+          },
+        },
       ],
     };
-  }, [displayedWeeklyOpen]);
+  }, [displayedWeeklyOpen, displayedWeeklySpend]);
 
   const exportPlanCsv = () => {
     if (!displayedPlanDetail.length) return;
@@ -587,11 +658,11 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               <Space size={8} align="center">
                 <CalendarOutlined style={{ color: 'var(--color-brand)' }} />
                 <span>按周开户量</span>
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>周度口径：上周五 ~ 本周四 · 广告开户节点</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>周度口径：上周五 ~ 本周四 · 广告开户节点 · 副坐标=周度开户成本(消耗÷开户量)</span>
               </Space>
             }
           >
-            {displayedWeeklyOpen.length > 0 ? <EChartsComponent option={openChartOption} height={320} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
+            {displayedWeeklyOpen.length > 0 || displayedWeeklySpend.length > 0 ? <EChartsComponent option={weeklyChartOption} height={340} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
           </Card>
         </FadeInSection>
 
@@ -791,6 +862,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             { label: '漏斗量口径', value: '分计划各阶段量 = 应用市场下载链路按 计划+周 统计去重设备号；消耗/展示/点击 = agg_vendor_daily' },
             { label: '转化率口径', value: '步骤间转化：点击率=点击/展示、下载率=下载/点击、激活率=激活/下载、开户注册率=开户注册/激活、身份证上传率=身份证/开户注册、银行卡上传率=银行卡/身份证、开户提交率=开户提交/银行卡、开户成功率=开户成功/开户提交、广告开户率=广告开户/开户成功' },
             { label: '广告开户成本', value: '消耗 ÷ 广告开户量（广告开户量为 0 时不可计算，展示 -）' },
+            { label: '周度开户成本(副坐标)', value: '按周五起始周：该周消耗(agg_vendor_daily.花费，按 平台 + 日期 的周五起始周聚合) ÷ 该周开户量(资金账号创建完成时间 的周五起始周聚合)；两者均按同一周五起始周 + 同一日期区间筛选，消耗日期与开户量日期统一' },
           ]}
           notes="广告计划分析将「计划分解维度」与「下载链路开户」和「投放消耗」打通：开户概览与按周开户量看整体量能与节奏；按周分计划看各计划每周消耗与全链路转化表现（默认最新一周，可切换）；广告聚类分析按所选周对版位/子版位/出价做 消耗·广告开户量·广告开户成本 的聚类对比；分计划展开可下钻每条计划的逐周明细。周度口径统一为上周五~本周四。注意：苹果/鸿蒙无计划分解，仅参与市场级统计，不进入计划级明细。"
         />
