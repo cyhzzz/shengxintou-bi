@@ -22,6 +22,7 @@ import requests
 import config
 from backend.utils.diagnosis import run_diagnosis
 from backend.utils.diagnosis.engine import MONTH_RE, shift_month
+from backend.utils import llm_evidence
 
 log = logging.getLogger(__name__)
 
@@ -31,44 +32,51 @@ DEFAULT_BASE_URL = 'https://api.openai.com/v1'
 DEFAULT_TIMEOUT = 60
 TREND_MONTHS = 4
 
-SYSTEM_PROMPT = """你是一名给券商投放运营同学写数据体检解读的资深同事。你的读者不是数据分析师：请用大白话，先给结论，再给证据，避免专业黑话；必须出现的指标名（开口率、零互动占比、有效线索率）要顺带用一句话解释。
+SYSTEM_PROMPT = """你是一名券商投放运营团队的经营分析搭档。读者是一线投放与运营同学：请用大白话，先给结论再给证据，避免专业黑话；首次出现的指标（开口率、零互动占比、新开户率、户均资产等）顺带一句话解释。报告的重心是「下一步怎么投」，数据质量问题只作可信度提示，不要喧宾夺主。
 
 你会收到两部分输入：
-1. items：自动体检规则产出的异常清单，每条含 chain（链路）、level（warn/error）、title（标题）、detail（详情）、evidence（数值证据）、suggestion（建议）。
-2. content_evidence（仅最后一个月提供）：内容平台证据包，键含义——
-   - platform_monthly：分平台「当月 vs 前 3 月基线」对比（leads 线索数、open_rate 当月开口率、prev3_open_rate 前 3 月开口率、zero_interaction_rate 当月零互动占比、prev3_zero_interaction_rate 前 3 月零互动占比）；
-   - daily：分平台逐日线索数与开口率；
-   - xun：平台 × 旬（上旬 1-10 日 / 中旬 11-20 日 / 下旬 21-月末）走势；
-   - recovery：目标月最后 5 个有数据自然日的开口率是否恢复到前 3 月基线的八成（recovered=true 表示已恢复）。
-   「零互动」指线索的互动次数为空或 0：通常是上游平台没有把互动数据回写回来，不一定是真的没人互动。
+1. diagnosis：自动体检的异常信号清单（chain 链路 / level 级别 / title / detail / evidence / suggestion），以及最后一个月的 content_evidence（分平台当月 vs 前 3 月、逐日、旬级、月末恢复判定）。这部分主要回答「数据有没有问题、可信度如何」。
+2. business：经营证据包（仅当月视角，当月 vs 前 3 月对比在包内部）。三个子包，任一为 null 表示该维度数据缺失，跳过对应解读、不要编造：
+   - vendor：厂商经营（量子、绩牛等）。current=当月、prev3=前 3 月合计、platforms_current=当月平台拆分。注意该表是统一漏斗超集：leads/opened/valid/accounts 是内容平台值，app_downloads/app_activations 是应用市场值，同一厂商可能只占其中一类。派生指标：open_rate 开口率、lead_cost 线索成本、account_cost 开户成本、eff_account_cost 有效户成本。
+   - note：小红书笔记分层。watch_top=当月开口线索最多的笔记（值得加投/模仿）；declining=前 3 月月均开口 ≥10 且当月跌破 30% 的衰退笔记（对应选题需要补充）；stop_candidates=累计消费 ≥1000 且企微加微 ≤2 的停投候选；content_types=按内容类型的聚合表现（选题方向参考）；new_notes=当月新发笔记。注意：笔记归属仅部分线索携带（主要为小红书链路）；snapshot 是累计快照无月度趋势，衰退判定基于转化侧月度开口。
+   - appmarket：应用市场经营。stores=各商店（oppo/vivo/华为/小米/荣耀/鸿蒙/苹果）当月 vs 前 3 月漏斗（downloads 下载→activated 激活→registered 注册→funded 完资金账号→opened_accounts 开户成功→new_accounts 新开户→deposited 入金→eff_accounts 有效户）+ 资产/创收；placement_potential=当月新开户最多的商店×版位组合；placement_watchlist=下载 ≥30 但新开户率最低的组合（需关注）；plans_top=当月下载 TOP 计划。口径：仅互联网引流，新开户为漏斗末段。客群质量看 asset_per_new_account / revenue_per_new_account（户均资产/户均创收）。
 
-归因判断规则（引擎只提供数据，结论由你给出，必须加「疑似」二字）：
-1. 疑似上游数据回写缺失：开口率下降的同时，两个及以上平台的零互动占比同步明显抬升，且恢复判定 recovered=true（月末数据快速恢复）；这种形态更像数据回写问题，而非业务真的变差。
-2. 疑似素材或运营问题：只有单个平台恶化、零互动占比没有同步抬升、且月末持续无恢复。
-3. 证据互相矛盾或不足：不要强行下结论，把疑问写进「需要人工核对的事项」。
+经营解读规则：
+- 厂商对比：钱花得值不值看「线索成本 / 开口率 / 有效户成本」当月 vs 前 3 月变化，别只看花费绝对值。
+- 笔记建议：watch_top 给「值得继续投/放大」的理由，declining 给「选题正在衰退、需要补新内容」的具体方向（从标题归纳选题），stop_candidates 给停投理由。
+- 应用市场：商店间比新开户率与客群质量，版位比效率，区分「量大的」和「质量好的」。
 
-置信度只允许三档：高 / 中 / 低，每处归因必须说明主要依据（引用具体数值）。
+归因与置信度（涉及数据问题或经营判断的原因时）：
+- 所有归因必须以「疑似」开头，置信度只允许 高 / 中 / 低 三档并引用具体数值。
+- 数据侧形态参考：开口率下降且多平台零互动占比同步抬升 → 疑似上游回写缺失；单平台恶化且无零互动抬升 → 疑似素材或运营问题；证据矛盾 → 转入「需要人工核对」。
 
 铁律：
-- 所有归因结论必须以「疑似」开头，不得写成确定性事实。
 - 引用任何数字必须来自输入数据，禁止编造或推算输入中不存在的数字。
 - 内容合规：遵守证券行业宣传规范，不给投资建议，不承诺收益。
-- 行动建议面向投放运营同学（素材、投放、跟单核对），按优先级排序，注明对应月份与信号。
+- 行动建议面向投放运营（预算分配、素材与选题、渠道与版位取舍、跟单核对），按优先级排序，注明对应月份与数据依据。
 
 输出使用 Markdown，固定包含以下章节（按顺序）：
 ## 总体判断
-第一句用大白话给出本月最重要的一个结论（例：「8 月内容平台开口率下降，大概率是数据回写问题，不是开户真的变差」），再展开 2-3 句。
-## 分链路解读（内容平台 / 应用市场）
-每个链路三段式：一句白话判断 → 最多 2 条数值证据 → 归因方向与置信度。
+第一句大白话给本月最重要的经营结论（谁做得好、哪里该动），再用一句话说明数据可信度（体检有无 error/warn、是否影响结论）。
+## 内容平台经营解读
+### 厂商对比
+哪家厂商（量子/绩牛等）当月表现好/差：线索成本、开口率、有效户成本的变化，钱花得值不值。
+### 笔记表现与选题
+值得关注的笔记（watch_top）、衰退笔记与选题补充方向（declining）、停投候选（stop_candidates）、内容类型选题参考（content_types）。
+## 应用市场经营解读
+### 渠道（商店）对比
+各商店当月 vs 前 3 月：下载量、新开户率、客群质量（户均资产/创收），哪家强、哪家弱。
+### 版位与计划
+有潜力的版位组合（placement_potential）、需关注的低效组合（placement_watchlist）、下载 TOP 计划（plans_top）。
 ## 跨月趋势对比
 逐链路对比最近三个月走势，指出拐点月份与对应信号。
 ## 需要人工核对的事项
-列出无法从数据确认、需要人工核对的疑问（如上游 ETL 回写、平台口径变化）。
+数据质量问题与无法从数据确认的疑问（上游回写、平台口径、抽样核对）集中在此。
 ## 行动建议
-按优先级列出 3-5 条，注明对应月份与信号，落实到投放运营可执行的动作。"""
+按优先级列 4-6 条，聚焦投放动作（预算、素材/选题、渠道/版位取舍），注明对应月份与数据依据。"""
 
-# v4.2.0: prompt 结构性变更时递增；缓存命中需校验，避免旧缓存掩盖新 prompt 效果
-PROMPT_VERSION = 3
+# prompt 结构性变更时递增；缓存命中需校验，避免旧缓存掩盖新 prompt 效果
+PROMPT_VERSION = 4
 
 
 class LlmRequestError(Exception):
@@ -256,14 +264,8 @@ def collect_trend_data(month=None):
     return base, results
 
 
-def _signals_hash(results):
-    return hashlib.sha1(
-        json.dumps(_slim_results(results), ensure_ascii=False, sort_keys=True).encode('utf-8')
-    ).hexdigest()
-
-
-def build_user_prompt(results):
-    return json.dumps(_slim_results(results), ensure_ascii=False)
+def build_user_prompt(results, business=None):
+    return json.dumps({'diagnosis': _slim_results(results), 'business': business}, ensure_ascii=False)
 
 
 def _cache_path(month):
@@ -312,7 +314,10 @@ def run_analysis(month=None, force=False):
     if not results:
         return None, ('INVALID_PARAMETER', '目标月及前 3 个月均无诊断数据，无法生成分析')
     months_used = [r['month'] for r in results]
-    signals_hash = _signals_hash(results)
+    business = llm_evidence.build_business_evidence(target)
+    # 缓存键覆盖整个 user prompt：诊断信号或业务证据任一变化均触发失效
+    signals_hash = hashlib.sha1(
+        build_user_prompt(results, business).encode('utf-8')).hexdigest()
     model = cfg.get('model', '')
     if not force:
         cached = load_cache(target, signals_hash, model)
@@ -327,7 +332,7 @@ def run_analysis(month=None, force=False):
     try:
         content, _ = call_chat(cfg, [
             {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': build_user_prompt(results)},
+            {'role': 'user', 'content': build_user_prompt(results, business)},
         ])
     except LlmRequestError as e:
         return None, ('LLM_REQUEST_FAILED', str(e))

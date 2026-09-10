@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """诊断引擎 content_evidence 证据包测试（内存 SQLite 合成数据，不依赖真实库与 Flask app）"""
+import hashlib
 import json
 import sys
 import unittest
@@ -359,16 +360,21 @@ class RulesLevelTest(unittest.TestCase):
 
 
 class LlmPromptTest(unittest.TestCase):
-    """SYSTEM_PROMPT 降维改造：白话角色设定、疑似归因指引、固定章节、版本升级"""
+    """SYSTEM_PROMPT 经营化改造（v4）：经营解读章节、疑似归因、版本升级"""
 
     def test_prompt_version_bumped(self):
-        self.assertEqual(llm_mod.PROMPT_VERSION, 3)
+        self.assertEqual(llm_mod.PROMPT_VERSION, 4)
 
-    def test_prompt_plain_language_sections(self):
+    def test_prompt_operating_sections(self):
         prompt = llm_mod.SYSTEM_PROMPT
         for marker in (
             '## 总体判断',
-            '## 分链路解读（内容平台 / 应用市场）',
+            '## 内容平台经营解读',
+            '### 厂商对比',
+            '### 笔记表现与选题',
+            '## 应用市场经营解读',
+            '### 渠道（商店）对比',
+            '### 版位与计划',
             '## 跨月趋势对比',
             '## 需要人工核对的事项',
             '## 行动建议',
@@ -377,6 +383,9 @@ class LlmPromptTest(unittest.TestCase):
         self.assertIn('疑似', prompt)
         self.assertIn('零互动', prompt)
         self.assertIn('置信度', prompt)
+        self.assertIn('厂商', prompt)
+        self.assertIn('选题', prompt)
+        self.assertIn('户均资产', prompt)
 
 
 def _result(month, evidence=None):
@@ -439,18 +448,24 @@ class LlmPayloadTest(unittest.TestCase):
         slim = llm_mod._slim_result(_result('2026-08', evidence=_evidence()), include_evidence=True)
         self.assertEqual(len(slim['content_evidence']['daily']), llm_mod.EVIDENCE_DAILY_LIMIT)
 
-    def test_signals_hash_covers_evidence(self):
+    def test_prompt_hash_covers_evidence_and_business(self):
         base = [_result('2026-08', evidence=_evidence())]
         raw = _evidence()
         flipped = [_result('2026-08', evidence={
             **raw, 'recovery': {**raw['recovery'], 'recovered': False},
         })]
-        self.assertNotEqual(llm_mod._signals_hash(base), llm_mod._signals_hash(flipped))
+        h_base = hashlib.sha1(llm_mod.build_user_prompt(base).encode('utf-8')).hexdigest()
+        h_flipped = hashlib.sha1(llm_mod.build_user_prompt(flipped).encode('utf-8')).hexdigest()
+        self.assertNotEqual(h_base, h_flipped)
+        h_biz = hashlib.sha1(
+            llm_mod.build_user_prompt(base, {'vendor': []}).encode('utf-8')).hexdigest()
+        self.assertNotEqual(h_base, h_biz)
 
     def test_build_user_prompt_includes_evidence(self):
         prompt = llm_mod.build_user_prompt([_result('2026-08', evidence=_evidence())])
         payload = json.loads(prompt)
-        self.assertIn('content_evidence', payload[0])
+        self.assertIn('content_evidence', payload['diagnosis'][0])
+        self.assertIn('business', payload)
 
 
 if __name__ == '__main__':
