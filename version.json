@@ -1,9 +1,10 @@
 {
-    "version": "4.2.9",
+    "version": "4.3.0",
     "release_date": "2026-09-11",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v4.3.0 应用市场·广告计划分析漏斗修复与数据溯源增强：按周转化率口径由「资金账号创建完成时间」改回「下载日期」做下载 cohort（与《周度转化率趋势》一致，消除中间步骤转化率虚高至 100% 的幸存者偏差，后端 ad_plan_analysis 漏斗与移动端 handler 同步改下载日期）；各数据/表格卡片下新增「数据来源 + 更新日期」小字（拉取 /api/v1/data-freshness 各表最新日期，缺口一眼可见）；周度开户成本在消耗缺失周显示「-」而非 ¥0（规避厂商投放分析止 09-03 而下载链路至 09-10 的新鲜度缺口误导）",
         "v4.2.9 数据导入·APP下载明细数据上传区间由 3 段拆为 4 段：conversion_appmarket 区间类型 h1/q3/q4 改为 h1/78/910/1112（1-6月/7-8月/9-10月/11-12月，落 fact_conv_appmarket 仍按区间 DELETE+BULK 重写，互不重叠且覆盖全年），前端数据导入页 Segmented 区间切换与菜单文案同步，单文件更小便于下载",
         "v4.2.8 AI 分析报告流式输出 + 安卓转圈修复：后端新增 SSE 端点 /api/v1/reports/llm-analysis/stream（llm.stream_chat 生成器增量返回 meta→delta*→done/error，非流式端点保留兼容）；前端统一 services/llmStream.ts 按平台分流（Web/桌面走 SSE 增量渲染，移动端/PWA 直连本地 handler 流式）；AI 分析页改两阶段 UI（取数-生成进度 + 生成计时，delta 增量渲染 Markdown、meta 事件先回证据包、缓存命中秒回、可中途停止）；安卓端 CapacitorHttp 接管 fetch 后 AbortSignal 失效致请求无限转圈 — callChat/streamChat 叠加 JS 层 Promise.race 超时兜底，超时必然触发报错不再转圈（安卓整包缓冲，结束后一次性渲染，阶段进度+计时仍可见）；llm-analysis/stream 纳入跨端对账与移动端路由测试（tests/api + test_mobile_routes 新增 stream 用例），全量回归绿",
         "v4.2.7 修复移动端/PWA AI 分析报告 business 证据包为 null 导致 LLM 无法开始经营解读：mobileRouteHandler llm-analysis 新增 llmEvidence.ts，同口径移植后端 llm_evidence.py 三包（厂商经营 agg_vendor_daily 当月 vs 前 3 月、小红书笔记转化侧+投放侧分层、应用市场漏斗+版位+计划 TOP），随 prompt 传入、随响应 evidence 透传（缓存键含 payload 旧缓存自动失效），单包失败降级不阻塞；测试脚本同步 6 条真实 SQL 对账用例，coverage 豁免移除纳入强制对账",

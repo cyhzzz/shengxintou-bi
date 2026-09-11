@@ -965,10 +965,10 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     const factWeekWhere = buildWhere([
       inClause('广告计划ID', planIdStrs),
       { sql: '"渠道类型" = ?', params: ['互联网引流'] },
-      dateClause('资金账号创建完成时间', sd, ed),
+      dateClause('下载日期', sd, ed),
     ]);
     const factWeekRows = await querySql<Row>(
-      `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('资金账号创建完成时间')} as week_start,
+      `SELECT "广告计划ID" as plan_id, ${fridayWeekExpr('下载日期')} as week_start,
          COUNT(DISTINCT CASE WHEN "是否激活APP" = 1 THEN "设备号" END) as activate,
          COUNT(DISTINCT CASE WHEN "是否开户注册" = 1 THEN "设备号" END) as register,
          COUNT(DISTINCT CASE WHEN "是否注册身份证" = 1 THEN "设备号" END) as id_card,

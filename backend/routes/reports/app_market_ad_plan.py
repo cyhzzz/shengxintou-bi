@@ -8,6 +8,8 @@
   2. fact_conv_appmarket（应用市场下载链路，1 行=1 APP 下载）
      → 按 应用市场 直接聚合 广告开户（渠道类型=互联网引流 & 是否新开户=1 & 是否创建完资金账号=1）
      → 按 广告计划ID + 周五周 统计下载链路各阶段（下载/激活/开户注册/身份证/银行卡/开户提交/开户成功/广告开户，按设备号去重）
+     → 漏斗 cohort 口径：下载链路各阶段均按「下载日期」做下载 cohort（与《周度转化率趋势》一致），
+       禁止按「资金账号创建完成时间」切分（会剔除未开户的幸存者 → 转化率≈100% 的偏差）
   3. agg_vendor_daily（厂商广告投放分析）
      → 按 平台(应用市场) 直接聚合 消耗（花费）
   4. fact_plan_daily（厂商广告计划维度明细 9.3）
@@ -415,7 +417,9 @@ def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
             }
 
         # ---- fact_conv_appmarket：下载链路各阶段（按 广告计划ID + 周五周，去重设备号） ----
-        fweek2 = make_friday_week_start_expr(FactConvAppmarket.资金账号创建完成时间).label('week_start')
+        # 漏斗 cohort 口径：按「下载日期」做下载 cohort（与《周度转化率趋势》一致），
+        # 避免按「资金账号创建完成时间」切出的幸存者偏差（只统计已完成开户的幸存记录 → 转化率≈100%）。
+        fweek2 = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
         fact_q = db.session.query(
             FactConvAppmarket.广告计划ID, fweek2,
             _count_devices(FactConvAppmarket.是否激活APP == 1).label('activate'),
@@ -430,9 +434,9 @@ def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
             FactConvAppmarket.渠道类型 == '互联网引流',
         )
         if start_date:
-            fact_q = fact_q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
+            fact_q = fact_q.filter(FactConvAppmarket.下载日期 >= start_date)
         if end_date:
-            fact_q = fact_q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
+            fact_q = fact_q.filter(FactConvAppmarket.下载日期 <= end_date)
         fact_q = fact_q.group_by(FactConvAppmarket.广告计划ID, fweek2)
         for r in fact_q.all():
             fact_by[(int(r.广告计划ID), _ws_str(r.week_start))] = {

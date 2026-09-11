@@ -28,6 +28,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { pickEChartsColor } from '@/utils/echartsColors';
 import { dataServiceReports } from '@/services/dataService';
+import { metadataService, type DataFreshness } from '@/services/metadataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
@@ -223,6 +224,23 @@ const clusterTabItems = (data: Record<string, ClusterRow[]>) => [
   { key: 'bid', label: '出价分析', children: <Table<ClusterRow> size="small" rowKey="dim" dataSource={data.by_bid} columns={clusterColumns} pagination={false} scroll={{ x: 'max-content' }} /> },
 ];
 
+// 数据来源 + 更新日期 小字行（Issue 2）：在每个数据块下方展示其依赖的数据表与最新更新日期
+const SourceLine: React.FC<{ keys: string[]; freshness: DataFreshness }> = ({ keys, freshness }) => {
+  const parts = keys.map((k) => {
+    if (k === 'dim_ad_plan_class') return 'dim_ad_plan_class（计划分解维度）';
+    const f = freshness[k];
+    if (!f) return null;
+    const date = f.latest_date ? `（更新至 ${f.latest_date}）` : '（暂无数据）';
+    return `${f.name}${date}`;
+  }).filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <div style={{ marginTop: 8, color: 'var(--color-text-tertiary)', fontSize: '12px', lineHeight: 1.5 }}>
+      数据来源：{parts.join('；')}
+    </div>
+  );
+};
+
 // 与后端 ALLOWED_PLATFORMS 对齐：首屏默认全选，避免初次加载前 Select 为空的闪烁
 const INITIAL_MARKETS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
 
@@ -291,6 +309,8 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
   const [planWeekDetail, setPlanWeekDetail] = useState<PlanWeekDetail[]>([]);
   const [loading, setLoading] = useState(false);
+  // Issue 2：各数据块下方展示「数据来源 + 更新日期」，来自 /api/v1/data-freshness
+  const [freshness, setFreshness] = useState<DataFreshness>({});
   // 分计划分析：只渲染当前页卡片，避免一次挂载上百张 antd Table 造成首屏卡顿
   const [planPage, setPlanPage] = useState(1);
   const PLAN_PAGE_SIZE = 10;
@@ -329,6 +349,13 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // 拉取各表数据新鲜度（更新日期），供每个数据块下方展示来源与更新时间
+  useEffect(() => {
+    metadataService.getDataFreshness().then((r: any) => {
+      if (r?.success) setFreshness(r.data || {});
+    }).catch(() => {});
+  }, []);
 
   // 仅日期范围变化触发重查；应用市场切换完全本地过滤（瞬时响应）
   useEffect(() => {
@@ -501,6 +528,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     const openData = weeks.map((ws) => openMap.get(ws) || 0);
     const costData = weeks.map((ws) => {
       const oc = openMap.get(ws) || 0;
+      if (!spendMap.has(ws)) return null; // 该周无消耗数据（厂商投放数据未覆盖此周）→ 不可核算开户成本，显示 '-'
       const sp = spendMap.get(ws) || 0;
       return oc > 0 ? Math.round((sp / oc) * 100) / 100 : null;
     });
@@ -514,7 +542,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
           if (!ws) return '';
           const oc = openMap.get(ws) || 0;
           const sp = spendMap.get(ws) || 0;
-          const cost = oc > 0 ? fmtMoney(Math.round((sp / oc) * 100) / 100) : '-';
+          const cost = spendMap.has(ws) && oc > 0 ? fmtMoney(Math.round((sp / oc) * 100) / 100) : '-';
           return `${ws} ~ ${weekLabel(ws).split('~')[1] ?? ''}<br/>开户量：<strong>${oc.toLocaleString()}</strong><br/>消耗：<strong>${fmtMoney(sp)}</strong><br/>周度开户成本：<strong>${cost}</strong>`;
         },
       },
@@ -647,6 +675,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               showWowChange={false}
             />
           </MetricSection>
+          <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
         </FadeInSection>
 
         {/* 三、按周开户量柱状图 */}
@@ -663,6 +692,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             }
           >
             {displayedWeeklyOpen.length > 0 || displayedWeeklySpend.length > 0 ? <EChartsComponent option={weeklyChartOption} height={340} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
+            <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -696,6 +726,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               scroll={{ x: 2800 }}
               columns={weekPlanColumns}
             />
+            <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -724,6 +755,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             }
           >
             <Tabs items={clusterTabItems(clusterData)} />
+            <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -760,6 +792,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 style={{ marginTop: 12 }}
               />
             )}
+            <SourceLine keys={['dim_ad_plan_class', 'fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -810,6 +843,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 },
               ]}
             />
+            <SourceLine keys={['dim_ad_plan_class', 'fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -831,6 +865,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                   { title: '开户成本', key: 'ocst', align: 'right', width: 120, sorter: (a: AggRow, b: AggRow) => (a.open_cost || 0) - (b.open_cost || 0), render: (_: any, r: AggRow) => fmtMoney(r.open_cost) },
                 ]}
               />
+              <SourceLine keys={['dim_ad_plan_class', 'fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
             </Card>
             <Card size="small" title={<Space size={8}><AppstoreOutlined style={{ color: 'var(--color-brand)' }} /><span>按应用市场 聚合</span></Space>}>
               <Table<AggRow>
@@ -846,6 +881,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                   { title: '开户成本', key: 'ocst', align: 'right', width: 120, sorter: (a: AggRow, b: AggRow) => (a.open_cost || 0) - (b.open_cost || 0), render: (_: any, r: AggRow) => fmtMoney(r.open_cost) },
                 ]}
               />
+              <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
             </Card>
           </div>
         </FadeInSection>
