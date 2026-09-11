@@ -191,6 +191,72 @@ class TableSyncUtilTest(unittest.TestCase):
         # 同一天：日期(无时间) < 带时间戳的 watermark，语义正确
         self.assertLess(ts.normalize_version('2026-08-24'), ts.normalize_version('20260824_083000'))
 
+    def test_snapshot_meta_dates_lightweight(self):
+        """快照日期改读 meta.json（<1KB），不再预下载快照本体（修前端转圈超时）。"""
+        meta = {'local_sources': {
+            'fact_conv_content': '2026-08-03',
+            'vendor_daily': '2026-08-05',
+        }}
+        seen = []
+
+        class _Client:
+            def list_backups(self):
+                return [{'filename': 'backup_20260824_120000.db'}]
+
+            def meta_filename_for(self, fname):
+                seen.append(fname)
+                return fname + '.meta.json'
+
+            def download_json(self, path):
+                seen.append(path)
+                return meta
+
+        out = ts.download_latest_snapshot_dates(_Client())
+        # 只读 meta，不下载快照本体
+        self.assertNotIn('download_backup', seen)
+        # 键按 SNAPSHOT_META_KEY_BY_TABLE 映射到业务表名
+        self.assertEqual(out, {
+            'fact_conv_content': '2026-08-03',
+            'agg_vendor_daily': '2026-08-05',
+        })
+
+    def test_snapshot_meta_dates_none_cases(self):
+        """无备份 / meta 读取失败时返回 None（不回退下载快照本体）。"""
+        class _NoBackup:
+            def list_backups(self):
+                return []
+
+        class _MetaFail:
+            def list_backups(self):
+                return [{'filename': 'b.db'}]
+
+            def meta_filename_for(self, fname):
+                return fname + '.meta.json'
+
+            def download_json(self, path):
+                raise IOError('boom')
+
+        self.assertIsNone(ts.download_latest_snapshot_dates(_NoBackup()))
+        self.assertIsNone(ts.download_latest_snapshot_dates(_MetaFail()))
+
+    @mock.patch.object(ts, '_watermark_path')
+    def test_refresh_watermarks_after_restore(self, mock_wm_path):
+        """整库恢复后重刷 watermark，使版本信号与新库实际数据对齐（修拿不回云端更新的数据）。"""
+        mock_wm_path.return_value = os.path.join(self.tmp, 'wm.json')
+        engine, _ = _build_source(self.src_db)  # fact 最新日期 2026-08-03；dim_account 2 行
+        # 预置一个过期 watermark（模拟整库恢复前版本信号与数据脱钩）
+        ts.set_table_watermark('fact_conv_content', '20260901_100000')
+        ts.set_table_watermark('dim_account', '20260901_100000')
+
+        res = ts.refresh_watermarks_after_restore(engine)
+        # 事实表 -> MAX(业务日期) 的 8 位版本
+        self.assertEqual(res['fact_conv_content'], '20260803')
+        # 维表有数据 -> 初始化版本
+        self.assertEqual(res['dim_account'], ts._INIT_DIM_VERSION)
+        # 空表/库中不存在的表 -> 清除 watermark
+        self.assertIsNone(res['agg_vendor_daily'])
+        self.assertNotIn('agg_vendor_daily', ts._load_watermarks())
+
 
 class WebDAVTablePathTest(unittest.TestCase):
     """回归：逐表同步的远端路径拼接必须只含单层 backup_dir。

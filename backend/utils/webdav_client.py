@@ -26,6 +26,13 @@ _WEBDAV_USER_AGENT = (
 # 因此逐表目录只需首次 MKCOL 建一次，之后直接复用（缓存到本进程生命周期）。
 _ENSURED_TABLES_DIRS = set()
 
+# v4.3.1：requests 超时（连接, 读）。此前所有 WebDAV 请求均未设 timeout，
+# 坚果云网络挂起时后端线程永久卡死（前端早已超时，后台任务仍占着连接与线程）。
+# - 元数据类（PROPFIND/小 JSON/DELETE）：读 60s
+# - 大文件传输（整库/单表 PUT/GET，stream 传输的读超时是相邻 chunk 间隔）：读 300s
+_TIMEOUT_META = (10, 60)
+_TIMEOUT_TRANSFER = (10, 300)
+
 
 class WebDAVBackupClient:
     """WebDAV 备份客户端"""
@@ -187,7 +194,8 @@ class WebDAVBackupClient:
 
         try:
             with open(file_to_upload, 'rb') as f:
-                response = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+                response = requests.put(remote_url, data=f, auth=self.auth,
+                                        timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
 
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -205,7 +213,7 @@ class WebDAVBackupClient:
         try:
             manifest_url = self._get_remote_url('latest_backup.txt')
             requests.put(manifest_url, data=filename.encode('utf-8'),
-                          auth=self.auth, **self._requests_kwargs())
+                         auth=self.auth, timeout=_TIMEOUT_META, **self._requests_kwargs())
         except Exception as manifest_err:
             print(f"Warning: Failed to upload latest_backup.txt: {manifest_err}")
 
@@ -246,7 +254,8 @@ class WebDAVBackupClient:
 
                 try:
                     # 下载压缩文件
-                    response = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
+                    response = requests.get(remote_url, auth=self.auth, stream=True,
+                                            timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
                     if response.status_code not in [200, 206]:
                         raise Exception(f"HTTP {response.status_code}: {response.text}")
 
@@ -268,7 +277,8 @@ class WebDAVBackupClient:
                         os.remove(temp_download_path)
             else:
                 # 直接下载
-                response = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
+                response = requests.get(remote_url, auth=self.auth, stream=True,
+                                        timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
                 if response.status_code not in [200, 206]:
                     raise Exception(f"HTTP {response.status_code}: {response.text}")
 
@@ -316,6 +326,7 @@ class WebDAVBackupClient:
                     method='PROPFIND',
                     url=list_url,
                     auth=self.auth,
+                    timeout=_TIMEOUT_META,
                     **kwargs
                 )
             except Exception as e:
@@ -409,7 +420,8 @@ class WebDAVBackupClient:
         """
         try:
             remote_url = self._get_remote_url(filename)
-            response = requests.delete(remote_url, auth=self.auth, **self._requests_kwargs())
+            response = requests.delete(remote_url, auth=self.auth,
+                                       timeout=_TIMEOUT_META, **self._requests_kwargs())
 
             if response.status_code not in [200, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -445,7 +457,8 @@ class WebDAVBackupClient:
         for part in parts:
             current = f'{current}/{part}' if current else part
             url = self._get_remote_url(current)
-            resp = requests.request('MKCOL', url, auth=self.auth, **self._requests_kwargs())
+            resp = requests.request('MKCOL', url, auth=self.auth,
+                                    timeout=_TIMEOUT_META, **self._requests_kwargs())
             if resp.status_code not in (200, 201, 204, 301, 302, 405, 409):
                 raise Exception(f'创建远端目录失败 HTTP {resp.status_code}: {resp.text}')
         _ENSURED_TABLES_DIRS.add(key)
@@ -469,13 +482,15 @@ class WebDAVBackupClient:
             remote_url = self._get_remote_url(self._table_name(table_name))
             retries = 0
             with open(file_to_upload, 'rb') as f:
-                resp = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+                resp = requests.put(remote_url, data=f, auth=self.auth,
+                                    timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
             # 坚果云 WAF 会对写入方法做临时拦截（HTTP 409），重试规避瞬时失败
             while resp.status_code in (409, 429, 500, 502, 503) and retries < 3:
                 time.sleep(2 + 2 * retries)
                 retries += 1
                 with open(file_to_upload, 'rb') as f:
-                    resp = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+                    resp = requests.put(remote_url, data=f, auth=self.auth,
+                                        timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
             if resp.status_code not in (200, 201, 204):
                 raise Exception(f"HTTP {resp.status_code}: {resp.text}")
             return self._table_name(table_name)
@@ -486,7 +501,8 @@ class WebDAVBackupClient:
     def download_table_file(self, table_name, local_path):
         """从 WebDAV 下载单表 SQLite 文件到本地。返回 bool。"""
         remote_url = self._get_remote_url(self._table_name(table_name))
-        resp = requests.get(remote_url, auth=self.auth, stream=True, **self._requests_kwargs())
+        resp = requests.get(remote_url, auth=self.auth, stream=True,
+                            timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
         if resp.status_code not in (200, 206):
             if resp.status_code == 404:
                 return False
@@ -501,7 +517,8 @@ class WebDAVBackupClient:
         """拉取云端表级清单 tables/table_sync/manifest.json。不存在返回 None。"""
         import json
         remote_url = self._get_remote_url(f'{self._tables_dir()}/manifest.json')
-        resp = requests.get(remote_url, auth=self.auth, **self._requests_kwargs())
+        resp = requests.get(remote_url, auth=self.auth,
+                            timeout=_TIMEOUT_META, **self._requests_kwargs())
         if resp.status_code == 404:
             return None
         if resp.status_code != 200:
@@ -519,13 +536,13 @@ class WebDAVBackupClient:
         kwargs = self._requests_kwargs()
         kwargs['headers']['Content-Type'] = 'application/json'
         resp = requests.put(remote_url, data=json.dumps(manifest, ensure_ascii=False),
-                            auth=self.auth, **kwargs)
+                            auth=self.auth, timeout=_TIMEOUT_META, **kwargs)
         retries = 0
         while resp.status_code in (409, 429, 500, 502, 503) and retries < 3:
             time.sleep(2 + 2 * retries)
             retries += 1
             resp = requests.put(remote_url, data=json.dumps(manifest, ensure_ascii=False),
-                                auth=self.auth, **kwargs)
+                                auth=self.auth, timeout=_TIMEOUT_META, **kwargs)
         if resp.status_code not in (200, 201, 204):
             raise Exception(f"HTTP {resp.status_code}: {resp.text}")
 
@@ -584,7 +601,8 @@ class WebDAVBackupClient:
             remote_url = self._get_remote_url(remote_filename)
 
             with open(local_file_path, 'rb') as f:
-                response = requests.put(remote_url, data=f, auth=self.auth, **self._requests_kwargs())
+                response = requests.put(remote_url, data=f, auth=self.auth,
+                                        timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
 
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -608,7 +626,8 @@ class WebDAVBackupClient:
             kwargs = self._requests_kwargs()
             kwargs['headers']['Content-Type'] = 'application/json'
             response = requests.put(
-                remote_url, data=payload, auth=self.auth, **kwargs
+                remote_url, data=payload, auth=self.auth,
+                timeout=_TIMEOUT_META, **kwargs
             )
             if response.status_code not in [200, 201, 204]:
                 raise Exception(f"HTTP {response.status_code}: {response.text}")
@@ -623,7 +642,8 @@ class WebDAVBackupClient:
         """
         import json as _json
         remote_url = self._get_remote_url(remote_filename)
-        response = requests.get(remote_url, auth=self.auth, **self._requests_kwargs())
+        response = requests.get(remote_url, auth=self.auth,
+                                timeout=_TIMEOUT_META, **self._requests_kwargs())
         if response.status_code == 404:
             raise RemoteResourceNotFound(f"meta 文件不存在: {remote_filename}")
         if response.status_code not in [200, 206]:

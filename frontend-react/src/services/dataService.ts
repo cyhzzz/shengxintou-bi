@@ -334,6 +334,12 @@ export interface TableSyncResultRow {
   from?: 'snapshot';
   filename?: string;
   size?: number;
+  /** v4.3.1：skipped(local_newer_or_equal) 附带两端行数，供前端提示「版本同但行数异」 */
+  local_version?: string;
+  local_rows?: number;
+  cloud_rows?: number;
+  /** v4.3.1：是否为强制拉取（跳过版本保护以云端覆盖本地） */
+  forced?: boolean;
 }
 export interface TableSyncOpResult {
   results: Record<string, TableSyncResultRow>;
@@ -343,17 +349,19 @@ export interface TableSyncMeta {
   label: string;
   type: 'dim' | 'fact';
 }
-// 逐表同步的业务表清单（与后端 table_sync.SYNC_TABLES 顺序/中文名一致）
+// 逐表同步的业务表清单（表名与顺序须与后端 table_sync.SYNC_TABLES 一致；label 以数据导入列表为准）
 export const SYNC_TABLE_META: TableSyncMeta[] = [
-  { name: 'dim_account', label: '代理商账号', type: 'dim' },
-  { name: 'dim_ad_plan_class', label: '广告计划分类', type: 'dim' },
-  { name: 'fact_conv_content', label: '内容线索', type: 'fact' },
-  { name: 'fact_conv_appmarket', label: '应用市场转化', type: 'fact' },
+  // label 与「数据导入」列表名称对齐（backend/routes/upload.py::DATA_TYPES 为权威源），
+  // 应用市场下载链路在导入侧按时间区间拆 4 类但落同一张表，此处用基名
+  { name: 'dim_account', label: '投放账号映射', type: 'dim' },
+  { name: 'dim_ad_plan_class', label: '应用市场计划分解', type: 'dim' },
+  { name: 'fact_conv_content', label: '内容平台加微链路', type: 'fact' },
+  { name: 'fact_conv_appmarket', label: '应用市场下载链路', type: 'fact' },
   { name: 'fact_plan_daily', label: '广告计划维度明细', type: 'fact' },
-  { name: 'agg_vendor_daily', label: '渠道日报', type: 'fact' },
+  { name: 'agg_vendor_daily', label: '厂商广告投放分析', type: 'fact' },
   { name: 'agg_xhs_note', label: '小红书笔记', type: 'fact' },
-  { name: 'agg_daily_channel_open', label: '全渠道开户日报', type: 'fact' },
-  { name: 'fact_qingniao_leads', label: '青鸟线索', type: 'fact' },
+  { name: 'agg_daily_channel_open', label: '开户渠道分析', type: 'fact' },
+  { name: 'fact_qingniao_leads', label: '抖音青鸟线索通', type: 'fact' },
 ];
 
 export const dataServiceTableSync = {
@@ -364,8 +372,9 @@ export const dataServiceTableSync = {
   upload: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
     return http.post('/webdav/tables/upload', { tables }, { timeout: 180000 }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
   },
-  download: async (tables: string[]): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
-    return http.post('/webdav/tables/download', { tables }, { timeout: 180000 }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
+  // force=true：跳过「本地不旧于云端」保护，强制以云端覆盖本地（版本号一致但行数/内容不一致时的逃生通道）
+  download: async (tables: string[], force = false): Promise<{ success: boolean; data?: TableSyncOpResult; message?: string }> => {
+    return http.post('/webdav/tables/download', { tables, force }, { timeout: 180000 }) as unknown as { success: boolean; data?: TableSyncOpResult; message?: string };
   },
 };
 

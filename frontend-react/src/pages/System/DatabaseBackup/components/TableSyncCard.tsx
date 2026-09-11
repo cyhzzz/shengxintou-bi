@@ -7,7 +7,7 @@
  * - 不显示任何角色/负责人字段
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Space, Tag, Alert, Spin, Modal, message } from 'antd';
+import { Card, Table, Button, Space, Tag, Alert, Spin, Modal, Checkbox, message } from 'antd';
 import { CloudUploadOutlined, CloudDownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   dataServiceTableSync,
@@ -27,6 +27,8 @@ interface TableRow {
   cloudVersion: string | null;
   cloudRows: number | null;
   status: RowStatus;
+  /** 版本号一致但两端行数不同（常见于整库恢复覆盖了本地数据），可强制拉取对齐云端 */
+  rowsDiff: boolean;
 }
 
 /** 把版本归一化成可比较的数字：'2026-08-23' -> 20260823；'20260824_083000' -> 20260824083000 */
@@ -41,10 +43,11 @@ export default function TableSyncCard() {
   const [manifest, setManifest] = useState<TableSyncManifestData | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [operating, setOperating] = useState<null | { direction: 'upload' | 'download'; tables: string[] }>(null);
+  const [operating, setOperating] = useState<null | { direction: 'upload' | 'download'; tables: string[]; force?: boolean }>(null);
   const [result, setResult] = useState<Record<string, TableSyncResultRow> | null>(null);
   const [lastResultDir, setLastResultDir] = useState<null | 'upload' | 'download'>(null);
   const [batchConfirm, setBatchConfirm] = useState<null | 'upload' | 'download'>(null);
+  const [batchForce, setBatchForce] = useState(false);
 
   const loadManifest = useCallback(async () => {
     setLoading(true);
@@ -76,6 +79,8 @@ export default function TableSyncCard() {
     const cv = cloud?.version ?? null;
     const ln = versionNum(lv);
     const cn = versionNum(cv);
+    const localRows = local?.rows ?? null;
+    const cloudRows = cloud?.rows ?? null;
     let status: RowStatus = 'no_local';
     if (!lv) status = 'no_local';
     else if (!cv) status = 'no_cloud';
@@ -91,35 +96,38 @@ export default function TableSyncCard() {
       label: m.label,
       type: m.type,
       localVersion: lv,
-      localRows: local?.rows ?? null,
+      localRows,
       cloudVersion: cv,
-      cloudRows: cloud?.rows ?? null,
+      cloudRows,
       status,
+      rowsDiff: status === 'equal' && localRows !== null && cloudRows !== null && localRows !== cloudRows,
     };
   });
 
   const notConfigured = manifest?.not_configured !== false;
   const cloudInitialized = rows.some((r) => r.cloudRows !== null);
 
-  const statusTag = (s: RowStatus) => {
-    switch (s) {
+  const statusTag = (r: TableRow) => {
+    switch (r.status) {
       case 'local_new': return <Tag color="blue">本地新</Tag>;
       case 'cloud_new': return <Tag color="cyan">云端新</Tag>;
-      case 'equal': return <Tag color="green">一致</Tag>;
+      case 'equal':
+        // v4.3.1：版本号一致但行数不同——整库恢复文件级替换 db 会造成此状态，需提示强制拉取
+        return r.rowsDiff ? <Tag color="orange">版本同·行数异</Tag> : <Tag color="green">一致</Tag>;
       case 'no_local': return <Tag color="default">无本地数据</Tag>;
       case 'no_cloud': return <Tag color="orange">云端无数据</Tag>;
       default: return <Tag>未知</Tag>;
     }
   };
 
-  const runOperation = async (direction: 'upload' | 'download', tables: string[]) => {
+  const runOperation = async (direction: 'upload' | 'download', tables: string[], force = false) => {
     if (!tables.length) return;
-    setOperating({ direction, tables });
+    setOperating({ direction, tables, force: force || undefined });
     setResult(null);
     try {
       const res = direction === 'upload'
         ? await dataServiceTableSync.upload(tables)
-        : await dataServiceTableSync.download(tables);
+        : await dataServiceTableSync.download(tables, force);
       if (res.success && res.data?.results) {
         setResult(res.data.results);
         setLastResultDir(direction);
@@ -128,7 +136,7 @@ export default function TableSyncCard() {
         const uploaded = tableResults.filter(([, r]) => r.status === 'uploaded' || r.status === 'downloaded').length;
         const skipped = tableResults.filter(([, r]) => r.status === 'skipped').length;
         const failed = tableResults.filter(([, r]) => r.status === 'error').length;
-        const dirLabel = direction === 'upload' ? '上传' : '下载';
+        const dirLabel = direction === 'upload' ? '上传' : (force ? '强制拉取' : '下载');
         if (failed) {
           message.warning(`${dirLabel}完成：上传 ${uploaded} 张、跳过 ${skipped} 张、失败 ${failed} 张`);
         } else {
@@ -151,6 +159,7 @@ export default function TableSyncCard() {
       message.info('请先勾选需要同步的业务表');
       return;
     }
+    setBatchForce(false);
     setBatchConfirm(direction);
   };
 
@@ -201,13 +210,13 @@ export default function TableSyncCard() {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
-      render: (s: RowStatus) => statusTag(s),
+      width: 130,
+      render: (_: unknown, r: TableRow) => statusTag(r),
     },
     {
       title: '操作',
       key: 'action',
-      width: 140,
+      width: 200,
       render: (_: unknown, r: TableRow) => (
         <Space size="small">
           <Button
@@ -222,12 +231,24 @@ export default function TableSyncCard() {
           <Button
             size="small"
             icon={<CloudDownloadOutlined />}
-            loading={operating?.direction === 'download' && operating.tables.includes(r.name)}
+            loading={operating?.direction === 'download' && !operating.force && operating.tables.includes(r.name)}
             disabled={!!operating || notConfigured}
             onClick={() => runOperation('download', [r.name])}
           >
             下载
           </Button>
+          {r.rowsDiff && (
+            <Button
+              size="small"
+              danger
+              icon={<CloudDownloadOutlined />}
+              loading={operating?.direction === 'download' && !!operating.force && operating.tables.includes(r.name)}
+              disabled={!!operating || notConfigured}
+              onClick={() => runOperation('download', [r.name], true)}
+            >
+              强制拉取
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -330,12 +351,17 @@ export default function TableSyncCard() {
                       );
                     }
                     const meta = SYNC_TABLE_META.find((m) => m.name === t);
+                    const rowsMismatch = r.local_rows != null && r.cloud_rows != null && r.local_rows !== r.cloud_rows;
                     const reasonText =
                       r.status === 'skipped'
                         ? r.reason === 'cloud_newer' ? '云端已更新，本地旧，未覆盖' :
                           r.reason === 'no_local_version' ? '本地无数据' :
                           r.reason === 'cloud_missing' ? '云端无该表' :
-                          '已是最新，跳过'
+                          r.reason === 'local_newer_or_equal'
+                            ? (rowsMismatch
+                                ? `版本号一致但行数不同（本地 ${r.local_rows!.toLocaleString()} / 云端 ${r.cloud_rows!.toLocaleString()}），可「强制拉取」以云端为准对齐`
+                                : '本地不旧于云端，保留本地')
+                            : '已是最新，跳过'
                         : '';
                     return (
                       <li key={t}>
@@ -343,8 +369,10 @@ export default function TableSyncCard() {
                         {r.status === 'error'
                           ? <span style={{ color: 'var(--color-danger)' }}>失败 — {r.message}</span>
                           : r.status === 'skipped'
-                            ? `${r.reason === 'no_local_version' || r.reason === 'cloud_missing' ? '跳过' : '保留云端'} — ${reasonText}`
-                            : `${(r.rows ?? 0).toLocaleString()} 行${r.from === 'snapshot' ? '（来自老版本整库快照兜底）' : ''}`}
+                            ? <span style={r.reason === 'local_newer_or_equal' && rowsMismatch ? { color: 'var(--color-warning)' } : undefined}>
+                                {r.reason === 'no_local_version' || r.reason === 'cloud_missing' ? '跳过' : '保留本地'} — {reasonText}
+                              </span>
+                            : `${(r.rows ?? 0).toLocaleString()} 行${r.forced ? '（强制拉取，已按云端覆盖本地）' : ''}${r.from === 'snapshot' ? '（来自老版本整库快照兜底）' : ''}`}
                       </li>
                     );
                   })}
@@ -360,14 +388,14 @@ export default function TableSyncCard() {
         title={batchConfirm === 'upload' ? '确认上传勾选表' : '确认下载勾选表'}
         open={!!batchConfirm}
         onOk={() => {
-          if (batchConfirm) runOperation(batchConfirm, selectedKeys);
+          if (batchConfirm) runOperation(batchConfirm, selectedKeys, batchConfirm === 'download' && batchForce);
           setBatchConfirm(null);
         }}
         onCancel={() => setBatchConfirm(null)}
-        okText={batchConfirm === 'upload' ? '确认上传' : '确认下载'}
+        okText={batchConfirm === 'upload' ? '确认上传' : (batchForce ? '强制下载' : '确认下载')}
         cancelText="取消"
         confirmLoading={!!operating}
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: batchConfirm === 'upload' || batchForce }}
       >
         <p>
           {batchConfirm === 'upload'
@@ -383,6 +411,14 @@ export default function TableSyncCard() {
         <p style={{ color: 'var(--color-warning)' }}>
           ⚠️ 目标表会先删除本地/云端同名表数据再写入整表快照，请仅勾选你负责且确认要同步的表。
         </p>
+        {batchConfirm === 'download' && (
+          <Checkbox
+            checked={batchForce}
+            onChange={(e) => setBatchForce(e.target.checked)}
+          >
+            强制以云端覆盖本地（跳过版本保护，用于版本号一致但本地行数被整库同步覆盖的情况）
+          </Checkbox>
+        )}
       </Modal>
     </Card>
   );

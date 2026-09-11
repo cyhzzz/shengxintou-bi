@@ -261,6 +261,25 @@ def auto_sync():
         }), status_code
 
 
+def _plausible_business_date(v):
+    """判断字符串是否可解析为合理业务日期（YYYY-MM-DD，年份在 2000~今年）。
+
+    v4.3.1：上游 Excel 解析偶尔产生脏日期（如 '2996-05-22'，数字被 Excel 误转成日期）。
+
+    TRUE 日期会被 `MAX()` 当作程序"最新数据日期"，进而本地/云端同步状态误判
+    「日期一致、无需同步」，掩盖真实的数据不同步。此类异常日期一律过滤掉。
+    """
+    if not v:
+        return False
+    s = str(v)[:10]
+    try:
+        from datetime import datetime as _dt
+        d = _dt.strptime(s, '%Y-%m-%d')
+    except Exception:
+        return False
+    return 2000 <= d.year <= _dt.now().year
+
+
 def _compute_local_sources(app):
     """计算本地 5 张业务表各自的 MAX 日期 + 整体 MAX。
 
@@ -287,7 +306,9 @@ def _compute_local_sources(app):
             ]:
                 try:
                     v = conn.execute(_func.max(col).select()).scalar()
-                    if v:
+                    # v4.3.1：只采纳合理业务日期，过滤被 Excel 解析成的脏日期（如 2996-05-22），
+                    # 否则 "最新数据日期" 会被污染成未来年份，同步状态误判本地/云端日期一致、无需同步。
+                    if v and _plausible_business_date(v):
                         local_sources[table_key] = str(v)[:10]
                 except Exception:
                     pass
@@ -347,7 +368,9 @@ def _check_sync_status():
             ]:
                 try:
                     v = conn.execute(_func.max(col).select()).scalar()
-                    if v:
+                    # v4.3.1：只采纳合理业务日期，过滤被 Excel 解析成的脏日期（如 2996-05-22），
+                    # 否则 "最新数据日期" 会被污染成未来年份，同步状态误判本地/云端日期一致、无需同步。
+                    if v and _plausible_business_date(v):
                         local_sources[table_key] = str(v)[:10]
                 except Exception:
                     pass
@@ -398,6 +421,13 @@ def _check_sync_status():
             cloud_data_latest = (cloud_latest_str or '')[:10]
             meta_source = 'file_mtime'
             needs_meta_rebuild = True
+
+        # v4.3.1：云端 data_latest 若也是被污染的未来年份（老备份 meta 在脏日期修复前生成），
+        # 一并过滤掉，并提示重建 meta（重新做一次本地备份即可覆盖为合理的 data_latest）。
+        if cloud_data_latest and not _plausible_business_date(cloud_data_latest):
+            if meta_source == 'meta':
+                needs_meta_rebuild = True
+            cloud_data_latest = None
 
         # 4. 比较：用 cloud_data_latest（真正的"数据日期"） vs local_latest
         need_sync = False
@@ -1090,6 +1120,17 @@ def _restore_async(task_id, filename):
                 backup_tasks[task_id]['progress'] = 90
                 backup_tasks[task_id]['message'] = f'恢复完成: {filename}'
 
+                # v4.3.1：整库恢复是文件级替换 db，watermark 文件（USER_DATA_DIR）不受影响，
+                # 若不刷新会导致本地版本信号与实际数据脱钩——逐表下载误判 local_newer_or_equal，
+                # 云端更新的数据永远拉不回（用户报「版本号一致但行数被整库覆盖无法重新拉取」）。
+                # 恢复成功后按新库实际数据重刷各表 watermark（best-effort，失败不影响恢复结果）。
+                try:
+                    from backend.utils.table_sync import refresh_watermarks_after_restore
+                    db.session.close()
+                    refresh_watermarks_after_restore(db.engine)
+                except Exception as wm_err:
+                    current_app.logger.warning('恢复后刷新逐表 watermark 失败: %s', wm_err)
+
                 # 保存预恢复备份路径（用于回滚）
                 backup_tasks[task_id]['pre_restore_backup'] = pre_restore_backup
 
@@ -1305,22 +1346,26 @@ def table_upload():
 def table_download():
     """逐表下载：云端版本严格新于本地才合并入库，否则跳过。
 
-    新老兼容：在逐表文件的基础上，还会检查云端最新整库快照里该表的最新数据日期——
-    老版本同事仍走整库 push 时，若快照里该表日期比云端逐表版本更新，则从快照拆分该表合并，
-    保证升级后也能拿到老同事新推的数据。任何来源都不覆盖本地更新的版本（新者胜、等者不动）。
+    新老兼容：先读云端最新整库快照的 meta.json（<1KB，v4.3.1 起不再预下载几十 MB 快照本体，
+    修「逐表下载先拖整库快照拖爆前端超时」）拿各表数据日期——老版本同事整库 push 后若
+    快照里该表日期比云端逐表版本更新，才真正下载快照并拆分该表合并。
+    body.force=true 时跳过「本地不旧于云端」的保护，强制以云端为准覆盖本地
+    （修「整库恢复覆盖本地行数后版本号显示一致，逐表下载永远跳过拿不回数据」的逃生通道）。
+    任何来源都不覆盖本地更新的版本（force 时除外）。
     """
     if not _is_webdav_configured():
         return jsonify({'success': False, 'message': '尚未配置 WebDAV 服务器'}), 400
     body = request.get_json() or {}
     names = _valid_table_names(body.get('tables') or [])
+    force = bool(body.get('force'))
     if not names:
         return jsonify({'success': False, 'message': '未选择有效业务表'}), 400
 
     try:
         from backend.utils.table_sync import (
             compute_table_local, merge_sqlite_table_into,
-            download_latest_snapshot, snapshot_table_max_date,
-            TABLE_DATE_COLS, normalize_version,
+            download_latest_snapshot, download_latest_snapshot_dates,
+            normalize_version,
         )
         import tempfile
         client, env = _get_table_sync_client()
@@ -1330,7 +1375,9 @@ def table_download():
         results = {}
 
         with current_app.app_context(), tempfile.TemporaryDirectory() as tmpdir:
-            # 整库快照（懒加载一次）：老同事整库 push 的兜底源 + 表日期对比源
+            # v4.3.1：快照日期改从 meta.json 轻量读取（免下载快照本体）；
+            # 仅当某表确认需要从快照拆分合并时才下载快照文件（懒加载一次）。
+            snap_dates = download_latest_snapshot_dates(client) or {}
             snapshot_path = None
 
             def _ensure_snapshot():
@@ -1339,56 +1386,68 @@ def table_download():
                     snapshot_path = download_latest_snapshot(client, tmpdir)
                 return snapshot_path
 
+            def _skip_local_not_older(t, snap_date, cloud_ver):
+                """构造 skipped 结果（附带两端行数，便于前端提示版本同但行数异）。"""
+                local_v, local_rows = compute_table_local(engine, t)
+                info = {'status': 'skipped', 'reason': 'local_newer_or_equal',
+                        'local_version': local_v, 'local_rows': local_rows,
+                        'version': snap_date or cloud_ver}
+                cloud_rows = (cloud_tables.get(t) or {}).get('rows')
+                if cloud_rows is not None:
+                    info['cloud_rows'] = cloud_rows
+                return info
+
             for t in names:
                 local_version, _ = compute_table_local(engine, t)
                 cloud_info = cloud_tables.get(t)
                 cloud_ver = (cloud_info or {}).get('version')
-
-                # 老整库快照里该表最新数据日期（事实/聚合表才有可比日期；维表返回 None）
-                snap_date = None
-                if t in TABLE_DATE_COLS:
-                    snap = _ensure_snapshot()
-                    if snap:
-                        snap_date = snapshot_table_max_date(snap, t)
+                snap_date = snap_dates.get(t)
 
                 local_num = normalize_version(local_version)
                 snap_num = normalize_version(snap_date)
                 cloud_num = normalize_version(cloud_ver)
 
-                # 1) 云端逐表清单缺失 → 整库快照兜底
+                # 1) 云端逐表清单缺失 → 整库快照兜底（老同事只整库 push 的场景）
                 if not cloud_ver:
-                    if not snap:
-                        snap = _ensure_snapshot()
-                    if snap is None or snap_date is None:
+                    if snap_date is None or snap_num is None:
                         results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
                         continue
-                    if local_num is not None and snap_num is not None and local_num >= snap_num:
-                        results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                    if not force and local_num is not None and local_num >= snap_num:
+                        results[t] = _skip_local_not_older(t, snap_date, None)
                         continue
                     try:
+                        snap = _ensure_snapshot()
+                        if not snap:
+                            results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
+                            continue
                         n = merge_sqlite_table_into(engine, t, snap, is_pg)
-                        results[t] = {'status': 'downloaded', 'rows': n, 'from': 'snapshot', 'version': snap_date}
+                        results[t] = {'status': 'downloaded', 'rows': n, 'from': 'snapshot',
+                                      'version': snap_date, 'forced': force or None}
                     except Exception as e:
                         results[t] = {'status': 'error', 'message': f'整库快照兜底失败: {str(e)}'}
                     continue
 
                 # 2) 逐表存在，但老整库快照该表日期严格更新 → 快照才是最新数据，拆分合并
                 if snap_date and snap_num is not None and cloud_num is not None and snap_num > cloud_num:
-                    if local_num is not None and local_num >= snap_num:
-                        results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                    if not force and local_num is not None and local_num >= snap_num:
+                        results[t] = _skip_local_not_older(t, snap_date, cloud_ver)
                         continue
                     try:
                         snap = _ensure_snapshot()
+                        if not snap:
+                            results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
+                            continue
                         n = merge_sqlite_table_into(engine, t, snap, is_pg)
                         results[t] = {'status': 'downloaded', 'rows': n, 'from': 'snapshot',
-                                      'version': snap_date, 'reason': 'snapshot_newer_than_manifest'}
+                                      'version': snap_date, 'reason': 'snapshot_newer_than_manifest',
+                                      'forced': force or None}
                     except Exception as e:
                         results[t] = {'status': 'error', 'message': f'整库快照兜底失败: {str(e)}'}
                     continue
 
-                # 3) 常规逐表对比：云端严格新于本地才下载合并
-                if local_num is not None and cloud_num is not None and local_num >= cloud_num:
-                    results[t] = {'status': 'skipped', 'reason': 'local_newer_or_equal'}
+                # 3) 常规逐表对比：云端严格新于本地才下载合并（force 时直接拉云端覆盖）
+                if not force and local_num is not None and cloud_num is not None and local_num >= cloud_num:
+                    results[t] = _skip_local_not_older(t, None, cloud_ver)
                     continue
                 try:
                     tmp_db = os.path.join(tmpdir, f'{t}.db')
@@ -1397,10 +1456,11 @@ def table_download():
                         results[t] = {'status': 'skipped', 'reason': 'cloud_missing'}
                         continue
                     n = merge_sqlite_table_into(engine, t, tmp_db, is_pg)
-                    results[t] = {'status': 'downloaded', 'rows': n, 'version': cloud_ver}
+                    results[t] = {'status': 'downloaded', 'rows': n, 'version': cloud_ver,
+                                  'forced': force or None}
                 except Exception as e:
                     results[t] = {'status': 'error', 'message': str(e)}
 
-        return jsonify({'success': True, 'data': {'results': results}})
+        return jsonify({'success': True, 'data': {'results': results, 'forced': force}})
     except Exception as e:
         return jsonify({'success': False, 'message': f'逐表下载失败: {str(e)}'}), 500

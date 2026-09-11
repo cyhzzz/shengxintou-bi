@@ -51,6 +51,19 @@ TABLE_DATE_COLS = {
 DIM_TABLES = ['dim_account', 'dim_ad_plan_class']
 _INIT_DIM_VERSION = '0'
 
+# 整库快照 meta.json 的 local_sources 键 ↔ 业务表名 映射。
+# 逐表下载时先 GET 这个 <1KB 的 meta 拿各表数据日期（代替下载几十 MB 快照本体做日期对比），
+# 仅当确认需要从快照拆分某表时才真正下载快照文件（v4.3.1 修「逐表下载先拖整库快照拖爆前端超时」）。
+SNAPSHOT_META_KEY_BY_TABLE = {
+    'agg_vendor_daily': 'vendor_daily',
+    'agg_xhs_note': 'xhs_note',
+    'fact_conv_content': 'fact_conv_content',
+    'fact_conv_appmarket': 'fact_conv_appmarket',
+    'agg_daily_channel_open': 'agg_daily_channel_open',
+    'fact_plan_daily': 'plan_daily',
+    'fact_qingniao_leads': 'qingniao_leads',
+}
+
 _WATERMARK_FILENAME = 'table_sync_watermark.json'
 
 
@@ -235,6 +248,71 @@ def snapshot_table_max_date(snapshot_db: str, table: str):
 
 
 # ---- 整库快照兜底（向下兼容：老同事整库 push，新逐表缺失表自动回填） ----
+
+def download_latest_snapshot_dates(client) -> dict | None:
+    """读云端最新整库快照的 meta.json，返回 {业务表名: 数据日期 'YYYY-MM-DD'}。
+
+    轻量替代「下载整库快照后查各表 MAX(日期)」：meta < 1KB，避免逐表下载被
+    几十 MB 快照下载拖爆超时。meta 缺失/损坏/无备份时返回 None（调用方跳过快照兜底，
+    不回退到下载快照本体——旧备份无 meta 属极端场景，宁可少兜底不可超时回归）。
+    """
+    try:
+        backups = client.list_backups()
+    except Exception as e:
+        log.warning('读取云端整库清单失败: %s', e)
+        return None
+    if not backups:
+        return None
+    fname = backups[0]['filename']
+    try:
+        meta = client.download_json(client.meta_filename_for(fname))
+    except Exception as e:
+        log.warning('读取整库快照 meta 失败 %s: %s', fname, e)
+        return None
+    sources = (meta or {}).get('local_sources') or {}
+    out = {}
+    for table, key in SNAPSHOT_META_KEY_BY_TABLE.items():
+        val = sources.get(key)
+        if val:
+            out[table] = str(val)[:10]
+    return out
+
+
+def refresh_watermarks_after_restore(engine) -> dict:
+    """整库恢复成功后，把各表 watermark 对齐到恢复后数据的真实版本信号。
+
+    修「整库恢复是文件级替换 db，watermark 文件不受影响 → 本地版本信号与实际数据脱钩，
+    逐表下载误判 local_newer_or_equal 而拿不回云端更新数据」：
+    - 事实/聚合表：watermark = 恢复后 MAX(业务日期) 的 'YYYYMMDD'（8 位，比同日真实
+      导入 watermark（14 位）旧，语义正确：恢复的数据 <= 同日后续导入）。
+    - 维表：有数据 → '0'（初始化版本），与 _INIT_DIM_VERSION 语义一致。
+    - 空表：删除该表 watermark（回到无版本状态）。
+    """
+    import sqlalchemy as sa
+    wm = _load_watermarks()
+    result = {}
+    for table in SYNC_TABLES:
+        date_col = TABLE_DATE_COLS.get(table)
+        max_val = None
+        if date_col:
+            try:
+                with engine.connect() as conn:
+                    max_val = conn.execute(
+                        sa.text(f'SELECT MAX("{date_col}") FROM "{table}"')).scalar()
+            except Exception as e:
+                log.warning('恢复后计算 %s MAX(%s) 失败: %s', table, date_col, e)
+        max_date = str(max_val)[:10].replace('-', '') if max_val else None
+        if max_date:
+            wm[table] = max_date
+        elif _count_rows(engine, table) > 0:
+            wm[table] = _INIT_DIM_VERSION
+        else:
+            wm.pop(table, None)
+        result[table] = wm.get(table)
+    _save_watermarks(wm)
+    log.info('整库恢复后已刷新逐表 watermark: %s', result)
+    return result
+
 
 def download_latest_snapshot(client, tmpdir: str):
     """拉取云端最新整库快照到本地临时目录。返回本地路径，无快照返回 None。
