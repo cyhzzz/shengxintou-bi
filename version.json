@@ -1,9 +1,10 @@
 {
-    "version": "4.2.7",
+    "version": "4.2.8",
     "release_date": "2026-09-11",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v4.2.8 AI 分析报告流式输出 + 安卓转圈修复：后端新增 SSE 端点 /api/v1/reports/llm-analysis/stream（llm.stream_chat 生成器增量返回 meta→delta*→done/error，非流式端点保留兼容）；前端统一 services/llmStream.ts 按平台分流（Web/桌面走 SSE 增量渲染，移动端/PWA 直连本地 handler 流式）；AI 分析页改两阶段 UI（取数-生成进度 + 生成计时，delta 增量渲染 Markdown、meta 事件先回证据包、缓存命中秒回、可中途停止）；安卓端 CapacitorHttp 接管 fetch 后 AbortSignal 失效致请求无限转圈 — callChat/streamChat 叠加 JS 层 Promise.race 超时兜底，超时必然触发报错不再转圈（安卓整包缓冲，结束后一次性渲染，阶段进度+计时仍可见）；llm-analysis/stream 纳入跨端对账与移动端路由测试（tests/api + test_mobile_routes 新增 stream 用例），全量回归绿",
         "v4.2.7 修复移动端/PWA AI 分析报告 business 证据包为 null 导致 LLM 无法开始经营解读：mobileRouteHandler llm-analysis 新增 llmEvidence.ts，同口径移植后端 llm_evidence.py 三包（厂商经营 agg_vendor_daily 当月 vs 前 3 月、小红书笔记转化侧+投放侧分层、应用市场漏斗+版位+计划 TOP），随 prompt 传入、随响应 evidence 透传（缓存键含 payload 旧缓存自动失效），单包失败降级不阻塞；测试脚本同步 6 条真实 SQL 对账用例，coverage 豁免移除纳入强制对账",
         "v4.2.6 周报图表 lieflat 专项 + 移动端开放 AI 分析报告：周报概览版 KPI 区新增环比增减 Diverging Bar（涨/跌/不可比三态语义色，零值不渲染）；周报页局部语义色板整理（涨跌色与 KPI 四档 token，全局 echarts 序列不动）；周报详细版导出新增单文件 HTML 格式（页面 DOM 快照 + 图表 canvas 转 dataURL，零外部依赖，与 PNG/PDF 并列）；AI 分析报告响应新增「图表证据卡」（evidence 证据包随响应透传、老缓存自动兼容，前端三面板：厂商经营/小红书笔记分层/应用市场漏斗）；移动端/PWA 端解除「AI 分析报告」菜单隐藏，mobileRouteHandler 新增 llm-config 读写/测试连接/llm-analysis 三端点（配置存本机 localStorage、LLM 请求 fetch 直连 Provider 免 CORS、诊断取数复用 reports/diagnosis 链路，SYSTEM_PROMPT 与后端 llm.py 两端同步维护，业务证据包首期 null 按 prompt 规则跳过解读不编造），跨端对账白名单移除改纳对账、coverage 脚本新增 NO_SQL_CASES 无 SQL 豁免类别；详细版开户来源云图曾实验 nested treemap 单 series 自布局，因四板块位置随数值浮动不再固定对齐而回滚，保持 4-series 固定四象限版",
         "v4.2.5 修复两线发版分叉：并入此前遗漏的「应用市场·广告计划分析·周度开户成本副坐标」功能（源自同事单独发的 v4.3.1，未并入 main）——后端新增 _weekly_spend 按周五起始周聚合 agg_vendor_daily.花费、ad_plan_analysis 返回 weekly_spend，Web 广告计划分析页开户量柱状图新增副坐标「周度开户成本」折线（双 Y 轴，tooltip 展示开户量/消耗/成本），移动端 handler 同步返回 weekly_spend 保持跨端契约一致，消耗与开户量按同一周五起始周+同日期区间对齐；同步清理两线各自发版造成的错误远端高版本 release/tag（v4.3.0/v4.3.1），版本线收敛回 4.2.x",
