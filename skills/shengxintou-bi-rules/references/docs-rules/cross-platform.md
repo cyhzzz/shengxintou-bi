@@ -54,6 +54,7 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - [ ] **移动端禁用任何新业务报表前必须先征求用户确认**（如在 features.ts 置 `showXxx: false` 或加入 mobileRouteHandler 忽略列表），并说明禁用理由（如依赖桌面端专属能力、后端端点未移植等）。不得在用户不知情时擅自禁用。
 - [ ] 仅当功能确实依赖桌面/Web 专属能力（如文件上传、对账桌面工作流、系统配置）时，才允许移动端禁用，且须在注释中写明原因。
 - [ ] 若需禁用，同步更新 `mobileRouteHandler.ts`（或加入 `MOBILE_IGNORED_PREFIXES`）、`features.ts`、`router/index.tsx`、测试与对账脚本，保持跨端契约检查通过。
+- [ ] **「全端提供」指功能对等，不是入口可见**：移动端实现相对后端降级（占位传 null、缺输入证据包、精简链路）时，必须保持 featureFlag 门控隐藏入口并留补齐计划，或先补齐再开放；禁止「占位实现 + 解除菜单隐藏」同时发版（2026-09 v4.2.6 llm-analysis 因 business 证据包 null 全量开放，次版补齐）。
 
 ### 4.1 新增 API 端点
 
@@ -112,6 +113,8 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - SQL 中文字段名直接使用（与 `models_v2.py` 一致），不做转换
 - 未实现的端点统一抛 `Mobile API not implemented: <path>`，不要静默返回空数据
 - 文件头部注释维护"SQL 从后端 Python 手工翻译"的说明
+- 复刻新功能时逐项对齐后端实现的**完整输入构成**（SQL 聚合、prompt payload、证据包），不只是返回结构——后端拿什么算，移动端就得有什么；禁止「首期传 null / 占位」直接发布（2026-09 教训：移动端 llm-analysis 只复刻了 diagnosis 链路，business 证据包 null 导致 LLM 无法经营解读）
+- 后端与移动端双写维护的资产（SYSTEM_PROMPT、对账口径等）修改任一端时，逐章节核对另一端实现是否仍支撑 prompt 所需的数据源
 
 ### 5.1 KNOWN_DRIFT / KNOWN_UNTESTED 维护原则
 
@@ -121,6 +124,7 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - **历史 drift 补齐后**，从列表中删除对应条目，并在 commit message 中说明补齐的端点。
 - **优先级标记**（`high` / `medium` / `low`）仅用于提示补齐顺序，不改变 CI 行为：所有 `KNOWN_*` 条目都不阻塞 CI，新增 drift 一律报错。
 - 列表只增不减是退化信号：每次合并 PR 前确认是否能在本期内补齐至少一条 `high` 或 `medium` 条目。
+- **豁免说明不等于测试豁免**：case 真实取数时不得以「复用某链路」等说明性条目绕过 `test_mobile_routes.py` SQL 用例（2026-09 教训：llm-analysis 曾挂复用说明豁免，掩盖了 business 证据包 null 的实现缺口）。
 
 ## 6. 对账脚本输出格式约定
 
