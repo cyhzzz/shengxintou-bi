@@ -151,9 +151,12 @@ CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚�
 - `/api/v1/account-mapping*`（账号映射管理，仅桌面端，移动端 features 禁用）
 - `/api/v1/config/*`（系统配置，仅桌面端）
 
-> `/api/v1/system/llm-config*` 与 `/api/v1/reports/llm-analysis` 已由
+> `/api/v1/system/llm-config*` 与 `/api/v1/reports/llm-analysis`（含流式 `/stream`）已由
 > `mobileHandlers/llmAnalysis.ts` 实现（配置存本机 localStorage，LLM 请求走全局 fetch
 > 直连 Provider），不再是例外，已从 `check_api_contract.py` 白名单移除。
+> 注意：流式调用不走 http.ts 拦截层，页面经 `services/llmStream.ts` 直连 handler 事件回调；
+> Android CapacitorHttp 缓冲整包（非增量），且其 fetch 补丁不支持 AbortSignal，
+> 移动端所有对 Provider 的请求超时必须用 JS 层 Promise.race 兜底（勿只依赖 abort()）。
 
 `check_api_contract.py` 通过 `MOBILE_IGNORED_PREFIXES` 白名单识别这些例外，不报 drift。`KNOWN_DRIFT` 记录历史遗留的未实现端点（待逐步补齐），新增端点不允许加入此列表。
 
