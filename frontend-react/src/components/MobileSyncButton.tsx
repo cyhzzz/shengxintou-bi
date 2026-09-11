@@ -9,6 +9,7 @@ import {
   hasWebDAVCredentials,
   getWebDAVCredentials,
 } from '@/services/mobileSync';
+import { syncTablesFromWebDAV } from '@/services/mobileTableSync';
 import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
 export default function MobileSyncButton() {
@@ -45,10 +46,18 @@ export default function MobileSyncButton() {
   // 仅在移动端 / PWA 端渲染
   if (!showComponent) return null;
 
+  // v4.3.3：右上角「同步数据」默认逐分表拉取云端每张表的最新版本（云端分表各自更新，
+  //   整库快照可能滞后）；仅当云端尚无逐表清单（对端仍是旧版整库上传）时回退整库拉取一次。
   const handleSync = async () => {
     setLoading(true);
     try {
-      const result = await syncFromWebDAV();
+      // 1. 优先分表同步：每张业务表取云端最新，合并覆盖本地
+      let result = await syncTablesFromWebDAV();
+      // 2. 云端暂无逐表清单 → 自动回退整库快照（其余失败如网络中断不回退，避免双倍下载）
+      if (!result.success && result.message.includes('云端暂无逐表清单')) {
+        message.info('云端暂无逐表清单，改为整库同步（首次整库后即可分表同步）...');
+        result = await syncFromWebDAV();
+      }
       if (result.success) {
         message.success(result.message);
         setHasCreds(true);
