@@ -660,6 +660,94 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertIn('跨月趋势对比', llm_mod.SYSTEM_PROMPT)
 
     # ============================================================
+    #  v4.2.8: 流式端点 /reports/llm-analysis/stream（SSE meta → delta* → done）
+    # ============================================================
+
+    @staticmethod
+    def _parse_sse_events(raw):
+        """把后端 SSE 文本解析为 [(event, data_dict), ...]"""
+        events = []
+        for block in raw.strip().split('\n\n'):
+            name, data_text = None, None
+            for line in block.split('\n'):
+                if line.startswith('event:'):
+                    name = line[len('event:'):].strip()
+                elif line.startswith('data:'):
+                    data_text = line[len('data:'):].strip()
+            if name and data_text:
+                events.append((name, json.loads(data_text)))
+        return events
+
+    def test_60h_llm_analysis_stream_mock_success_and_cache(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        fake_resp = mock.Mock(status_code=200)
+        fake_resp.iter_lines.return_value = [
+            'data: {"choices": [{"delta": {"content": "## 总体判断"}}]}',
+            'data: {"choices": [{"delta": {"content": "\\n## 跨月趋势对比\\n连续改善"}}]}',
+            'data: [DONE]',
+        ]
+        # SSE 为惰性生成器：必须在 mock 作用域内消费响应体（离开 with 后 patch 已卸载）
+        with mock.patch.object(llm_mod, 'run_diagnosis', side_effect=_fake_diagnosis), \
+                mock.patch.object(llm_mod.requests, 'post', return_value=fake_resp) as post_mock:
+            resp = self._post('/api/v1/reports/llm-analysis/stream', {'month': '2026-06'})
+            self.assertEqual(resp.status_code, 200,
+                             f'流式应 200: {resp.status_code}: {resp.data[:300]}')
+            self.assertTrue(resp.headers['Content-Type'].startswith('text/event-stream'))
+            events = self._parse_sse_events(resp.get_data(as_text=True))
+            # 流式上游请求必须带 stream: True
+            self.assertTrue(post_mock.call_args.kwargs['json'].get('stream'))
+            # 相同信号再次触发 → 缓存命中：meta(cached) + 单 delta + done，上游只调用一次
+            # （同样必须在 mock 作用域内：缓存哈希依赖被 mock 的诊断信号）
+            resp2 = self._post('/api/v1/reports/llm-analysis/stream', {'month': '2026-06'})
+            events2 = self._parse_sse_events(resp2.get_data(as_text=True))
+        # meta 先行：含月份窗口 / 模型 / 证据包，cached=False
+        self.assertEqual(events[0][0], 'meta')
+        self.assertEqual(events[0][1]['months_used'], ['2026-03', '2026-04', '2026-05', '2026-06'])
+        self.assertFalse(events[0][1]['cached'])
+        self.assertIn('evidence', events[0][1])
+        deltas = [d for (n, d) in events if n == 'delta']
+        self.assertEqual(''.join(d['text'] for d in deltas), '## 总体判断\n## 跨月趋势对比\n连续改善')
+        self.assertEqual(events[-1][0], 'done')
+        self.assertEqual(events2[0][0], 'meta')
+        self.assertTrue(events2[0][1]['cached'])
+        deltas2 = [d for (n, d) in events2 if n == 'delta']
+        self.assertEqual(len(deltas2), 1)
+        self.assertEqual(events2[-1][0], 'done')
+        self.assertEqual(post_mock.call_count, 1)
+
+    def test_60i_llm_analysis_stream_unconfigured_400(self):
+        self._llm_sandbox()
+        resp = self._post('/api/v1/reports/llm-analysis/stream', {})
+        self.assertEqual(resp.status_code, 400,
+                         f'未配置应 400: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertEqual(body.get('error'), 'LLM_NOT_CONFIGURED')
+
+    def test_60j_llm_analysis_stream_invalid_month_400(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        resp = self._post('/api/v1/reports/llm-analysis/stream', {'month': '2099-13'})
+        self.assertEqual(resp.status_code, 400,
+                         f'非法 month 应 400: {resp.status_code}: {resp.data[:300]}')
+        body = resp.get_json()
+        self.assertEqual(body.get('error'), 'INVALID_PARAMETER')
+
+    def test_60k_llm_analysis_stream_empty_content_error_event(self):
+        self._llm_sandbox()
+        llm_mod.save_config({'api_key': 'sk-test1234567890abcd', 'model': 'gpt-4o-mini'})
+        fake_resp = mock.Mock(status_code=200)
+        fake_resp.iter_lines.return_value = iter([])  # 上游无任何 delta → 空内容 error 事件
+        # SSE 为惰性生成器：必须在 mock 作用域内消费响应体
+        with mock.patch.object(llm_mod, 'run_diagnosis', side_effect=_fake_diagnosis), \
+                mock.patch.object(llm_mod.requests, 'post', return_value=fake_resp):
+            resp = self._post('/api/v1/reports/llm-analysis/stream', {'month': '2026-06'})
+            self.assertEqual(resp.status_code, 200, '生成中失败应为 200 SSE + error 事件')
+            events = self._parse_sse_events(resp.get_data(as_text=True))
+        self.assertEqual(events[-1][0], 'error')
+        self.assertIn('内容为空', events[-1][1]['message'])
+
+    # ============================================================
     #  v3.3.0: 主播聚类 live_type（映射表由 JSON 同步到 DB，无独立 CRUD API）
     # ============================================================
 

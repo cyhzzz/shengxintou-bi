@@ -163,8 +163,12 @@ const LlmConfigModal: React.FC<LlmConfigModalProps> = ({ open, onClose, onSaved 
         >
           <Input placeholder="模型名称" autoComplete="off" />
         </Form.Item>
-        <Form.Item name="timeout_seconds" label="超时时间（秒）" extra="5 ~ 600 秒，默认 60">
-          <InputNumber min={5} max={600} style={{ width: 160 }} placeholder="60" />
+        <Form.Item
+          name="timeout_seconds"
+          label="超时时间（秒）"
+          extra="5 ~ 600 秒，默认 180；报告篇幅大或思考型模型建议 300+"
+        >
+          <InputNumber min={5} max={600} style={{ width: 160 }} placeholder="180" />
         </Form.Item>
       </Form>
     </Modal>

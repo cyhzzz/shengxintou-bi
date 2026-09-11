@@ -329,6 +329,29 @@ tests = [
           GROUP BY COALESCE(LOWER(NULLIF(f."应用市场", '')), '未知'), COALESCE(NULLIF(d."广告分组名称", ''), '未命名计划')''',
         'params': ['2026-08'],
     },
+    {
+        # v4.2.8 AI 分析流式端点（handleLlmAnalysisStream）：与非流式共用取数链路
+        # （collectTrendData 诊断 + llmEvidence 三包），此处对账厂商经营聚合为代表用例，
+        # 其余 SQL 与上方 reports/llm-analysis 六条逐字相同（同一 handler 链路执行）
+        'name': 'llm-analysis/stream',
+        'sql': '''SELECT substr("日期", 1, 7) AS month,
+            COALESCE(NULLIF("厂商", ''), '未归因') AS vendor,
+            COALESCE(NULLIF("平台", ''), '未知') AS platform,
+            SUM("花费") AS cost,
+            SUM("线索数") AS leads,
+            SUM("开口人数") AS opened,
+            SUM("有效线索数") AS valid,
+            SUM("开户人数") AS accounts,
+            SUM("有效户人数") AS eff_accounts,
+            SUM("APP下载数") AS app_downloads,
+            SUM("APP激活人数") AS app_activations,
+            SUM("客户资产") AS asset,
+            SUM("客户创收") AS revenue
+          FROM agg_vendor_daily
+          WHERE substr("日期", 1, 7) IN (?, ?, ?, ?)
+          GROUP BY substr("日期", 1, 7), COALESCE(NULLIF("厂商", ''), '未归因'), COALESCE(NULLIF("平台", ''), '未知')''',
+        'params': ['2026-06', '2026-07', '2026-08', '2026-09'],
+    },
 ]
 
 if __name__ == '__main__':

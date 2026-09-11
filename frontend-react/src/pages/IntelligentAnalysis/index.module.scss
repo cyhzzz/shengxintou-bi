@@ -49,6 +49,11 @@
   font-size: var(--text-sm);
 }
 
+// v4.2.8 流式生成中的进度提示条（已耗时计时）
+.generatingBar {
+  margin-bottom: var(--spacer-12);
+}
+
 // LLM 输出的 Markdown 渲染（GFM：表格 / 列表 / 代码块）
 .markdown {
   color: var(--color-text-primary);

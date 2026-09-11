@@ -557,7 +557,7 @@ export interface LlmConfigPayload {
   timeout_seconds?: number;
 }
 // ---- LLM 分析证据卡：backend/utils/llm_evidence 三包随响应返回，供人工核验 AI 结论 ----
-export interface EvidenceVendorSide {
+export interface EvidenceVendorAccum {
   cost: number;
   leads: number;
   opened: number;
@@ -568,16 +568,22 @@ export interface EvidenceVendorSide {
   app_activations: number;
   asset: number;
   revenue: number;
+}
+export interface EvidenceVendorSide extends EvidenceVendorAccum {
   open_rate: number | null;
   lead_cost: number | null;
   account_cost: number | null;
   eff_account_cost: number | null;
 }
+// 对齐后端 llm_evidence.build_vendor_evidence：平台拆分行为原始累计值，不含派生率
+export interface EvidenceVendorPlatform extends EvidenceVendorAccum {
+  platform: string;
+}
 export interface EvidenceVendorRow {
   vendor: string;
   current: EvidenceVendorSide;
   prev3: EvidenceVendorSide;
-  platforms_current: Array<{ platform: string } & EvidenceVendorSide>;
+  platforms_current: EvidenceVendorPlatform[];
 }
 export interface EvidenceNoteSnapshot {
   type: string;
@@ -626,8 +632,9 @@ export interface EvidencePlacementRow {
   placement: string;
   downloads: number;
   new_accounts: number;
-  asset: number;
-  revenue: number;
+  // SUM(总资产/累计创收) 空表可得 null（对齐后端与移动端 llmEvidence）
+  asset: number | null;
+  revenue: number | null;
 }
 export interface EvidenceAppmarketPack {
   stores: Array<{ store: string; current: EvidenceAppmarketSide; prev3: EvidenceAppmarketSide }>;

@@ -23,7 +23,7 @@ import { handleDataFreshness } from './mobileHandlers/freshness';
 import { handleDiagnosis } from './mobileHandlers/diagnosis';
 import { handleWeeklyPeriods, handleWeeklyData, handleWeeklyDetail } from './mobileHandlers/weekly';
 import { handleMetadata } from './mobileHandlers/metadata';
-import { handleLlmConfigGet, handleLlmConfigSave, handleLlmConfigTest, handleLlmAnalysis } from './mobileHandlers/llmAnalysis';
+import { handleLlmConfigGet, handleLlmConfigSave, handleLlmConfigTest, handleLlmAnalysis, handleLlmAnalysisStream } from './mobileHandlers/llmAnalysis';
 
 // v3.6.4：由 vite.config.ts define 注入的 version.json 内容（构建时确定）
 // 移动端/PWA 端关于页的 version/local 端点直接返回此对象
@@ -179,6 +179,10 @@ export async function mobileRouteHandler(url: string, body: any, method?: string
       return handleLlmConfigTest(body);
     case 'reports/llm-analysis':
       return handleLlmAnalysis(url, body);
+    // v4.2.8：流式端点的非流式降级（与后端 /reports/llm-analysis/stream 对账保持契约一致）；
+    // 页面流式渲染不经此 case，走 services/llmStream.ts 直连 handleLlmAnalysisStream
+    case 'reports/llm-analysis/stream':
+      return handleLlmAnalysisStream(url, body);
 
     default:
       throw new Error(`Mobile API not implemented: ${path}`);

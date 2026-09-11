@@ -5,18 +5,23 @@
  *   Android 端 fetch 已被 CapacitorHttp 接管，直连 LLM Provider 免 CORS）
  * - 分析复用 diagnosis 数据链路（runDiagnosis × 目标月与前 3 月）；business 三包
  *   （vendor/note/appmarket）由 llmEvidence.ts 同口径移植，随 prompt 传入、随响应 evidence 透传
+ * - v4.2.8 新增流式 handleLlmAnalysisStream（meta → delta* → done 事件回调）：
+ *   PWA/浏览器走真流式（resp.body 增量解析）；Android CapacitorHttp 缓冲整包、
+ *   delta 结束时一次性到齐（结果正确，仅非增量）。
  * - SYSTEM_PROMPT / PROMPT_VERSION 与后端 llm.py 两端同步维护：修改任一侧必须同步另一侧，
  *   否则两端报告口径漂移且缓存失效行为不一致
  * - 错误处理：throw Error(消息)，由 http.ts 移动端包装为失败响应；消息文本与后端一致，
  *   且不含 'not implemented' / 'database' / 'connection' 等错误替换触发词
  */
+import { Capacitor } from '@capacitor/core';
 import { runDiagnosis, type DiagnosisResult } from './diagnosis';
 import { buildBusinessEvidence, type BusinessEvidence } from './llmEvidence';
 
 const CONFIG_STORAGE_KEY = 'sxt_mobile_llm_config';
 const CACHE_STORAGE_PREFIX = 'sxt_mobile_llm_cache_';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
-const DEFAULT_TIMEOUT = 60;
+// v4.2.8：业务证据包入 prompt 后生成时长普遍超过 60s，默认 60 → 180（与后端 llm.py 同步）
+const DEFAULT_TIMEOUT = 180;
 const TREND_MONTHS = 4;
 
 // prompt 结构性变更时递增；缓存命中需校验，避免旧缓存掩盖新 prompt 效果（与 llm.py PROMPT_VERSION 一致）
@@ -195,6 +200,10 @@ function resolveConfig(payload?: Record<string, unknown> | null): ResolvedConfig
 
 interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string; }
 
+function timeoutErrorMessage(timeout: number): string {
+  return `LLM 生成超时（${timeout} 秒）：可在「LLM 配置」调大超时时间或换用更快的模型`;
+}
+
 async function callChat(
   cfg: ResolvedConfig,
   messages: ChatMessage[],
@@ -206,23 +215,33 @@ async function callChat(
   const payload: Record<string, unknown> = { model: cfg.model, messages, temperature: 0.3 };
   if (maxTokens) payload.max_tokens = maxTokens;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout * 1000);
+  const abortTimer = setTimeout(() => controller.abort(), timeout * 1000);
+  // v4.2.8：Android CapacitorHttp 接管 fetch 后不支持 AbortSignal，controller.abort() 形同虚设，
+  // 请求会无限挂起（页面转圈无报错）。叠加 JS 层 race 超时兜底：任何平台超时都必然触发。
+  let raceTimer: ReturnType<typeof setTimeout> | null = null;
   const started = Date.now();
   let resp: Response;
   try {
-    resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${String(cfg.api_key || '')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-  } catch {
+    resp = await Promise.race([
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${String(cfg.api_key || '')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      }),
+      new Promise<never>((_, reject) => {
+        raceTimer = setTimeout(() => reject(new Error(timeoutErrorMessage(timeout))), timeout * 1000);
+      }),
+    ]);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('生成超时')) throw e;
     throw new Error('LLM 请求失败：网络错误或超时，请检查 base_url / api_key / 超时配置');
   } finally {
-    clearTimeout(timer);
+    clearTimeout(abortTimer);
+    if (raceTimer) clearTimeout(raceTimer);
   }
   if (resp.status !== 200) {
     throw new Error(`LLM 返回异常状态 ${resp.status}，请检查模型名称与 api_key`);
@@ -245,6 +264,126 @@ async function callChat(
   // 思考型模型（GLM 系列）小预算下 content 可能为空：连通性测试允许空，正式分析严格要求非空
   if (!content && !allowEmptyContent) throw new Error('LLM 返回内容为空');
   return [content || '', Date.now() - started];
+}
+
+// ==== 流式调用（v4.2.8，llm.stream_chat 同口径移植）====
+
+/** SSE data: 行解析器（跨 chunk 缓冲；feed 喂入文本，onData 收到去前缀后的 data 载荷） */
+function createSseParser(onData: (dataText: string) => void) {
+  let buffer = '';
+  return {
+    feed(text: string) {
+      buffer += text;
+      let idx = buffer.indexOf('\n');
+      while (idx >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, '');
+        buffer = buffer.slice(idx + 1);
+        if (line.startsWith('data:')) onData(line.slice(5).trim());
+        idx = buffer.indexOf('\n');
+      }
+    },
+    flush() {
+      if (buffer.startsWith('data:')) onData(buffer.slice(5).trim());
+      buffer = '';
+    },
+  };
+}
+
+/**
+ * 流式调用 OpenAI 协议 /chat/completions（stream: true + SSE）。
+ * 返回完整 content；onDelta 逐段回调（PWA/浏览器为增量；Android CapacitorHttp 缓冲，结束时一次性到齐）。
+ * 超时口径：Android（原生 fetch 被接管、无增量且 abort 失效）→ 总时长 race；
+ * 其余环境 → 相邻 chunk 间空闲看门狗（每个 chunk 重置，长生成不误杀）。
+ */
+async function streamChat(
+  cfg: ResolvedConfig,
+  messages: ChatMessage[],
+  onDelta: (text: string) => void,
+): Promise<string> {
+  const timeout = cfg.timeout_seconds || DEFAULT_TIMEOUT;
+  const url = cfg.base_url.replace(/\/+$/, '') + '/chat/completions';
+  const payload: Record<string, unknown> = { model: cfg.model, messages, temperature: 0.3, stream: true };
+  const nativeFetch = Capacitor.isNativePlatform?.() ?? false;
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), timeout * 1000);
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    let resp: Response;
+    if (nativeFetch) {
+      // Android：无增量也无 abort，用总时长 race 保证超时必然触发（v4.2.8 转圈修复核心）
+      resp = await Promise.race([
+        fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${String(cfg.api_key || '')}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        }),
+        new Promise<never>((_, reject) => {
+          idleTimer = setTimeout(() => reject(new Error(timeoutErrorMessage(timeout))), timeout * 1000);
+        }),
+      ]);
+    } else {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${String(cfg.api_key || '')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    }
+    if (resp.status !== 200) {
+      throw new Error(`LLM 返回异常状态 ${resp.status}，请检查模型名称与 api_key`);
+    }
+    let content = '';
+    const parser = createSseParser((dataText) => {
+      if (!dataText || dataText === '[DONE]') return;
+      try {
+        const delta = JSON.parse(dataText)?.choices?.[0]?.delta?.content;
+        if (typeof delta === 'string' && delta) {
+          content += delta;
+          onDelta(delta);
+        }
+      } catch {
+        // 心跳/非 JSON 行忽略
+      }
+    });
+    if (resp.body && typeof resp.body.getReader === 'function') {
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        if (idleTimer) clearTimeout(idleTimer);
+        const readPromise = reader.read();
+        const result = nativeFetch
+          ? await readPromise
+          : await Promise.race([
+              readPromise,
+              new Promise<never>((_, reject) => {
+                idleTimer = setTimeout(
+                  () => reject(new Error(`LLM 流式响应超时（${timeout} 秒无新增内容），可调大超时或换用更快的模型`)),
+                  timeout * 1000,
+                );
+              }),
+            ]);
+        if (result.done) break;
+        parser.feed(decoder.decode(result.value, { stream: true }));
+      }
+      parser.feed(decoder.decode()); // 多字节字符跨 chunk 冲刷
+      parser.flush();
+    } else {
+      // 兜底：Response 无流式 body 时整体取回后解析（事件一次性分发）
+      parser.feed(await resp.text());
+      parser.flush();
+    }
+    if (!content) throw new Error('LLM 返回内容为空');
+    return content;
+  } catch (e) {
+    if (e instanceof Error && (e.message.includes('超时') || e.name === 'AbortError')) {
+      throw new Error(e.message.includes('超时') ? e.message : timeoutErrorMessage(timeout));
+    }
+    throw new Error('LLM 请求失败：网络错误或超时，请检查 base_url / api_key / 超时配置');
+  } finally {
+    clearTimeout(abortTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+  }
 }
 
 // ==== 跨月取数与 prompt 组装（collect_trend_data / build_user_prompt 移植版）====
@@ -324,46 +463,68 @@ function saveCache(month: string, signalsHash: string, model: string, content: s
   }
 }
 
-// ==== 分析主入口（run_analysis 移植版）====
+// ==== 分析主入口（run_analysis / prepare_analysis 移植版）====
 
-async function runAnalysis(month?: string, force = false): Promise<Record<string, unknown>> {
+interface AnalysisPrep {
+  cfg: LlmStoredConfig;
+  target: string;
+  monthsUsed: string[];
+  business: BusinessEvidence;
+  userPrompt: string;
+  signalsHash: string;
+  model: string;
+  cached: LlmCacheEntry | null;
+}
+
+/** 与后端 llm.prepare_analysis 同口径：配置校验 → 跨月取数 → 证据包 → 缓存判定 */
+async function prepareAnalysis(month?: string, force = false): Promise<AnalysisPrep> {
   const cfg = loadConfig();
   if (!cfg || !cfg.api_key) {
     throw new Error('尚未配置 LLM，请先在「AI 分析报告」页点击「LLM 配置」完成设置');
   }
   const [target, results] = await collectTrendData(month);
   if (!results.length) throw new Error('目标月及前 3 个月均无诊断数据，无法生成分析');
-  const monthsUsed = results.map((r) => r.month);
   const business = await buildBusinessEvidence(target);
   const userPrompt = buildUserPrompt(results, business);
-  // 缓存键覆盖整个 user prompt：诊断信号变化即触发失效
+  // 缓存键覆盖整个 user prompt：诊断信号或业务证据任一变化均触发失效
   const signalsHash = await sha1Hex(userPrompt);
   const model = cfg.model || '';
-  if (!force) {
-    const cached = loadCache(target, signalsHash, model);
-    if (cached) {
-      return {
-        content: cached.content,
-        months_used: monthsUsed,
-        model,
-        generated_at: cached.generated_at || '',
-        cached: true,
-        evidence: business,
-      };
-    }
+  return {
+    cfg,
+    target,
+    monthsUsed: results.map((r) => r.month),
+    business,
+    userPrompt,
+    signalsHash,
+    model,
+    cached: force ? null : loadCache(target, signalsHash, model),
+  };
+}
+
+async function runAnalysis(month?: string, force = false): Promise<Record<string, unknown>> {
+  const prep = await prepareAnalysis(month, force);
+  if (prep.cached) {
+    return {
+      content: prep.cached.content,
+      months_used: prep.monthsUsed,
+      model: prep.model,
+      generated_at: prep.cached.generated_at || '',
+      cached: true,
+      evidence: prep.business,
+    };
   }
-  const [content] = await callChat(cfg, [
+  const [content] = await callChat(prep.cfg, [
     { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: userPrompt },
+    { role: 'user', content: prep.userPrompt },
   ]);
-  saveCache(target, signalsHash, model, content);
+  saveCache(prep.target, prep.signalsHash, prep.model, content);
   return {
     content,
-    months_used: monthsUsed,
-    model,
+    months_used: prep.monthsUsed,
+    model: prep.model,
     generated_at: localNowIsoSeconds(),
     cached: false,
-    evidence: business,
+    evidence: prep.business,
   };
 }
 
@@ -393,4 +554,63 @@ export async function handleLlmAnalysis(_url: string, body: Record<string, unkno
   const payload = body || {};
   const month = typeof payload.month === 'string' ? payload.month : undefined;
   return runAnalysis(month, payload.force === true);
+}
+
+// ==== 流式入口（v4.2.8）：meta（取数完成，含证据包）→ delta*（增量文本）→ done ====
+
+export type LlmStreamEvent =
+  | { type: 'meta'; months_used: string[]; model: string; cached: boolean; evidence: BusinessEvidence }
+  | { type: 'delta'; text: string }
+  | { type: 'done'; generated_at: string };
+
+/**
+ * POST /api/v1/reports/llm-analysis/stream —— 流式版（body: {month?, force?}）。
+ * 事件经 onEvent 回调（不经 http.ts 拦截层，页面经 services/llmStream.ts 直连）；
+ * 失败仍走 throw（调用方统一 catch 展示）；最终返回值与非流式 handleLlmAnalysis 完全一致
+ * （供 mobileRouteHandler case 降级复用：跑完整个流、回最终结果）。
+ */
+export async function handleLlmAnalysisStream(
+  _url: string,
+  body: Record<string, unknown> | null,
+  onEvent?: (evt: LlmStreamEvent) => void,
+): Promise<Record<string, unknown>> {
+  const emit: (evt: LlmStreamEvent) => void = onEvent || (() => { /* 非流式调用方不订阅事件 */ });
+  const payload = body || {};
+  const month = typeof payload.month === 'string' ? payload.month : undefined;
+  const prep = await prepareAnalysis(month, payload.force === true);
+  if (prep.cached) {
+    const generatedAt = prep.cached.generated_at || '';
+    emit({ type: 'meta', months_used: prep.monthsUsed, model: prep.model, cached: true, evidence: prep.business });
+    emit({ type: 'delta', text: prep.cached.content });
+    emit({ type: 'done', generated_at: generatedAt });
+    return {
+      content: prep.cached.content,
+      months_used: prep.monthsUsed,
+      model: prep.model,
+      generated_at: generatedAt,
+      cached: true,
+      evidence: prep.business,
+    };
+  }
+  // meta 先行：证据包随事件下发，页面在 LLM 生成期间即可核验证据卡
+  emit({ type: 'meta', months_used: prep.monthsUsed, model: prep.model, cached: false, evidence: prep.business });
+  const content = await streamChat(
+    prep.cfg,
+    [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: prep.userPrompt },
+    ],
+    (text) => emit({ type: 'delta', text }),
+  );
+  saveCache(prep.target, prep.signalsHash, prep.model, content);
+  const generatedAt = localNowIsoSeconds();
+  emit({ type: 'done', generated_at: generatedAt });
+  return {
+    content,
+    months_used: prep.monthsUsed,
+    model: prep.model,
+    generated_at: generatedAt,
+    cached: false,
+    evidence: prep.business,
+  };
 }

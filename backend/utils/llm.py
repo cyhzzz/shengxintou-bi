@@ -29,7 +29,8 @@ log = logging.getLogger(__name__)
 CONFIG_FILENAME = 'llm_config.json'
 CACHE_DIRNAME = 'llm_analysis_cache'
 DEFAULT_BASE_URL = 'https://api.openai.com/v1'
-DEFAULT_TIMEOUT = 60
+# v4.2.8：业务证据包入 prompt 后生成时长普遍超过 60s，默认超时 60 → 180（两端同步）
+DEFAULT_TIMEOUT = 180
 TREND_MONTHS = 4
 
 SYSTEM_PROMPT = """你是一名券商投放运营团队的经营分析搭档。读者是一线投放与运营同学：请用大白话，先给结论再给证据，避免专业黑话；首次出现的指标（开口率、零互动占比、新开户率、户均资产等）顺带一句话解释。报告的重心是「下一步怎么投」，数据质量问题只作可信度提示，不要喧宾夺主。
@@ -206,6 +207,51 @@ def call_chat(cfg, messages, max_tokens=None, allow_empty_content=False):
     return content or '', int((time.time() - started) * 1000)
 
 
+def stream_chat(cfg, messages):
+    """流式调用 OpenAI 协议 /chat/completions（SSE），生成器逐步 yield 增量文本。
+
+    - v4.2.8：供 /reports/llm-analysis/stream 端点使用，前端边生成边渲染。
+    - 读超时 = timeout_seconds，作用于相邻 chunk 之间（每个 chunk 重置计时），
+      流式响应长生成不会被总时长误杀。
+    - 网络错误 / 非 200 / 流中断统一抛 LlmRequestError（与 call_chat 口径一致）。
+    """
+    timeout = cfg.get('timeout_seconds') or DEFAULT_TIMEOUT
+    url = cfg['base_url'].rstrip('/') + '/chat/completions'
+    payload = {'model': cfg['model'], 'messages': messages, 'temperature': 0.3, 'stream': True}
+    headers = {'Authorization': 'Bearer ' + str(cfg.get('api_key') or ''), 'Content-Type': 'application/json'}
+    try:
+        resp = requests.post(url, json=payload, headers=headers, stream=True, timeout=(10, timeout))
+    except requests.RequestException:
+        log.warning('LLM 流式请求失败: base_url=%s model=%s（网络错误或超时）', cfg.get('base_url'), cfg.get('model'))
+        raise LlmRequestError('LLM 请求失败：网络错误或超时，请检查 base_url / api_key / 超时配置')
+    try:
+        if resp.status_code != 200:
+            raise LlmRequestError('LLM 返回异常状态 %s，请检查模型名称与 api_key' % resp.status_code)
+        for raw_line in resp.iter_lines(decode_unicode=True):
+            if not raw_line:
+                continue
+            line = raw_line.strip()
+            if not line.startswith('data:'):
+                continue  # 忽略 event:/注释/心跳行
+            data_text = line[5:].strip()
+            if data_text == '[DONE]':
+                break
+            try:
+                chunk = json.loads(data_text)
+            except ValueError:
+                continue
+            try:
+                delta = chunk['choices'][0]['delta'].get('content') or ''
+            except (KeyError, IndexError, TypeError, AttributeError):
+                continue
+            if delta:
+                yield delta
+    except requests.RequestException:
+        raise LlmRequestError('LLM 流式响应中断：网络错误或超时')
+    finally:
+        resp.close()
+
+
 EVIDENCE_MONTHLY_LIMIT = 12
 EVIDENCE_DAILY_LIMIT = 200
 EVIDENCE_XUN_LIMIT = 200
@@ -305,8 +351,13 @@ def save_cache(month, signals_hash, model, content):
         log.warning('保存 LLM 分析缓存失败: %s', e)
 
 
-def run_analysis(month=None, force=False):
-    """智能分析主入口：跨月取数 → 缓存 → LLM；返回 (data, (code, message) | None)"""
+def prepare_analysis(month=None, force=False):
+    """流式/非流式共用的前置阶段：配置校验 → 跨月取数 → 证据包 → 缓存判定。
+
+    返回 (prep, None) 或 (None, (code, message))；prep 为 dict：
+    {cfg, target, months_used, business, signals_hash, user_prompt, model, cached}
+    （cached 命中时为缓存条目 dict，force 或未命中时为 None）
+    """
     cfg = load_config()
     if not cfg or not cfg.get('api_key'):
         return None, ('LLM_NOT_CONFIGURED', '尚未配置 LLM，请先在「AI 分析报告」页点击「LLM 配置」完成设置')
@@ -315,34 +366,50 @@ def run_analysis(month=None, force=False):
         return None, ('INVALID_PARAMETER', '目标月及前 3 个月均无诊断数据，无法生成分析')
     months_used = [r['month'] for r in results]
     business = llm_evidence.build_business_evidence(target)
+    user_prompt = build_user_prompt(results, business)
     # 缓存键覆盖整个 user prompt：诊断信号或业务证据任一变化均触发失效
-    signals_hash = hashlib.sha1(
-        build_user_prompt(results, business).encode('utf-8')).hexdigest()
+    signals_hash = hashlib.sha1(user_prompt.encode('utf-8')).hexdigest()
     model = cfg.get('model', '')
-    if not force:
-        cached = load_cache(target, signals_hash, model)
-        if cached:
-            return {
-                'content': cached['content'],
-                'months_used': months_used,
-                'model': model,
-                'generated_at': cached.get('generated_at', ''),
-                'cached': True,
-                'evidence': business,
-            }, None
+    cached = None if force else load_cache(target, signals_hash, model)
+    return {
+        'cfg': cfg,
+        'target': target,
+        'months_used': months_used,
+        'business': business,
+        'signals_hash': signals_hash,
+        'user_prompt': user_prompt,
+        'model': model,
+        'cached': cached,
+    }, None
+
+
+def run_analysis(month=None, force=False):
+    """智能分析主入口：跨月取数 → 缓存 → LLM；返回 (data, (code, message) | None)"""
+    prep, error = prepare_analysis(month, force)
+    if error:
+        return None, error
+    if prep['cached']:
+        return {
+            'content': prep['cached']['content'],
+            'months_used': prep['months_used'],
+            'model': prep['model'],
+            'generated_at': prep['cached'].get('generated_at', ''),
+            'cached': True,
+            'evidence': prep['business'],
+        }, None
     try:
-        content, _ = call_chat(cfg, [
+        content, _ = call_chat(prep['cfg'], [
             {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': build_user_prompt(results, business)},
+            {'role': 'user', 'content': prep['user_prompt']},
         ])
     except LlmRequestError as e:
         return None, ('LLM_REQUEST_FAILED', str(e))
-    save_cache(target, signals_hash, model, content)
+    save_cache(prep['target'], prep['signals_hash'], prep['model'], content)
     return {
         'content': content,
-        'months_used': months_used,
-        'model': model,
+        'months_used': prep['months_used'],
+        'model': prep['model'],
         'generated_at': datetime.now().isoformat(timespec='seconds'),
         'cached': False,
-        'evidence': business,
+        'evidence': prep['business'],
     }, None
