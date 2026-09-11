@@ -119,7 +119,7 @@ export default function MobileDatabaseSync() {
     }
   }, [message]);
 
-  // v3.9.5：分表增量同步（按 manifest 只拉取比本地新的表，避免整库重复下载）
+  // v4.3.2：分表同步默认全量拉取云端每张表最新版（不再版本比对跳过）
   const handleTableSync = useCallback(async () => {
     setSyncing(true);
     setProgress('准备分表同步...');
@@ -211,7 +211,7 @@ export default function MobileDatabaseSync() {
             仅支持下载，不支持上传。
           </Paragraph>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            「分表同步」按需增量拉取比本地新的业务表（更省流量）；首次使用或云端无逐表清单时，
+            「分表同步」拉取云端每张业务表的最新版本，整体覆盖本地（更省流量）；首次使用或云端无逐表清单时，
             请先用「从坚果云同步」整库拉取一次。
           </Paragraph>
 

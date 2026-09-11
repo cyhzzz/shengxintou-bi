@@ -483,7 +483,10 @@ async function prepareAnalysis(month?: string, force = false): Promise<AnalysisP
     throw new Error('尚未配置 LLM，请先在「AI 分析报告」页点击「LLM 配置」完成设置');
   }
   const [target, results] = await collectTrendData(month);
-  if (!results.length) throw new Error('目标月及前 3 个月均无诊断数据，无法生成分析');
+  // v4.3.2：移动端本地库缺表/空库时数据退化为空，补充自愈指引（后端无此场景，后缀为移动端专属）
+  if (!results.length) {
+    throw new Error('目标月及前 3 个月均无诊断数据，无法生成分析；请先到「数据同步」页更新全部分表后重试');
+  }
   const business = await buildBusinessEvidence(target);
   const userPrompt = buildUserPrompt(results, business);
   // 缓存键覆盖整个 user prompt：诊断信号或业务证据任一变化均触发失效

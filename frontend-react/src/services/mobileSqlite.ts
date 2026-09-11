@@ -8,6 +8,11 @@
  *
  *   对 mobileRouteHandler.ts 完全透明：只导出 querySql 等同名函数，内部按运行时分发。
  *
+ * v4.3.2：querySql 缺表容错（安卓/PWA 两端同语义）——老用户本地库可能缺后续版本新增的表
+ *   （旧内置空库或旧整库 WebDAV 恢复覆盖），缺表查询按空结果降级（console.warn），
+ *   页面按「无数据」渲染而非弹原生 SQL 报错；「数据同步」分表同步查 sqlite_master
+ *   发现缺表会强制下载建表，形成自愈闭环。
+ *
  * v3.5.3 关键修复（安卓端）：
  *   @capacitor-community/sqlite 7.x 不再导出 SQLiteConnection / SQLiteDBConnection 类，
  *   必须直接用 CapacitorSQLite 插件对象调用原生方法。
@@ -106,6 +111,15 @@ export async function initMobileDatabase(): Promise<void> {
   return dbInitPromise;
 }
 
+/**
+ * v4.3.2：识别「缺表」错误（CapacitorSQLite 原生层与 sql.js 的错误消息格式一致：
+ * "... no such table: <表名> ..."）。仅缺表降级为空结果，其他错误照常抛出。
+ */
+function isMissingTableError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /no such table/i.test(msg);
+}
+
 export async function querySql<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   // v3.6.2：PWA 端走 sql.js，与安卓端逻辑分离
   if (isPwaClient()) {
@@ -114,12 +128,22 @@ export async function querySql<T>(sql: string, params: unknown[] = []): Promise<
   }
 
   if (!dbOpen) await initMobileDatabase();
-  const result = await CapacitorSQLite.query({
-    database: DB_NAME,
-    statement: sql,
-    values: params as any[],
-  });
-  return (result.values ?? []) as T[];
+  try {
+    const result = await CapacitorSQLite.query({
+      database: DB_NAME,
+      statement: sql,
+      values: params as any[],
+    });
+    return (result.values ?? []) as T[];
+  } catch (e) {
+    // v4.3.2：老库缺新表时按空结果降级，页面按「无数据」渲染而非弹原生 SQL 报错；
+    // 分表同步（computeLocalVersion 查 sqlite_master）发现缺表会强制下载建表，自愈闭环
+    if (isMissingTableError(e)) {
+      console.warn('[mobileSqlite] 本地库缺表，按空结果降级:', e instanceof Error ? e.message : e);
+      return [];
+    }
+    throw e;
+  }
 }
 
 export async function closeMobileDatabase(): Promise<void> {
@@ -140,27 +164,73 @@ export async function closeMobileDatabase(): Promise<void> {
 }
 
 /**
- * v3.9.5：批量执行写语句（DROP/CREATE/INSERT），一条事务。
+ * v3.9.5：批量执行写语句（DROP/CREATE/INSERT）。
  *
  * 用于移动端分表同步把云端「单表 .db」合并进本地 Capacitor SQLite：
  * 对每张表 DROP + CREATE（原 schema）+ 逐行 INSERT，语义与后端 merge_sqlite_table_into 一致，
- * 且不触碰其它表。用 executeSet（单事务）保证中途失败整体回滚、不产生半更新表。
+ * 且不触碰其它表。
+ *
+ * v4.3.2：分块执行——原先 9 张表全部语句一次性 executeSet，大表（数十万行 INSERT）场景下
+ * 单次跨 JS→原生桥 payload 过大，原生层反序列化直接 OOM 闪退（App 直接消失，JS catch 捕获不到）。
+ * 改为按「语句数 ≤ 500 且估算字符量 ≤ 2MB」切块、每块单独事务 execute：
+ * 中途失败目标表可能只写入部分数据，但分表同步 v4.3.2 起默认全量拉取，
+ * 下次同步会 DROP + CREATE 整体重建该表，可自愈。
  */
-export async function executeSetSql(
+/** 单块语句数上限 */
+const EXECUTE_SET_CHUNK_STATEMENTS = 500;
+/** 单块估算 payload 字符量上限（语句 + 参数值字符长度粗估） */
+const EXECUTE_SET_CHUNK_CHARS = 2_000_000;
+
+function chunkStatements(
   statements: { statement: string; values: unknown[] }[]
+): { statement: string; values: unknown[] }[][] {
+  const chunks: { statement: string; values: unknown[] }[][] = [];
+  let cur: { statement: string; values: unknown[] }[] = [];
+  let curChars = 0;
+  const flush = () => {
+    if (cur.length > 0) chunks.push(cur);
+    cur = [];
+    curChars = 0;
+  };
+  for (const s of statements) {
+    const size =
+      s.statement.length + s.values.reduce<number>((a, v) => a + String(v ?? '').length + 8, 0);
+    if (
+      cur.length > 0 &&
+      (cur.length >= EXECUTE_SET_CHUNK_STATEMENTS || curChars + size > EXECUTE_SET_CHUNK_CHARS)
+    ) {
+      flush();
+    }
+    cur.push(s);
+    curChars += size;
+  }
+  flush();
+  return chunks;
+}
+
+export async function executeSetSql(
+  statements: { statement: string; values: unknown[] }[],
+  onChunkDone?: (done: number, total: number) => void
 ): Promise<void> {
   if (!statements || statements.length === 0) return;
   if (!dbOpen) await initMobileDatabase();
-  const result = await CapacitorSQLite.executeSet({
-    database: DB_NAME,
-    set: statements.map((s) => ({
-      statement: s.statement,
-      values: s.values as any[],
-    })),
-  });
-  if (!result?.changes && statements.some((s) => /^(DROP|CREATE|INSERT)/i.test(s.statement.trimStart()))) {
-    // executeSet 空 changes 在纯 DDL 场景属正常（无行变更），这里不报错；仅日志
-    console.log('[mobileSqlite] executeSetSql: changes=', result?.changes);
+  const chunks = chunkStatements(statements);
+  for (let i = 0; i < chunks.length; i++) {
+    try {
+      await CapacitorSQLite.executeSet({
+        database: DB_NAME,
+        set: chunks[i].map((s) => ({
+          statement: s.statement,
+          values: s.values as any[],
+        })),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `写入本地库第 ${i + 1}/${chunks.length} 批失败（本批 ${chunks[i].length} 条语句）: ${msg}`
+      );
+    }
+    onChunkDone?.(i + 1, chunks.length);
   }
 }
 

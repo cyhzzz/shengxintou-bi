@@ -14,6 +14,8 @@
  * v3.6.2 新增：iOS PWA 支持
  * v3.6.4 关键修复：保存 DB 前主动调用 navigator.storage.persist()，
  *   避免安卓 Chrome / iOS Safari 在存储压力下清理 IndexedDB（否则同步成功后下次启动 DB 丢失）
+ * v4.3.2：querySql 缺表容错——与 mobileSqlite.ts 安卓端同语义，本地库缺表按空结果降级，
+ *   由「数据同步」分表同步自愈（computeLocalVersion 缺表 → 强制下载建表）
  */
 import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from 'sql.js';
 
@@ -190,31 +192,42 @@ export async function loadNewDb(buffer: ArrayBuffer): Promise<void> {
 export async function querySql<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   if (!db) await initSqlJsDatabase();
 
-  // sql.js 的 exec 不支持 ? 参数绑定，需要用 prepare + bind
-  // 但绝大多数 mobileRouteHandler SQL 都没用 ?，直接 exec 即可
-  if (params.length === 0) {
-    const result = db!.exec(sql);
-    if (result.length === 0) return [] as T[];
-    const { columns, values } = result[0];
-    return values.map((row: SqlValue[]) => {
-      const obj: Record<string, unknown> = {};
-      columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
-      return obj as T;
-    });
-  }
-
-  // 有参数：用 prepared statement
-  const stmt = db!.prepare(sql);
+  // v4.3.2：老库缺新表时按空结果降级（与 mobileSqlite.ts 安卓端同语义），
+  // 分表同步发现缺表会强制下载建表，自愈闭环
   try {
-    stmt.bind(params as SqlValue[]);
-    const rows: T[] = [];
-    while (stmt.step()) {
-      const row = stmt.getAsObject() as T;
-      rows.push(row);
+    // sql.js 的 exec 不支持 ? 参数绑定，需要用 prepare + bind
+    // 但绝大多数 mobileRouteHandler SQL 都没用 ?，直接 exec 即可
+    if (params.length === 0) {
+      const result = db!.exec(sql);
+      if (result.length === 0) return [] as T[];
+      const { columns, values } = result[0];
+      return values.map((row: SqlValue[]) => {
+        const obj: Record<string, unknown> = {};
+        columns.forEach((col: string, i: number) => { obj[col] = row[i]; });
+        return obj as T;
+      });
     }
-    return rows;
-  } finally {
-    stmt.free();
+
+    // 有参数：用 prepared statement
+    const stmt = db!.prepare(sql);
+    try {
+      stmt.bind(params as SqlValue[]);
+      const rows: T[] = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject() as T;
+        rows.push(row);
+      }
+      return rows;
+    } finally {
+      stmt.free();
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/no such table/i.test(msg)) {
+      console.warn('[sqlJsAdapter] 本地库缺表，按空结果降级:', msg);
+      return [] as T[];
+    }
+    throw e;
   }
 }
 

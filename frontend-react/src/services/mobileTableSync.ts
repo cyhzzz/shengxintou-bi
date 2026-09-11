@@ -13,6 +13,13 @@
  * 归因 / 兼容：
  *   - 云端无 manifest 时（老版本桌面端只整库 push）返回提示，让用户走原有「从坚果云同步」整库拉取
  *   - 首次初始化（本地无库）仍应走整库同步；分表同步适合「已有库、增量刷新」，避免整库重复下载
+ *
+ * v4.3.2：
+ *   - 默认全量拉取：云端清单里存在的表一律下载最新版整体覆盖本地，不再做「云端严格新于本地」
+ *     的版本比对跳过（版本号仅用于日志展示）——避免本地水位异常（整库恢复、行数被截断、
+ *     分块写入中断）时误判「已是最新」导致数据停留在旧版
+ *   - 安卓端合并改走分块 executeSet（见 mobileSqlite.executeSetSql），防止单次跨桥 payload
+ *     过大触发原生层 OOM 闪退
  */
 import initSqlJs from 'sql.js';
 import type { SqlValue } from 'sql.js';
@@ -66,13 +73,6 @@ function normalizeProxyUrl(raw: string): string {
 
 function buildProxyUrl(proxyUrl: string, targetUrl: string, auth: string): string {
   return `${normalizeProxyUrl(proxyUrl)}?url=${encodeURIComponent(targetUrl)}&auth=${encodeURIComponent(auth)}`;
-}
-
-/** 与后端 normalize_version 一致：去非数字后按 int 比较。 */
-function normalizeVersion(v: unknown): number | null {
-  if (v === null || v === undefined || v === '') return null;
-  const digits = String(v).replace(/\D/g, '');
-  return digits ? parseInt(digits, 10) : null;
 }
 
 function tablesSubDir(creds: { remoteDir: string }): string {
@@ -241,7 +241,7 @@ function buildStatements(tables: ParsedTable[]): { statement: string; values: un
 }
 
 /**
- * 移动端分表同步：按表增量拉取云端数据合并进本地库。
+ * 移动端分表同步：v4.3.2 起默认全量拉取云端每张表的最新版本，整体覆盖合并进本地库。
  *
  * 返回 success + 更新了哪些表；云端无 manifest 时返回错误提示走整库同步。
  */
@@ -268,22 +268,17 @@ export async function syncTablesFromWebDAV(
       };
     }
 
-    // 2. 逐表比较版本，收集需要更新的单表
-    step('2/4 对比本地版本，选择需更新的表');
+    // 2. v4.3.2：默认全量拉取——云端清单里存在的表一律下载最新版整体覆盖本地，
+    //    不再版本比对跳过（版本号仅用于日志展示）；本地水位异常时也能强制对齐云端
+    step('2/4 确定待拉取表（云端最新版）');
     const parsed: ParsedTable[] = [];
     const updated: string[] = [];
     for (const table of MOBILE_SYNC_TABLES) {
       const cloudInfo = cloud[table.name];
-      if (!cloudInfo || cloudInfo.version === undefined || cloudInfo.version === '') continue;
+      if (!cloudInfo) continue;
 
       const localV = await computeLocalVersion(table);
-      const needUpdate =
-        localV === null
-          ? true
-          : (normalizeVersion(cloudInfo.version) ?? 0) > (normalizeVersion(localV) ?? 0);
-      if (!needUpdate) continue;
-
-      step(`   - 更新 ${table.name}（云端 ${cloudInfo.version} > 本地 ${localV ?? '空'}）`);
+      step(`   - 拉取 ${table.name}（云端 ${cloudInfo.version ?? '未知'} / 本地 ${localV ?? '空'}）`);
       const bytes = await fetchTableFile(creds, table.name);
       if (!bytes) {
         step(`   - ${table.name} 云端文件缺失，跳过`);
@@ -302,11 +297,15 @@ export async function syncTablesFromWebDAV(
     }
 
     // 3. 合并进本地库
-    step('3/4 合并 ${updated.length} 张表到本地数据库');
+    const mergeMsg = `3/4 合并 ${updated.length} 张表到本地数据库`;
+    step(mergeMsg);
     if (isPwaClient()) {
       await mergeParsedTablesIntoLocal(parsed);
     } else {
-      await executeSetSql(buildStatements(parsed));
+      // v4.3.2：安卓端分块写入，回调刷新「x/y 批」进度，避免长时间无反馈
+      await executeSetSql(buildStatements(parsed), (done, total) => {
+        step(`${mergeMsg}（${done}/${total} 批）`);
+      });
     }
 
     // 4. 持久化同步时间戳
