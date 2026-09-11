@@ -437,10 +437,15 @@ class WebDAVBackupClient:
         因此这里不能再包含 backup_dir，否则会拼出双重 backup_dir 导致远端父目录不存在、PUT 返回 409）。"""
         return 'tables/table_sync'
 
-    def _table_name(self, name):
-        """单表文件相对 backup_dir 的路径（表名中转义目录穿越）。"""
+    def _table_name(self, name, compressed=False):
+        """单表文件相对 backup_dir 的路径（表名中转义目录穿越）。
+
+        compressed=True 返回 .db.gz 路径（v4.3.2 逐表上传改 gzip 压缩，
+        传输体积约为裸 SQLite 的 1/5~1/10，移动端逐表拉取明显提速）。
+        """
         safe = name.replace('/', '_').replace('\\', '_')
-        return f'{self._tables_dir()}/{safe}.db'
+        suffix = '.db.gz' if compressed else '.db'
+        return f'{self._tables_dir()}/{safe}{suffix}'
 
     def _ensure_tables_dir_exists(self):
         """确保逐表目录 tables/table_sync 在远端存在（坚果云要求父目录先建，否则 PUT 返回 409）。
@@ -479,7 +484,7 @@ class WebDAVBackupClient:
                         f_out.writelines(f_in)
                 file_to_upload = temp_compressed_path
 
-            remote_url = self._get_remote_url(self._table_name(table_name))
+            remote_url = self._get_remote_url(self._table_name(table_name, compressed=use_compression))
             retries = 0
             with open(file_to_upload, 'rb') as f:
                 resp = requests.put(remote_url, data=f, auth=self.auth,
@@ -493,13 +498,40 @@ class WebDAVBackupClient:
                                         timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
             if resp.status_code not in (200, 201, 204):
                 raise Exception(f"HTTP {resp.status_code}: {resp.text}")
-            return self._table_name(table_name)
+            return self._table_name(table_name, compressed=use_compression)
         finally:
             if temp_compressed_path and os.path.exists(temp_compressed_path):
                 os.remove(temp_compressed_path)
 
     def download_table_file(self, table_name, local_path):
-        """从 WebDAV 下载单表 SQLite 文件到本地。返回 bool。"""
+        """从 WebDAV 下载单表 SQLite 文件到本地。返回 bool。
+
+        v4.3.2：优先下载 .db.gz（逐表上传已改 gzip）解压落盘；
+        云端只有旧版未压缩 .db 时自动回退，兼容过渡期。
+        """
+        gz_url = self._get_remote_url(self._table_name(table_name, compressed=True))
+        resp = requests.get(gz_url, auth=self.auth, stream=True,
+                            timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())
+        if resp.status_code in (200, 206):
+            tmp_gz = f'{local_path}.gz.tmp'
+            with open(tmp_gz, 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            try:
+                with gzip.open(tmp_gz, 'rb') as f_in, open(local_path, 'wb') as f_out:
+                    while True:
+                        chunk = f_in.read(65536)
+                        if not chunk:
+                            break
+                        f_out.write(chunk)
+            finally:
+                if os.path.exists(tmp_gz):
+                    os.remove(tmp_gz)
+            return True
+        if resp.status_code != 404:
+            raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+
         remote_url = self._get_remote_url(self._table_name(table_name))
         resp = requests.get(remote_url, auth=self.auth, stream=True,
                             timeout=_TIMEOUT_TRANSFER, **self._requests_kwargs())

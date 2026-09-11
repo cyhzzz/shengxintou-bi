@@ -162,10 +162,11 @@ function blobToBase64(blob: Blob): Promise<string> {
  *
  * 后端上传的备份是 backup_*.db.gz（gzip 压缩），
  * 下载后必须解压才能被 SQLite 读取。
+ * v4.3.2 起逐表同步的单表 .db.gz 也复用本函数解压。
  *
  * 使用浏览器原生 DecompressionStream API（Chrome 80+ / Android WebView 90+）。
  */
-async function decompressGzip(blob: Blob): Promise<Blob> {
+export async function decompressGzip(blob: Blob): Promise<Blob> {
   if (typeof DecompressionStream === 'undefined') {
     throw new Error('当前 WebView 不支持 DecompressionStream，无法解压 .db.gz');
   }

@@ -1307,7 +1307,7 @@ def table_upload():
                     tmp_db = os.path.join(tmpdir, f'{t}.db')
                     export_table_to_sqlite_file(engine, t, tmp_db)
                     size = os.path.getsize(tmp_db)
-                    client.upload_table_file(tmp_db, t, use_compression=False)
+                    client.upload_table_file(tmp_db, t, use_compression=True)
                     from datetime import datetime as _dt
                     cloud_tables[t] = {
                         'version': version,

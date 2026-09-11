@@ -24,7 +24,7 @@
 import initSqlJs from 'sql.js';
 import type { SqlValue } from 'sql.js';
 import { isPwaClient } from '@/utils/isDesktop';
-import { getWebDAVCredentials, saveLastSyncAt, type SyncResult } from './mobileSync';
+import { decompressGzip, getWebDAVCredentials, saveLastSyncAt, type SyncResult } from './mobileSync';
 import { querySql as mobileQuerySql, executeSetSql } from './mobileSqlite';
 import {
   mergeParsedTablesIntoLocal,
@@ -131,7 +131,10 @@ async function fetchRemoteManifest(
 }
 
 /**
- * 下载单个分表 .db 文件，返回 ArrayBuffer。404 返回 null。
+ * 下载单个分表文件并返回解压后的 SQLite ArrayBuffer。云端均缺失返回 null。
+ *
+ * v4.3.2 提速：优先下载 .db.gz（桌面端配套 gzip 上传，传输体积约为裸 .db 的 1/5~1/10），
+ * 以 gzip 魔数校验内容（防个别网关对 .gz 路径返回假 200）；旧云端只有未压缩 .db 时自动回退。
  */
 async function fetchTableFile(
   creds: {
@@ -145,22 +148,33 @@ async function fetchTableFile(
 ): Promise<ArrayBuffer | null> {
   const pwa = isPwaClient();
   const auth = authB64(creds);
-  const target = buildTargetUrl(creds, `${tableName}.db`, pwa);
 
-  let resp: Response;
-  if (pwa) {
-    if (!creds.proxyUrl) throw new Error('PWA 分表同步需要代理地址');
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 120000);
-    try {
-      resp = await fetch(buildProxyUrl(creds.proxyUrl, target, auth), { signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
+  const fetchUrl = async (file: string): Promise<Response> => {
+    const target = buildTargetUrl(creds, file, pwa);
+    if (pwa) {
+      if (!creds.proxyUrl) throw new Error('PWA 分表同步需要代理地址');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 120000);
+      try {
+        return await fetch(buildProxyUrl(creds.proxyUrl, target, auth), { signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
     }
-  } else {
-    resp = await fetch(target, { headers: { Authorization: `Basic ${auth}` } });
+    return fetch(target, { headers: { Authorization: `Basic ${auth}` } });
+  };
+
+  const gzResp = await fetchUrl(`${tableName}.db.gz`);
+  if (gzResp.ok) {
+    const gzBuf = await gzResp.arrayBuffer();
+    const head = new Uint8Array(gzBuf.slice(0, 2));
+    if (head[0] === 0x1f && head[1] === 0x8b) {
+      const blob = await decompressGzip(new Blob([gzBuf]));
+      return blob.arrayBuffer();
+    }
   }
 
+  const resp = await fetchUrl(`${tableName}.db`);
   if (resp.status === 404) return null;
   if (!resp.ok) throw new Error(`下载分表 ${tableName} 失败: HTTP ${resp.status}`);
   return resp.arrayBuffer();
@@ -241,6 +255,30 @@ function buildStatements(tables: ParsedTable[]): { statement: string; values: un
 }
 
 /**
+ * v4.3.2 提速：并发拉取多张分表（worker 池限流，默认并发 3，避免打爆坚果云 WAF）。
+ * 某张表下载抛错会中断整体（与旧串行行为一致）；404 缺失以 null 传出、其余表继续。
+ */
+async function fetchTableFilesParallel(
+  creds: Parameters<typeof fetchTableFile>[0],
+  tableNames: string[],
+  onResult: (name: string, bytes: ArrayBuffer | null) => Promise<void> | void,
+  concurrency = 3
+): Promise<void> {
+  let idx = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, tableNames.length) },
+    async () => {
+      while (idx < tableNames.length) {
+        const name = tableNames[idx++];
+        const bytes = await fetchTableFile(creds, name);
+        await onResult(name, bytes);
+      }
+    }
+  );
+  await Promise.all(workers);
+}
+
+/**
  * 移动端分表同步：v4.3.2 起默认全量拉取云端每张表的最新版本，整体覆盖合并进本地库。
  *
  * 返回 success + 更新了哪些表；云端无 manifest 时返回错误提示走整库同步。
@@ -269,27 +307,31 @@ export async function syncTablesFromWebDAV(
     }
 
     // 2. v4.3.2：默认全量拉取——云端清单里存在的表一律下载最新版整体覆盖本地，
-    //    不再版本比对跳过（版本号仅用于日志展示）；本地水位异常时也能强制对齐云端
+    //    不再版本比对跳过（版本号仅用于日志展示）；本地水位异常时也能强制对齐云端。
+    //    v4.3.2 提速：单表改走 .db.gz 压缩格式 + 下载阶段并发拉取，整体耗时对齐整库快照
     step('2/4 确定待拉取表（云端最新版）');
-    const parsed: ParsedTable[] = [];
-    const updated: string[] = [];
+    const pending: string[] = [];
     for (const table of MOBILE_SYNC_TABLES) {
       const cloudInfo = cloud[table.name];
       if (!cloudInfo) continue;
-
       const localV = await computeLocalVersion(table);
       step(`   - 拉取 ${table.name}（云端 ${cloudInfo.version ?? '未知'} / 本地 ${localV ?? '空'}）`);
-      const bytes = await fetchTableFile(creds, table.name);
+      pending.push(table.name);
+    }
+
+    const parsed: ParsedTable[] = [];
+    const updated: string[] = [];
+    await fetchTableFilesParallel(creds, pending, async (name, bytes) => {
       if (!bytes) {
-        step(`   - ${table.name} 云端文件缺失，跳过`);
-        continue;
+        step(`   - ${name} 云端文件缺失，跳过`);
+        return;
       }
-      const tbl = await parseTableDb(bytes, table.name);
+      const tbl = await parseTableDb(bytes, name);
       if (tbl) {
         parsed.push(tbl);
-        updated.push(table.name);
+        updated.push(name);
       }
-    }
+    });
 
     if (parsed.length === 0) {
       await saveLastSyncAt(new Date().toISOString());

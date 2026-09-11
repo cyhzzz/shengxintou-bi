@@ -46,7 +46,7 @@ export default function MobileSyncButton() {
   // 仅在移动端 / PWA 端渲染
   if (!showComponent) return null;
 
-  // v4.3.3：右上角「同步数据」默认逐分表拉取云端每张表的最新版本（云端分表各自更新，
+  // v4.3.2：右上角「同步数据」默认逐分表拉取云端每张表的最新版本（云端分表各自更新，
   //   整库快照可能滞后）；仅当云端尚无逐表清单（对端仍是旧版整库上传）时回退整库拉取一次。
   const handleSync = async () => {
     setLoading(true);
