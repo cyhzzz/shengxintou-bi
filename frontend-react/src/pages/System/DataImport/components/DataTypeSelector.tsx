@@ -1,7 +1,7 @@
 /**
  * 数据类型选择器组件（v2 - 10 个 type + 占位项，按业务域分组）
  * 紧凑纵向菜单列表：每项 = 图标 + 名称 + 指南入口
- * 应用市场下载链路 3 个区间在 UI 上合并为一项，具体区间在右侧上传区切换
+ * 应用市场下载链路 4 个区间在 UI 上合并为一项，具体区间在右侧上传区切换
  * 占位数据源（如 手机号明细数据）以「开发中」禁用展示
  */
 import React, { useState } from 'react';
@@ -78,7 +78,7 @@ const DataTypeSelector: React.FC<DataTypeSelectorProps> = ({ selected, onChange 
         <span className={styles.itemIcon}>
           <Icon />
         </span>
-        <span className={styles.itemLabel}>{appmarketCfg.label.replace(/(\(1-6月\)|\(7-9月\)|\(10-12月\))/, '')}</span>
+        <span className={styles.itemLabel}>{appmarketCfg.label.replace(/(\(1-6月\)|\(7-8月\)|\(9-10月\)|\(11-12月\))/, '')}</span>
         <button
           type="button"
           className={styles.guideBtn}

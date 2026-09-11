@@ -16,8 +16,8 @@ v2 改造要点：
   xhs_notes_list/xhs_notes_daily/xhs_notes_content_daily）已退役，返回 410 Gone。
 - 保留 DataImportLog 记录（用于上传历史与进度跟踪）。
 - 异步线程处理（保留 progress 查询体验）。
-- 应用市场下载链路（conversion_appmarket）按时间区间拆分为 3 个上传路径
-  （1-6月 / 7-9月 / 10-12月），均落 fact_conv_appmarket，导入只清空并重写各自区间。
+- 应用市场下载链路（conversion_appmarket）按时间区间拆分为 4 个上传路径
+  （1-6月 / 7-8月 / 9-10月 / 11-12月），均落 fact_conv_appmarket，导入只清空并重写各自区间。
 """
 
 from flask import Blueprint, request, jsonify, current_app
@@ -40,9 +40,10 @@ bp = Blueprint('upload', __name__)
 DATA_TYPES = {
     'account_mapping':      '投放账号映射',
     'conversion_content':   '内容平台加微链路',
-    'conversion_appmarket_h1': '应用市场下载链路(1-6月)',
-    'conversion_appmarket_q3': '应用市场下载链路(7-9月)',
-    'conversion_appmarket_q4': '应用市场下载链路(10-12月)',
+    'conversion_appmarket_h1':   '应用市场下载链路(1-6月)',
+    'conversion_appmarket_78':   '应用市场下载链路(7-8月)',
+    'conversion_appmarket_910':  '应用市场下载链路(9-10月)',
+    'conversion_appmarket_1112': '应用市场下载链路(11-12月)',
     'vendor_daily':         '厂商广告投放分析',
     'xhs_note':             '小红书笔记',
     'channel_open':         '开户渠道分析',
@@ -51,14 +52,16 @@ DATA_TYPES = {
     'qingniao_leads':       '抖音青鸟线索通',
 }
 
-# 应用市场下载链路按时间区间拆分为 3 个独立上传路径（2026 年）：
-#   1-6 月 / 7-9 月 / 10-12 月。三者均落 fact_conv_appmarket，但导入时只清空并重写
-# 各自区间内的数据，互不干扰（避免一次上传误操作覆盖全年）。
-# 旧的「全量」类型（保留 6/30 及之前、只重写 7/1 以后）已移除，统一由这 3 个区间路径替代。
+# 应用市场下载链路按时间区间拆分为 4 个独立上传路径（2026 年）：
+#   1-6 月 / 7-8 月 / 9-10 月 / 11-12 月。四者均落 fact_conv_appmarket，但导入时只清空并重写
+# 各自区间内的数据，互不干扰（避免一次上传误操作覆盖全年）。各区间互不重叠，
+# 同一月份只归属一个区间，避免重复导入时区间交叉覆盖丢失数据。
+# 旧的「全量」类型（保留 6/30 及之前、只重写 7/1 以后）已移除，统一由这 4 个区间路径替代。
 APPMARKET_PERIOD_KEYS = {
-    'conversion_appmarket_h1': ('2026-01-01', '2026-06-30'),
-    'conversion_appmarket_q3': ('2026-07-01', '2026-09-30'),
-    'conversion_appmarket_q4': ('2026-10-01', '2026-12-31'),
+    'conversion_appmarket_h1':   ('2026-01-01', '2026-06-30'),
+    'conversion_appmarket_78':   ('2026-07-01', '2026-08-31'),
+    'conversion_appmarket_910':  ('2026-09-01', '2026-10-31'),
+    'conversion_appmarket_1112': ('2026-11-01', '2026-12-31'),
 }
 
 # v1 已退役数据类型（保留识别名但返回 410）
@@ -230,7 +233,7 @@ def upload_file():
 
     overwrite = request.form.get('overwrite', 'false').lower() == 'true'
 
-    # 应用市场下载链路区间拆分类型（h1/q3/q4）：取对应日期区间，导入时只重写该区间
+    # 应用市场下载链路区间拆分类型（h1/78/910/1112）：取对应日期区间，导入时只重写该区间
     period = APPMARKET_PERIOD_KEYS.get(data_type)
 
     # v3.3.6：批次标注（仅 qingniao_leads 使用，其他类型忽略）
@@ -413,9 +416,10 @@ def _target_tables(data_type: str):
     return {
         'account_mapping':      ['dim_account'],
         'conversion_content':   ['fact_conv_content'],
-        'conversion_appmarket_h1': ['fact_conv_appmarket'],
-        'conversion_appmarket_q3': ['fact_conv_appmarket'],
-        'conversion_appmarket_q4': ['fact_conv_appmarket'],
+        'conversion_appmarket_h1':   ['fact_conv_appmarket'],
+        'conversion_appmarket_78':   ['fact_conv_appmarket'],
+        'conversion_appmarket_910':  ['fact_conv_appmarket'],
+        'conversion_appmarket_1112': ['fact_conv_appmarket'],
         'vendor_daily':         ['agg_vendor_daily'],
         'xhs_note':             ['agg_xhs_note'],
         'channel_open':         ['agg_daily_channel_open'],

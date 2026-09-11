@@ -1,7 +1,7 @@
 /**
  * 数据导入页面
  * 左右两栏布局：左侧按业务域分组的数据类型菜单，右侧上传区
- * 应用市场下载链路合并为一项，选择后用 Segmented 切换区间（1-6月/7-9月/10-12月）
+ * 应用市场下载链路合并为一项，选择后用 Segmented 切换区间（1-6月/7-8月/9-10月/11-12月）
  */
 import React, { useState } from 'react';
 import { Typography, Alert, Segmented, Tag, Card } from 'antd';
@@ -26,7 +26,7 @@ const DataImportPage: React.FC = () => {
   const selectedTypeInfo = DATA_TYPES.find((t) => t.type === selectedType);
 
   const displayTitle = isAppmarket
-    ? selectedTypeInfo?.label.replace(/(\(1-6月\)|\(7-9月\)|\(10-12月\))/, '') ?? '应用市场下载链路'
+    ? selectedTypeInfo?.label.replace(/(\(1-6月\)|\(7-8月\)|\(9-10月\)|\(11-12月\))/, '') ?? '应用市场下载链路'
     : selectedTypeInfo?.label ?? '';
 
   const handleImportSuccess = () => {

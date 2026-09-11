@@ -221,7 +221,7 @@ class VendorDailyPartitionTest(unittest.TestCase):
 
 
 class AppmarketPeriodReplaceTest(unittest.TestCase):
-    """应用市场下载链路区间拆分（h1/q3/q4）：只清空并重写指定区间，不影响其它月份。"""
+    """应用市场下载链路区间拆分（h1/78/910/1112）：只清空并重写指定区间，不影响其它月份。"""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix='conv_appmarket_period_')

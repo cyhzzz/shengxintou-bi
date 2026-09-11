@@ -35,8 +35,9 @@ export type DataType =
   | 'account_mapping'
   | 'conversion_content'
   | 'conversion_appmarket_h1'
-  | 'conversion_appmarket_q3'
-  | 'conversion_appmarket_q4'
+  | 'conversion_appmarket_78'
+  | 'conversion_appmarket_910'
+  | 'conversion_appmarket_1112'
   | 'vendor_daily'
   | 'xhs_note'
   | 'channel_open'
@@ -54,14 +55,15 @@ export const DATA_GROUPS: { key: DataGroupKey; label: string; icon: IconCmp }[] 
   { key: 'dimension', label: '维度关联', icon: ApartmentOutlined },
 ];
 
-// 应用市场下载链路：区间拆分（1-6月 / 7-9月 / 10-12月）
+// 应用市场下载链路：区间拆分（1-6月 / 7-8月 / 9-10月 / 11-12月）
 // UI 上合并为一项展示，选择后在右侧用 Segmented 切换具体区间
 export const APPMARKET_DOWNLOAD_TYPE = 'conversion_appmarket_h1';
 export const APPMARKET_PREFIX = 'conversion_appmarket_';
 export const APPMARKET_INTERVALS: { type: DataType; label: string; desc: string }[] = [
   { type: 'conversion_appmarket_h1', label: '1-6月', desc: '1月1日-6月30日' },
-  { type: 'conversion_appmarket_q3', label: '7-9月', desc: '7月1日-9月30日' },
-  { type: 'conversion_appmarket_q4', label: '10-12月', desc: '10月1日-12月31日' },
+  { type: 'conversion_appmarket_78', label: '7-8月', desc: '7月1日-8月31日' },
+  { type: 'conversion_appmarket_910', label: '9-10月', desc: '9月1日-10月31日' },
+  { type: 'conversion_appmarket_1112', label: '11-12月', desc: '11月1日-12月31日' },
 ];
 
 // 占位数据源（开发中，不可选择）
@@ -115,18 +117,27 @@ export const DATA_TYPES: DataTypeConfig[] = [
     group: 'leads',
   },
   {
-    type: 'conversion_appmarket_q3',
-    label: 'APP下载明细数据(7-9月)',
-    description: '7月1日-9月30日 下载→开户归因明细（仅替换该区间）',
+    type: 'conversion_appmarket_78',
+    label: 'APP下载明细数据(7-8月)',
+    description: '7月1日-8月31日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
     icon: DownloadOutlined,
     group: 'leads',
   },
   {
-    type: 'conversion_appmarket_q4',
-    label: 'APP下载明细数据(10-12月)',
-    description: '10月1日-12月31日 下载→开户归因明细（仅替换该区间）',
+    type: 'conversion_appmarket_910',
+    label: 'APP下载明细数据(9-10月)',
+    description: '9月1日-10月31日 下载→开户归因明细（仅替换该区间）',
+    targetTables: ['fact_conv_appmarket'],
+    guideFile: 'conversion_appmarket_guide.md',
+    icon: DownloadOutlined,
+    group: 'leads',
+  },
+  {
+    type: 'conversion_appmarket_1112',
+    label: 'APP下载明细数据(11-12月)',
+    description: '11月1日-12月31日 下载→开户归因明细（仅替换该区间）',
     targetTables: ['fact_conv_appmarket'],
     guideFile: 'conversion_appmarket_guide.md',
     icon: DownloadOutlined,
