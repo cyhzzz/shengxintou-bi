@@ -16,19 +16,10 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily, FactConvAppmarket
 from backend.database import db
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS
 from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('app_market_cost', __name__, url_prefix='/api/v1/reports/app-market')
-
-# 7 大应用市场（与归因转化率 / 广告计划分析口径一致，含 鸿蒙）
-APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
-
-# 广告开户复合条件（与归因转化率 / 广告计划分析一致）
-AD_ACCOUNT_CONDITIONS = (
-    (FactConvAppmarket.是否创建完资金账号 == 1)
-    & (FactConvAppmarket.渠道类型 == '互联网引流')
-    & (FactConvAppmarket.是否新开户 == 1)
-)
 
 _META = {
     'version': 'v3.6.3',

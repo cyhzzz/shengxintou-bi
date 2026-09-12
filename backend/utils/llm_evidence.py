@@ -26,8 +26,9 @@ from backend.models_v2 import (
     FactConvAppmarket,
     FactConvContent,
 )
+from backend.utils.calibers import CONTENT_NON_STOCK
 from backend.utils.diagnosis.engine import shift_month
-from backend.utils.diagnosis.metrics import CONTENT_NON_STOCK, ratio
+from backend.utils.diagnosis.metrics import ratio
 
 log = logging.getLogger(__name__)
 

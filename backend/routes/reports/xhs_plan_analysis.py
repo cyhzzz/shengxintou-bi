@@ -32,6 +32,7 @@ from sqlalchemy import func, and_, case, or_
 
 from backend.models_v2 import FactConvContent, FactPlanDaily
 from backend.database import db
+from backend.utils.calibers import CONTENT_NON_STOCK
 from backend.utils.decorators import handle_exceptions
 
 bp = Blueprint('xhs_plan_analysis_report', __name__, url_prefix='/api/v1/reports/xhs')
@@ -115,12 +116,8 @@ def xhs_plan_analysis():
         else_=FactConvContent.广告ID
     ).label('plan_key')
 
-    # v3.3.10 业务不变式「内容平台非存量条件」：
-    #   是否为存量客户 == 0 OR IS NULL
-    not_existing = or_(
-        FactConvContent.是否为存量客户 == 0,
-        FactConvContent.是否为存量客户.is_(None),
-    )
+    # v3.3.10 业务不变式「内容平台非存量条件」（权威定义见 backend/utils/calibers.py）
+    not_existing = CONTENT_NON_STOCK
 
     funnels = [
         ('企微', func.count(FactConvContent.id)),                          # 企微 = 行数

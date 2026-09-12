@@ -7,11 +7,12 @@
 - summary：totals + 派生 avg_cost_per_*
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, and_
 from backend.models_v2 import AggVendorDaily, FactConvContent, FactConvAppmarket
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls
+from backend.utils.calibers import CONTENT_NON_STOCK
 
 bp = Blueprint('cost_analysis', __name__)
 
@@ -142,7 +143,7 @@ def get_conversion_funnel_split():
         cq_new = cq_new.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms:
         cq_new = cq_new.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
-    cq_new = cq_new.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    cq_new = cq_new.filter(CONTENT_NON_STOCK)
     cr_new = cq_new.first()
     new_valid_lead = int(cr_new.new_valid_lead or 0)
     opened = int(cr_new.opened or 0)
@@ -157,7 +158,7 @@ def get_conversion_funnel_split():
         extra_open_q = extra_open_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms:
         extra_open_q = extra_open_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
-    extra_open_q = extra_open_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    extra_open_q = extra_open_q.filter(CONTENT_NON_STOCK)
     extra_open_q = extra_open_q.filter(FactConvContent.是否有效线索 != 1)
     extra_open_r = extra_open_q.first()
     extra_new_opened = int(extra_open_r.extra_opened or 0)
@@ -170,7 +171,7 @@ def get_conversion_funnel_split():
         content_asset_q = content_asset_q.filter(and_(FactConvContent.线索日期 >= sd, FactConvContent.线索日期 <= ed))
     if platforms:
         content_asset_q = content_asset_q.filter(FactConvContent.平台来源.in_([str(p) for p in platforms]))
-    content_asset_q = content_asset_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+    content_asset_q = content_asset_q.filter(CONTENT_NON_STOCK)
     content_asset_q = content_asset_q.filter(FactConvContent.是否开户 == 1)
     content_asset_r = content_asset_q.first()
     content_new_open_assets = round(float(content_asset_r.new_open_assets or 0), 2)

@@ -8,6 +8,7 @@ from backend.routes.data.employee_conversion_helpers import (
     get_employee_list, get_platform_overview, get_latest_data_week_range,
     get_qualified_employees, get_yearly_breakdown
 )
+from backend.utils.calibers import CONTENT_NON_STOCK
 from backend.utils.decorators import handle_exceptions
 
 logger = logging.getLogger(__name__)
@@ -129,7 +130,7 @@ def get_employee_analysis_channel_overview():
     """
     from backend.models_v2 import AggDailyChannelOpen, FactConvContent
     from backend.database import db
-    from sqlalchemy import func, and_, or_
+    from sqlalchemy import func, and_
     data = request.get_json() or {}
     sd = data.get('start_date')
     ed = data.get('end_date')
@@ -162,7 +163,7 @@ def get_employee_analysis_channel_overview():
     if lead_type == 'existing':
         detail_q = detail_q.filter(FactConvContent.是否为存量客户 == 1)
     elif lead_type == 'new':
-        detail_q = detail_q.filter(or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None)))
+        detail_q = detail_q.filter(CONTENT_NON_STOCK)
     dr = detail_q.first()
 
     # 渠道参考口径（agg_daily_channel_open，仅互联网引流）

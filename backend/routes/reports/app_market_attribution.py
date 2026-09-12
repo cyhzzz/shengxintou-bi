@@ -18,6 +18,7 @@ from sqlalchemy import case, func
 
 from backend.models_v2 import FactConvAppmarket
 from backend.database import db
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS
 from backend.utils.decorators import handle_exceptions
 from backend.utils.dialect_helpers import make_week_start_expr
 
@@ -28,9 +29,6 @@ _META = {
     'source': 'fact_conv_appmarket 数据库表',
     'note': '按周(周一~周日)聚合各步骤转化率，含开户成功→广告开户节点',
 }
-
-# 仅统计以下 7 个应用市场，其他一律排除
-ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 
 # 漏斗步骤列 → 别名映射（与 app_market.py FUNNEL_STAGES 前 6 步一致）
 FUNNEL_STAGES = [
@@ -43,14 +41,6 @@ FUNNEL_STAGES = [
     # 上游存在「开户成功=0 但 创建完资金账号=1」倒挂数据，见 business-invariants.md 第3节）
     ('是否创建完资金账号', 'success'),
 ]
-
-# 广告开户：开户成功之后的复合条件节点
-#   是否创建完资金账号 = 是（1）AND 渠道类型 = 互联网引流 AND 是否新开户 = 是（1）
-AD_ACCOUNT_CONDITIONS = (
-    (FactConvAppmarket.是否创建完资金账号 == 1)
-    & (FactConvAppmarket.渠道类型 == '互联网引流')
-    & (FactConvAppmarket.是否新开户 == 1)
-)
 
 WEEKDAY_MAP = {0: '周一', 1: '周二', 2: '周三', 3: '周四', 4: '周五', 5: '周六', 6: '周日'}
 

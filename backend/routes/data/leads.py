@@ -6,6 +6,7 @@ from backend.models_v2 import FactConvContent, DimAnchorLiveType
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls, full_to_short
+from backend.utils.calibers import CONTENT_NON_STOCK
 
 bp = Blueprint('leads', __name__)
 
@@ -128,9 +129,8 @@ def _compute_anchor_cluster_items(sd, ed, platforms_filter, agencies_filter, liv
 
     # 主播聚类正则: (平台)引流-(主播名)
     # 复合来源如 "视频号引流-姚立琦,视频号引流-蒋亦凡" 需按分隔符拆成多个主播归因。
-    # v3.1.26: 存量剔除口径与 cost_analysis/conversion-funnel/split 对齐
-    # 非存量条件: 是否为存量客户 == 0 OR IS NULL
-    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+    # 非存量条件（权威定义见 backend/utils/calibers.py）
+    non_existing = CONTENT_NON_STOCK
 
     base_q = db.session.query(
         FactConvContent.客户来源,
@@ -473,7 +473,7 @@ def get_anchor_clusters_trend():
         granularity = 'daily'
         period_expr = func.substr(FactConvContent.线索日期, 1, 10)
     period_label = period_expr.label('period')
-    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+    non_existing = CONTENT_NON_STOCK
 
     # 预加载 dim_anchor_live_type 表，构建 plain_name_tokens
     # 纯人名 token（如"黄天平"）不含"引流-"，原有的 like('%引流-%') 过滤
@@ -623,7 +623,7 @@ def get_anchor_weekly_analysis():
 
     # 周起始日（dialect 无关）：SQLite date(d, 'weekday 0', '-6 days')；PG date_trunc('week', d::date)
     week_start_expr = make_week_start_expr(FactConvContent.线索日期).label('week_start')
-    non_existing = or_(FactConvContent.是否为存量客户 == 0, FactConvContent.是否为存量客户.is_(None))
+    non_existing = CONTENT_NON_STOCK
 
     # 预加载 dim_anchor_live_type 表（与 get_anchor_clusters 同口径）
     lt_rows_all = db.session.query(

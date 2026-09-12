@@ -47,13 +47,11 @@ from sqlalchemy import case, distinct, func
 
 from backend.models_v2 import DimAdPlanClass, FactConvAppmarket, AggVendorDaily, FactPlanDaily
 from backend.database import db
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS
 from backend.utils.decorators import handle_exceptions
 from backend.utils.dialect_helpers import make_friday_week_start_expr
 
 bp = Blueprint('app_market_ad_plan', __name__, url_prefix='/api/v1/reports/app-market')
-
-# 7 大应用市场（与归因转化率 / 计划分解口径一致）
-ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 
 _META = {
     'version': 'v3.8.2',
@@ -65,13 +63,6 @@ _META = {
     'week_rule': '上周五 ~ 本周四',
     'funnel_note': '分计划漏斗量按 设备号去重；计划级消耗/展示/点击/下载取自 fact_plan_daily（9.3）；转化率为步骤间口径（点击/展示、下载/点击、激活/下载、…、广告开户/开户成功）',
 }
-
-# 广告开户复合条件（与归因转化率报表口径一致）
-AD_ACCOUNT_CONDITIONS = (
-    (FactConvAppmarket.是否创建完资金账号 == 1)
-    & (FactConvAppmarket.渠道类型 == '互联网引流')
-    & (FactConvAppmarket.是否新开户 == 1)
-)
 
 # 下载链路各阶段条件（量 = 去重设备号）
 FUNNEL_STAGES = [

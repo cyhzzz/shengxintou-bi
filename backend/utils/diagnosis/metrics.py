@@ -16,6 +16,7 @@ from backend.models_v2 import (
     FactConvContent,
     FactPlanDaily,
 )
+from backend.utils.calibers import CONTENT_NON_STOCK
 
 SNAPSHOT_SOURCES = [
     {'key': 'agg_vendor_daily', 'name': '厂商日聚合', 'model': AggVendorDaily, 'column': '日期'},
@@ -25,8 +26,6 @@ SNAPSHOT_SOURCES = [
     {'key': 'fact_conv_appmarket', 'name': '应用市场明细', 'model': FactConvAppmarket, 'column': '下载日期'},
     {'key': 'agg_daily_channel_open', 'name': '渠道开户聚合', 'model': AggDailyChannelOpen, 'column': '时间区间'},
 ]
-
-CONTENT_NON_STOCK = or_(FactConvContent.是否为存量客户.is_(None), FactConvContent.是否为存量客户 == 0)
 
 
 def parse_date(value):

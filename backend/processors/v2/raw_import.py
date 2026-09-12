@@ -34,6 +34,9 @@ from sqlalchemy import create_engine, text, inspect as sqla_inspect
 from datetime import datetime
 import logging
 
+# 应用市场白名单（权威定义见 backend/utils/calibers.py；OPPO/VIVO 源表大写，落库前 .lower()）
+from backend.utils.calibers import APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS
+
 logger = logging.getLogger(__name__)
 
 # 应用市场下载链路（conversion_appmarket → fact_conv_appmarket）的分区替换边界：
@@ -78,9 +81,6 @@ def _resolve_db_url() -> str:
 
 # 6 个新数据类型到处理器函数的映射
 HANDLERS = {}  # filled after function defs
-
-# 应用市场白名单（与归因转化率报表口径一致；OPPO/VIVO 源表大写，落库前 .lower()）
-ALLOWED_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 
 
 def _read_excel(path: str) -> pd.DataFrame:

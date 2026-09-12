@@ -13,7 +13,7 @@ from sqlalchemy import func, and_, case, or_, cast, String, type_coerce
 from backend.models_v2 import FactConvAppmarket, FactPlanDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.routes.reports.app_market_ad_plan import ALLOWED_PLATFORMS as APP_MARKET_PLATFORMS
+from backend.utils.calibers import APP_MARKET_PLATFORMS
 
 bp = Blueprint('app_market_report', __name__, url_prefix='/api/v1/reports/app-market')
 

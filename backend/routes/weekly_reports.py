@@ -22,6 +22,7 @@ from backend.utils.decorators import handle_exceptions
 from sqlalchemy import func, and_, case, distinct
 # 复用主播聚类核心（复合来源均分口径与 /anchor-clusters 严格一致），避免两处实现漂移
 from backend.routes.data.leads import _compute_anchor_cluster_items
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS
 
 logger = logging.getLogger(__name__)
 
@@ -366,19 +367,12 @@ def get_weekly_data():
 #   内容平台(小红书/腾讯/抖音) -> 平台 -> 厂商 -> 计划
 #   直播 -> 主播（复合来源均分，复用 leads.py 的 _compute_anchor_cluster_items）
 # ============================================================================
-APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 # 内容平台：小红书/腾讯/抖音/yj/云极/快手；财联社不在此列（财联社数据均为直播场景，由直播聚合覆盖，避免重复计数）
 CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', 'yj', '云极', '快手']
 # 展示用内容平台列表：yj 与 云极 为同一平台的两种上游命名，查询保留双名，展示统一归并为「云极」
 CONTENT_PLATFORMS_DISPLAY = ['小红书', '腾讯', '抖音', '云极', '快手']
 # 本地生活渠道（独立板块，当前仅高德）
 LOCAL_LIFE_CHANNELS = ('高德',)
-# 广告开户复合条件（与 app_market_ad_plan.py / app_market_attribution.py 一致）
-_AD_ACCOUNT_COND = (
-    (FactConvAppmarket.是否创建完资金账号 == 1)
-    & (FactConvAppmarket.渠道类型 == '互联网引流')
-    & (FactConvAppmarket.是否新开户 == 1)
-)
 # 平台名归一：yj/云极 统一展示为「云极」（BI 侧临时口径，上游统一命名后可移除；仅查询层展示，不动底表）
 _PLATFORM_ALIAS = {'yj': '云极'}
 # 内容平台厂商白名单：白名单平台仅列内厂商独立展示，其余统一并入「未归因」；
@@ -516,7 +510,7 @@ def _app_market_detail(sd, ed):
     if plan_ids:
         oc_rows = db.session.query(
             FactConvAppmarket.广告计划ID,
-            func.coalesce(func.sum(case((_AD_ACCOUNT_COND, 1), else_=0)), 0).label('open_cnt'),
+            func.coalesce(func.sum(case((AD_ACCOUNT_CONDITIONS, 1), else_=0)), 0).label('open_cnt'),
         ).filter(and_(
             FactConvAppmarket.广告计划ID.in_(plan_ids),
             FactConvAppmarket.资金账号创建完成时间 >= sd,
@@ -548,7 +542,7 @@ def _app_market_detail(sd, ed):
             func.coalesce(func.sum(FactConvAppmarket.总资产), 0).label('assets'),
         ).filter(and_(
             FactConvAppmarket.广告计划ID.in_(plan_ids),
-            _AD_ACCOUNT_COND,
+            AD_ACCOUNT_CONDITIONS,
             FactConvAppmarket.资金账号创建完成时间 >= sd,
             FactConvAppmarket.资金账号创建完成时间 <= ed,
         )).group_by(FactConvAppmarket.广告计划ID).all()
