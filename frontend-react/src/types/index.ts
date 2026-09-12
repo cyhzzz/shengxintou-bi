@@ -179,18 +179,3 @@ export interface ApiResponse<T = Record<string, unknown>> {
   error?: string;
   message?: string;
 }
-
-/** 汇总数据（后端 /summary 返回结构） */
-export type SummaryData = Record<string, unknown>;
-
-/** 代理商分析数据 */
-export type AgencyAnalysisData = Record<string, unknown>;
-
-/** 转化漏斗数据 */
-export type ConversionFunnelData = Record<string, unknown>;
-
-/** 线索明细数据 */
-export type LeadsDetailData = Record<string, unknown>;
-
-/** 数据概览核心指标数据 */
-export type DashboardCoreMetricsData = Record<string, unknown>;

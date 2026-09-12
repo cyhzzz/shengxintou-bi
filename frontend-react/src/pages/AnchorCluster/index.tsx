@@ -28,6 +28,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
 import { sanitizeText, sanitizeList } from '@/utils/sanitizeText';
+import type { ApiResponse } from '@/types';
 import styles from './index.module.scss';
 
 type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
@@ -106,6 +107,13 @@ interface LiveTypeBreakdown {
   valid_rate: number;
 }
 
+interface AnchorClustersRespData {
+  items?: AnchorItem[];
+  platforms?: string[];
+  live_types?: string[];
+  live_type_breakdown?: LiveTypeBreakdown[];
+}
+
 const AnchorClusterPage: React.FC = () => {
   const { dateRange, selectedPlatforms } = useFilterStore();
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
@@ -134,9 +142,9 @@ const AnchorClusterPage: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res: any = await dataServiceLeadsAnchor.getAnchorClusters({ filters, top_n: 200 });
-      if (res?.success) {
-        setItems((res.data.items || []) as AnchorItem[]);
+      const res = await dataServiceLeadsAnchor.getAnchorClusters({ filters, top_n: 200 }) as ApiResponse<AnchorClustersRespData>;
+      if (res?.success && res.data) {
+        setItems(res.data.items || []);
         setPlatforms(res.data.platforms || []);
         setLiveTypeOptions(res.data.live_types || []);
         setBreakdown(res.data.live_type_breakdown || []);

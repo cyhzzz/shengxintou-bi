@@ -20,6 +20,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
 import { sanitizeText } from '@/utils/sanitizeText';
+import type { ApiResponse } from '@/types';
 import styles from './ConversionFunnel.module.scss';
 
 interface FunnelStage {
@@ -27,6 +28,20 @@ interface FunnelStage {
   value: number;
   rate: number;
   step_rate?: number;
+}
+
+interface FunnelSplitRespData {
+  funnels?: {
+    content?: {
+      stages?: FunnelStage[];
+      extra_new_opened?: number;
+      new_open_assets?: number;
+    };
+    appmarket?: {
+      stages?: FunnelStage[];
+      new_open_assets?: number;
+    };
+  };
 }
 
 const ConversionFunnelPage: React.FC = () => {
@@ -59,11 +74,11 @@ const ConversionFunnelPage: React.FC = () => {
       const sd = override?.startDate ?? dateRange.startDate;
       const ed = override?.endDate ?? dateRange.endDate;
       const pls = override?.platforms ?? platforms;
-      const response: any = await dataService.getConversionFunnelSplit({
+      const response = await dataService.getConversionFunnelSplit({
         start_date: sd,
         end_date: ed,
         platforms: pls.length ? pls : undefined,
-      } as any);
+      }) as ApiResponse<FunnelSplitRespData>;
       if (response.success && response.data) {
         const funnels = response.data.funnels || {};
         setContentStages(funnels.content?.stages || []);

@@ -28,11 +28,11 @@ const fetchOptionSets = (): Promise<AppMarketFilterOptionSets | null> => {
   if (pendingPromise) return pendingPromise;
   pendingPromise = dataServiceReports
     .getAppMarketFilterOptions()
-    .then((res: any) => {
+    .then((res) => {
       if (!res?.success || !res.data) return null;
       const sets: AppMarketFilterOptionSets = {
-        appMarkets: (res.data.app_markets || []).map((m: string) => ({ value: m, label: m })),
-        channelTypes: (res.data.channel_types || []).map((c: string) => ({ value: c, label: c })),
+        appMarkets: (res.data.app_markets || []).map((m) => ({ value: m, label: m })),
+        channelTypes: (res.data.channel_types || []).map((c) => ({ value: c, label: c })),
       };
       cachedSets = sets;
       return sets;

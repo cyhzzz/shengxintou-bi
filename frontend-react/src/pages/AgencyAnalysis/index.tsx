@@ -83,6 +83,22 @@ interface TrendSeriesItem {
   };
 }
 
+interface AgencyRawSummaryItem {
+  platform?: string;
+  business_model?: string;
+  agency?: string;
+  agency_short?: string;
+  is_subtotal?: boolean;
+  is_total?: boolean;
+  metrics?: Record<string, number>;
+}
+
+interface AgencyAnalysisRespData {
+  summary?: AgencyRawSummaryItem[];
+  trend?: { dates: string[]; series: TrendSeriesItem[] };
+  meta?: { agency_count: number; platform_count: number };
+}
+
 const AgencyAnalysisPage: React.FC = () => {
   const [summary, setSummary] = useState<FlattenedSummaryItem[]>([]);
   const [trend, setTrend] = useState<{ dates: string[]; series: TrendSeriesItem[] }>({ dates: [], series: [] });
@@ -113,9 +129,9 @@ const AgencyAnalysisPage: React.FC = () => {
     setLoading(true);
     try {
       const params = buildParams();
-      const res: any = await http.get('/agency-analysis', params);
+      const res = await http.get<AgencyAnalysisRespData>('/agency-analysis', params);
       if (res?.success && res.data) {
-        const flattened: FlattenedSummaryItem[] = (res.data.summary || []).map((item: any) => {
+        const flattened: FlattenedSummaryItem[] = (res.data.summary || []).map((item) => {
           const m = item.metrics || {};
           return {
             platform: item.platform || '',
