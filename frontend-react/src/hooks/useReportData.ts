@@ -18,7 +18,8 @@ export interface UseReportDataResult<T, TArgs> {
   data: T | null;
   loading: boolean;
   error: string | null;
-  load: (args: TArgs) => Promise<void>;
+  /** load 返回本次取到的数据；失败返回 null（页面可据此做成功提示等后续动作） */
+  load: (args: TArgs) => Promise<T | null>;
   reset: () => void;
 }
 
@@ -31,17 +32,19 @@ export function useReportData<T, TArgs = void>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (args: TArgs) => {
+  const load = useCallback(async (args: TArgs): Promise<T | null> => {
     setLoading(true);
     setError(null);
     try {
       const result = await fetcher(args);
       setData(result);
+      return result;
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : errorMessage;
       setError(msg);
       message.error(msg);
       console.error('[useReportData] fetch failed:', err);
+      return null;
     } finally {
       setLoading(false);
     }

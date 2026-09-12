@@ -24,6 +24,7 @@ import type { EChartsOption } from 'echarts';
 import '@/components/Chart/ECharts'; // 触发 echarts.use 副作用（幂等）
 import { FadeInSection } from '@/components';
 import { http } from '@/services/http'; // feat-local-auth：用 http 客户端自动带 Authorization
+import { useReportData } from '@/hooks/useReportData';
 import {
   CHANNEL_CATEGORY_MAP,
   sortChannelsByCategory,
@@ -987,16 +988,62 @@ function DetailPoster({ data }: { data: WeeklyDetailData }) {
   );
 }
 
+type WeeklyPeriodArgs = { report_year: number; report_week: number };
+
+// feat-local-auth：用 http 客户端自动带 Authorization 头，避免 401
+async function fetchWeeklyPeriods(): Promise<PeriodOption[]> {
+  const resp = await http.get<PeriodOption[]>('/reports/weekly/periods');
+  if (!resp.success || !resp.data) {
+    throw new Error(resp.message || '加载报告期失败');
+  }
+  return resp.data;
+}
+
+async function fetchWeeklyData(args: WeeklyPeriodArgs): Promise<WeeklyData> {
+  const resp = await http.post<WeeklyData>('/reports/weekly/data', {
+    report_year: args.report_year,
+    report_week: args.report_week,
+  });
+  if (!resp.success || !resp.data) {
+    throw new Error(resp.message || '生成周报失败');
+  }
+  return resp.data;
+}
+
+async function fetchWeeklyDetail(args: WeeklyPeriodArgs): Promise<WeeklyDetailData> {
+  const resp = await http.post<WeeklyDetailData>('/reports/weekly/detail', {
+    report_year: args.report_year,
+    report_week: args.report_week,
+  });
+  if (!resp.success || !resp.data) {
+    throw new Error(resp.message || '生成周报详细版失败');
+  }
+  return resp.data;
+}
+
 const ReportGeneration: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption | null>(null);
-  const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
-  const [weeklyData, setWeeklyData] = useState<WeeklyData | null>(null);
-  const [detailData, setDetailData] = useState<WeeklyDetailData | null>(null);
   const [mode, setMode] = useState<ReportMode>('overview');
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [periodsLoading, setPeriodsLoading] = useState(true);
   const [exporting, setExporting] = useState<'png' | 'pdf' | 'html' | null>(null);
+  const {
+    data: periodOptionsData,
+    error: periodsError,
+    load: loadWeekOptions,
+  } = useReportData<PeriodOption[]>(fetchWeeklyPeriods);
+  const {
+    data: weeklyData,
+    loading,
+    load: loadWeeklyData,
+  } = useReportData<WeeklyData, WeeklyPeriodArgs>(fetchWeeklyData);
+  const {
+    data: detailData,
+    loading: detailLoading,
+    load: loadDetailData,
+  } = useReportData<WeeklyDetailData, WeeklyPeriodArgs>(fetchWeeklyDetail);
+  // periodOptions 保持永不为 null 的数组语义，JSX 与选择回调引用零改动
+  const periodOptions = periodOptionsData ?? [];
+  // 期次列表加载中：挂载请求未落地（成功或失败）前保持 true，与原 setPeriodsLoading 时序一致
+  const periodsLoading = periodOptionsData === null && !periodsError;
 
   const posterRef = useRef<HTMLDivElement>(null);
   const posterDetailRef = useRef<HTMLDivElement>(null);
@@ -1005,88 +1052,34 @@ const ReportGeneration: React.FC = () => {
   const opensChartInstanceRef = useRef<EChartsType | null>(null);
   const yearlyChartInstanceRef = useRef<EChartsType | null>(null);
 
-  // 加载报告期选项
-  const loadWeekOptions = useCallback(async () => {
-    try {
-      setPeriodsLoading(true);
-      // feat-local-auth：用 http 客户端自动带 Authorization 头，避免 401
-      const resp = await http.get<PeriodOption[]>('/reports/weekly/periods');
-      if (resp.success && resp.data) {
-        setPeriodOptions(resp.data);
-        const first = resp.data.find((o) => !o.disabled);
-        if (first) {
-          setSelectedPeriod(first);
-          handleLoadData(first);
-        }
-      } else {
-        message.error(resp.message || '加载报告期失败');
-      }
-    } catch (error) {
-      console.error('加载报告期失败:', error);
-      message.error('加载报告期失败');
-    } finally {
-      setPeriodsLoading(false);
-    }
-  }, []);
-
-  // 加载周报数据
-  const handleLoadData = useCallback(async (period: PeriodOption) => {
-    if (!period) return;
-    try {
-      setLoading(true);
-      // feat-local-auth：用 http 客户端自动带 Authorization 头
-      const resp = await http.post<WeeklyData>('/reports/weekly/data', {
-        report_year: period.report_year,
-        report_week: period.report_week,
-      });
-      if (resp.success && resp.data) {
-        setWeeklyData(resp.data);
-      } else {
-        message.error(resp.error || '生成周报失败');
-      }
-    } catch (error) {
-      console.error('生成周报失败:', error);
-      message.error('生成周报失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // 挂载加载报告期选项，并自动选中第一个可用期次生成周报
   useEffect(() => {
-    loadWeekOptions();
-  }, [loadWeekOptions]);
+    (async () => {
+      const options = await loadWeekOptions(undefined);
+      if (!options) return;
+      const first = options.find((o) => !o.disabled);
+      if (first) {
+        setSelectedPeriod(first);
+        loadWeeklyData({ report_year: first.report_year, report_week: first.report_week });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 记录 detailData 对应的报告期，避免切换 Tab 时重复请求
   const detailForRef = useRef<string | null>(null);
 
-  // 加载周报详细版数据
-  const loadDetailData = useCallback(async (period: PeriodOption) => {
-    if (!period) return;
-    try {
-      setDetailLoading(true);
-      const resp = await http.post<WeeklyDetailData>('/reports/weekly/detail', {
-        report_year: period.report_year,
-        report_week: period.report_week,
-      });
-      if (resp.success && resp.data) {
-        setDetailData(resp.data);
-        detailForRef.current = period.value;
-      } else {
-        message.error(resp.error || '生成周报详细版失败');
-      }
-    } catch (error) {
-      console.error('生成周报详细版失败:', error);
-      message.error('生成周报详细版失败');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
-
-  // 切换详细版 Tab 时，若当前报告期的详细数据尚未加载则补拉
+  // 切换详细版 Tab 时，若当前报告期的详细数据尚未加载则补拉（成功后记录期次，失败保留重试机会）
   useEffect(() => {
-    if (mode === 'detail' && selectedPeriod && (!detailData || detailForRef.current !== selectedPeriod.value)) {
-      loadDetailData(selectedPeriod);
-    }
+    if (mode !== 'detail' || !selectedPeriod) return;
+    if (detailData && detailForRef.current === selectedPeriod.value) return;
+    (async () => {
+      const detail = await loadDetailData({
+        report_year: selectedPeriod.report_year,
+        report_week: selectedPeriod.report_week,
+      });
+      if (detail) detailForRef.current = selectedPeriod.value;
+    })();
   }, [mode, selectedPeriod, detailData, loadDetailData]);
 
   // 渲染开户数 · 本周内按日堆叠柱状图
@@ -1194,10 +1187,10 @@ const ReportGeneration: React.FC = () => {
       const option = periodOptions.find((opt) => opt.value === value);
       if (option) {
         setSelectedPeriod(option);
-        handleLoadData(option);
+        loadWeeklyData({ report_year: option.report_year, report_week: option.report_week });
       }
     },
-    [periodOptions, handleLoadData]
+    [periodOptions, loadWeeklyData]
   );
 
   // 动态加载 jspdf

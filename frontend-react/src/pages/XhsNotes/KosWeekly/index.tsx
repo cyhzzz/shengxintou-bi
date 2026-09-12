@@ -15,6 +15,7 @@ import { dataServiceXhsKos } from '@/services/dataService';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import { withKosRoster, type KosWeeklyData } from './kosRoster';
 import styles from './index.module.scss';
 
@@ -27,11 +28,33 @@ interface KosDefaultDateOptions {
   default_week_end?: string;
 }
 
+// 周报生成取数：接口数据 + 文本版内容一并返回（formatReportContent 在文件尾部）
+interface KosWeeklyArgs {
+  start_date: string;
+  end_date: string;
+}
+
+async function fetchKosWeekly(args: KosWeeklyArgs): Promise<{ data: KosWeeklyData; content: string }> {
+  const response = await dataServiceXhsKos.getXhsKosWeekly({
+    start_date: args.start_date,
+    end_date: args.end_date,
+  });
+  if (!response?.success || !response.data) {
+    throw new Error(response?.message || '生成周报失败');
+  }
+  const weeklyData = response.data as unknown as KosWeeklyData;
+  return { data: weeklyData, content: formatReportContent(weeklyData, args.start_date, args.end_date) };
+}
+
 const KosWeeklyPage: React.FC = () => {
   const { dateRange, setDateRange } = useFilterStore();
-  const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<KosWeeklyData | null>(null);
-  const [reportContent, setReportContent] = useState<string>('');
+  const {
+    data: weeklyResult,
+    loading,
+    load: loadKosWeekly,
+  } = useReportData(fetchKosWeekly);
+  const reportData = weeklyResult?.data ?? null;
+  const reportContent = weeklyResult?.content || '';
   // 默认以海报为主视图，文本为备选（对齐员工转化周报）
   const [viewMode, setViewMode] = useState<'poster' | 'text'>('poster');
   // 默认周范围加载完成后再自动生成，避免用全局持久化日期先发一次无效请求
@@ -44,29 +67,9 @@ const KosWeeklyPage: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await dataServiceXhsKos.getXhsKosWeekly({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-      });
-
-      if (response.success && response.data) {
-        const weeklyData = response.data as unknown as KosWeeklyData;
-        setReportData(weeklyData);
-        const content = formatReportContent(weeklyData, dateRange.startDate, dateRange.endDate);
-        setReportContent(content);
-        message.success('周报生成成功');
-      } else {
-        message.error(response.message || '生成周报失败');
-      }
-    } catch (error) {
-      console.error('生成周报失败:', error);
-      message.error('生成周报失败，请重试');
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange.startDate, dateRange.endDate]);
+    const result = await loadKosWeekly({ start_date: dateRange.startDate, end_date: dateRange.endDate });
+    if (result) message.success('周报生成成功');
+  }, [dateRange.startDate, dateRange.endDate, loadKosWeekly]);
 
   // 挂载：默认日期取数据库最新有数据的一周（对齐员工转化周报 Bug 5 修复）
   useEffect(() => {

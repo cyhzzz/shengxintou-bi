@@ -10,6 +10,7 @@ import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import { withFixedAssistants, type WeeklyReportData } from './weeklyRanking';
 import styles from './index.module.scss';
 
@@ -27,15 +28,41 @@ interface WeeklyDefaultDateOptions {
   default_week_end?: string;
 }
 
+// 周报生成取数：接口数据 + 文本版内容一并返回（formatReportContent 在文件尾部）
+interface EmployeeWeeklyArgs {
+  start_date: string;
+  end_date: string;
+  platforms: string[];
+}
+
+async function fetchEmployeeWeekly(
+  args: EmployeeWeeklyArgs
+): Promise<{ data: WeeklyReportData; content: string }> {
+  const response = await postEmployeeConversionWeekly({
+    start_date: args.start_date,
+    end_date: args.end_date,
+    platforms: args.platforms,
+  });
+  if (!response?.success || !response.data) {
+    throw new Error(response?.message || '生成周报失败');
+  }
+  const weeklyData = response.data as unknown as WeeklyReportData;
+  return { data: weeklyData, content: formatReportContent(weeklyData, args.start_date, args.end_date) };
+}
+
 const EmployeeConversionWeeklyPage: React.FC = () => {
   // 日期接入全局筛选 store（persist 持久化）；平台为周报固定三平台域，保持本页本地筛选
   const { dateRange, setDateRange } = useFilterStore();
   const [platforms, setPlatforms] = useState<string[]>(['小红书', '腾讯', '抖音']);
   // 动态默认周拉取完成后才允许自动生成，避免用出厂默认年度范围空跑一次
   const [dateReady, setDateReady] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<WeeklyReportData | null>(null);
-  const [reportContent, setReportContent] = useState<string>('');
+  const {
+    data: weeklyResult,
+    loading,
+    load: loadWeeklyReport,
+  } = useReportData(fetchEmployeeWeekly);
+  const reportData = weeklyResult?.data ?? null;
+  const reportContent = weeklyResult?.content || '';
   // v3.1.25: 默认以海报为主视图，文本为备选
   const [viewMode, setViewMode] = useState<'poster' | 'text'>('poster');
   const [posterPlatform, setPosterPlatform] = useState<string>('小红书');
@@ -56,30 +83,9 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await postEmployeeConversionWeekly({
-        start_date: startDate,
-        end_date: endDate,
-        platforms,
-      });
-
-      if (response.success && response.data) {
-        const weeklyData = response.data as unknown as WeeklyReportData;
-        setReportData(weeklyData);
-        const content = formatReportContent(weeklyData, startDate, endDate);
-        setReportContent(content);
-        message.success('周报生成成功');
-      } else {
-        message.error(response.message || '生成周报失败');
-      }
-    } catch (error) {
-      console.error('生成周报失败:', error);
-      message.error('生成周报失败，请重试');
-    } finally {
-      setLoading(false);
-    }
-  }, [platforms]);
+    const result = await loadWeeklyReport({ start_date: startDate, end_date: endDate, platforms });
+    if (result) message.success('周报生成成功');
+  }, [platforms, loadWeeklyReport]);
 
   // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
   // 仅当全局日期仍为出厂默认（用户未自定义）时才覆盖，避免污染用户已选的全局日期
