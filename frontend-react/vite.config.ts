@@ -101,8 +101,12 @@ export default defineConfig(({ mode }) => ({
       'echarts', 'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers',
       'framer-motion',
       'zustand', 'dayjs',
+      // v4.3.3：sql.js 纳入预构建。1.14.x 全系只有 CJS 产物（module.exports），
+      // exclude 会让 dev 模式原样直供 CJS，浏览器 ESM 加载器报
+      // "does not provide an export named 'default'"，应用启动即崩。
+      // 预构建由 esbuild 完成 CJS→ESM 互操作，不影响 WASM：
+      // sql-wasm.wasm 是 public/ 静态资产，运行时经 locateFile 绝对路径加载。
+      'sql.js',
     ],
-    // v3.6.2：sql.js 含 WASM，必须 exclude 避免 Vite 预构建破坏
-    exclude: ['sql.js'],
   },
 }))

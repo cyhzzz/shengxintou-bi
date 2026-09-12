@@ -38,11 +38,11 @@ test.describe('数据导入页面功能测试', () => {
   });
 
   test('页面加载 - 数据类型选择器', async ({ page }) => {
-    // v3.2.x 数据导入页使用卡片网格选择器，不再是 ant-select
-    const typeGrid = page.locator('[class*="typeGrid"]').first();
-    await expect(typeGrid).toBeVisible({ timeout: 10000 });
-    const typeCards = page.locator('[class*="typeCard"]');
-    expect(await typeCards.count()).toBeGreaterThan(0);
+    // v4.0.0 数据导入页使用业务域分组菜单选择器（menu > group > groupItems > item）
+    // 限定左侧面板：页面上方数据新鲜度卡片也有同名 groupItems/item 类
+    const typeItems = page.locator('[class*="leftPanel"] [class*="groupItems"] > div');
+    await expect(typeItems.first()).toBeVisible({ timeout: 10000 });
+    expect(await typeItems.count()).toBeGreaterThan(0);
   });
 
   test('页面加载 - 文件上传区域', async ({ page }) => {
@@ -59,31 +59,48 @@ test.describe('数据导入页面功能测试', () => {
   });
 
   test('功能 - 数据类型卡片切换', async ({ page }) => {
-    // v3.2.x 数据类型改为卡片网格，点击第二个卡片可切换选中态
-    const typeCards = page.locator('[class*="typeCard"]');
-    const firstCard = typeCards.first();
-    const secondCard = typeCards.nth(1);
-    await expect(firstCard).toBeVisible();
-    await expect(secondCard).toBeVisible();
+    // v4.0.0 数据类型为分组菜单项，点击另一项可切换选中态
+    // 限定左侧面板（上方数据新鲜度卡片也有同名 item 类）；CSS Modules 类名带哈希，
+    // 采用自校准：先抓当前选中项的 active 类名 token，点击另一项后验证选中态转移
+    const typeItems = page.locator('[class*="leftPanel"] [class*="groupItems"] > div:not([class*="Disabled"])');
+    await expect(typeItems.first()).toBeVisible({ timeout: 10000 });
 
-    // 先点击第二个卡片
-    await secondCard.click();
+    const count = await typeItems.count();
+    console.log('数据类型可切换项数量:', count);
+    expect(count).toBeGreaterThan(1);
+
+    // 自校准：找出当前选中项（类名含 active token）
+    let activeIndex = -1;
+    let activeToken = '';
+    for (let i = 0; i < count; i++) {
+      const cls = await typeItems.nth(i).evaluate((el) => el.className);
+      const token = cls.split(/\s+/).find((c) => /active/i.test(c));
+      if (token) {
+        activeIndex = i;
+        activeToken = token;
+      }
+    }
+    expect(activeToken).toBeTruthy();
+
+    // 点击非当前选中项，验证选中态转移
+    const targetIndex = activeIndex === 0 ? 1 : 0;
+    const target = typeItems.nth(targetIndex);
+    await target.click();
     await page.waitForTimeout(300);
-    const isSecondActive = await secondCard.evaluate((el) =>
-      el.className.includes('active')
-    );
-    expect(isSecondActive).toBeTruthy();
-    console.log('数据类型可切换卡片数量:', await typeCards.count());
+
+    const targetCls = await target.evaluate((el) => el.className);
+    console.log(`点击第${targetIndex + 1}项后类名:`, targetCls);
+    expect(targetCls.split(/\s+/)).toContain(activeToken);
   });
 
   test('功能 - 数据类型选项验证', async ({ page }) => {
-    // 卡片网格中的标题即为选项
-    const typeCards = page.locator('[class*="typeCard"]');
-    const titles = page.locator('[class*="typeCard"] [class*="cardTitle"]');
+    // 分组菜单项的标签即为选项（限定左侧面板，避开新鲜度卡片同名类）
+    const typeItems = page.locator('[class*="leftPanel"] [class*="groupItems"] > div');
+    const titles = page.locator('[class*="leftPanel"] [class*="groupItems"] [class*="itemLabel"]');
     const optionTexts = await titles.allTextContents();
     console.log('数据类型选项:', optionTexts);
 
-    expect(await typeCards.count()).toBeGreaterThan(0);
+    expect(await typeItems.count()).toBeGreaterThan(0);
     expect(optionTexts.length).toBeGreaterThan(0);
   });
 
