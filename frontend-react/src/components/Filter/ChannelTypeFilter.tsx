@@ -5,7 +5,7 @@
 import React from 'react';
 import { Select } from 'antd';
 import { useFilterStore } from '@/stores';
-import { useAppMarketFilterOptionSets } from './AppMarketFilter';
+import { useAppMarketFilterOptionSets } from './useAppMarketFilterOptionSets';
 
 const { Option } = Select;
 
