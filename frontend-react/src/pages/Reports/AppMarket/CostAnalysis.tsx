@@ -3,7 +3,7 @@
  * 数据源: agg_vendor_daily
  * 4 部分: 总览指标卡 → 分市场表格 → 月度柱状图 → 周度柱状图
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, Spin, Table, Tag } from 'antd';
 import { MoneyCollectOutlined, TeamOutlined, AimOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -13,6 +13,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -25,28 +26,26 @@ const PLATFORM_COLORS: Record<string, string> = {
   '鸿蒙': '#E0B0A0', // 莫兰迪粉杏
 };
 
+interface CostQuery {
+  startDate: string;
+  endDate: string;
+}
+
+const fetchCostAnalysis = async (query: CostQuery): Promise<any> => {
+  const res = await dataServiceReports.getAppMarketCostAnalysis({
+    start_date: query.startDate,
+    end_date: query.endDate,
+  });
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载消耗成本失败');
+  return res.data;
+};
+
 const CostAnalysisPage: React.FC = () => {
   const { dateRange } = useFilterStore();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await dataServiceReports.getAppMarketCostAnalysis({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-      });
-      if (res?.success) setData(res.data);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, loading, load } = useReportData(fetchCostAnalysis, { errorMessage: '加载消耗成本失败' });
 
   useEffect(() => {
-    loadData();
+    load({ startDate: dateRange.startDate, endDate: dateRange.endDate });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.startDate, dateRange.endDate]);
 
@@ -238,8 +237,8 @@ const CostAnalysisPage: React.FC = () => {
         <FilterBar
           showPlatform={false}
           showAgency={false}
-          onSearch={() => loadData()}
-          onReset={() => loadData()}
+          onSearch={() => load({ startDate: dateRange.startDate, endDate: dateRange.endDate })}
+          onReset={() => load({ startDate: dateRange.startDate, endDate: dateRange.endDate })}
         />
       </FadeInSection>
 

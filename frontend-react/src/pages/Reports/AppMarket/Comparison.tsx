@@ -4,20 +4,32 @@
  * 维度: 应用市场 × 月份 × 渠道类型
  * 图表: 应用市场雷达对比 + 月度堆叠
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, Row, Col, Spin, Table, Tag } from 'antd';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection, FilterBar } from '@/components';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
+interface ComparisonFilters {
+  start_date: string;
+  end_date: string;
+  channel_types?: string[];
+}
+
+const fetchAppMarketSummary = async (filters: ComparisonFilters) => {
+  const res: any = await dataServiceReports.getAppMarketSummary(filters);
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载应用市场对比失败');
+  return res.data;
+};
+
 const AppMarketComparisonPage: React.FC = () => {
   const { dateRange, selectedChannelTypes } = useFilterStore();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, load } = useReportData(fetchAppMarketSummary, { errorMessage: '加载应用市场对比失败' });
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -25,17 +37,7 @@ const AppMarketComparisonPage: React.FC = () => {
     channel_types: selectedChannelTypes.length ? selectedChannelTypes : undefined,
   }), [dateRange, selectedChannelTypes]);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await dataServiceReports.getAppMarketSummary(filters);
-      if (res?.success) setData(res.data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { load(filters); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   // 雷达图：每个应用市场一个指标维度
   const radarOption: EChartsOption = useMemo(() => {
@@ -107,7 +109,7 @@ const AppMarketComparisonPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform={false} showAgency={false} showChannelType onSearch={() => load()} />
+        <FilterBar showPlatform={false} showAgency={false} showChannelType onSearch={() => load(filters)} />
       </FadeInSection>
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>

@@ -10,17 +10,36 @@ import { EyeOutlined } from "@ant-design/icons";
 import { dataServiceReports } from "@/services/dataService";
 import { FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import styles from "./index.module.scss";
 
 const renderBool = (v: any): React.ReactNode =>
   v ? <Tag color="blue">是</Tag> : <Tag>否</Tag>;
 
+interface DetailQuery {
+  filters: Record<string, any>;
+  page: number;
+  page_size: number;
+}
+
+interface DetailData {
+  rows: any[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+const fetchAppMarketDetail = async (query: DetailQuery): Promise<DetailData> => {
+  const res: any = await dataServiceReports.getAppMarketDetail(query);
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载设备明细失败');
+  return { rows: res.data.detail, total: res.data.total, page: res.data.page, page_size: res.data.page_size };
+};
+
 const AppMarketDetailPage: React.FC = () => {
   const { dateRange, selectedAppMarkets, selectedChannelTypes } = useFilterStore();
-  const [detail, setDetail] = useState<{ rows: any[]; total: number; page: number; page_size: number }>({ rows: [], total: 0, page: 1, page_size: 50 });
-  const [loading, setLoading] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any>(null);
+  const { data: detailData, loading, load } = useReportData(fetchAppMarketDetail, { errorMessage: '加载设备明细失败' });
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -29,24 +48,14 @@ const AppMarketDetailPage: React.FC = () => {
     channel_types: selectedChannelTypes.length ? selectedChannelTypes : undefined,
   }), [dateRange, selectedAppMarkets, selectedChannelTypes]);
 
-  const load = async (page = 1, page_size = 50) => {
-    setLoading(true);
-    try {
-      const res: any = await dataServiceReports.getAppMarketDetail({ filters, page, page_size });
-      if (res?.success) {
-        setDetail({ rows: res.data.detail, total: res.data.total, page: res.data.page, page_size: res.data.page_size });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const detail = detailData ?? { rows: [] as any[], total: 0, page: 1, page_size: 50 };
 
-  useEffect(() => { load(1, detail.page_size); }, [filters]);
+  useEffect(() => { load({ filters, page: 1, page_size: detail.page_size }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform={false} showAgency={false} showAppMarket showChannelType onSearch={() => load(1, detail.page_size)} />
+        <FilterBar showPlatform={false} showAgency={false} showAppMarket showChannelType onSearch={() => load({ filters, page: 1, page_size: detail.page_size })} />
       </FadeInSection>
 
       <FadeInSection delay={0.4} duration={0.8}>
@@ -63,7 +72,7 @@ const AppMarketDetailPage: React.FC = () => {
                 showSizeChanger: true,
                 showTotal: (t) => "共 " + t.toLocaleString() + " 条",
                 pageSizeOptions: ["20", "50", "100", "200"],
-                onChange: (p, ps) => load(p, ps),
+                onChange: (p, ps) => load({ filters, page: p, page_size: ps }),
               }}
               columns={[
                 { title: "下载日期", dataIndex: "下载日期", key: "下载日期", width: 110 },

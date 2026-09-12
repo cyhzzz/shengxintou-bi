@@ -3,7 +3,7 @@
  * 数据源: fact_conv_appmarket
  * 漏斗: 下载 → 激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, Row, Col, Spin, Tag } from 'antd';
 import { CheckCircleOutlined, MobileOutlined, RiseOutlined, TeamOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components/Chart';
@@ -13,12 +13,24 @@ import { FadeInSection, FilterBar } from '@/components';
 
 import { dataServiceReports } from '@/services/dataService';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
+
+interface AppMarketFilters {
+  start_date: string;
+  end_date: string;
+  app_markets?: string[];
+}
+
+const fetchAppMarketSummary = async (filters: AppMarketFilters) => {
+  const res: any = await dataServiceReports.getAppMarketSummary(filters);
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载应用市场漏斗失败');
+  return res.data;
+};
 
 const AppMarketFunnelPage: React.FC = () => {
   const { dateRange, selectedAppMarkets } = useFilterStore();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, load } = useReportData(fetchAppMarketSummary, { errorMessage: '加载应用市场漏斗失败' });
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -26,19 +38,7 @@ const AppMarketFunnelPage: React.FC = () => {
     app_markets: selectedAppMarkets.length ? selectedAppMarkets : undefined,
   }), [dateRange, selectedAppMarkets]);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await dataServiceReports.getAppMarketSummary(filters);
-      if (res?.success) setData(res.data);
-    } catch (e) {
-      console.error('[AppMarket/Funnel] load() exception:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { load(filters); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   const total = data?.total_counts || {};
   const funnel = data?.total_funnel || [];
@@ -50,7 +50,7 @@ const AppMarketFunnelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform={false} showAgency={false} showAppMarket onSearch={() => load()} />
+        <FilterBar showPlatform={false} showAgency={false} showAppMarket onSearch={() => load(filters)} />
       </FadeInSection>
       <Spin spinning={loading}>
         {/* v3.1.25: 4 卡片概览，核心业务产出导向 */}
