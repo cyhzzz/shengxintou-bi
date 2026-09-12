@@ -185,7 +185,7 @@
 
 - 数据库 `dim_anchor_live_type` 是查询缓存，不是人工维护源。
 
-- 启动时 `_sync_anchor_live_types_from_json` 执行：JSON 新增则插入、已有则更新、JSON 删除则软删除为 `is_active=0`。
+- 启动时 `backend/database_bootstrap.py` 的 `_sync_anchor_live_types_from_json` 执行：JSON 新增则插入、已有则更新、JSON 删除则软删除为 `is_active=0`。
 
 - 没有管理页面；不要直接改库维护映射。
 

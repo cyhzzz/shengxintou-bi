@@ -61,7 +61,8 @@
 ### 后端
 
 ```text
-app.py                         Flask、蓝图、SPA、中间件、主播映射同步
+app.py                         Flask、蓝图、SPA、中间件装配
+backend/database_bootstrap.py  数据库引导与迁移（从 app.py 搬出）
 config.py                      环境变量与路径（DATABASE_URL 归一化 + AUTH_ENABLED 开关）
 server_entry.py                PyInstaller 打包入口（仅桌面版构建用，开发版不引用）
 backend/models.py              系统表

@@ -41,7 +41,8 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| `app.py` | Flask 应用、蓝图注册、SQLite 参数、SPA 兜底、主播映射同步、中间件 |
+| `app.py` | Flask 应用、蓝图注册、SPA 兜底、中间件 |
+| `backend/database_bootstrap.py` | 建库建表、复合索引、SQLite 参数优化、主播映射同步、青鸟迁移、PG 序列重置 |
 | `config.py` | 环境变量、路径、上传、WebDAV 和预留飞书配置 |
 | `backend/models.py` | 数据导入日志和系统配置两张系统表 |
 | `backend/models_v2.py` | 当前业务 ORM：账号、主播映射、两张转化明细、三张聚合表、青鸟对账表 |
@@ -63,7 +64,7 @@
 - 默认路径为 `database/shengxintou.db`，可通过 `DATABASE_PATH` 覆盖。
 - 启动时注册 `models_v2` 并执行 `db.create_all()`。
 - SQLite 使用 `journal_mode=DELETE`，不要改回 WAL；便携版曾因 WAL 外部文件产生损坏风险。
-- 启动优化包括较大 cache、`synchronous=NORMAL`、`temp_store=MEMORY` 和 busy timeout；修改前读取 `app.configure_sqlite_optimization()` 当前实现。
+- 启动优化包括较大 cache、`synchronous=NORMAL`、`temp_store=MEMORY` 和 busy timeout；修改前读取 `backend/database_bootstrap.py` 的 `configure_sqlite_optimization()` 当前实现。
 - `backend/models_v2.py` 的中文列名与源表 / `to_sql` 结果对齐，不能为前端字段命名重写。
 
 ## 前端模块
@@ -107,7 +108,8 @@
 
 | 文件 | 影响范围 | 变更时额外验证 |
 | --- | --- | --- |
-| `app.py` | Flask 启动、蓝图注册、中间件、主播映射同步 | API smoke + 深链接/静态资源验证 |
+| `app.py` | Flask 启动、蓝图注册、中间件 | API smoke + 深链接/静态资源验证 |
+| `backend/database_bootstrap.py` | 建库建表、复合索引、主播映射同步、历史迁移 | API smoke（覆盖启动路径） |
 | `config.py` | 环境变量、路径、鉴权开关 | 确认 `.env.example` 默认值一致；四端启动不受影响 |
 | `backend/models_v2.py` | 业务 ORM 中文列名、表结构 | 确认上游文件列名一致；`to_sql` 落库结果核对 |
 | `backend/models.py` | 系统表 | 确认 `db.create_all()` 注册路径 |
