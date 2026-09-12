@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Table, Select, Button, Space, message, Spin, Radio, Typography, Tag, Empty, Tabs,
+  Card, Table, Select, Button, Space, Spin, Radio, Typography, Tag, Empty, Tabs,
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, DollarOutlined, RiseOutlined,
@@ -23,6 +23,7 @@ import type { EChartsOption } from 'echarts';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { DateRangePicker } from '@/components/Filter';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './Analysis.module.scss';
 
@@ -41,6 +42,59 @@ interface ApiShape {
   channel_overview?: any;
 }
 
+interface EmployeeConversionArgs {
+  dateRange: [string, string];
+  granularity: 'weekly' | 'monthly';
+  selectedPlatforms: string[];
+  selectedEmployees: string[];
+  defaultPlatforms: string[];
+}
+
+async function fetchEmployeeConversionAnalysis(args: EmployeeConversionArgs): Promise<ApiShape> {
+  const params: Record<string, unknown> = {
+    lead_type: 'all',
+    granularity: args.granularity,
+  };
+  if (args.dateRange[0] && args.dateRange[1]) {
+    params.start_date = args.dateRange[0];
+    params.end_date = args.dateRange[1];
+  }
+  if (args.selectedPlatforms.length > 0) params.platforms = args.selectedPlatforms;
+  if (args.selectedEmployees.length > 0) params.employees = args.selectedEmployees;
+  // v3.1.27: 即使前端未选也透传 defaultPlatforms，让后端始终走内容平台默认
+  if (args.defaultPlatforms.length && !args.selectedPlatforms.length) params.platforms = args.defaultPlatforms;
+
+  let res: any;
+  try {
+    res = await http.post('/employee-conversion/analysis', params);
+  } catch (err) {
+    console.error('analysis fetch failed', err);
+    throw new Error('加载数据异常');
+  }
+  if (res?.success && res.data) return res.data;
+  throw new Error(res?.message || '加载数据失败');
+}
+
+// 渠道参考副接口：静默失败（只 console，不弹全局错误），失败返回 null 不展示
+async function fetchChannelOverviewData(args: EmployeeConversionArgs): Promise<any | null> {
+  try {
+    const params: Record<string, unknown> = { lead_type: 'all' };
+    if (args.dateRange[0] && args.dateRange[1]) {
+      params.start_date = args.dateRange[0];
+      params.end_date = args.dateRange[1];
+    }
+    if (args.selectedEmployees.length > 0) params.employees = args.selectedEmployees;
+    // v3.1 §四：与 /analysis 端点对齐，前端 selectedPlatforms 也传给 channel-overview
+    if (args.selectedPlatforms.length > 0) params.platforms = args.selectedPlatforms;
+    if (args.defaultPlatforms.length && !args.selectedPlatforms.length) params.platforms = args.defaultPlatforms;
+    const res: any = await http.post('/employee-conversion/analysis-channel-overview', params);
+    return res?.success ? (res.data ?? null) : null;
+  } catch (err) {
+    console.warn('channel overview fetch failed', err);
+    return null;
+  }
+}
+
 const EmployeeConversionAnalysisPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -52,9 +106,14 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
   const [employeeOptions, setEmployeeOptions] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
-  const [data, setData] = useState<ApiShape | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [channelOverview, setChannelOverview] = useState<any>(null);
+  const { data, loading, load: loadAnalysisData } = useReportData<ApiShape, EmployeeConversionArgs>(
+    fetchEmployeeConversionAnalysis,
+    { errorMessage: '加载数据异常' }
+  );
+  const { data: channelOverview, load: loadChannelOverviewData } = useReportData<any, EmployeeConversionArgs>(
+    fetchChannelOverviewData,
+    { errorMessage: '加载渠道概览失败' }
+  );
 
   const loadFilterOptions = useCallback(async () => {
     setOptionsLoading(true);
@@ -80,53 +139,25 @@ const EmployeeConversionAnalysisPage: React.FC = () => {
     loadFilterOptions();
   }, [loadFilterOptions]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, unknown> = {
-        lead_type: 'all',
-        granularity: rateTrendGranularity,
-      };
-      if (dateRange[0] && dateRange[1]) {
-        params.start_date = dateRange[0];
-        params.end_date = dateRange[1];
-      }
-      if (selectedPlatforms.length > 0) params.platforms = selectedPlatforms;
-      if (selectedEmployees.length > 0) params.employees = selectedEmployees;
-      // v3.1.27: 即使前端未选也透传 defaultPlatforms，让后端始终走内容平台默认
-      if (defaultPlatforms.length && !selectedPlatforms.length) params.platforms = defaultPlatforms;
+  const fetchData = useCallback(() => {
+    loadAnalysisData({
+      dateRange,
+      granularity: rateTrendGranularity,
+      selectedPlatforms,
+      selectedEmployees,
+      defaultPlatforms,
+    });
+  }, [dateRange, rateTrendGranularity, selectedPlatforms, selectedEmployees, defaultPlatforms, loadAnalysisData]);
 
-      const res: any = await http.post('/employee-conversion/analysis', params);
-      if (res?.success && res.data) {
-        setData(res.data);
-      } else {
-        message.error(res?.message || '加载数据失败');
-      }
-    } catch (err) {
-      console.error('analysis fetch failed', err);
-      message.error('加载数据异常');
-    } finally {
-      setLoading(false);
-    }
-  }, [dateRange, selectedPlatforms, selectedEmployees, rateTrendGranularity, defaultPlatforms]);
-
-  const fetchChannelOverview = useCallback(async () => {
-    try {
-      const params: Record<string, unknown> = { lead_type: 'all' };
-      if (dateRange[0] && dateRange[1]) {
-        params.start_date = dateRange[0];
-        params.end_date = dateRange[1];
-      }
-      if (selectedEmployees.length > 0) params.employees = selectedEmployees;
-      // v3.1 §四：与 /analysis 端点对齐，前端 selectedPlatforms 也传给 channel-overview
-      if (selectedPlatforms.length > 0) params.platforms = selectedPlatforms;
-      if (defaultPlatforms.length && !selectedPlatforms.length) params.platforms = defaultPlatforms;
-      const res: any = await http.post('/employee-conversion/analysis-channel-overview', params);
-      if (res?.success) setChannelOverview(res.data);
-    } catch (err) {
-      console.warn('channel overview fetch failed', err);
-    }
-  }, [dateRange, selectedEmployees, selectedPlatforms, defaultPlatforms]);
+  const fetchChannelOverview = useCallback(() => {
+    loadChannelOverviewData({
+      dateRange,
+      granularity: rateTrendGranularity,
+      selectedPlatforms,
+      selectedEmployees,
+      defaultPlatforms,
+    });
+  }, [dateRange, rateTrendGranularity, selectedPlatforms, selectedEmployees, defaultPlatforms, loadChannelOverviewData]);
 
   // 初始加载 + 任何筛选项变化都重取
   useEffect(() => {

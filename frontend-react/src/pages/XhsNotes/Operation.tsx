@@ -32,6 +32,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection } from '@/components';
 import { DateRangePicker } from '@/components/Filter';
 import { postXhsOperationAnalysis } from '@/types/api';
+import { useReportData } from '@/hooks/useReportData';
 import { metadataService } from '@/services/metadataService';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import type {
@@ -69,6 +70,35 @@ const CardTitle: React.FC<{ icon?: string; children: React.ReactNode; plain?: bo
     </div>
   );
 };
+
+type XhsOperationFilters = {
+  date_range?: [string, string];
+  top_notes_date_range?: [string, string];
+};
+
+async function fetchXhsOperation(filters: XhsOperationFilters): Promise<XhsOperationAnalysisData> {
+  let response;
+  try {
+    response = await postXhsOperationAnalysis({ filters });
+  } catch (error) {
+    console.error('获取小红书运营分析数据失败:', error);
+    throw new Error('获取数据失败，请重试');
+  }
+  if (!response.success || !response.data) {
+    throw new Error(response.message || '获取数据失败');
+  }
+  return response.data as unknown as XhsOperationAnalysisData;
+}
+
+// 独立排行榜查询：静默失败（只 console，不弹全局错误），失败返回 null 保持旧数据展示
+async function fetchXhsOperationTopNotes(notesDateRange: [string, string]): Promise<XhsOperationAnalysisData | null> {
+  try {
+    return await fetchXhsOperation({ top_notes_date_range: notesDateRange });
+  } catch (error) {
+    console.error('获取笔记排行榜数据失败:', error);
+    return null;
+  }
+}
 
 const XhsNotesOperationPage: React.FC = () => {
   // 页面内容ref - 用于导出
@@ -200,13 +230,23 @@ const XhsNotesOperationPage: React.FC = () => {
   // 笔记排行榜日期范围
   const [topNotesDateRange, setTopNotesDateRange] = useState<[string, string] | null>(null);
 
-  // 数据状态
-  const [data, setData] = useState<XhsOperationAnalysisData | null>(null);
-  const [loading, setLoading] = useState(false);
+  // 数据状态：主查询 + 独立排行榜查询（各自 loading / 错误处理）
+  const { data: mainData, loading, load: loadMainData, reset: resetMainData } = useReportData<XhsOperationAnalysisData, XhsOperationFilters>(
+    fetchXhsOperation,
+    { errorMessage: '获取数据失败，请重试' }
+  );
+  const { data: topNotesData, loading: topNotesLoading, load: loadTopNotesData, reset: resetTopNotesData } = useReportData<XhsOperationAnalysisData | null, [string, string]>(
+    fetchXhsOperationTopNotes,
+    { errorMessage: '获取数据失败，请重试' }
+  );
   const [metadataLoaded, setMetadataLoaded] = useState(false);
 
-  // 独立模块加载状态 - 用于优秀笔记排行榜
-  const [topNotesLoading, setTopNotesLoading] = useState(false);
+  // 合并派生：主数据为底，排行榜数据就近覆盖 top_notes（保持原函数式合并的展示行为）
+  const data = useMemo<XhsOperationAnalysisData | null>(() => {
+    if (!mainData) return topNotesData;
+    if (!topNotesData) return mainData;
+    return { ...mainData, top_notes: topNotesData.top_notes };
+  }, [mainData, topNotesData]);
 
   // v3.2.3：视图模式 - Web 桌面布局 / H5 手机布局（480px poster）
   // H5 模式参考报告生成页 poster 容器，所有双列改单列，导出截图即手机友好长图
@@ -246,64 +286,34 @@ const XhsNotesOperationPage: React.FC = () => {
   }, []);
 
   // 加载数据
-  const fetchData = useCallback(async () => {
+  // 依赖刻意与原实现一致：topNotesDateRange 变化由排行榜独立查询自行拉取，不触发主查询重建
+  const fetchData = useCallback(() => {
     if (!dateRange || !dateRange[0] || !dateRange[1]) {
       message.warning('请选择主日期范围');
       return;
     }
 
-    setLoading(true);
-    try {
-      const filters: Record<string, unknown> = {
-        date_range: dateRange,
-      };
+    const filters: XhsOperationFilters = {
+      date_range: dateRange,
+    };
 
-      // 添加可选日期范围
-      if (topNotesDateRange?.[0] && topNotesDateRange?.[1]) {
-        filters.top_notes_date_range = topNotesDateRange as [string, string];
-      }
-
-      const response = await postXhsOperationAnalysis({ filters });
-
-      // 后端返回格式: { success: true, data: { core_metrics, creator_content_data, ... } }
-      // response.data 已经是 XhsOperationAnalysisData 类型
-      if (response.success && response.data) {
-        // response.data 运行时已是 XhsOperationAnalysisData，类型签名存在双重包装，需断言
-        setData(response.data as unknown as XhsOperationAnalysisData);
-      } else {
-        message.error(response.message || '获取数据失败');
-      }
-    } catch (error) {
-      console.error('获取小红书运营分析数据失败:', error);
-      message.error('获取数据失败，请重试');
-    } finally {
-      setLoading(false);
+    // 添加可选日期范围
+    if (topNotesDateRange?.[0] && topNotesDateRange?.[1]) {
+      filters.top_notes_date_range = topNotesDateRange as [string, string];
     }
-  }, [dateRange]);
+
+    loadMainData(filters);
+  }, [dateRange, loadMainData]);
 
   // 处理查询
   const handleSearch = () => {
     fetchData();
   };
 
-  // 独立获取笔记排行榜数据
+  // 独立获取笔记排行榜数据（静默失败：fetcher 内 catch 返回 null，不触发全局错误弹窗，与原实现一致）
   const fetchTopNotesData = useCallback(async (notesDateRange: [string, string]) => {
-    setTopNotesLoading(true);
-    try {
-      const filters: Record<string, unknown> = {
-        top_notes_date_range: notesDateRange,
-      };
-      const response = await postXhsOperationAnalysis({ filters });
-      if (response.success && response.data) {
-        const innerData = response.data as unknown as XhsOperationAnalysisData;
-        setData(prev => prev ? { ...prev, top_notes: innerData.top_notes } : innerData);
-      }
-    } catch (error) {
-      console.error('获取笔记排行榜数据失败:', error);
-    } finally {
-      setTopNotesLoading(false);
-    }
-  }, []);
+    await loadTopNotesData(notesDateRange);
+  }, [loadTopNotesData]);
 
   // 组件加载时自动获取数据（等待元数据加载完成）
   useEffect(() => {
@@ -407,7 +417,8 @@ const XhsNotesOperationPage: React.FC = () => {
     );
     setDateRange(defaultRange);
     setTopNotesDateRange(defaultRange);
-    setData(null);
+    resetMainData();
+    resetTopNotesData();
   };
 
   // 格式化数字（添加千分位）

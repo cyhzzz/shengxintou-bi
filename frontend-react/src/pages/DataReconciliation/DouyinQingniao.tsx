@@ -35,6 +35,7 @@ import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
+import { useReportData } from '@/hooks/useReportData';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -120,14 +121,44 @@ const STATUS_FILTER_OPTIONS = [
   { label: '已删除', value: '已删除' },
 ];
 
+interface MatchArgs {
+  startDate: string;
+  endDate: string;
+  toleranceDays: number;
+  batchTag?: string;
+}
+
+// 对账主请求（供 useReportData 使用）；端点返回空时抛错统一提示，失败保留旧数据由 hook 保证
+async function fetchDouyinQingniaoMatch(
+  args: MatchArgs,
+): Promise<{ records: ReconcileRecord[]; summary: ReconcileSummary }> {
+  const params: any = {
+    start_date: args.startDate,
+    end_date: args.endDate,
+    date_tolerance_days: args.toleranceDays,
+  };
+  if (args.batchTag) {
+    params.batch_tag = args.batchTag;
+  }
+  const res: any = await dataService.getDouyinQingniaoMatch(params);
+  const d = res?.data || res;
+  if (d?.records && d?.summary) {
+    return { records: d.records, summary: d.summary };
+  }
+  throw new Error('对账端点返回数据为空');
+}
+
 const DouyinQingniaoReconciliationPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [toleranceDays, setToleranceDays] = useState<number>(7);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const [records, setRecords] = useState<ReconcileRecord[]>([]);
-  const [summary, setSummary] = useState<ReconcileSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { data: matchData, loading, load: runMatch, reset: resetMatch } = useReportData<{ records: ReconcileRecord[]; summary: ReconcileSummary }, MatchArgs>(
+    fetchDouyinQingniaoMatch,
+    { errorMessage: '对账请求失败' }
+  );
+  const records = useMemo(() => matchData?.records ?? [], [matchData]);
+  const summary = matchData?.summary ?? null;
   const [uploading, setUploading] = useState(false);
   const [dateRangeInfo, setDateRangeInfo] = useState<DateRangeResp | null>(null);
 
@@ -272,37 +303,18 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
 
   // 共用的对账请求逻辑（手动传入日期范围，避免 state 更新延迟问题）
   // v3.3.6：支持 batch_tag 过滤，不传时查全表
+  // 失败时 hook 保留旧数据（不置空），与原「提示为空后保留旧 records」行为一致
   const runMatchWithRange = async (
     range: [Dayjs, Dayjs],
     tolerance: number,
     batchTag?: string,
   ) => {
-    setLoading(true);
-    try {
-      const params: any = {
-        start_date: range[0].format('YYYY-MM-DD'),
-        end_date: range[1].format('YYYY-MM-DD'),
-        date_tolerance_days: tolerance,
-      };
-      if (batchTag) {
-        params.batch_tag = batchTag;
-      }
-      const res: any = await dataService.getDouyinQingniaoMatch(params);
-      const d = res?.data || res;
-      if (d?.records && d?.summary) {
-        setRecords(d.records);
-        setSummary(d.summary);
-        return d;
-      } else {
-        message.warning('对账端点返回数据为空');
-        return null;
-      }
-    } catch (e: any) {
-      message.error(e?.message || '对账请求失败');
-      return null;
-    } finally {
-      setLoading(false);
-    }
+    return runMatch({
+      startDate: range[0].format('YYYY-MM-DD'),
+      endDate: range[1].format('YYYY-MM-DD'),
+      toleranceDays: tolerance,
+      batchTag,
+    });
   };
 
   const handleMatch = async () => {
@@ -326,13 +338,11 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
         setDateRange(newRange);
         await runMatchWithRange(newRange, toleranceDays, tag);
       } else {
-        setRecords([]);
-        setSummary(null);
+        resetMatch();
       }
     } else {
       // 清空批次 → 清空对账结果，等用户点「开始对账」
-      setRecords([]);
-      setSummary(null);
+      resetMatch();
     }
   };
 
@@ -545,8 +555,7 @@ const DouyinQingniaoReconciliationPage: React.FC = () => {
               </Button>
             </Upload>
             <Button icon={<ReloadOutlined />} onClick={() => {
-              setRecords([]);
-              setSummary(null);
+              resetMatch();
               setStatusFilter('all');
             }}>
               重置
