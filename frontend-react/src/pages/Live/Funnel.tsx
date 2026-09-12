@@ -14,22 +14,20 @@
  * 当前以主播引流链路作为"直播业务漏斗"的替代口径。
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
-import { ReloadOutlined, SearchOutlined, VideoCameraOutlined, RiseOutlined, DollarOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { Card, Row, Col, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
+import { VideoCameraOutlined, RiseOutlined, DollarOutlined, InfoCircleOutlined, AimOutlined, CheckCircleOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components/Chart';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { http } from '@/services/http';
 import styles from './Funnel.module.scss';
-
-const { RangePicker } = DatePicker;
 
 // v3.3.0: 直播类型（4 类，由 dim_anchor_live_type 表映射）
 type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
@@ -128,8 +126,7 @@ const renderLiveTypeTag = (lt: string | null) => {
 };
 
 const LiveFunnelPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const { dateRange, selectedPlatforms } = useFilterStore();
   // v3.3.0: 直播类型筛选
   const [liveTypeFilter, setLiveTypeFilter] = useState<LiveType[]>([]);
   const [liveTypeOptions, setLiveTypeOptions] = useState<string[]>([]);
@@ -141,16 +138,15 @@ const LiveFunnelPage: React.FC = () => {
   const [trendLoading, setTrendLoading] = useState(false);
 
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    platforms: platformFilter.length ? platformFilter : undefined,
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
     // v3.3.0: 把直播类型筛选传给后端
     live_types: liveTypeFilter.length ? liveTypeFilter : undefined,
-  }), [dateRange, platformFilter, liveTypeFilter]);
+  }), [dateRange, selectedPlatforms, liveTypeFilter]);
 
+  // 日期/平台由 FilterBar 内置 resetAll 重置，这里只清页面特有筛选
   const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setPlatformFilter([]);
     setLiveTypeFilter([]);
   };
 
@@ -337,7 +333,7 @@ const LiveFunnelPage: React.FC = () => {
     const map = new Map<string, AnchorAggRow>();
     items.forEach((it) => {
       // 平台筛选：选中平台时只聚合命中平台的主播行
-      if (platformFilter.length && !platformFilter.includes(it.platform)) return;
+      if (selectedPlatforms.length && !selectedPlatforms.includes(it.platform)) return;
       const r = map.get(it.anchor) || {
         anchor: it.anchor, platforms: [], live_type: null, live_types: [], secondary_live_types: [],
         leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
@@ -379,7 +375,7 @@ const LiveFunnelPage: React.FC = () => {
     });
     rows.sort((a, b) => b.leads - a.leads);
     return rows;
-  }, [items, platformFilter]);
+  }, [items, selectedPlatforms]);
 
   const platformColumns = [
     { title: '平台', dataIndex: 'platform', width: 120, render: (v: string) => <Tag color="cyan">{v}</Tag> },
@@ -443,36 +439,24 @@ const LiveFunnelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size="small">
-          <Space size="middle" wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>主播平台</span>
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder={'全部'}
-              value={platformFilter}
-              onChange={setPlatformFilter}
-              options={platforms.map((p) => ({ label: p, value: p }))}
-              style={{ minWidth: 200 }}
-              maxTagCount="responsive"
-            />
-            <span className={styles.label}>直播类型</span>
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder={'全部类型'}
-              value={liveTypeFilter}
-              onChange={(v) => setLiveTypeFilter(v as LiveType[])}
-              options={liveTypeOptions.map((t) => ({ label: t, value: t }))}
-              style={{ minWidth: 200 }}
-              maxTagCount="responsive"
-            />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar
+          showAgency={false}
+          platformOptions={platforms.map((p) => ({ label: p, value: p }))}
+          onSearch={load}
+          onReset={resetFilters}
+        >
+          <span className={styles.label}>直播类型:</span>
+          <Select
+            mode="multiple"
+            allowClear
+            placeholder={'全部类型'}
+            value={liveTypeFilter}
+            onChange={(v) => setLiveTypeFilter(v as LiveType[])}
+            options={liveTypeOptions.map((t) => ({ label: t, value: t }))}
+            style={{ minWidth: 200 }}
+            maxTagCount="responsive"
+          />
+        </FilterBar>
       </FadeInSection>
 
       <Spin spinning={loading}>
@@ -586,7 +570,7 @@ const LiveFunnelPage: React.FC = () => {
         </FadeInSection>
 
         <FadeInSection delay={2.4} duration={0.8}>
-          <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{platformFilter.length ? '·已按选中平台筛选' : ''}</span>}>
+          <Card title={"主播详情（" + anchorAggRows.length + " 位主播·同名跨平台聚合）"} size="small" extra={<span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>按线索量降序{selectedPlatforms.length ? '·已按选中平台筛选' : ''}</span>}>
             {anchorAggRows.length > 0 ? (
               <Table<AnchorAggRow> size="small" rowKey="anchor" dataSource={anchorAggRows} pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 位主播` }} columns={anchorAggColumns as any} scroll={{ x: 'max-content' }} />
             ) : (

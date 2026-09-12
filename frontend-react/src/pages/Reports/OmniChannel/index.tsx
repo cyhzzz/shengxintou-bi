@@ -18,32 +18,28 @@ import {
   Card,
   Row,
   Col,
-  DatePicker,
   Space,
   Spin,
   Tabs,
   Table,
   Tag,
   Empty,
-  Button,
   Segmented,
   Select,
   message,
 } from 'antd';
-import { BankOutlined, CheckCircleOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { BankOutlined, CheckCircleOutlined, TeamOutlined, TrophyOutlined } from '@ant-design/icons';
 import type { EChartsOption } from 'echarts';
 import { EChartsComponent } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
 import metricStyles from '@/components/MetricCard/MetricCard.module.scss';
 import { dataServiceOmniChannel } from '@/services/dataService';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { compactStackTooltip } from '@/utils/chartTooltip';
+import { useFilterStore } from '@/stores';
 import styles from './index.module.scss';
-
-const { RangePicker } = DatePicker;
 
 // 4 大类颜色（按实际 SUM 开户降序：合作 > 自然 > 员工 > 互联网）
 // ⚠️ ECharts 不能解析 CSS var()，必须用真实 hex。JSX 用法仍然兼容（直接当 background）。
@@ -85,7 +81,8 @@ interface TrendRow {
 }
 
 const OmniChannelPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+  // 日期接入全局筛选 store（自动查询：store 变化 -> useEffect 重载）
+  const { dateRange } = useFilterStore();
   const [summary, setSummary] = useState<{
     totals: { opens: number; deposit: number; valid: number };
     by_category: CategoryRow[];
@@ -119,8 +116,8 @@ const OmniChannelPage: React.FC = () => {
   // v3.1.11：summary 概览只受日期范围影响，trend + by-channel 才受全部筛选影响
   const summaryFilters = useMemo(
     () => ({
-      start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-      end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
+      start_date: dateRange.startDate,
+      end_date: dateRange.endDate,
     }),
     [dateRange]
   );
@@ -177,8 +174,8 @@ const OmniChannelPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summaryFilters, filters, activeCategories, byChannelFilters]);
 
+  // 重置：日期由 FilterBar 内置 resetAll 重置（全局 store，useEffect 自动重载），这里只清本页渠道筛选
   const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
     setSelectedCategories([]);
     setSelectedSubChannels([]);
   };
@@ -365,51 +362,44 @@ const OmniChannelPage: React.FC = () => {
 
   return (
     <div className={styles.page}>
-      {/* 筛选条：仅日期区间 + 刷新 */}
+      {/* 筛选条：全局日期区间 + 本页渠道筛选（自动查询：筛选变化 -> useEffect 重载） */}
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size="small">
-          <Space size="middle" wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker
-              value={dateRange}
-              onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])}
-              allowClear={false}
-            />
-            <span className={styles.label}>渠道类别</span>
-            <Select
-              mode="multiple"
-              placeholder="全部类别"
-              value={selectedCategories}
-              onChange={setSelectedCategories}
-              style={{ minWidth: 180 }}
-              allowClear
-              maxTagCount="responsive"
-            >
-              {channelCategoryOptions.map((c) => (
-                <Select.Option key={c} value={c}>{c}</Select.Option>
-              ))}
-            </Select>
-            <span className={styles.label}>子渠道</span>
-            <Select
-              mode="multiple"
-              placeholder="全部子渠道"
-              value={selectedSubChannels}
-              onChange={setSelectedSubChannels}
-              style={{ minWidth: 220 }}
-              allowClear
-              maxTagCount="responsive"
-              showSearch
-            >
-              {subChannelOptions.map((s) => (
-                <Select.Option key={s} value={s}>{s}</Select.Option>
-              ))}
-            </Select>
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>
-              查询
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar
+          showAgency={false}
+          showPlatform={false}
+          onSearch={load}
+          onReset={resetFilters}
+        >
+          <span className={styles.label}>渠道类别:</span>
+          <Select
+            mode="multiple"
+            placeholder="全部类别"
+            value={selectedCategories}
+            onChange={setSelectedCategories}
+            style={{ minWidth: 180 }}
+            allowClear
+            maxTagCount="responsive"
+          >
+            {channelCategoryOptions.map((c) => (
+              <Select.Option key={c} value={c}>{c}</Select.Option>
+            ))}
+          </Select>
+          <span className={styles.label}>子渠道:</span>
+          <Select
+            mode="multiple"
+            placeholder="全部子渠道"
+            value={selectedSubChannels}
+            onChange={setSelectedSubChannels}
+            style={{ minWidth: 220 }}
+            allowClear
+            maxTagCount="responsive"
+            showSearch
+          >
+            {subChannelOptions.map((s) => (
+              <Select.Option key={s} value={s}>{s}</Select.Option>
+            ))}
+          </Select>
+        </FilterBar>
       </FadeInSection>
 
       <Spin spinning={loading}>

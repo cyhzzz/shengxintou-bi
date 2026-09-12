@@ -2,20 +2,18 @@
  * 员工转化周报页面
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, DatePicker, Button, Select, Space, message, Typography, Segmented } from 'antd';
+import { Card, Button, Select, Space, message, Typography, Segmented } from 'antd';
 import { CopyOutlined, FileWordOutlined, FileExcelOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import WeeklyReportPreview from './components/WeeklyReportPreview';
 import PosterModal from './components/PosterModal';
 import { getEmployeeConversionFilterOptions, postEmployeeConversionWeekly } from '@/types/api';
 import { ReportFooter } from '@/components/ReportFooter';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import { withFixedAssistants, type WeeklyReportData } from './weeklyRanking';
 import styles from './index.module.scss';
 
 const { Text } = Typography;
-
-const { RangePicker } = DatePicker;
 
 // 平台选项
 const PLATFORM_OPTIONS = [
@@ -30,8 +28,11 @@ interface WeeklyDefaultDateOptions {
 }
 
 const EmployeeConversionWeeklyPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[string, string]>(['', '']);
+  // 日期接入全局筛选 store（persist 持久化）；平台为周报固定三平台域，保持本页本地筛选
+  const { dateRange, setDateRange } = useFilterStore();
   const [platforms, setPlatforms] = useState<string[]>(['小红书', '腾讯', '抖音']);
+  // 动态默认周拉取完成后才允许自动生成，避免用出厂默认年度范围空跑一次
+  const [dateReady, setDateReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<WeeklyReportData | null>(null);
   const [reportContent, setReportContent] = useState<string>('');
@@ -43,7 +44,9 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
 
   // 生成周报（必须在 useEffect 之前定义，否则 TDZ ReferenceError: Cannot access 'handleGenerateReport' before initialization）
   const handleGenerateReport = useCallback(async () => {
-    if (!dateRange[0] || !dateRange[1]) {
+    // 直接读 store 最新值，避免初始化写入动态默认周后闭包读到旧日期
+    const { startDate, endDate } = useFilterStore.getState().dateRange;
+    if (!startDate || !endDate) {
       message.warning('请选择日期范围');
       return;
     }
@@ -56,15 +59,15 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await postEmployeeConversionWeekly({
-        start_date: dateRange[0],
-        end_date: dateRange[1],
+        start_date: startDate,
+        end_date: endDate,
         platforms,
       });
 
       if (response.success && response.data) {
         const weeklyData = response.data as unknown as WeeklyReportData;
         setReportData(weeklyData);
-        const content = formatReportContent(weeklyData, dateRange[0], dateRange[1]);
+        const content = formatReportContent(weeklyData, startDate, endDate);
         setReportContent(content);
         message.success('周报生成成功');
       } else {
@@ -76,33 +79,36 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, platforms]);
+  }, [platforms]);
 
   // Bug 5 修复: 默认日期取数据库最新有数据的一周，避免自然周晚于数据刷新日导致生成 0 行
+  // 仅当全局日期仍为出厂默认（用户未自定义）时才覆盖，避免污染用户已选的全局日期
   useEffect(() => {
+    const pristine = dateRange.startDate === '2026-01-01' && dateRange.endDate === '2026-12-31';
     getEmployeeConversionFilterOptions()
       .then((res) => {
+        if (!pristine) return;
         const defaultDates = res?.data as WeeklyDefaultDateOptions | undefined;
         const start = defaultDates?.default_week_start;
         const end = defaultDates?.default_week_end;
         if (start && end) {
-          setDateRange([start, end]);
-        } else {
-          setDateRange(['2026-01-01', '2026-12-31']);
+          setDateRange({ startDate: start, endDate: end });
         }
       })
-      .catch(() => setDateRange(['2026-01-01', '2026-12-31']));
+      .catch(() => {})
+      .finally(() => setDateReady(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 进页面默认视图为海报时，dateRange 加载完后自动 generate 一次，以避免看到 Empty 空预览
+  // 进页面默认视图为海报时，动态默认周就绪（dateReady）后自动 generate 一次，以避免看到 Empty 空预览
   useEffect(() => {
     if (didAutoGenRef.current) return;
     if (viewMode !== 'poster') return;
-    if (!dateRange[0] || !dateRange[1]) return;
+    if (!dateReady) return;
     if (reportData || loading) return;
     didAutoGenRef.current = true;
     handleGenerateReport();
-  }, [viewMode, dateRange, reportData, loading, handleGenerateReport]);
+  }, [viewMode, dateReady, reportData, loading, handleGenerateReport]);
 
   // 复制报告
   const handleCopy = useCallback(async () => {
@@ -145,7 +151,7 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     const blob = new Blob([htmlContent], { type: 'application/msword' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `员工转化周报_${dateRange[0]}_${dateRange[1]}.doc`;
+    link.download = `员工转化周报_${dateRange.startDate}_${dateRange.endDate}.doc`;
     link.click();
   }, [reportContent, dateRange]);
 
@@ -176,46 +182,32 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `员工转化周报_${dateRange[0]}_${dateRange[1]}.csv`;
+    link.download = `员工转化周报_${dateRange.startDate}_${dateRange.endDate}.csv`;
     link.click();
   }, [reportData, dateRange]);
 
   return (
     <div className={styles.weeklyPage}>
-      {/* 配置卡片 */}
+      {/* 配置卡片：全局日期范围 + 本页平台（查询按钮即生成周报） */}
       <FadeInSection delay={0} duration={0.8}>
-      <Card className={styles.configCard}>
-        <div className={styles.configContent}>
-          <Space wrap size={16}>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>日期范围</label>
-              <RangePicker
-                value={dateRange[0] && dateRange[1] ? [dayjs(dateRange[0]), dayjs(dateRange[1])] : null}
-                onChange={(dates) => {
-                  if (dates && dates[0] && dates[1]) {
-                    setDateRange([dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]);
-                  }
-                }}
-                format="YYYY-MM-DD"
-              />
-            </div>
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>平台</label>
-              <Select
-                mode="multiple"
-                value={platforms}
-                onChange={setPlatforms}
-                options={PLATFORM_OPTIONS}
-                style={{ minWidth: 200 }}
-                placeholder="选择平台"
-              />
-            </div>
-          </Space>
-          <Button type="primary" onClick={handleGenerateReport} loading={loading}>
-            生成周报
-          </Button>
-        </div>
-      </Card>
+        <FilterBar
+          showAgency={false}
+          showPlatform={false}
+          onSearch={handleGenerateReport}
+          onReset={() => setPlatforms(['小红书', '腾讯', '抖音'])}
+        >
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>平台:</span>
+            <Select
+              mode="multiple"
+              value={platforms}
+              onChange={setPlatforms}
+              options={PLATFORM_OPTIONS}
+              style={{ minWidth: 200 }}
+              placeholder="选择平台"
+            />
+          </div>
+        </FilterBar>
       </FadeInSection>
 
       {/* 周报内容卡片 */}
@@ -274,12 +266,12 @@ const EmployeeConversionWeeklyPage: React.FC = () => {
 
         {/* v3.1.25: 视图主体 */}
         {viewMode === 'poster' ? (
-          reportData && dateRange[0] && dateRange[1] && (reportData?.overview?.[posterPlatform]?.leads ?? reportData?.overview?.[posterPlatform]?.total_leads ?? 0) > 0 ? (
+          reportData && dateRange.startDate && dateRange.endDate && (reportData?.overview?.[posterPlatform]?.leads ?? reportData?.overview?.[posterPlatform]?.total_leads ?? 0) > 0 ? (
             <PosterModal
               mode="inline"
               platform={posterPlatform}
-              startDate={dateRange[0]}
-              endDate={dateRange[1]}
+              startDate={dateRange.startDate}
+              endDate={dateRange.endDate}
               rankings={reportData.rankings?.[posterPlatform] || { total: [], existing: [], new: [] }}
               yearBreakdown={reportData.year_breakdown?.[posterPlatform]}
             />

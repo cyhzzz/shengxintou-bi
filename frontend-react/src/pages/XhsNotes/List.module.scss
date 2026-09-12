@@ -8,26 +8,12 @@
   padding: 0;
 }
 
-.filterCard {
-  margin-bottom: var(--spacer-16);
-
-  @include card-base;
-}
-
-.filterRow {
-  @include filter-bar;
-}
-
 .filterGroup {
   @include filter-group;
 }
 
 .filterLabel {
   @include filter-label;
-}
-
-.filterActions {
-  @include filter-actions;
 }
 
 .tableCard {
@@ -52,14 +38,4 @@
   color: var(--color-text-secondary);
   font-size: var(--text-base);
   margin-right: var(--spacer-16);
-}
-
-// 链接样式
-.noteLink {
-  color: var(--color-text-brand);
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
 }

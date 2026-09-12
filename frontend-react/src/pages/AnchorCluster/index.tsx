@@ -16,21 +16,19 @@
  * - 新开户作为核心获客产出，存量客户线索与资产作为辅助呈现
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty, message } from 'antd';
+import { Card, Select, Space, Spin, Table, Tag, Button, Tooltip, Empty, message } from 'antd';
 import {
-  ReloadOutlined, SearchOutlined, VideoCameraOutlined, UserOutlined,
+  VideoCameraOutlined, UserOutlined,
   RiseOutlined, DollarOutlined, DownloadOutlined, AimOutlined, CheckCircleOutlined,
   UserAddOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
 import { dataServiceLeadsAnchor } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import { sanitizeText, sanitizeList } from '@/utils/sanitizeText';
 import styles from './index.module.scss';
-
-const { RangePicker } = DatePicker;
 
 type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
 
@@ -109,8 +107,7 @@ interface LiveTypeBreakdown {
 }
 
 const AnchorClusterPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const { dateRange, selectedPlatforms } = useFilterStore();
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
   // v3.3.0: 直播类型筛选
   const [liveTypeFilter, setLiveTypeFilter] = useState<LiveType[]>([]);
@@ -121,16 +118,15 @@ const AnchorClusterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    platforms: platformFilter.length ? platformFilter : undefined,
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
     // v3.3.0: 把直播类型筛选传给后端
     live_types: liveTypeFilter.length ? liveTypeFilter : undefined,
-  }), [dateRange, platformFilter, liveTypeFilter]);
+  }), [dateRange, selectedPlatforms, liveTypeFilter]);
 
+  // 日期/平台由 FilterBar 内置 resetAll 重置，这里只清页面特有筛选
   const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setPlatformFilter([]);
     setAnchorFilter([]);
     setLiveTypeFilter([]);
   };
@@ -161,7 +157,7 @@ const AnchorClusterPage: React.FC = () => {
   const anchorAggRows: AnchorAggRow[] = useMemo(() => {
     const map = new Map<string, AnchorAggRow>();
     items.forEach((it) => {
-      if (platformFilter.length && !platformFilter.includes(it.platform)) return;
+      if (selectedPlatforms.length && !selectedPlatforms.includes(it.platform)) return;
       if (anchorFilter.length && !anchorFilter.includes(it.anchor)) return;
       const r = map.get(it.anchor) || {
         anchor: it.anchor, platforms: [], live_type: null, live_types: [], secondary_live_types: [],
@@ -204,7 +200,7 @@ const AnchorClusterPage: React.FC = () => {
     });
     rows.sort((a, b) => b.leads - a.leads);
     return rows;
-  }, [items, platformFilter, anchorFilter]);
+  }, [items, selectedPlatforms, anchorFilter]);
 
   // 概览 totals（基于 anchorAggRows 去重后聚合）
   const totals = useMemo(() => {
@@ -338,27 +334,22 @@ const AnchorClusterPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size='small'>
-          <Space size='middle' wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>主播平台</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={platformFilter}
-              onChange={setPlatformFilter} options={platforms.map((p) => ({ label: p, value: p }))}
-              style={{ minWidth: 180 }} maxTagCount='responsive' />
-            <span className={styles.label}>直播类型</span>
-            <Select mode='multiple' allowClear placeholder='全部类型' value={liveTypeFilter}
-              onChange={(v) => setLiveTypeFilter(v as LiveType[])}
-              options={liveTypeOptions.map((t) => ({ label: t, value: t }))}
-              style={{ minWidth: 200 }} maxTagCount='responsive' />
-            <span className={styles.label}>主播</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
-              onChange={setAnchorFilter} options={anchorOptions.map((a) => ({ label: a, value: a }))}
-              style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar
+          showAgency={false}
+          platformOptions={platforms.map((p) => ({ label: p, value: p }))}
+          onSearch={load}
+          onReset={resetFilters}
+        >
+          <span className={styles.label}>直播类型:</span>
+          <Select mode='multiple' allowClear placeholder='全部类型' value={liveTypeFilter}
+            onChange={(v) => setLiveTypeFilter(v as LiveType[])}
+            options={liveTypeOptions.map((t) => ({ label: t, value: t }))}
+            style={{ minWidth: 200 }} maxTagCount='responsive' />
+          <span className={styles.label}>主播:</span>
+          <Select mode='multiple' allowClear placeholder='全部' value={anchorFilter}
+            onChange={setAnchorFilter} options={anchorOptions.map((a) => ({ label: a, value: a }))}
+            style={{ minWidth: 200 }} maxTagCount='responsive' showSearch optionFilterProp='label' />
+        </FilterBar>
       </FadeInSection>
 
       <Spin spinning={loading}>

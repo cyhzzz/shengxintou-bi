@@ -8,20 +8,8 @@
   @include card-base;
 }
 
-.filterRow {
-  @include filter-bar;
-}
-
-.filterGroup {
-  @include filter-group;
-}
-
 .filterLabel {
   @include filter-label;
-}
-
-.filterActions {
-  @include filter-actions;
 }
 
 .tableCard {
@@ -55,14 +43,6 @@
     width: 110px;
     color: var(--color-text-secondary);
   }
-}
-.filterCard {
-  margin-bottom: var(--spacer-16);
-  @include card-base;
-}
-.label {
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
 }
 .funnelList {
   display: flex;

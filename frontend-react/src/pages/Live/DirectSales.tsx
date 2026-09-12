@@ -21,10 +21,8 @@
  *   8. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Row, Col, DatePicker, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
+import { Card, Row, Col, Space, Spin, Table, Tag, Select, Empty, Tooltip, Segmented } from 'antd';
 import {
-  ReloadOutlined,
-  SearchOutlined,
   VideoCameraOutlined,
   RiseOutlined,
   FallOutlined,
@@ -41,21 +39,20 @@ import {
   SolutionOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import { FunnelChart } from '@/components/Chart';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { http } from '@/services/http';
 import CalendarHeatmap from '@/pages/Dashboard/components/CalendarHeatmap';
 import styles from './Funnel.module.scss';
-
-const { RangePicker } = DatePicker;
 
 // 4 类直播类型枚举
 type LiveType = '分析师' | '投顾IP' | '投顾配合做带货' | '带货直播';
@@ -198,8 +195,7 @@ interface DirectSalesPageProps {
 
 const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直播' }) => {
   const meta = LIVE_TYPE_META[liveType];
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const { dateRange, selectedPlatforms } = useFilterStore();
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
   const [items, setItems] = useState<AnchorItem[]>([]);
   const [platforms, setPlatforms] = useState<string[]>([]);
@@ -230,16 +226,15 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
   const [anchorWeeklyLoading, setAnchorWeeklyLoading] = useState(false);
 
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    platforms: platformFilter.length ? platformFilter : undefined,
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
     // 固定 live_types = [liveType]，由路由 prop 决定
     live_types: [liveType] as LiveType[],
-  }), [dateRange, platformFilter, liveType]);
+  }), [dateRange, selectedPlatforms, liveType]);
 
+  // 日期/平台由 FilterBar 内置 resetAll 重置，这里只清页面特有筛选
   const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setPlatformFilter([]);
     setAnchorFilter([]);
   };
 
@@ -664,7 +659,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
   const anchorAggRows: AnchorAggRow[] = useMemo(() => {
     const map = new Map<string, AnchorAggRow>();
     filteredItems.forEach((it) => {
-      if (platformFilter.length && !platformFilter.includes(it.platform)) return;
+      if (selectedPlatforms.length && !selectedPlatforms.includes(it.platform)) return;
       const r = map.get(it.anchor) || {
         anchor: it.anchor, platforms: [], leads: 0, existing_leads: 0, new_leads: 0, mouth: 0,
         valid_lead: 0, new_valid_lead: 0,
@@ -705,7 +700,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     });
     rows.sort((a, b) => b.leads - a.leads);
     return rows;
-  }, [filteredItems, platformFilter]);
+  }, [filteredItems, selectedPlatforms]);
 
   // 主播详情表 expandable 行展开内容（token 来源拆分）
   const expandedRowRender = (r: AnchorAggRow) => {
@@ -1067,39 +1062,27 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size="small">
-          <Space size="middle" wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>主播平台</span>
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder={'全部'}
-              value={platformFilter}
-              onChange={setPlatformFilter}
-              options={platforms.map((p) => ({ label: p, value: p }))}
-              style={{ minWidth: 200 }}
-              maxTagCount="responsive"
-            />
-            <span className={styles.label}>主播</span>
-            <Select
-              mode="multiple"
-              allowClear
-              showSearch
-              placeholder={`全部${meta.anchorLabel}`}
-              value={anchorFilter}
-              onChange={(v) => setAnchorFilter(v as string[])}
-              options={anchorOptions.map((a) => ({ label: a, value: a }))}
-              style={{ minWidth: 220 }}
-              maxTagCount="responsive"
-              filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
-            />
-            <Tag color={meta.color} style={{ marginLeft: 4 }}>{meta.descTag}</Tag>
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar
+          showAgency={false}
+          platformOptions={platforms.map((p) => ({ label: p, value: p }))}
+          onSearch={load}
+          onReset={resetFilters}
+        >
+          <span className={styles.label}>主播:</span>
+          <Select
+            mode="multiple"
+            allowClear
+            showSearch
+            placeholder={`全部${meta.anchorLabel}`}
+            value={anchorFilter}
+            onChange={(v) => setAnchorFilter(v as string[])}
+            options={anchorOptions.map((a) => ({ label: a, value: a }))}
+            style={{ minWidth: 220 }}
+            maxTagCount="responsive"
+            filterOption={(input, option) => (option?.label as string)?.toLowerCase().includes(input.toLowerCase())}
+          />
+          <Tag color={meta.color}>{meta.descTag}</Tag>
+        </FilterBar>
       </FadeInSection>
 
       <Spin spinning={loading}>

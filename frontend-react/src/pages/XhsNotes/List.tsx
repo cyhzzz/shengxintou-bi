@@ -18,8 +18,6 @@ import {
   Descriptions,
 } from 'antd';
 import {
-  SearchOutlined,
-  ReloadOutlined,
   DownloadOutlined,
   LinkOutlined,
   EyeOutlined,
@@ -28,7 +26,8 @@ import dayjs from 'dayjs';
 import { dataService } from '@/services/dataService';
 import type { XhsNotesListItem } from '@/types/api.schemas';
 import styles from './List.module.scss';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 
 const { Link } = Typography;
 const { RangePicker } = DatePicker;
@@ -48,9 +47,8 @@ const XhsNotesListPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
-  // 筛选状态
-  // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31
-  const [dataDateRange, setDataDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
+  // 筛选状态：数据时间接入全局筛选 store（自动查询：store 变化 -> fetchData 依赖变化自动重载）；发布时间是本页业务语义（笔记发布日期），保留本地
+  const { dateRange, setQuickDateRange } = useFilterStore();
   const [publishDateRange, setPublishDateRange] = useState<[string, string]>(['', '']);
   const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
   const [selectedContentTypes, setSelectedContentTypes] = useState<string[]>([]);
@@ -100,7 +98,6 @@ const XhsNotesListPage: React.FC = () => {
 
   // 使用 ref 来存储最新的筛选条件（用于导出）
   const filtersRef = useRef({
-    dataDateRange: ['', ''] as [string, string],
     publishDateRange: ['', ''] as [string, string],
     selectedCreators: [] as string[],
     selectedContentTypes: [] as string[],
@@ -135,7 +132,6 @@ const XhsNotesListPage: React.FC = () => {
     try {
       // 更新 filtersRef
       filtersRef.current = {
-        dataDateRange,
         publishDateRange,
         selectedCreators,
         selectedContentTypes,
@@ -146,11 +142,9 @@ const XhsNotesListPage: React.FC = () => {
       // 构建筛选条件
       const filters: Record<string, unknown> = {};
 
-      // 数据时间范围
-      if (dataDateRange[0] && dataDateRange[1]) {
-        filters.start_date = dataDateRange[0];
-        filters.end_date = dataDateRange[1];
-      }
+      // 数据时间范围（全局 store，始终有值）
+      filters.start_date = dateRange.startDate;
+      filters.end_date = dateRange.endDate;
 
       // 发布时间范围
       if (publishDateRange[0] && publishDateRange[1]) {
@@ -208,7 +202,7 @@ const XhsNotesListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, dataDateRange, publishDateRange, selectedCreators, selectedContentTypes, selectedAdStrategies, selectedAccount]);
+  }, [page, pageSize, dateRange, publishDateRange, selectedCreators, selectedContentTypes, selectedAdStrategies, selectedAccount]);
 
   // 初始加载
   useEffect(() => {
@@ -225,11 +219,8 @@ const XhsNotesListPage: React.FC = () => {
     fetchData();
   };
 
-  // 处理重置
+  // 处理重置：数据时间由 FilterBar 内置 resetAll 重置（全局 store，fetchData 依赖变化自动重载），这里清本页业务筛选
   const handleReset = () => {
-    const today = dayjs();
-    const thirtyDaysAgo = today.subtract(30, 'day');
-    setDataDateRange([thirtyDaysAgo.format('YYYY-MM-DD'), today.format('YYYY-MM-DD')]);
     setPublishDateRange(['', '']);
     setSelectedCreators([]);
     setSelectedContentTypes([]);
@@ -238,22 +229,10 @@ const XhsNotesListPage: React.FC = () => {
     setPage(1);
   };
 
-  // 快速选择日期
-  const handleQuickDateSelect = (days: number, type: 'data' | 'publish') => {
-    const today = dayjs();
-    const startDate = today.subtract(days, 'day').format('YYYY-MM-DD');
-    const endDate = today.format('YYYY-MM-DD');
-
-    if (type === 'data') {
-      setDataDateRange([startDate, endDate]);
-    } else {
-      setPublishDateRange([startDate, endDate]);
-    }
-  };
-
   // 获取筛选后的全部数据（用于导出）
   const fetchAllDataForExport = useCallback(async (): Promise<XhsNotesListItem[]> => {
     const filters = filtersRef.current;
+    const { startDate, endDate } = useFilterStore.getState().dateRange;
     const allItems: XhsNotesListItem[] = [];
     const exportPageSize = 10000;
     let currentPage = 1;
@@ -262,10 +241,9 @@ const XhsNotesListPage: React.FC = () => {
     while (hasMore) {
       const filterParams: Record<string, unknown> = {};
 
-      if (filters.dataDateRange[0] && filters.dataDateRange[1]) {
-        filterParams.start_date = filters.dataDateRange[0];
-        filterParams.end_date = filters.dataDateRange[1];
-      }
+      // 数据时间范围（全局 store 实时值）
+      filterParams.start_date = startDate;
+      filterParams.end_date = endDate;
 
       if (filters.publishDateRange[0] && filters.publishDateRange[1]) {
         filterParams.publish_start_date = filters.publishDateRange[0];
@@ -397,7 +375,7 @@ const XhsNotesListPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `小红书笔记列表_${dataDateRange[0]}_${dataDateRange[1]}.csv`;
+    link.download = `小红书笔记列表_${dateRange.startDate}_${dateRange.endDate}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -673,36 +651,25 @@ const XhsNotesListPage: React.FC = () => {
     <div className={styles.notesListPage}>
       {/* 筛选器卡片 */}
       <FadeInSection delay={0} duration={0.8}>
-      <Card className={styles.filterCard} size="small">
-        <Space wrap size="middle">
-          {/* 数据时间 */}
-          <div className={styles.filterGroup}>
-            <span className={styles.filterLabel}>数据时间:</span>
-            <RangePicker
-              value={[dataDateRange[0] ? dayjs(dataDateRange[0]) : null, dataDateRange[1] ? dayjs(dataDateRange[1]) : null]}
-              onChange={(dates) => {
-                if (dates && dates[0] && dates[1]) {
-                  setDataDateRange([dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]);
-                } else {
-                  setDataDateRange(['', '']);
-                }
-              }}
-              allowClear
-              style={{ width: 240 }}
-            />
-            <Space size={4}>
-              {QUICK_DATE_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  size="small"
-                  type={dataDateRange[0] === dayjs().subtract(opt.value, 'day').format('YYYY-MM-DD') ? 'primary' : 'default'}
-                  onClick={() => handleQuickDateSelect(opt.value, 'data')}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </Space>
-          </div>
+      <FilterBar
+        showAgency={false}
+        showPlatform={false}
+        onSearch={handleSearch}
+        onReset={handleReset}
+      >
+          {/* 数据时间快捷键（写入全局 store） */}
+          <Space size={4}>
+            {QUICK_DATE_OPTIONS.map((opt) => (
+              <Button
+                key={opt.value}
+                size="small"
+                type={dateRange.startDate === dayjs().subtract(opt.value, 'day').format('YYYY-MM-DD') ? 'primary' : 'default'}
+                onClick={() => setQuickDateRange(opt.value)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </Space>
 
           {/* 发布时间 */}
           <div className={styles.filterGroup}>
@@ -789,17 +756,7 @@ const XhsNotesListPage: React.FC = () => {
           </div>
 
 
-          {/* 操作按钮 */}
-          <div className={styles.filterActions}>
-            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
-              查询
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
-            </Button>
-          </div>
-        </Space>
-      </Card>
+      </FilterBar>
       </FadeInSection>
 
       {/* 数据表格卡片 */}

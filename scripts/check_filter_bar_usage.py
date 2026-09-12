@@ -39,19 +39,12 @@ PATTERNS = [
     re.compile(r'<DatePicker\.RangePicker\b'),
 ]
 
-# 已知违规（历史债务，记录在此供后续逐步迁移到 FilterBar）
+# 有意豁免的白名单（手写 RangePicker 但有明确业务理由，非历史债务）
 # 新增页面不得加入此列表，必须使用 FilterBar
-# 格式：{相对路径: 迁移说明}
+# 格式：{相对路径: 豁免理由}
 KNOWN_VIOLATIONS: Dict[str, str] = {
-    'frontend-react/src/pages/DataReconciliation/DouyinQingniao.tsx': '对账页，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/ConversionFunnel/index.tsx': '转化漏斗，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/AnchorCluster/index.tsx': '主播聚类，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Live/Funnel.tsx': '直播漏斗，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Live/DirectSales.tsx': '直播带货，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/XhsNotes/List.tsx': '小红书列表，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/EmployeeConversion/Weekly/index.tsx': '员工转化周报，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/OmniChannel/index.tsx': '全渠道，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/Xhs/PlanAnalysis.tsx': '小红书计划分析，迁移到 FilterBar 待排期',
+    'frontend-react/src/pages/DataReconciliation/DouyinQingniao.tsx': '对账工具页，日期为批次衍生值（后端动态填充，非用户筛选意图），有意豁免',
+    'frontend-react/src/pages/XhsNotes/List.tsx': '发布时间为本页业务日期（FilterBar children 内合法使用），数据时间已接入 FilterBar 全局筛选',
 }
 
 
@@ -94,7 +87,7 @@ def main() -> int:
     print()
 
     if known_present:
-        print(f'--- 已知违规（{len(known_present)} 个，历史债务，不影响 CI） ---')
+        print(f'--- 白名单豁免（{len(known_present)} 个，有意豁免，不影响 CI） ---')
         for f in sorted(known_present):
             note = KNOWN_VIOLATIONS.get(f, '')
             lines = violations[f]
@@ -125,7 +118,7 @@ def main() -> int:
         return 1
 
     if known_present:
-        print(f'⚠️  有 {len(known_present)} 个已知违规待逐步迁移到 FilterBar（不影响 CI）')
+        print(f'⚠️  有 {len(known_present)} 个白名单豁免页面（有意豁免，不影响 CI）')
     print('✅ 无新增违规，新增报表筛选器符合 FilterBar 规范')
     return 0
 

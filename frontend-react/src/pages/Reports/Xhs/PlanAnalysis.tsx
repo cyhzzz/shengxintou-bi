@@ -19,25 +19,23 @@
  *   6. ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, DatePicker, Space, Spin, Table, Tag, Button, Tooltip, Empty } from 'antd';
+import { Card, Select, Space, Spin, Table, Tag, Button, Tooltip, Empty } from 'antd';
 import {
-  CheckCircleOutlined, DownloadOutlined, ReloadOutlined,
-  RiseOutlined, SearchOutlined,
+  CheckCircleOutlined, DownloadOutlined,
+  RiseOutlined,
   LineChartOutlined, AimOutlined, FallOutlined, BookOutlined, MessageOutlined,
 } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
 import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { dataServiceReports } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
+import { useFilterStore } from '@/stores';
 import styles from '../AppMarket/index.module.scss';
-
-const { RangePicker } = DatePicker;
 
 // v3.3.10: 6 阶段漏斗
 // 企微 → 开口 → 有效线索 → 有效线索(不含存量) → 新开户 → 有效户
@@ -75,7 +73,8 @@ interface PlanItem {
 const TARGET_AGENCIES = ['直投', '量子', '绩牛', '美洋'];
 
 const XhsPlanAnalysisPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
+  // 日期接入全局筛选 store（自动查询：store 变化 -> useEffect 重载）；代理商为投放评审固定名单单选域，保持本页本地筛选
+  const { dateRange } = useFilterStore();
   const [agency, setAgency] = useState<string | undefined>(undefined);
   const [agencies, setAgencies] = useState<string[]>([]);
   const [planItems, setPlanItems] = useState<PlanItem[]>([]);
@@ -87,13 +86,13 @@ const XhsPlanAnalysisPage: React.FC = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
     agency: agency || undefined,
   }), [dateRange, agency]);
 
+  // 重置：日期由 FilterBar 内置 resetAll 重置（全局 store，useEffect 自动重载），这里清本页本地筛选
   const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
     setAgency(undefined);
     setTopN(30);
     setSelectedAccounts([]);
@@ -339,32 +338,31 @@ const XhsPlanAnalysisPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size='small'>
-          <Space size='middle' wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>代理商</span>
-            <Select
-              allowClear
-              placeholder="全部代理商"
-              value={agency}
-              onChange={(v) => setAgency(v || undefined)}
-              options={agencies.map((m) => ({ label: m, value: m }))}
-              style={{ minWidth: 180 }}
-              showSearch
-              optionFilterProp="label"
-            />
-            <span className={styles.label}>Top</span>
-            <Select value={topN} onChange={setTopN} options={[
-              { value: 10, label: 'Top 10' },
-              { value: 30, label: 'Top 30' },
-              { value: 50, label: 'Top 50' },
-              { value: 100, label: 'Top 100' },
-            ]} style={{ width: 110 }} />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar
+          showAgency={false}
+          showPlatform={false}
+          onSearch={load}
+          onReset={resetFilters}
+        >
+          <span className={styles.label}>代理商:</span>
+          <Select
+            allowClear
+            placeholder="全部代理商"
+            value={agency}
+            onChange={(v) => setAgency(v || undefined)}
+            options={agencies.map((m) => ({ label: m, value: m }))}
+            style={{ minWidth: 180 }}
+            showSearch
+            optionFilterProp="label"
+          />
+          <span className={styles.label}>Top:</span>
+          <Select value={topN} onChange={setTopN} options={[
+            { value: 10, label: 'Top 10' },
+            { value: 30, label: 'Top 30' },
+            { value: 50, label: 'Top 50' },
+            { value: 100, label: 'Top 100' },
+          ]} style={{ width: 110 }} />
+        </FilterBar>
       </FadeInSection>
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>

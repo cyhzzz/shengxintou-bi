@@ -12,11 +12,10 @@
  * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Row, Col, Card, Spin, message, Tabs, Tag, Space, Empty, DatePicker, Select, Button } from 'antd';
-import dayjs, { Dayjs } from 'dayjs';
+import { Row, Col, Card, Spin, message, Tabs, Tag, Empty, Select } from 'antd';
 import { CheckCircleOutlined, MobileOutlined, RiseOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
-import { FunnelChart, FadeInSection } from '@/components';
+import { FunnelChart, FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
@@ -38,8 +37,8 @@ const ConversionFunnelPage: React.FC = () => {
   const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
   const [appmarketNewOpenAssets, setAppmarketNewOpenAssets] = useState<number>(0);
 
-  // v3.1.10: 全局日期默认值统一为 2026-01-01 ~ 2026-12-31
-  const [dateRange, setDateRange] = useState<[string, string]>(['2026-01-01', '2026-12-31']);
+  // 日期接入全局筛选 store；平台为「内容平台 + 应用市场」混合域，保持本页本地筛选
+  const { dateRange } = useFilterStore();
   const [platforms, setPlatforms] = useState<string[]>([]);
   // 筛选器可选平台：内容平台 + 应用市场
   const PLATFORM_OPTIONS = [
@@ -54,13 +53,11 @@ const ConversionFunnelPage: React.FC = () => {
     { label: '荣耀', value: '荣耀' },
     { label: '苹果', value: '苹果' },
   ];
-  // dateRange state 是 string[]，DatePicker 需要 dayjs，转换中间变量
-  const dateRangeDayjs: [Dayjs, Dayjs] = [dayjs(dateRange[0]), dayjs(dateRange[1])];
   const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
     setLoading(true);
     try {
-      const sd = override?.startDate ?? dateRange[0];
-      const ed = override?.endDate ?? dateRange[1];
+      const sd = override?.startDate ?? dateRange.startDate;
+      const ed = override?.endDate ?? dateRange.endDate;
       const pls = override?.platforms ?? platforms;
       const response: any = await dataService.getConversionFunnelSplit({
         start_date: sd,
@@ -83,21 +80,11 @@ const ConversionFunnelPage: React.FC = () => {
       setLoading(false);
     }
   };
-  const applyFilters = (next: { start?: Dayjs; end?: Dayjs; pls?: string[] }) => {
-    if (next.start && next.end) {
-      setDateRange([next.start.format('YYYY-MM-DD'), next.end.format('YYYY-MM-DD')]);
-    }
-    if (next.pls !== undefined) setPlatforms(next.pls);
-    loadData({
-      startDate: next.start ? next.start.format('YYYY-MM-DD') : undefined,
-      endDate: next.end ? next.end.format('YYYY-MM-DD') : undefined,
-      platforms: next.pls !== undefined ? next.pls : platforms,
-    });
-  };
+  // 重置：日期由 FilterBar 内置 resetAll 重置（全局 store），平台是本页本地筛选；按重置后的条件重新加载
   const resetFilters = () => {
-    setDateRange(['2026-01-01', '2026-12-31']);
     setPlatforms([]);
-    loadData({ startDate: '2026-01-01', endDate: '2026-12-31', platforms: [] });
+    const dr = useFilterStore.getState().dateRange;
+    loadData({ startDate: dr.startDate, endDate: dr.endDate, platforms: [] });
   };
 
   useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -156,31 +143,26 @@ const ConversionFunnelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <Spin spinning={loading}>
-        {/* v3.1.4: 筛选器 — 日期范围 + 平台多选 */}
+        {/* v3.1.4: 筛选器 — 全局日期范围 + 本页平台多选（内容平台 + 应用市场混合域） */}
         <FadeInSection delay={0} duration={0.8}>
-          <Card size='small' style={{ marginBottom: 16 }}>
-            <Space size={16} wrap>
-              <span>日期范围：</span>
-              <DatePicker.RangePicker
-                value={dateRangeDayjs}
-                onChange={(d) => d && d[0] && d[1] && applyFilters({ start: d[0], end: d[1], pls: platforms })}
-                allowClear={false}
-              />
-              <span>平台：</span>
-              <Select
-                mode='multiple'
-                maxTagCount='responsive'
-                placeholder='全部平台'
-                style={{ minWidth: 220 }}
-                value={platforms}
-                onChange={(pls) => applyFilters({ start: dateRangeDayjs[0], end: dateRangeDayjs[1], pls })}
-                options={PLATFORM_OPTIONS}
-                allowClear
-              />
-              <Button type="primary" icon={<SearchOutlined />} onClick={() => loadData()}>查询</Button>
-              <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-            </Space>
-          </Card>
+          <FilterBar
+            showAgency={false}
+            showPlatform={false}
+            onSearch={() => loadData()}
+            onReset={resetFilters}
+          >
+            <span className={styles.label}>平台:</span>
+            <Select
+              mode='multiple'
+              maxTagCount='responsive'
+              placeholder='全部平台'
+              style={{ minWidth: 220 }}
+              value={platforms}
+              onChange={setPlatforms}
+              options={PLATFORM_OPTIONS}
+              allowClear
+            />
+          </FilterBar>
         </FadeInSection>
 
         {/* v3.1: Tab 切换两套独立漏斗 */}
