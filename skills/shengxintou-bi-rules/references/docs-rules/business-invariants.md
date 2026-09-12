@@ -179,7 +179,7 @@
 
 - 主播表保持一页呈现时使用 `pagination={false}`，不要因默认分页隐藏主播。
 
-- **复合来源线索均分**：线索的 `客户来源` 可能出现多个主播（如 `抖音引流-周乐意,抖音引流-杨毅`）。anchor 聚合（`anchor-clusters`、`anchor-weekly-analysis`）必须按匹配主播数均分线索、开口、开户、资产等所有指标，避免同一线索被累加到每个主播造成总数虚增。关键实现：`backend/routes/data/leads.py` 与 `frontend-react/src/services/mobileRouteHandler.ts`（SQL/算法必须完全一致，由 `scripts/check_api_contract.py` ALGO_MARKERS 门禁强制）。
+- **复合来源线索均分**：线索的 `客户来源` 可能出现多个主播（如 `抖音引流-周乐意,抖音引流-杨毅`）。anchor 聚合（`anchor-clusters`、`anchor-weekly-analysis`）必须按匹配主播数均分线索、开口、开户、资产等所有指标，避免同一线索被累加到每个主播造成总数虚增。关键实现：`backend/utils/anchor_attribution.py`（后端唯一实现，`leads.py` 只保留路由壳）与 `frontend-react/src/services/mobileRouteHandler.ts`（SQL/算法必须完全一致，由 `scripts/check_api_contract.py` ALGO_MARKERS 门禁强制）。
 
 ## 7. 主播直播类型
 
@@ -266,6 +266,8 @@
 逐表同步是把 WebDAV 整库快照拆成「每张业务表一个独立 `.db` 文件 + 表级清单 `tables/manifest.json`」，让不同同事各自增量上传自己改动的表，云端各表保持独立最新。
 
 - **权威实现**：`backend/utils/table_sync.py`（`SYNC_TABLES` / 版本计算 / 单表导出合并）、`backend/routes/webdav_backup.py`（`/webdav/tables/manifest|upload|download`）。
+
+- **前端消费侧**：移动端/PWA 下载走 `frontend-react/src/services/mobileSync.ts` / `mobileTableSync.ts`，代理 URL 归一与请求构造统一用共享 `webdavProxy.ts`（两文件不得再复制本地副本）；整库与分表下载都必须做 gzip 魔数校验（`hasGzipMagic`），假 200 响应返回用户可理解的报错而非静默落库坏文件。
 
 - **业务可同步表 =** **`SYNC_TABLES`（8 张）**：`dim_account`、`dim_ad_plan_class`、`fact_conv_content`、`fact_conv_appmarket`、`agg_vendor_daily`、`agg_xhs_note`、`agg_daily_channel_open`、`fact_qingniao_leads`。
 

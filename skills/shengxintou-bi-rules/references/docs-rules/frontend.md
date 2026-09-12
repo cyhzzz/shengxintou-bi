@@ -36,6 +36,14 @@
 - 对数尺度只改变视觉宽度，tooltip、表格和指标仍显示原始值。
 - 修改漏斗阶段前先读 `business-invariants.md`，前端不能通过过滤重写后端口径。
 
+### 报表取数骨架 useReportData
+
+- 报表页取数统一走 `src/hooks/useReportData.ts`：`useReportData<T, TArgs>(fetcher, { errorMessage? })` 返回 `data/loading/error` + `load(args)` + `reset()`；页面不再手写一组 `useState` 管数据、加载与报错三态。
+- fetcher 定义在模块级（负责取数与数据映射，失败 `throw Error`），页面内只保留薄包装（参数校验 + `load()` 调用）；一个页面多个数据块 = 多个 hook 实例。
+- 副接口需要静默失败（不打扰全局错误弹窗）时，在 fetcher 内 `catch` 返回 `null` 且永不 `throw`，hook 的报错提示便不会触发。
+- 已知例外：`IntelligentAnalysis`（SSE 流式，整页不接 hook）；上传进度轮询等非查询逻辑保留页面层。
+- 禁止在报表页恢复手写 `setData`/`setLoading` 式三态组；迁移或新写报表页的验证三件套为 typecheck + lint + build。
+
 ## 3. 表格和详情
 
 - Ant Design `Table` 的业务列必须设置正确的 `dataIndex` / `key`。

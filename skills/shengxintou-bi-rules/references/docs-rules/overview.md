@@ -96,6 +96,7 @@
 | `MetricCard` / `MetricSection` | 报表头部统一指标卡与响应式卡组 |
 | `ReportFooter` | 数据源、端点、口径和备注的统一弱化脚注 |
 | `FilterBar` | 报表筛选器统一入口（内置查询/重置按钮 + `DateRangeFilter` 近 7/14/30/90/180 天快速选择） |
+| `useReportData` | 报表页取数骨架：统一 data/loading/error 三态、失败弹窗且保留旧数据、`load` 参数覆盖防闭包旧值（约定见 `frontend.md` 第 2 节） |
 | `FunnelChart` | Ant Design Plots 漏斗及 CSS 横条错误降级 |
 | `CalendarHeatmap` | Dashboard 开户日历热力图 |
 | `sanitizeText` | 清理 Excel 导入字段中的 BOM、NUL、控制字符、替换符和零宽字符 |
@@ -114,7 +115,8 @@
 | `backend/models_v2.py` | 业务 ORM 中文列名、表结构 | 确认上游文件列名一致；`to_sql` 落库结果核对 |
 | `backend/models.py` | 系统表 | 确认 `db.create_all()` 注册路径 |
 | `backend/processors/v2/raw_import.py` | 唯一业务导入处理器 | 使用隔离数据库和最小样例验证目标表、行数、replace/append 语义 |
-| `backend/routes/data/leads.py` | 漏斗、线索、转化查询 | 核对 `business-invariants.md` 中的口径规则 |
+| `backend/utils/anchor_attribution.py` | 主播聚类归因唯一实现（正则、映射加载、聚合计算） | 先读 `business-invariants.md` 第 6 节；跑 `python scripts/check_api_contract.py` |
+| `backend/routes/data/leads.py` | 漏斗、线索、转化查询路由（主播聚类计算已收敛至 `anchor_attribution.py`） | 核对 `business-invariants.md` 中的口径规则 |
 | `backend/routes/data/cost_analysis.py` | 成本分析查询 | 核对 `business-invariants.md` 中的口径规则 |
 | `backend/routes/reports/app_market.py` | 应用市场专题报表 | 核对漏斗不变平、真实获客渠道过滤 |
 
