@@ -20,6 +20,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import { pickEChartsColor } from '@/utils/echartsColors';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import {
@@ -100,10 +101,6 @@ interface AgencyAnalysisRespData {
 }
 
 const AgencyAnalysisPage: React.FC = () => {
-  const [summary, setSummary] = useState<FlattenedSummaryItem[]>([]);
-  const [trend, setTrend] = useState<{ dates: string[]; series: TrendSeriesItem[] }>({ dates: [], series: [] });
-  const [stats, setStats] = useState<{ agency_count: number; platform_count: number }>({ agency_count: 0, platform_count: 0 });
-  const [loading, setLoading] = useState(false);
   const [metric, setMetric] = useState<MetricType>('cost');
 
   const {
@@ -125,49 +122,56 @@ const AgencyAnalysisPage: React.FC = () => {
     return params;
   }, [dateRange, selectedPlatforms, selectedAgencies, selectedBusinessModels]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = buildParams();
-      const res = await http.get<AgencyAnalysisRespData>('/agency-analysis', params);
-      if (res?.success && res.data) {
-        const flattened: FlattenedSummaryItem[] = (res.data.summary || []).map((item) => {
-          const m = item.metrics || {};
-          return {
-            platform: item.platform || '',
-            business_model: item.business_model || '',
-            agency: item.agency || '',
-            agency_short: item.agency_short || item.agency || '',
-            is_subtotal: item.is_subtotal,
-            is_total: item.is_total,
-            cost: m.cost || 0,
-            impressions: m.impressions || 0,
-            clicks: m.clicks || 0,
-            lead_users: m.lead_users || 0,
-            opened_account_users: m.opened_account_users || 0,
-            valid_customer_users: m.valid_customer_users || 0,
-            opened_account_assets: m.opened_account_assets || 0,
-            existing_customer_assets: m.existing_customer_assets || 0,
-            lead_cost: m.lead_cost || 0,
-            account_cost: m.account_cost || 0,
-            app_activation_users: m.app_activation_users || 0,
-            app_activation_cost: m.app_activation_cost || 0,
-          };
-        });
-        setSummary(flattened);
-        setTrend(res.data.trend || { dates: [], series: [] });
-        setStats(res.data.meta || { agency_count: 0, platform_count: 0 });
-      }
-    } catch (err) {
-      console.error('[AgencyAnalysis] fetch error', err);
-    } finally {
-      setLoading(false);
+  // 取数器：只负责请求与校验，loading/error/失败提示由 useReportData 统一处理（修复原先失败静默无提示）
+  const fetchAgencyAnalysis = useCallback(async (): Promise<AgencyAnalysisRespData> => {
+    const res = await http.get<AgencyAnalysisRespData>('/agency-analysis', buildParams());
+    if (!res?.success || !res.data) {
+      throw new Error(res?.message || '加载厂商分析失败');
     }
+    return res.data;
   }, [buildParams]);
 
+  const { data: agencyData, loading, load } = useReportData(fetchAgencyAnalysis, { errorMessage: '加载厂商分析异常' });
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    load();
+  }, [load]);
+
+  const summary = useMemo<FlattenedSummaryItem[]>(() => {
+    if (!agencyData) return [];
+    return (agencyData.summary || []).map((item) => {
+      const m = item.metrics || {};
+      return {
+        platform: item.platform || '',
+        business_model: item.business_model || '',
+        agency: item.agency || '',
+        agency_short: item.agency_short || item.agency || '',
+        is_subtotal: item.is_subtotal,
+        is_total: item.is_total,
+        cost: m.cost || 0,
+        impressions: m.impressions || 0,
+        clicks: m.clicks || 0,
+        lead_users: m.lead_users || 0,
+        opened_account_users: m.opened_account_users || 0,
+        valid_customer_users: m.valid_customer_users || 0,
+        opened_account_assets: m.opened_account_assets || 0,
+        existing_customer_assets: m.existing_customer_assets || 0,
+        lead_cost: m.lead_cost || 0,
+        account_cost: m.account_cost || 0,
+        app_activation_users: m.app_activation_users || 0,
+        app_activation_cost: m.app_activation_cost || 0,
+      };
+    });
+  }, [agencyData]);
+
+  const trend = useMemo<{ dates: string[]; series: TrendSeriesItem[] }>(
+    () => agencyData?.trend || { dates: [], series: [] },
+    [agencyData]
+  );
+  const stats = useMemo<{ agency_count: number; platform_count: number }>(
+    () => agencyData?.meta || { agency_count: 0, platform_count: 0 },
+    [agencyData]
+  );
 
   const totals = useMemo(() => {
     const t = { cost: 0, impressions: 0, clicks: 0, lead_users: 0, app_activation: 0, opened: 0, valid: 0 };
@@ -306,7 +310,7 @@ const AgencyAnalysisPage: React.FC = () => {
   return (
     <div className={styles.agencyAnalysisPage}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform showAgency showBusinessModel onSearch={() => fetchData()} onReset={() => fetchData()} />
+        <FilterBar showPlatform showAgency showBusinessModel onSearch={() => load()} onReset={() => load()} />
       </FadeInSection>
 
       <FadeInSection delay={0.4} duration={0.8}>

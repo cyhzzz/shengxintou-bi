@@ -12,13 +12,14 @@
  * 兼容: 旧 is_employee_mode 单端点已弃用，前端默认走 split（v3.2 删除旧响应）
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Row, Col, Card, Spin, message, Tabs, Tag, Empty, Select } from 'antd';
+import { Row, Col, Card, Spin, Tabs, Tag, Empty, Select } from 'antd';
 import { CheckCircleOutlined, MobileOutlined, RiseOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { FunnelChart, FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { dataService } from '@/services';
+import { useReportData } from '@/hooks/useReportData';
 import { sanitizeText } from '@/utils/sanitizeText';
 import type { ApiResponse } from '@/types';
 import styles from './ConversionFunnel.module.scss';
@@ -44,17 +45,31 @@ interface FunnelSplitRespData {
   };
 }
 
-const ConversionFunnelPage: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [contentStages, setContentStages] = useState<FunnelStage[]>([]);
-  const [extraNewOpened, setExtraNewOpened] = useState<number>(0);
-  const [contentNewOpenAssets, setContentNewOpenAssets] = useState<number>(0);
-  const [appmarketStages, setAppmarketStages] = useState<FunnelStage[]>([]);
-  const [appmarketNewOpenAssets, setAppmarketNewOpenAssets] = useState<number>(0);
+interface FunnelQuery {
+  startDate: string;
+  endDate: string;
+  platforms: string[];
+}
 
+// 取数器：只负责请求与校验，loading/error/失败提示由 useReportData 统一处理
+const fetchFunnelSplit = async (query: FunnelQuery): Promise<FunnelSplitRespData> => {
+  const response = await dataService.getConversionFunnelSplit({
+    start_date: query.startDate,
+    end_date: query.endDate,
+    platforms: query.platforms.length ? query.platforms : undefined,
+  }) as ApiResponse<FunnelSplitRespData>;
+  if (!response.success || !response.data) {
+    throw new Error(response.message || '加载转化漏斗失败');
+  }
+  return response.data;
+};
+
+const ConversionFunnelPage: React.FC = () => {
   // 日期接入全局筛选 store；平台为「内容平台 + 应用市场」混合域，保持本页本地筛选
   const { dateRange } = useFilterStore();
   const [platforms, setPlatforms] = useState<string[]>([]);
+  const { data: funnelData, loading, load } = useReportData(fetchFunnelSplit, { errorMessage: '加载转化漏斗异常' });
+
   // 筛选器可选平台：内容平台 + 应用市场
   const PLATFORM_OPTIONS = [
     { label: '小红书', value: '小红书' },
@@ -68,41 +83,27 @@ const ConversionFunnelPage: React.FC = () => {
     { label: '荣耀', value: '荣耀' },
     { label: '苹果', value: '苹果' },
   ];
-  const loadData = async (override?: { startDate?: string; endDate?: string; platforms?: string[] }) => {
-    setLoading(true);
-    try {
-      const sd = override?.startDate ?? dateRange.startDate;
-      const ed = override?.endDate ?? dateRange.endDate;
-      const pls = override?.platforms ?? platforms;
-      const response = await dataService.getConversionFunnelSplit({
-        start_date: sd,
-        end_date: ed,
-        platforms: pls.length ? pls : undefined,
-      }) as ApiResponse<FunnelSplitRespData>;
-      if (response.success && response.data) {
-        const funnels = response.data.funnels || {};
-        setContentStages(funnels.content?.stages || []);
-        setAppmarketStages(funnels.appmarket?.stages || []);
-        setExtraNewOpened(funnels.content?.extra_new_opened || 0);
-        setContentNewOpenAssets(funnels.content?.new_open_assets || 0);
-        setAppmarketNewOpenAssets(funnels.appmarket?.new_open_assets || 0);
-      } else {
-        message.error(response.message || '加载转化漏斗失败');
-      }
-    } catch {
-      message.error('加载转化漏斗异常');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const buildQuery = (): FunnelQuery => ({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    platforms,
+  });
+
   // 重置：日期由 FilterBar 内置 resetAll 重置（全局 store），平台是本页本地筛选；按重置后的条件重新加载
   const resetFilters = () => {
     setPlatforms([]);
     const dr = useFilterStore.getState().dateRange;
-    loadData({ startDate: dr.startDate, endDate: dr.endDate, platforms: [] });
+    load({ startDate: dr.startDate, endDate: dr.endDate, platforms: [] });
   };
 
-  useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { load(buildQuery()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const funnels = funnelData?.funnels;
+  const contentStages = funnels?.content?.stages || [];
+  const appmarketStages = funnels?.appmarket?.stages || [];
+  const extraNewOpened = funnels?.content?.extra_new_opened || 0;
+  const contentNewOpenAssets = funnels?.content?.new_open_assets || 0;
+  const appmarketNewOpenAssets = funnels?.appmarket?.new_open_assets || 0;
 
 
   // 转换 stages 给 FunnelChart 组件 (期望 {name, count, rate})
@@ -163,7 +164,7 @@ const ConversionFunnelPage: React.FC = () => {
           <FilterBar
             showAgency={false}
             showPlatform={false}
-            onSearch={() => loadData()}
+            onSearch={() => load(buildQuery())}
             onReset={resetFilters}
           >
             <span className={styles.label}>平台:</span>
