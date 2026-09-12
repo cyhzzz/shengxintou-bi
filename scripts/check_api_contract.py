@@ -88,7 +88,7 @@ CASE_ALIASES: Dict[str, str] = {
 ALGO_MARKERS: List[Dict[str, str]] = [
     {
         'name': '复合来源线索均分（anchor-clusters / anchor-weekly-analysis）',
-        'backend_file': ROUTES_DIR / 'data' / 'leads.py',
+        'backend_file': ROOT / 'backend' / 'utils' / 'anchor_attribution.py',
         'backend_pattern': r'div = max\(n, 1\)',
         'mobile_pattern': r'div = Math\.max\(n, 1\)',
     },
@@ -138,7 +138,7 @@ def check_algorithm_consistency() -> List[str]:
         if m_cnt != b_cnt:
             drifts.append(
                 f"[{marker['name']}] 后端 {b_cnt} 处 vs 移动端 {m_cnt} 处，"
-                f"数量不一致，需在 mobileRouteHandler.ts 同步（后端位置见 leads.py）"
+                f"数量不一致，需在 mobileRouteHandler.ts 同步（后端位置见 {b_file.name}）"
             )
     return drifts
 

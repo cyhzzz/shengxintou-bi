@@ -10,18 +10,22 @@ v3.1.31 起纯数据化改造：所有数据实时聚合，不依赖 weekly_repo
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta, date as _date
 import logging
-import re
 
 from backend.database import db
 from backend.models_v2 import (
     AggVendorDaily, AggDailyChannelOpen, FactConvContent,
-    FactConvAppmarket, FactPlanDaily, DimAdPlanClass, DimAnchorLiveType,
+    FactConvAppmarket, FactPlanDaily, DimAdPlanClass,
 )
 from backend.utils.weekly_utils import get_week_info, generate_week_options, validate_week_period, get_all_fridays_in_year
 from backend.utils.decorators import handle_exceptions
 from sqlalchemy import func, and_, case, distinct
-# 复用主播聚类核心（复合来源均分口径与 /anchor-clusters 严格一致），避免两处实现漂移
-from backend.routes.data.leads import _compute_anchor_cluster_items
+# 主播归因唯一权威源：聚类核心 + 直播线索识别正则统一从 anchor_attribution 导入，避免两处实现漂移
+from backend.utils.anchor_attribution import (
+    ANCHOR_SOURCE_PATTERN as _ANCHOR_SRC_PATTERN,
+    SOURCE_SPLIT_PATTERN as _ANCHOR_SRC_SPLIT,
+    compute_anchor_cluster_items,
+    load_live_type_mappings,
+)
 from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS
 
 logger = logging.getLogger(__name__)
@@ -365,7 +369,7 @@ def get_weekly_data():
 # 周报详细版（v4.2.x）：在"总数+走势"概览基础上，按渠道分类下钻细分分析
 #   应用市场 -> 平台 -> 广告计划 -> 版位/子版位/出价
 #   内容平台(小红书/腾讯/抖音) -> 平台 -> 厂商 -> 计划
-#   直播 -> 主播（复合来源均分，复用 leads.py 的 _compute_anchor_cluster_items）
+#   直播 -> 主播（复合来源均分，复用 anchor_attribution.py 的 compute_anchor_cluster_items）
 # ============================================================================
 # 内容平台：小红书/腾讯/抖音/yj/云极/快手；财联社不在此列（财联社数据均为直播场景，由直播聚合覆盖，避免重复计数）
 CONTENT_PLATFORMS = ['小红书', '腾讯', '抖音', 'yj', '云极', '快手']
@@ -401,23 +405,10 @@ def _norm_factory(platform, name):
     return '未归因' if n.lower() in _GLOBAL_FACTORY_MERGE else (n or '未归因')
 
 
-# 直播线索识别（客户来源口径）— 与 leads.py _compute_anchor_cluster_items 的匹配逻辑保持一致：
+# 直播线索识别（客户来源口径）— 正则统一从 backend/utils/anchor_attribution.py 导入：
 # 客户来源按 [,，;；、] 拆分后，任一段命中「(平台)引流-主播」正则或 dim_anchor_live_type
 # 纯人名 token（is_active），即归为直播线索。直播线索在 _live_detail 板块单独统计，
 # 内容平台线索数须排除，避免两板块重复计数。
-_ANCHOR_SRC_PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
-_ANCHOR_SRC_SPLIT = re.compile(r"[,，;；、]+")
-
-
-def _load_live_plain_tokens():
-    """加载 dim_anchor_live_type 中 is_active 的纯人名 token（不含 引流-/直播带货-）。"""
-    rows = db.session.query(
-        DimAnchorLiveType.source_token, DimAnchorLiveType.is_active,
-    ).all()
-    return {
-        r.source_token for r in rows
-        if r.is_active and '引流-' not in r.source_token and '直播带货-' not in r.source_token
-    }
 
 
 def _is_live_lead_source(src, plain_tokens):
@@ -660,7 +651,7 @@ def _content_platform_detail(sd, ed):
     # v4.x 口径：排除直播线索（客户来源命中主播聚类口径），直播线索在 _live_detail 单独板块统计
     lead_counts = {}
     if CONTENT_PLATFORMS:
-        plain_tokens = _load_live_plain_tokens()
+        _, _, _, plain_tokens = load_live_type_mappings()
         lc_rows = db.session.query(
             FactConvContent.平台来源,
             FactConvContent.客户来源,
@@ -717,7 +708,7 @@ def _live_detail(sd, ed):
     取全部主播前 top 200（按线索量降序），含直播类型/线索/开口/开户/有效户/资产。
     v4.1.4：30 → 200，避免「开户多但线索量小」的主播被截断导致云图直播板块漏主播名。
     """
-    items = _compute_anchor_cluster_items(sd, ed, [], [], [])
+    items = compute_anchor_cluster_items(sd, ed, [], [], [])
     # items 已按 (leads, new_opened) 降序，截取头部
     out = []
     for i in items[:200]:
@@ -769,12 +760,12 @@ def _weekly_opens_by_channels(week_list, channels, category='互联网引流'):
 def _live_weekly(week_list):
     """按周次聚合主播开户数（复用主播聚类核心，复合来源均分）。
 
-    逐周调用 _compute_anchor_cluster_items，周区间内开户数>0 的主播作为该周数据点，
+    逐周调用 compute_anchor_cluster_items，周区间内开户数>0 的主播作为该周数据点，
     返回 [{week, 主播1: opens, 主播2: opens, ...}]，供直播分周开户堆叠图使用。
     """
     result = []
     for w in week_list:
-        items = _compute_anchor_cluster_items(w['sd'], w['ed'], [], [], [])
+        items = compute_anchor_cluster_items(w['sd'], w['ed'], [], [], [])
         row = {'week': w['week']}
         for i in items:
             if i['new_opened'] > 0:
