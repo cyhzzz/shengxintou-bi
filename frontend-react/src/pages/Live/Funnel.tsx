@@ -27,6 +27,7 @@ import { useFilterStore } from '@/stores';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './Funnel.module.scss';
 
 // v3.3.0: 直播类型（4 类，由 dim_anchor_live_type 表映射）
@@ -125,17 +126,49 @@ const renderLiveTypeTag = (lt: string | null) => {
   return <Tag color={LIVE_TYPE_COLOR[lt] || 'default'}>{lt}</Tag>;
 };
 
+// 取数参数与返回结构（迁移到 useReportData 统一三态与报错）
+type AnchorFilters = {
+  start_date: string | null;
+  end_date: string | null;
+  platforms?: string[];
+  live_types?: LiveType[];
+};
+
+interface AnchorClustersData {
+  items: AnchorItem[];
+  platforms: string[];
+  live_types: string[];
+}
+
+const fetchAnchorClusters = async ({ filters }: { filters: AnchorFilters }): Promise<AnchorClustersData> => {
+  const res: any = await http.post('/leads-detail/anchor-clusters', { filters, top_n: 200 });
+  if (!res?.success || !res.data) throw new Error(res?.message || '主播聚类数据加载失败');
+  return {
+    items: res.data.items || [],
+    platforms: res.data.platforms || [],
+    live_types: res.data.live_types || [],
+  };
+};
+
+// v3.1.27: 主播引流走势 — 按日/周/月聚合（与 /leads-detail/anchor-clusters 同口径）
+const fetchAnchorTrend = async ({ filters, granularity }: { filters: AnchorFilters; granularity: 'daily' | 'weekly' | 'monthly' }): Promise<any> => {
+  const res: any = await http.post('/leads-detail/anchor-clusters-trend', { filters, granularity });
+  if (!res?.success || !res.data) throw new Error(res?.message || '主播走势数据加载失败');
+  return res.data;
+};
+
 const LiveFunnelPage: React.FC = () => {
   const { dateRange, selectedPlatforms } = useFilterStore();
   // v3.3.0: 直播类型筛选
   const [liveTypeFilter, setLiveTypeFilter] = useState<LiveType[]>([]);
-  const [liveTypeOptions, setLiveTypeOptions] = useState<string[]>([]);
-  const [items, setItems] = useState<AnchorItem[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [trendData, setTrendData] = useState<any>(null);
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
-  const [trendLoading, setTrendLoading] = useState(false);
+
+  // useReportData 统一三态：聚类与走势各一实例，派生变量沿用原 state 名
+  const { data: clusterData, loading, load: loadClusters } = useReportData(fetchAnchorClusters, { errorMessage: '主播聚类数据加载失败' });
+  const { data: trendData, loading: trendLoading, load: loadTrend } = useReportData(fetchAnchorTrend, { errorMessage: '主播走势数据加载失败' });
+  const items = clusterData?.items ?? [];
+  const platforms = clusterData?.platforms ?? [];
+  const liveTypeOptions = clusterData?.live_types ?? [];
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -150,38 +183,8 @@ const LiveFunnelPage: React.FC = () => {
     setLiveTypeFilter([]);
   };
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-clusters', { filters, top_n: 200 });
-      if (res?.success) {
-        setItems(res.data.items || []);
-        setPlatforms(res.data.platforms || []);
-        setLiveTypeOptions(res.data.live_types || []);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // v3.1.27: 主播引流走势 — 按日/周/月聚合（与 /leads-detail/anchor-clusters 同口径）
-  const loadTrend = async () => {
-    setTrendLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
-        filters,
-        granularity: trendGranularity,
-      });
-      if (res?.success && res.data) setTrendData(res.data);
-    } catch (err) {
-      console.warn('anchor trend load failed', err);
-    } finally {
-      setTrendLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
-  useEffect(() => { loadTrend(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
+  useEffect(() => { loadClusters({ filters }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { loadTrend({ filters, granularity: trendGranularity }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
 
   // 6 阶段漏斗（v3.1.26 业务口径: 线索 → 开口 → 有效线索 → 有效线索(剔除存量) → 成功开户(新) → 有效户(新)）
   // stage.rate = 阶段转化率（此阶段 / 上一阶段）；stage.step_rate = 累计转化率（此阶段 / 顶端线索）
@@ -442,7 +445,7 @@ const LiveFunnelPage: React.FC = () => {
         <FilterBar
           showAgency={false}
           platformOptions={platforms.map((p) => ({ label: p, value: p }))}
-          onSearch={load}
+          onSearch={() => loadClusters({ filters })}
           onReset={resetFilters}
         >
           <span className={styles.label}>直播类型:</span>

@@ -51,6 +51,7 @@ import { useFilterStore } from '@/stores';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import CalendarHeatmap from '@/pages/Dashboard/components/CalendarHeatmap';
 import styles from './Funnel.module.scss';
 
@@ -193,37 +194,121 @@ interface DirectSalesPageProps {
   liveType?: LiveType;
 }
 
+// 取数参数与返回结构（迁移到 useReportData 统一三态与报错）
+type DirectSalesFilters = {
+  start_date: string | null;
+  end_date: string | null;
+  platforms?: string[];
+  live_types: LiveType[];
+};
+
+interface DirectSalesClusterData {
+  items: AnchorItem[];
+  platforms: string[];
+  anchorOptions: string[];
+}
+
+interface TopQualityDay {
+  date: string;
+  leads: number;
+  new_opened: number;
+  opening_rate: number;
+  new_assets: number;
+}
+
+interface AnchorWeeklyData {
+  anchor_items: AnchorWeeklyItem[];
+  totals: any;
+  weekly_totals: AnchorWeeklyPoint[];
+}
+
+const fetchCluster = async ({ filters }: { filters: DirectSalesFilters }): Promise<DirectSalesClusterData> => {
+  const res: any = await http.post('/leads-detail/anchor-clusters', { filters, top_n: 200 });
+  if (!res?.success || !res.data) throw new Error(res?.message || '主播聚类数据加载失败');
+  const items = res.data.items || [];
+  const anchorOptions = Array.from(new Set(items.map((it: AnchorItem) => it.anchor))).sort() as string[];
+  return { items, platforms: res.data.platforms || [], anchorOptions };
+};
+
+const fetchTrend = async ({ filters, granularity }: { filters: DirectSalesFilters; granularity: 'daily' | 'weekly' | 'monthly' }): Promise<any> => {
+  const res: any = await http.post('/leads-detail/anchor-clusters-trend', { filters, granularity });
+  if (!res?.success || !res.data) throw new Error(res?.message || '主播走势数据加载失败');
+  return res.data;
+};
+
+// 热力图：固定 daily + 滚动 365 天窗口（与原实现一致），按 metric 字面映射（opening_rate 分支保留原兜底）
+const fetchHeatmap = async ({ filters, metric }: { filters: DirectSalesFilters; metric: 'new_leads' | 'new_opened' | 'opening_rate' }): Promise<{ date: string; value: number }[]> => {
+  const today = dayjs();
+  const start = today.subtract(364, 'day').format('YYYY-MM-DD');
+  const end = today.format('YYYY-MM-DD');
+  const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
+    filters: { ...filters, start_date: start, end_date: end },
+    granularity: 'daily',
+  });
+  if (!res?.success || !res.data) throw new Error(res?.message || '日历热力图数据加载失败');
+  return Object.entries(res.data.totals || {}).map(([date, v]: [string, any]) => {
+    let value: number;
+    if (metric === 'opening_rate') {
+      const opened = Number(v?.new_opened || 0);
+      const leads = Number(v?.new_leads || v?.leads || 0);
+      value = leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
+    } else {
+      value = Number(v?.[metric] || 0);
+    }
+    return { date, value };
+  });
+};
+
+// 质效双高日 Top 10（线索量 > 10 AND 开户率 >= 5% AND 开户数 > 0，按开户数降序）
+const fetchTopQualityDays = async ({ filters }: { filters: DirectSalesFilters }): Promise<TopQualityDay[]> => {
+  const res: any = await http.post('/leads-detail/anchor-clusters-trend', { filters, granularity: 'daily' });
+  if (!res?.success || !res.data) throw new Error(res?.message || '质效双高日数据加载失败');
+  const arr = Object.entries(res.data.totals || {}).map(([date, v]: [string, any]): TopQualityDay => {
+    const leads = Number(v?.new_leads || v?.leads || 0);
+    const new_opened = Number(v?.new_opened || 0);
+    const new_assets = Number(v?.new_assets || 0);
+    const opening_rate = leads > 0 ? +((new_opened / leads) * 100).toFixed(2) : 0;
+    return { date, leads, new_opened, opening_rate, new_assets };
+  });
+  return arr
+    .filter((d) => d.leads > 10 && d.opening_rate >= 5 && d.new_opened > 0)
+    .sort((a, b) => b.new_opened - a.new_opened || b.opening_rate - a.opening_rate)
+    .slice(0, 10);
+};
+
+const fetchAnchorWeekly = async ({ filters }: { filters: DirectSalesFilters }): Promise<AnchorWeeklyData> => {
+  const res: any = await http.post('/leads-detail/anchor-weekly-analysis', { filters, top_n: 50 });
+  if (!res?.success || !res.data) throw new Error(res?.message || '主播周度分析数据加载失败');
+  return {
+    anchor_items: res.data.anchor_items || [],
+    totals: res.data.totals || null,
+    weekly_totals: res.data.weekly_totals || [],
+  };
+};
+
 const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直播' }) => {
   const meta = LIVE_TYPE_META[liveType];
   const { dateRange, selectedPlatforms } = useFilterStore();
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
-  const [items, setItems] = useState<AnchorItem[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [anchorOptions, setAnchorOptions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // 走势图
-  const [trendData, setTrendData] = useState<any>(null);
   const [trendGranularity, setTrendGranularity] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
-  const [trendLoading, setTrendLoading] = useState(false);
-
-  // 热力图（固定 daily + 365 天滚动窗口，支持「线索数 / 开户数 / 开户率」切换）
-  const [heatmapData, setHeatmapData] = useState<{ date: string; value: number }[]>([]);
-  const [heatmapLoading, setHeatmapLoading] = useState(false);
   const [heatmapMetric, setHeatmapMetric] = useState<'new_leads' | 'new_opened' | 'opening_rate'>('new_leads');
 
-  // 质效双高日 Top 10（开户率>5% AND 线索量>10，按开户数降序）
-  const [topQualityDays, setTopQualityDays] = useState<
-    Array<{ date: string; leads: number; new_opened: number; opening_rate: number; new_assets: number }>
-  >([]);
-  const [topQualityLoading, setTopQualityLoading] = useState(false);
+  // useReportData 统一三态：聚类 / 走势 / 热力图 / 质效双高日 / 主播×周 各一实例
+  const { data: clusterData, loading, load: loadCluster } = useReportData(fetchCluster, { errorMessage: '主播聚类数据加载失败' });
+  const { data: trendData, loading: trendLoading, load: loadTrend } = useReportData(fetchTrend, { errorMessage: '主播走势数据加载失败' });
+  const { data: heatmapRaw, loading: heatmapLoading, load: loadHeatmap } = useReportData(fetchHeatmap, { errorMessage: '日历热力图数据加载失败' });
+  const { data: topQualityRaw, loading: topQualityLoading, load: loadTopQualityDays } = useReportData(fetchTopQualityDays, { errorMessage: '质效双高日数据加载失败' });
+  const { data: anchorWeeklyData, loading: anchorWeeklyLoading, load: loadAnchorWeekly } = useReportData(fetchAnchorWeekly, { errorMessage: '主播周度分析数据加载失败' });
 
-  // 主播 × 周交叉表（拿量能力 + 5 漏斗率周度稳定性）
-  const [anchorWeeklyItems, setAnchorWeeklyItems] = useState<AnchorWeeklyItem[]>([]);
-  const [anchorWeeklyTotals, setAnchorWeeklyTotals] = useState<any>(null);
-  // 整体周度走势数组（来自后端 weekly_totals，未按主播拆分，用于整体量质走势图）
-  const [weeklyTotals, setWeeklyTotals] = useState<AnchorWeeklyPoint[]>([]);
-  const [anchorWeeklyLoading, setAnchorWeeklyLoading] = useState(false);
+  // 派生变量沿用原 state 名，下游零改动
+  const items = clusterData?.items ?? [];
+  const platforms = clusterData?.platforms ?? [];
+  const anchorOptions = clusterData?.anchorOptions ?? [];
+  const heatmapData = heatmapRaw ?? [];
+  const topQualityDays = topQualityRaw ?? [];
+  const anchorWeeklyItems = anchorWeeklyData?.anchor_items ?? [];
+  const anchorWeeklyTotals = anchorWeeklyData?.totals ?? null;
+  const weeklyTotals = anchorWeeklyData?.weekly_totals ?? [];
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -238,127 +323,13 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
     setAnchorFilter([]);
   };
 
-  // 加载主播聚类数据（已按 live_types=['带货直播'] 过滤）
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-clusters', { filters, top_n: 200 });
-      if (res?.success) {
-        setItems(res.data.items || []);
-        setPlatforms(res.data.platforms || []);
-        // 主播选项（用于多选筛选）
-        const allAnchors = Array.from(new Set((res.data.items || []).map((it: AnchorItem) => it.anchor))) as string[];
-        setAnchorOptions(allAnchors.sort());
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { loadCluster({ filters }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { loadTrend({ filters, granularity: trendGranularity }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
+  useEffect(() => { loadHeatmap({ filters, metric: heatmapMetric }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, heatmapMetric]);
 
-  // 走势图（受 dateRange / platformFilter 影响）
-  const loadTrend = async () => {
-    setTrendLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
-        filters,
-        granularity: trendGranularity,
-      });
-      if (res?.success && res.data) setTrendData(res.data);
-    } catch (err) {
-      console.warn('direct-sales trend load failed', err);
-    } finally {
-      setTrendLoading(false);
-    }
-  };
+  useEffect(() => { loadTopQualityDays({ filters }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
-  // 热力图（固定 daily + 滚动 365 天，不受顶部 trendGranularity 影响）
-  const loadHeatmap = async () => {
-    setHeatmapLoading(true);
-    try {
-      const today = dayjs();
-      const start = today.subtract(364, 'day').format('YYYY-MM-DD');
-      const end = today.format('YYYY-MM-DD');
-      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
-        filters: {
-          ...filters,
-          start_date: start,
-          end_date: end,
-        },
-        granularity: 'daily',
-      });
-      if (res?.success && res.data?.totals) {
-        const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => {
-          let value: number;
-          if (heatmapMetric === 'opening_rate') {
-            const opened = Number(v?.new_opened || 0);
-            const leads = Number(v?.new_leads || v?.leads || 0);
-            value = leads > 0 ? +((opened / leads) * 100).toFixed(2) : 0;
-          } else {
-            value = Number(v?.[heatmapMetric] || 0);
-          }
-          return { date, value };
-        });
-        setHeatmapData(arr);
-      }
-    } catch (err) {
-      console.warn('direct-sales heatmap load failed', err);
-    } finally {
-      setHeatmapLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
-  useEffect(() => { loadTrend(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, trendGranularity]);
-  useEffect(() => { loadHeatmap(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, heatmapMetric]);
-
-  // v3.3.3 P3-8: 质效双高日 Top 10
-  const loadTopQualityDays = async () => {
-    setTopQualityLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-clusters-trend', {
-        filters,
-        granularity: 'daily',
-      });
-      if (res?.success && res.data?.totals) {
-        const arr = Object.entries(res.data.totals).map(([date, v]: [string, any]) => {
-          const leads = Number(v?.new_leads || v?.leads || 0);
-          const new_opened = Number(v?.new_opened || 0);
-          const new_assets = Number(v?.new_assets || 0);
-          const opening_rate = leads > 0 ? +((new_opened / leads) * 100).toFixed(2) : 0;
-          return { date, leads, new_opened, opening_rate, new_assets };
-        });
-        // 筛选：线索量 > 10 AND 开户率 >= 5% AND 开户数 > 0
-        const filtered = arr
-          .filter((d) => d.leads > 10 && d.opening_rate >= 5 && d.new_opened > 0)
-          .sort((a, b) => b.new_opened - a.new_opened || b.opening_rate - a.opening_rate)
-          .slice(0, 10);
-        setTopQualityDays(filtered);
-      }
-    } catch (err) {
-      console.warn('direct-sales top-quality-days load failed', err);
-    } finally {
-      setTopQualityLoading(false);
-    }
-  };
-  useEffect(() => { loadTopQualityDays(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
-
-  // 主播 × 周交叉表（按主播 × 周聚合，6 阶段漏斗量 + 5 个转化率）
-  const loadAnchorWeekly = async () => {
-    setAnchorWeeklyLoading(true);
-    try {
-      const res: any = await http.post('/leads-detail/anchor-weekly-analysis', { filters, top_n: 50 });
-      if (res?.success) {
-        setAnchorWeeklyItems(res.data.anchor_items || []);
-        setAnchorWeeklyTotals(res.data.totals || null);
-        setWeeklyTotals(res.data.weekly_totals || []);
-      }
-    } catch (err) {
-      console.warn('anchor-weekly-analysis load failed', err);
-    } finally {
-      setAnchorWeeklyLoading(false);
-    }
-  };
-  useEffect(() => { loadAnchorWeekly(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  useEffect(() => { loadAnchorWeekly({ filters }); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
 
   // 整体周度拿量能力走势（双 Y 轴：左=线索数柱 + 右=新开户/新有效户折线）
   const weeklyVolumeOption: EChartsOption = useMemo(() => {
@@ -1065,7 +1036,7 @@ const DirectSalesPage: React.FC<DirectSalesPageProps> = ({ liveType = '带货直
         <FilterBar
           showAgency={false}
           platformOptions={platforms.map((p) => ({ label: p, value: p }))}
-          onSearch={load}
+          onSearch={() => loadCluster({ filters })}
           onReset={resetFilters}
         >
           <span className={styles.label}>主播:</span>
