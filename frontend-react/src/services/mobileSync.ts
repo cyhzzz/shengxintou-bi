@@ -30,6 +30,7 @@ import {
   moveDatabaseFromCache,
   deleteMobileDatabase,
 } from './mobileSqlite';
+import { buildProxyRequestUrl, hasGzipMagic } from './webdavProxy';
 import { isPwaClient } from '@/utils/isDesktop';
 
 // 坚果云固定 WebDAV 入口（非凭据，可作为默认值）
@@ -381,8 +382,15 @@ export async function syncFromWebDAV(
     let blob = await response.blob();
     step(`  下载完成: ${blob.size} bytes`);
 
-    // 4a. 如果下载的是 .db.gz（gzip 压缩），先解压
+    // 4a. 如果下载的是 .db.gz（gzip 压缩），先校验魔数再解压
+    //     防网关对 .gz 路径返回假 200（HTML 错误页喂给解压器必然失败且难排查）
     if (latestFile.endsWith('.db.gz')) {
+      if (!hasGzipMagic(await blob.slice(0, 2).arrayBuffer())) {
+        return {
+          success: false,
+          message: '备份文件校验失败：下载内容不是有效的 gzip 文件（可能被网络拦截或传输中断），请稍后重试',
+        };
+      }
       blob = await decompressGzip(blob);
       step(`  解压完成: ${blob.size} bytes`);
     }
@@ -457,43 +465,6 @@ export async function syncFromWebDAV(
       message: `同步失败: ${errMsg}`,
     };
   }
-}
-
-/**
- * v3.6.2：规范化 Deno Deploy 代理 URL
- *
- * 用户在表单中可能填入以下几种格式：
- *   - https://xxx.deno.dev
- *   - https://xxx.deno.dev/
- *   - https://xxx.deno.dev/?
- *
- * 统一去掉末尾的 / 和 ?，再由调用方拼 ?url=...&auth=...
- * 避免拼出 `https://xxx.deno.dev?url=...`（部分代理对裸域名请求
- * 可能触发重定向到带 / 的版本，重定向后 query string 丢失，导致请求失败）。
- */
-function normalizeProxyUrl(raw: string): string {
-  let u = raw.trim();
-  while (u.endsWith('/') || u.endsWith('?')) {
-    u = u.slice(0, -1);
-  }
-  return u;
-}
-
-/**
- * v3.6.2：构造 PWA 代理请求 URL
- *
- * 关键修复：
- *   1. auth（base64）必须 encodeURIComponent —— base64 可能含 +、/、= 字符，
- *      其中 + 在 URL query string 中会被解析为空格，导致坚果云收到错误的凭据 → 401
- *   2. proxyUrl 末尾斜杠规范化，避免代理重定向丢 query string
- */
-function buildProxyRequestUrl(
-  proxyUrl: string,
-  targetUrl: string,
-  authBase64: string
-): string {
-  const proxy = normalizeProxyUrl(proxyUrl);
-  return `${proxy}?url=${encodeURIComponent(targetUrl)}&auth=${encodeURIComponent(authBase64)}`;
 }
 
 /**
@@ -582,9 +553,15 @@ async function syncFromWebDAVPwa(
     let blob = await dlResp.blob();
     step(`  下载完成: ${blob.size} bytes`);
 
-    // 3. 解压（如果是 .db.gz）
+    // 3. 解压（如果是 .db.gz，先校验魔数防代理假 200）
     if (latestFile.endsWith('.db.gz')) {
       step('3/5 解压 gzip');
+      if (!hasGzipMagic(await blob.slice(0, 2).arrayBuffer())) {
+        return {
+          success: false,
+          message: '备份文件校验失败：代理返回内容不是有效的 gzip 文件（网关假 200 或传输中断），请检查代理配置后重试',
+        };
+      }
       blob = await decompressGzip(blob);
       step(`  解压完成: ${blob.size} bytes`);
     } else {

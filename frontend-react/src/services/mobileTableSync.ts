@@ -25,6 +25,7 @@ import initSqlJs from 'sql.js';
 import type { SqlValue } from 'sql.js';
 import { isPwaClient } from '@/utils/isDesktop';
 import { decompressGzip, getWebDAVCredentials, saveLastSyncAt, type SyncResult } from './mobileSync';
+import { buildProxyRequestUrl, hasGzipMagic } from './webdavProxy';
 import { querySql as mobileQuerySql, executeSetSql } from './mobileSqlite';
 import {
   mergeParsedTablesIntoLocal,
@@ -65,16 +66,6 @@ function authB64(creds: { username: string; password: string }): string {
   return btoa(`${creds.username}:${creds.password}`);
 }
 
-function normalizeProxyUrl(raw: string): string {
-  let u = raw.trim();
-  while (u.endsWith('/') || u.endsWith('?')) u = u.slice(0, -1);
-  return u;
-}
-
-function buildProxyUrl(proxyUrl: string, targetUrl: string, auth: string): string {
-  return `${normalizeProxyUrl(proxyUrl)}?url=${encodeURIComponent(targetUrl)}&auth=${encodeURIComponent(auth)}`;
-}
-
 function tablesSubDir(creds: { remoteDir: string }): string {
   return creds.remoteDir
     ? `${creds.remoteDir}/tables/table_sync`
@@ -109,7 +100,7 @@ async function fetchRemoteManifest(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
     try {
-      const proxyTarget = buildProxyUrl(creds.proxyUrl, target, auth);
+      const proxyTarget = buildProxyRequestUrl(creds.proxyUrl, target, auth);
       resp = await fetch(proxyTarget, { signal: controller.signal });
     } finally {
       clearTimeout(timer);
@@ -156,7 +147,7 @@ async function fetchTableFile(
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 120000);
       try {
-        return await fetch(buildProxyUrl(creds.proxyUrl, target, auth), { signal: controller.signal });
+        return await fetch(buildProxyRequestUrl(creds.proxyUrl, target, auth), { signal: controller.signal });
       } finally {
         clearTimeout(timer);
       }
@@ -167,8 +158,7 @@ async function fetchTableFile(
   const gzResp = await fetchUrl(`${tableName}.db.gz`);
   if (gzResp.ok) {
     const gzBuf = await gzResp.arrayBuffer();
-    const head = new Uint8Array(gzBuf.slice(0, 2));
-    if (head[0] === 0x1f && head[1] === 0x8b) {
+    if (hasGzipMagic(gzBuf)) {
       const blob = await decompressGzip(new Blob([gzBuf]));
       return blob.arrayBuffer();
     }
