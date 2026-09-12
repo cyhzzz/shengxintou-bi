@@ -44,6 +44,18 @@ interface FilterState {
   toggleEmployee: (employee: string) => void;
   clearEmployees: () => void;
 
+  // 应用市场筛选 (多选)
+  selectedAppMarkets: string[];
+  setAppMarkets: (markets: string[]) => void;
+  toggleAppMarket: (market: string) => void;
+  clearAppMarkets: () => void;
+
+  // 渠道类型筛选 (多选)
+  selectedChannelTypes: string[];
+  setChannelTypes: (types: string[]) => void;
+  toggleChannelType: (type: string) => void;
+  clearChannelTypes: () => void;
+
   // 重置所有筛选条件
   resetAll: () => void;
 }
@@ -125,6 +137,34 @@ export const useFilterStore = create<FilterState>()(
         }),
       clearEmployees: () => set({ selectedEmployees: [] }),
 
+      // 应用市场筛选
+      selectedAppMarkets: [],
+      setAppMarkets: (markets) => set({ selectedAppMarkets: markets }),
+      toggleAppMarket: (market) =>
+        set((state) => {
+          const isSelected = state.selectedAppMarkets.includes(market);
+          return {
+            selectedAppMarkets: isSelected
+              ? state.selectedAppMarkets.filter((m) => m !== market)
+              : [...state.selectedAppMarkets, market],
+          };
+        }),
+      clearAppMarkets: () => set({ selectedAppMarkets: [] }),
+
+      // 渠道类型筛选
+      selectedChannelTypes: [],
+      setChannelTypes: (types) => set({ selectedChannelTypes: types }),
+      toggleChannelType: (type) =>
+        set((state) => {
+          const isSelected = state.selectedChannelTypes.includes(type);
+          return {
+            selectedChannelTypes: isSelected
+              ? state.selectedChannelTypes.filter((t) => t !== type)
+              : [...state.selectedChannelTypes, type],
+          };
+        }),
+      clearChannelTypes: () => set({ selectedChannelTypes: [] }),
+
       // 重置所有
       resetAll: () =>
         set({
@@ -133,6 +173,8 @@ export const useFilterStore = create<FilterState>()(
           selectedAgencies: [],
           selectedBusinessModels: [],
           selectedEmployees: [],
+          selectedAppMarkets: [],
+          selectedChannelTypes: [],
         }),
     }),
     {
@@ -143,6 +185,8 @@ export const useFilterStore = create<FilterState>()(
         selectedAgencies: state.selectedAgencies,
         selectedBusinessModels: state.selectedBusinessModels,
         selectedEmployees: state.selectedEmployees,
+        selectedAppMarkets: state.selectedAppMarkets,
+        selectedChannelTypes: state.selectedChannelTypes,
       }),
     }
   )

@@ -10,6 +10,8 @@ import PlatformFilter from './PlatformFilter';
 import AgencyFilter from './AgencyFilter';
 import BusinessModelFilter from './BusinessModelFilter';
 import EmployeeFilter from './EmployeeFilter';
+import AppMarketFilter from './AppMarketFilter';
+import ChannelTypeFilter from './ChannelTypeFilter';
 import { useFilterStore } from '@/stores';
 import styles from './FilterBar.module.scss';
 
@@ -18,6 +20,10 @@ interface FilterBarProps {
   showAgency?: boolean;
   showBusinessModel?: boolean;
   showEmployee?: boolean;
+  showAppMarket?: boolean;
+  showChannelType?: boolean;
+  /** 页面特有筛选控件插槽，渲染在操作按钮前 */
+  children?: React.ReactNode;
   /** 外部传入的平台选项（优先使用，缺省时 PlatformFilter 从 metadata 加载） */
   platformOptions?: { value: string; label: string }[];
   onSearch?: (filters: {
@@ -27,6 +33,8 @@ interface FilterBarProps {
     agencies: string[];
     businessModels: string[];
     employees: string[];
+    appMarkets: string[];
+    channelTypes: string[];
   }) => void;
   onReset?: () => void;
 }
@@ -36,6 +44,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
   showAgency = true,
   showBusinessModel = false,
   showEmployee = false,
+  showAppMarket = false,
+  showChannelType = false,
+  children,
   platformOptions,
   onSearch,
   onReset,
@@ -46,6 +57,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
     selectedAgencies,
     selectedBusinessModels,
     selectedEmployees,
+    selectedAppMarkets,
+    selectedChannelTypes,
     resetAll,
   } = useFilterStore();
 
@@ -58,6 +71,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
       agencies: selectedAgencies,
       businessModels: selectedBusinessModels,
       employees: selectedEmployees,
+      appMarkets: selectedAppMarkets,
+      channelTypes: selectedChannelTypes,
     });
   };
 
@@ -107,6 +122,25 @@ const FilterBar: React.FC<FilterBarProps> = ({
             <EmployeeFilter />
           </div>
         )}
+
+        {/* 应用市场筛选 */}
+        {showAppMarket && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>应用市场:</span>
+            <AppMarketFilter />
+          </div>
+        )}
+
+        {/* 渠道类型筛选 */}
+        {showChannelType && (
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>渠道类型:</span>
+            <ChannelTypeFilter />
+          </div>
+        )}
+
+        {/* 页面特有筛选控件插槽 */}
+        {children}
 
         {/* 操作按钮 */}
         <Space size={8}>

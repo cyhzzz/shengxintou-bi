@@ -5,46 +5,29 @@
  * 样式: 与 LeadsDetail（线索明细）保持一致（filter/table/modal 三段同款）
  */
 import React, { useEffect, useMemo, useState } from "react";
-import { Card, Select, DatePicker, Spin, Table, Tag, Button, Empty, Modal, Descriptions } from "antd";
-import { ReloadOutlined, EyeOutlined, SearchOutlined } from "@ant-design/icons";
-import dayjs, { Dayjs } from "dayjs";
+import { Card, Spin, Table, Tag, Button, Empty, Modal, Descriptions } from "antd";
+import { EyeOutlined } from "@ant-design/icons";
 import { dataServiceReports } from "@/services/dataService";
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
+import { useFilterStore } from '@/stores';
 import styles from "./index.module.scss";
-
-const { RangePicker } = DatePicker;
 
 const renderBool = (v: any): React.ReactNode =>
   v ? <Tag color="blue">是</Tag> : <Tag>否</Tag>;
 
 const AppMarketDetailPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs("2026-01-01"), dayjs("2026-12-31")]);
-  const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
-  const [channelType, setChannelType] = useState<string[]>([]);
-  const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });
+  const { dateRange, selectedAppMarkets, selectedChannelTypes } = useFilterStore();
   const [detail, setDetail] = useState<{ rows: any[]; total: number; page: number; page_size: number }>({ rows: [], total: 0, page: 1, page_size: 50 });
   const [loading, setLoading] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any>(null);
 
-  useEffect(() => {
-    dataServiceReports.getAppMarketFilterOptions()
-      .then((res: any) => { if (res?.success) setOpts(res.data); })
-      .catch(() => undefined);
-  }, []);
-
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format("YYYY-MM-DD"),
-    end_date: dateRange?.[1]?.format("YYYY-MM-DD"),
-    app_markets: appMarketFilter.length ? appMarketFilter : undefined,
-    channel_types: channelType.length ? channelType : undefined,
-  }), [dateRange, appMarketFilter, channelType]);
-
-  const resetFilters = () => {
-    setDateRange([dayjs("2026-01-01"), dayjs("2026-12-31")]);
-    setAppMarketFilter([]);
-    setChannelType([]);
-  };
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    app_markets: selectedAppMarkets.length ? selectedAppMarkets : undefined,
+    channel_types: selectedChannelTypes.length ? selectedChannelTypes : undefined,
+  }), [dateRange, selectedAppMarkets, selectedChannelTypes]);
 
   const load = async (page = 1, page_size = 50) => {
     setLoading(true);
@@ -63,32 +46,7 @@ const AppMarketDetailPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size="small">
-          <div className={styles.filterRow}>
-            <div className={styles.filterGroup}>
-              <span className={styles.filterLabel}>日期区间:</span>
-              <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            </div>
-            <div className={styles.filterGroup}>
-              <span className={styles.filterLabel}>应用市场:</span>
-              <Select mode="multiple" allowClear placeholder="全部" value={appMarketFilter}
-                onChange={setAppMarketFilter}
-                options={opts.app_markets.map((m) => ({ label: m, value: m }))}
-                style={{ minWidth: 200 }} maxTagCount="responsive" />
-            </div>
-            <div className={styles.filterGroup}>
-              <span className={styles.filterLabel}>渠道类型:</span>
-              <Select mode="multiple" allowClear placeholder="全部" value={channelType}
-                onChange={setChannelType}
-                options={opts.channel_types.map((t) => ({ label: t, value: t }))}
-                style={{ minWidth: 180 }} maxTagCount="responsive" />
-            </div>
-            <div className={styles.filterActions}>
-              <Button type="primary" icon={<SearchOutlined />} onClick={() => load(1, detail.page_size)}>查询</Button>
-              <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-            </div>
-          </div>
-        </Card>
+        <FilterBar showPlatform={false} showAgency={false} showAppMarket showChannelType onSearch={() => load(1, detail.page_size)} />
       </FadeInSection>
 
       <FadeInSection delay={0.4} duration={0.8}>

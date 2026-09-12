@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 对账 frontend-react/src/pages 下页面是否手写 antd 原生 RangePicker
 （而非使用 FilterBar / DateRangeFilter 共享组件）。
@@ -51,11 +51,7 @@ KNOWN_VIOLATIONS: Dict[str, str] = {
     'frontend-react/src/pages/XhsNotes/List.tsx': '小红书列表，迁移到 FilterBar 待排期',
     'frontend-react/src/pages/EmployeeConversion/Weekly/index.tsx': '员工转化周报，迁移到 FilterBar 待排期',
     'frontend-react/src/pages/Reports/OmniChannel/index.tsx': '全渠道，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/AppMarket/Comparison.tsx': '应用市场对比，迁移到 FilterBar 待排期',
     'frontend-react/src/pages/Reports/Xhs/PlanAnalysis.tsx': '小红书计划分析，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/AppMarket/Detail.tsx': '应用市场明细，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/AppMarket/Funnel.tsx': '应用市场漏斗，迁移到 FilterBar 待排期',
-    'frontend-react/src/pages/Reports/AppMarket/PlanAnalysis.tsx': '应用市场计划分析，迁移到 FilterBar 待排期',
 }
 
 

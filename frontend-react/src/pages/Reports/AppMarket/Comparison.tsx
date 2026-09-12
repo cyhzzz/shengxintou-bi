@@ -5,41 +5,25 @@
  * 图表: 应用市场雷达对比 + 月度堆叠
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Select, DatePicker, Space, Spin, Table, Tag, Button } from 'antd';
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { Card, Row, Col, Spin, Table, Tag } from 'antd';
 import EChartsComponent from '@/components/Chart/ECharts';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
+import { useFilterStore } from '@/stores';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import styles from './index.module.scss';
 
-const { RangePicker } = DatePicker;
-
 const AppMarketComparisonPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [channelType, setChannelType] = useState<string[]>([]);
-  const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });
+  const { dateRange, selectedChannelTypes } = useFilterStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    dataServiceReports.getAppMarketFilterOptions().then((res: any) => {
-      if (res?.success) setOpts(res.data);
-    }).catch(() => undefined);
-  }, []);
-
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    channel_types: channelType.length ? channelType : undefined,
-  }), [dateRange, channelType]);
-
-  const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setChannelType([]);
-  };
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    channel_types: selectedChannelTypes.length ? selectedChannelTypes : undefined,
+  }), [dateRange, selectedChannelTypes]);
 
   const load = async () => {
     setLoading(true);
@@ -123,19 +107,7 @@ const AppMarketComparisonPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size='small'>
-          <Space size='middle' wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>渠道类型</span>
-            <Select mode='multiple' allowClear placeholder='全部'
-              value={channelType} onChange={setChannelType}
-              options={opts.channel_types.map((t) => ({ label: t, value: t }))}
-              style={{ minWidth: 180 }} maxTagCount='responsive' />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar showPlatform={false} showAgency={false} showChannelType onSearch={() => load()} />
       </FadeInSection>
       <Spin spinning={loading}>
         <FadeInSection delay={0.4} duration={0.8}>

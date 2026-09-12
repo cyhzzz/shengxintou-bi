@@ -4,42 +4,27 @@
  * 漏斗: 下载 → 激活APP → 开户注册 → 注册身份证 → 注册银行卡 → 提交开户 → 开户成功 → 新开户 → 入金 → 有效户
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Select, DatePicker, Space, Spin, Tag, Button } from 'antd';
-import { CheckCircleOutlined, MobileOutlined, ReloadOutlined, RiseOutlined, SearchOutlined, TeamOutlined } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { Card, Row, Col, Spin, Tag } from 'antd';
+import { CheckCircleOutlined, MobileOutlined, RiseOutlined, TeamOutlined } from '@ant-design/icons';
 import { FunnelChart } from '@/components/Chart';
 import { ReportFooter } from '@/components/ReportFooter';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
-import { FadeInSection } from '@/components';
+import { FadeInSection, FilterBar } from '@/components';
 
 import { dataServiceReports } from '@/services/dataService';
+import { useFilterStore } from '@/stores';
 import styles from './index.module.scss';
 
-const { RangePicker } = DatePicker;
-
 const AppMarketFunnelPage: React.FC = () => {
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-  const [appMarketFilter, setAppMarketFilter] = useState<string[]>([]);
-  const [opts, setOpts] = useState<{ app_markets: string[]; channel_types: string[] }>({ app_markets: [], channel_types: [] });
+  const { dateRange, selectedAppMarkets } = useFilterStore();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    dataServiceReports.getAppMarketFilterOptions().then((res: any) => {
-      if (res?.success) setOpts(res.data);
-    }).catch(() => undefined);
-  }, []);
-
   const filters = useMemo(() => ({
-    start_date: dateRange?.[0]?.format('YYYY-MM-DD'),
-    end_date: dateRange?.[1]?.format('YYYY-MM-DD'),
-    app_markets: appMarketFilter.length ? appMarketFilter : undefined,
-  }), [dateRange, appMarketFilter]);
-
-  const resetFilters = () => {
-    setDateRange([dayjs('2026-01-01'), dayjs('2026-12-31')]);
-    setAppMarketFilter([]);
-  };
+    start_date: dateRange.startDate,
+    end_date: dateRange.endDate,
+    app_markets: selectedAppMarkets.length ? selectedAppMarkets : undefined,
+  }), [dateRange, selectedAppMarkets]);
 
   const load = async () => {
     setLoading(true);
@@ -65,18 +50,7 @@ const AppMarketFunnelPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <Card className={styles.filterCard} size='small'>
-          <Space size='middle' wrap>
-            <span className={styles.label}>日期区间</span>
-            <RangePicker value={dateRange} onChange={(v) => v && v[0] && v[1] && setDateRange([v[0], v[1]])} allowClear={false} />
-            <span className={styles.label}>应用市场</span>
-            <Select mode='multiple' allowClear placeholder='全部' value={appMarketFilter}
-              onChange={setAppMarketFilter} options={opts.app_markets.map((m) => ({ label: m, value: m }))}
-              style={{ minWidth: 220 }} maxTagCount='responsive' />
-            <Button type="primary" icon={<SearchOutlined />} onClick={load}>查询</Button>
-            <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置</Button>
-          </Space>
-        </Card>
+        <FilterBar showPlatform={false} showAgency={false} showAppMarket onSearch={() => load()} />
       </FadeInSection>
       <Spin spinning={loading}>
         {/* v3.1.25: 4 卡片概览，核心业务产出导向 */}
