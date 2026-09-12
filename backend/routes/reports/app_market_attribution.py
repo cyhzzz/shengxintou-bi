@@ -20,14 +20,14 @@ from backend.models_v2 import FactConvAppmarket
 from backend.database import db
 from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS
 from backend.utils.decorators import handle_exceptions
-from backend.utils.dialect_helpers import make_week_start_expr
+from backend.utils.dialect_helpers import make_friday_week_start_expr
 
 bp = Blueprint('app_market_attribution', __name__, url_prefix='/api/v1/reports/app-market')
 
 _META = {
     'version': 'v3.8.1',
     'source': 'fact_conv_appmarket 数据库表',
-    'note': '按周(周一~周日)聚合各步骤转化率，含开户成功→广告开户节点',
+    'note': '按周五业务周(上周五~本周四)聚合各步骤转化率，含开户成功→广告开户节点',
 }
 
 # 漏斗步骤列 → 别名映射（与 app_market.py FUNNEL_STAGES 前 6 步一致）
@@ -46,17 +46,17 @@ WEEKDAY_MAP = {0: '周一', 1: '周二', 2: '周三', 3: '周四', 4: '周五', 
 
 
 def _week_start(d):
-    """返回日期 d 所在周的周一日期"""
+    """返回日期 d 所在「周五业务周」的起始日（上周五）"""
     if isinstance(d, str):
         d = datetime.strptime(d, '%Y-%m-%d').date()
-    return d - timedelta(days=d.weekday())
+    return d - timedelta(days=(d.weekday() - 4) % 7)
 
 
 def _week_end(d):
-    """返回日期 d 所在周的周日日期"""
+    """返回日期 d 所在「周五业务周」的结束日（本周四）"""
     if isinstance(d, str):
         d = datetime.strptime(d, '%Y-%m-%d').date()
-    return d + timedelta(days=6 - d.weekday())
+    return _week_start(d) + timedelta(days=3)
 
 
 def _rate(numerator, denominator):
@@ -153,8 +153,8 @@ def _aggregate(platforms, start_date, end_date):
         rec['week_start'] = _week_start(d).isoformat()
         daily_records.append(rec)
 
-    # ---- 周聚合（按 下载日期 的周起始） ----
-    week_expr = make_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
+    # ---- 周聚合（按 下载日期 的周五业务周起始） ----
+    week_expr = make_friday_week_start_expr(FactConvAppmarket.下载日期).label('week_start')
     weekly_q = _build_query(platforms, start_date, end_date)
     weekly_q = weekly_q.with_entities(
         week_expr,

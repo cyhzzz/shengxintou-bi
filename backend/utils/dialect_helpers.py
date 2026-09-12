@@ -2,9 +2,13 @@
 """
 SQL 方言工具：SQLite 与 Postgres 的日期函数差异在这里集中处理。
 
-feat-desktop-supabase：切到 Supabase PG 后，原 SQLite 专属语法会报错：
+全仓周口径统一为「周五业务周」（上周五 ~ 本周四）：任何周分组一律走
+make_friday_week_start_expr（或 make_period_expr('weekly')），不要新增
+周一起始周表达式。
+
+切到 Supabase PG 后，原 SQLite 专属语法会报错：
 - func.strftime('%Y-%W', col)          → PG 无 strftime
-- func.date(col, 'weekday 0', '-6 days') → PG date() 不接受修饰符
+- func.date(col, 'weekday 4', ...)     → PG date() 不接受修饰符
 
 集中在本模块，让报表路由保持 dialect 无关。
 """
@@ -33,7 +37,7 @@ def make_period_expr(col, granularity: str):
 
     granularity:
       - 'daily'   → 原值（'YYYY-MM-DD' 字符串）
-      - 'weekly'  → 'YYYY-WW'（ISO 周号；SQLite %W 与 PG IW 略有差异，但报表口径自洽）
+      - 'weekly'  → 周五业务周起始日 'YYYY-MM-DD'（上周五 ~ 本周四）
       - 'monthly' → 'YYYY-MM'
 
     返回值可直接 .label('period') 使用。
@@ -41,34 +45,12 @@ def make_period_expr(col, granularity: str):
     if granularity == 'daily':
         return col
 
-    d = _dialect()
     if granularity == 'monthly':
         # 两种 dialect 都支持 substr（PG 内置 substr(text,int,int)）
         return func.substr(col, 1, 7)
 
-    # weekly
-    if d == 'postgresql':
-        # PG: to_char(col, 'YYYY-IW') 返回 ISO 周号（4 位年 + 2 位周号）
-        return func.to_char(col, 'YYYY-IW')
-    # SQLite: strftime('%Y-%W', col)，%W = 周一为周首日、00-53
-    return func.strftime('%Y-%W', col)
-
-
-def make_week_start_expr(col):
-    """返回 col 所在周的周一表达式（用于 plan-analysis 按周聚合）。
-
-    SQLite: date(col, 'weekday 0', '-6 days') = col 所在周周一（周一为 weekday 0）
-    PG:     date_trunc('week', col::date) = 所在周周一（PG 默认周一为周首日）
-
-    feat-cloud-supabase：日期字段在 ORM 里是 Text（'YYYY-MM-DD'），
-    PG 必须显式 ::date cast 才能传给 date_trunc；SQLite 直接 date() 自带隐式转换。
-    """
-    d = _dialect()
-    if d == 'postgresql':
-        # PG date_trunc 接收 timestamp/date；Text 必须显式 cast
-        return func.date_trunc('week', cast(col, Date))
-    # SQLite 专属修饰符，PG 不支持
-    return func.date(col, 'weekday 0', '-6 days')
+    # weekly：统一为周五业务周（上周五 ~ 本周四），与周报/广告计划分析口径一致
+    return make_friday_week_start_expr(col)
 
 
 def make_friday_week_start_expr(col):

@@ -92,10 +92,10 @@ const APP_MARKET_PLATFORMS = ['华为', '小米', '荣耀', 'oppo', 'vivo', '苹
 
 function _weekStart(dateStr: string): string {
   const d = new Date(dateStr);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return monday.toISOString().slice(0, 10);
+  const wd = (d.getDay() + 6) % 7; // Mon=0..Sun=6，与 Python weekday() 对齐
+  const diff = d.getDate() - ((wd - 4 + 7) % 7); // 回退到所在周五业务周起始（上周五）
+  const friday = new Date(d.setDate(diff));
+  return friday.toISOString().slice(0, 10);
 }
 
 export async function handleAppMarketCostAnalysis(body: any): Promise<any> {

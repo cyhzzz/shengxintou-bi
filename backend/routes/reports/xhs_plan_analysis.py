@@ -104,10 +104,10 @@ def xhs_plan_analysis():
     ).all()
     agencies = [r[0] for r in agency_rows]
 
-    # 周起始日表达式（dialect 无关）：SQLite 用 date(d, 'weekday 0', '-6 days')；
-    # PG 用 date_trunc('week', d)，均返回 d 所在周的周一
-    from backend.utils.dialect_helpers import make_week_start_expr
-    week_start_expr = make_week_start_expr(FactConvContent.线索日期).label('week_start')
+    # 周起始日表达式（dialect 无关）：统一「周五业务周」（上周五 ~ 本周四），
+    # 与应用市场广告计划分析、周报口径一致
+    from backend.utils.dialect_helpers import make_friday_week_start_expr
+    week_start_expr = make_friday_week_start_expr(FactConvContent.线索日期).label('week_start')
 
     # 广告ID 归一化（与 app-market 一致：NULL/空 fallback 到广告账号）
     plan_expr = case(
@@ -194,7 +194,7 @@ def xhs_plan_analysis():
     )
 
     # ---- 补计划级 消耗/展示/点击/下载 + 计划名称 + 代理商（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
-    # 周起始用本报表统一的 make_week_start_expr（周一），保证消耗周与漏斗周对齐。
+    # 周起始用本报表统一的周五业务周表达式，保证消耗周与漏斗周对齐。
     # 注意：fact_conv_content.广告ID 常带浮点残留（如 '157763399.0'），去末尾 '.0' 后才能与整数 计划ID 关联；
     #       名称与代理商（厂商名称=直投/量子/绩牛/美洋）都取自 fact_plan_daily。
     def _plan_num(s):
@@ -203,7 +203,7 @@ def xhs_plan_analysis():
             k = k[:-2]
         return int(k) if k.isdigit() and int(k) > 0 else None
 
-    plan_daily_fweek = make_week_start_expr(FactPlanDaily.日期).label('week_start')
+    plan_daily_fweek = make_friday_week_start_expr(FactPlanDaily.日期).label('week_start')
     cover_names = {'消耗': 0.0, '展示': 0, '点击': 0, '下载': 0}
     def _cover(spend, imp, clk, dl):
         return {'消耗': round(float(spend or 0), 2), '展示': int(imp or 0),

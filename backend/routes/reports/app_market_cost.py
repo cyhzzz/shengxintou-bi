@@ -72,12 +72,12 @@ def _base_query(sd, ed, platforms=None):
     return q
 
 
-# 周起始工具函数：给定日期字符串 YYYY-MM-DD，返回该周周一 YYYY-MM-DD
+# 周起始工具函数：给定日期字符串 YYYY-MM-DD，返回所在「周五业务周」起始日（上周五）YYYY-MM-DD
 def _week_start(date_str):
     from datetime import datetime, timedelta
     d = datetime.strptime(date_str, '%Y-%m-%d')
-    monday = d - timedelta(days=d.weekday())
-    return monday.strftime('%Y-%m-%d')
+    friday = d - timedelta(days=(d.weekday() - 4) % 7)
+    return friday.strftime('%Y-%m-%d')
 
 
 @bp.route('/cost-analysis', methods=['POST'])

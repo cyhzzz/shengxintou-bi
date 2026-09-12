@@ -137,6 +137,12 @@ ALGO_MARKERS: List[Dict[str, str]] = [
         'mobile_pattern': r"date\(\"\$\{col\}\", 'weekday 4', '-6 days'\)",
     },
     {
+        'name': '应用市场·周五业务周吸附（周一~周四归属上周五）',
+        'backend_file': ROUTES_DIR / 'reports' / 'app_market_cost.py',
+        'backend_pattern': r'\(d\.weekday\(\) - 4\) % 7',
+        'mobile_pattern': r'\(wd - 4 \+ 7\) % 7',
+    },
+    {
         'name': '周报·周次计算（周五~次周四）',
         'backend_file': ROOT / 'backend' / 'utils' / 'weekly_utils.py',
         'backend_pattern': r'def get_week_info\(',

@@ -611,7 +611,7 @@ const XhsPlanAnalysisPage: React.FC = () => {
             { label: '端点', value: 'POST /api/v1/reports/xhs/plan-analysis' },
             { label: '漏斗阶段', value: '企微 → 开口 → 有效线索 → 有效线索(不含存量) → 新开户 → 有效户（6 阶段）' },
             { label: '存量剔除', value: '业务不变式「内容平台非存量条件」：是否为存量客户 = 0 OR IS NULL（用于「有效线索(不含存量)」「新开户」两阶段）' },
-            { label: '周起始日', value: 'SQLite date(线索日期, \'weekday 0\', \'-6 days\') = 该日期所在周的周一' },
+            { label: '周起始日', value: '周五业务周（上周五 ~ 本周四）：SQLite date(线索日期, \'weekday 4\', \'-6 days\') = 业务周起始上周五' },
             { label: '代理商筛选', value: `单选 ${TARGET_AGENCIES.join(' / ')} 等（投放评审业务口径固定名单）` },
           ]}
           notes={`小红书计划分析按周度走势看两类指标：拿量能力（企微/开口/新开户量是否衰减）+ 精准性（各转化节点转化率是否稳定）。量增率降通常意味着流量泛化。`}

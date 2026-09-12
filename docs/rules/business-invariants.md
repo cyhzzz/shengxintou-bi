@@ -86,11 +86,15 @@
 
 - 实现：`_apply_filters` / `_funnel_filters` 增加 `date_col` 参数，默认 = `资金账号创建完成时间`；漏斗端点显式传 `FactConvAppmarket.下载日期`。**移动端必须与后端一致**：漏斗用「下载日期」，开户数报表用「资金账号创建完成时间」。
 
-### 计划分析周度口径
+### 周度口径（全仓统一：周五业务周）
 
-- 应用市场「计划分析」（`/plan-analysis`）周度口径统一为**上周五 \~ 本周四**，周五为周起始日，Web 与移动端一致；时间维度为「资金账号创建完成时间」（开户数口径）。
+- **全仓周口径统一为「周五业务周」（上周五 ~ 本周四）**，周五为周起始日，Web 与移动端一致。任何周分组一律走 `backend/utils/dialect_helpers.py::make_friday_week_start_expr`（或 `make_period_expr('weekly')`，内部即它），不要新增周一起始周表达式或 `%Y-%W` 周号分组。
 
-- SQLite 用 `date(资金账号创建完成时间, 'weekday 4', '-6 days')`；PG 用 `date_trunc('week') + CASE(isodow<=4 → -3天，否则 → +4天)`（`backend/utils/dialect_helpers.py::make_friday_week_start_expr`）；移动端复用同一 `fridayWeekExpr('资金账号创建完成时间')`。
+- SQLite 用 `date(col, 'weekday 4', '-6 days')`；PG 用 `date_trunc('week') + CASE(isodow<=4 → -3天，否则 → +4天)`；移动端 SQL 副本同表达式，JS 吸附副本（appMarket `_weekStart`）与 Python 吸附（`(weekday - 4) % 7`）由 `check_api_contract.py` marker 门禁对账。
+
+- 周分组值 / period 标签统一为**周起始日 'YYYY-MM-DD'**（不再是 "YYYY-WW" 周号）；前端均按不透明字符串消费（map 键 / 字典序排序 / dayjs 格式化），无解析依赖。周度曲线边缘日期（周五~周四 vs 周一~周日）换桶属预期变化。
+
+- 应用市场「计划分析」（`/plan-analysis`）周度口径即上述统一口径，时间维度为「资金账号创建完成时间」（开户数口径）；移动端复用同一 `fridayWeekExpr('资金账号创建完成时间')`。
 
 - 「各应用市场周度获客量」为**跨平台对比图**：忽略平台单选，仅受日期 + 互联网引流约束，获客量取「新开户」。单平台被选中时，整体走势图收窄为该平台、对比图保持全市场（二者口径需区分，勿混用）。
 

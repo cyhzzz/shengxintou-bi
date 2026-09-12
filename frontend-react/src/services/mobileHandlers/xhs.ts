@@ -544,7 +544,7 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
 
   const sql = `SELECT ${planExpr} as plan_key,
     "广告账号", "广告代理商",
-    date("线索日期", 'weekday 0', '-6 days') as week_start,
+    date("线索日期", 'weekday 4', '-6 days') as week_start,
     COUNT(id) as "企微",
     COALESCE(SUM("是否客户开口"), 0) as "开口",
     COALESCE(SUM("是否有效线索"), 0) as "有效线索",
@@ -599,7 +599,7 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
   );
 
   // ---- 补计划级 消耗/展示/点击/下载 + 计划名称 + 代理商（数据源 fact_plan_daily，平台=小红书，广告ID=计划ID） ----
-  // 周起始用与漏斗一致的周一（date("日期",'weekday 0','-6 days')），保证消耗周与漏斗周对齐。
+  // 周起始用与漏斗一致的周五业务周（date("日期",'weekday 4','-6 days') = 上周五），保证消耗周与漏斗周对齐。
   // 注意：fact_conv_content.广告ID 常带浮点残留（如 '157763399.0'），去末尾 '.0' 后才能与整数 计划ID 关联；
   //       名称与代理商（厂商名称=直投/量子/绩牛/美洋）都取自 fact_plan_daily。
   const planNum = (s: unknown): number | null => {
@@ -627,7 +627,7 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
       dateClause('日期', sd, ed),
     ]);
     const pdRows = await querySql<Row>(
-      `SELECT "计划ID" as plan_id, date("日期", 'weekday 0', '-6 days') as week_start,
+      `SELECT "计划ID" as plan_id, date("日期", 'weekday 4', '-6 days') as week_start,
          COALESCE(SUM("花费"), 0) as spend, COALESCE(SUM("展示量"), 0) as impressions,
          COALESCE(SUM("点击量"), 0) as clicks, COALESCE(SUM("下载量"), 0) as downloads
        FROM fact_plan_daily ${pdWhere.clause}

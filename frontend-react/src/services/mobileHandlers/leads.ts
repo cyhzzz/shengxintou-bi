@@ -418,7 +418,7 @@ export async function handleAnchorClustersTrend(body: any): Promise<any> {
   // 周期表达式（SQLite）
   let periodExpr: string;
   if (granularity === 'weekly') {
-    periodExpr = `strftime('%Y-%W', "线索日期")`;
+    periodExpr = `date("线索日期", 'weekday 4', '-6 days')`;
   } else if (granularity === 'monthly') {
     periodExpr = `substr("线索日期", 1, 7)`;
   } else {
@@ -572,9 +572,9 @@ export async function handleAnchorWeeklyAnalysis(body: any): Promise<any> {
     inClause('平台来源', platforms_filter),
   ]);
 
-  // SQLite 周起始日：date(d, 'weekday 0', '-6 days') = 周一
+  // SQLite 周起始日：date(d, 'weekday 4', '-6 days') = 上周五（周五业务周，上周五 ~ 本周四）
   const sql = `SELECT
-    date("线索日期", 'weekday 0', '-6 days') as week_start,
+    date("线索日期", 'weekday 4', '-6 days') as week_start,
     "平台来源" as platform,
     "客户来源" as customer_source,
     COUNT(id) as leads,

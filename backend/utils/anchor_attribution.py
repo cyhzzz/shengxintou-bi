@@ -16,7 +16,7 @@ from sqlalchemy import func, and_, or_, case
 from backend.database import db
 from backend.models_v2 import FactConvContent, DimAnchorLiveType
 from backend.utils.calibers import CONTENT_NON_STOCK
-from backend.utils.dialect_helpers import make_period_expr, make_week_start_expr
+from backend.utils.dialect_helpers import make_friday_week_start_expr, make_period_expr
 
 # 主播聚类正则: (平台)引流-(主播名)
 ANCHOR_SOURCE_PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
@@ -362,7 +362,7 @@ def anchor_clusters_trend_response(granularity, filters):
 
     if granularity == 'weekly':
         granularity = 'weekly'
-        # dialect 无关：SQLite strftime('%Y-%W') / PG to_char('YYYY-IW')
+        # 周五业务周（上周五 ~ 本周四），全仓周口径统一
         period_expr = make_period_expr(FactConvContent.线索日期, 'weekly')
     elif granularity == 'monthly':
         granularity = 'monthly'
@@ -476,8 +476,8 @@ def anchor_weekly_analysis_response(filters, top_n):
     platforms_filter = filters.get('platforms') or []
     live_types_filter = filters.get('live_types') or []
 
-    # 周起始日（dialect 无关）：SQLite date(d, 'weekday 0', '-6 days')；PG date_trunc('week', d::date)
-    week_start_expr = make_week_start_expr(FactConvContent.线索日期).label('week_start')
+    # 周起始日（dialect 无关）：统一周五业务周（上周五 ~ 本周四），与 plan-analysis 口径一致
+    week_start_expr = make_friday_week_start_expr(FactConvContent.线索日期).label('week_start')
     non_existing = CONTENT_NON_STOCK
 
     # 预加载 dim_anchor_live_type 表（与 get_anchor_clusters 同口径）
