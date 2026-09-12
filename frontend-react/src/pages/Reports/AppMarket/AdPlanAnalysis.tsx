@@ -18,7 +18,7 @@
  *   八、ReportFooter
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, Space, Spin, Table, Button, Tooltip, Empty, message, Collapse, Tag, Tabs, Pagination } from 'antd';
+import { Card, Select, Space, Spin, Table, Button, Tooltip, Empty, Collapse, Tag, Tabs, Pagination } from 'antd';
 import {
   DownloadOutlined, ReloadOutlined,
   UserAddOutlined, MoneyCollectOutlined, FundOutlined,
@@ -28,6 +28,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { pickEChartsColor } from '@/utils/echartsColors';
 import { dataServiceReports } from '@/services/dataService';
+import { useReportData } from '@/hooks/useReportData';
 import { metadataService, type DataFreshness } from '@/services/metadataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
@@ -244,6 +245,21 @@ const SourceLine: React.FC<{ keys: string[]; freshness: DataFreshness }> = ({ ke
 // 与后端 ALLOWED_PLATFORMS 对齐：首屏默认全选，避免初次加载前 Select 为空的闪烁
 const INITIAL_MARKETS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
 
+interface AdPlanQuery {
+  start_date: string;
+  end_date: string;
+}
+
+// 始终请求全量（7 大市场）的数据作为客户端缓存，应用市场筛选在本地进行
+// —— 避免每次切换市场触发 8s 的 plan_week_analysis 重查，做到 Select 即时响应。
+const fetchAdPlanAnalysis = async (query: AdPlanQuery): Promise<any> => {
+  const res: any = await dataServiceReports.getAppMarketAdPlanAnalysis({
+    filters: { platforms: [], start_date: query.start_date, end_date: query.end_date },
+  });
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载广告计划分析失败');
+  return res.data;
+};
+
 // 分计划分析：单条计划卡片（React.memo 隔离，避免切换周/聚类等无关状态变化导致全员重渲染）。
 // 汇总用单行 Table，周明细用 Collapse（antd 默认展开时才会挂载子表 → 惰性渲染，不展开不产生额外 DOM）。
 const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
@@ -297,18 +313,9 @@ const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
 });
 
 const AppMarketAdPlanAnalysisPage: React.FC = () => {
-  const [markets, setMarkets] = useState<string[]>(INITIAL_MARKETS);
   const [selected, setSelected] = useState<string[]>(INITIAL_MARKETS);
-  const [overview, setOverview] = useState<Overview>({ total_open: 0, total_spend: 0, total_open_cost: null });
-  const [planDetail, setPlanDetail] = useState<PlanDetailRow[]>([]);
-  const [byMarket, setByMarket] = useState<AggRow[]>([]);
-  const [weeklyOpen, setWeeklyOpen] = useState<WeeklyOpenPoint[]>([]);
-  const [weeklySpend, setWeeklySpend] = useState<WeeklySpendPoint[]>([]);
-  const [weeks, setWeeks] = useState<string[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<string | undefined>(undefined);
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
-  const [planWeekDetail, setPlanWeekDetail] = useState<PlanWeekDetail[]>([]);
-  const [loading, setLoading] = useState(false);
   // Issue 2：各数据块下方展示「数据来源 + 更新日期」，来自 /api/v1/data-freshness
   const [freshness, setFreshness] = useState<DataFreshness>({});
   // 分计划分析：只渲染当前页卡片，避免一次挂载上百张 antd Table 造成首屏卡顿
@@ -316,39 +323,33 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const PLAN_PAGE_SIZE = 10;
   const { dateRange, resetDateRange } = useFilterStore();
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      // 始终请求全量（7 大市场）的数据作为客户端缓存，应用市场筛选在本地进行
-      // —— 避免每次切换市场触发 8s 的 plan_week_analysis 重查，做到 Select 即时响应。
-      const res: any = await dataServiceReports.getAppMarketAdPlanAnalysis({
-        filters: {
-          platforms: [],
-          start_date: dateRange.startDate,
-          end_date: dateRange.endDate,
-        },
-      });
-      if (res?.success) {
-        const d = res.data || {};
-        setMarkets(d.platforms || INITIAL_MARKETS);
-        setOverview(d.overview || { total_open: 0, total_spend: 0, total_open_cost: null });
-        setPlanDetail(d.plan_detail || []);
-        setByMarket(d.by_market || []);
-        setWeeklyOpen(d.weekly_open || []);
-        setWeeklySpend(d.weekly_spend || []);
-        setWeeks(d.weeks || []);
-        setSelectedWeek(d.selected_week || undefined);
-        setClusterWeek(d.selected_week || undefined);
-        setPlanWeekDetail(d.plan_week_detail || []);
-      } else {
-        message.error(res?.message || '加载失败');
-      }
-    } catch (_e) {
-      message.error('加载失败');
-    } finally {
-      setLoading(false);
+  const { data, loading, load } = useReportData(fetchAdPlanAnalysis, {
+    errorMessage: '加载广告计划分析失败',
+  });
+
+  // 主取数：单 data 派生全部报表数据（接口字段映射为页面变量名，下游零改动）
+  const markets: string[] = data?.platforms || INITIAL_MARKETS;
+  const overview: Overview = data?.overview || { total_open: 0, total_spend: 0, total_open_cost: null };
+  const planDetail: PlanDetailRow[] = data?.plan_detail || [];
+  const byMarket: AggRow[] = data?.by_market || [];
+  const weeklyOpen: WeeklyOpenPoint[] = data?.weekly_open || [];
+  const weeklySpend: WeeklySpendPoint[] = data?.weekly_spend || [];
+  const weeks: string[] = data?.weeks || [];
+  const planWeekDetail: PlanWeekDetail[] = data?.plan_week_detail || [];
+
+  // 仅日期范围变化触发重查；应用市场切换完全本地过滤（瞬时响应）
+  useEffect(() => {
+    load({ start_date: dateRange.startDate, end_date: dateRange.endDate });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.startDate, dateRange.endDate]);
+
+  // 每次重查成功后，周选择器回到接口给定的最新周
+  useEffect(() => {
+    if (data) {
+      setSelectedWeek(data.selected_week || undefined);
+      setClusterWeek(data.selected_week || undefined);
     }
-  };
+  }, [data]);
 
   // 拉取各表数据新鲜度（更新日期），供每个数据块下方展示来源与更新时间
   useEffect(() => {
@@ -356,12 +357,6 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       if (r?.success) setFreshness(r.data || {});
     }).catch(() => {});
   }, []);
-
-  // 仅日期范围变化触发重查；应用市场切换完全本地过滤（瞬时响应）
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange.startDate, dateRange.endDate]);
 
   const resetFilters = () => {
     setSelected(markets.length ? markets : INITIAL_MARKETS);
@@ -618,7 +613,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform={false} showAgency={false} onSearch={() => load()} />
+        <FilterBar showPlatform={false} showAgency={false} onSearch={() => load({ start_date: dateRange.startDate, end_date: dateRange.endDate })} />
       </FadeInSection>
 
       <FadeInSection delay={0.1} duration={0.8}>

@@ -10,11 +10,12 @@
  *   3. 归因转化率明细（按周折叠，可展开查看每日，降序排列）
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Spin, Table, Tag, Select, Button, Space, message } from 'antd';
+import { Card, Spin, Table, Tag, Select, Button, Space } from 'antd';
 import { RiseOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection, ReportFooter, FilterBar } from '@/components';
 import { dataServiceReports } from '@/services/dataService';
+import { useReportData } from '@/hooks/useReportData';
 import { useFilterStore } from '@/stores';
 import type { EChartsOption } from 'echarts';
 import type { ColumnsType } from 'antd/es/table';
@@ -153,39 +154,40 @@ function buildTreeData(daily: DailyRow[], weekly: WeeklyRow[]): TableRow[] {
   });
 }
 
+interface AttributionQuery {
+  start_date: string;
+  end_date: string;
+  platform: string;
+}
+
+const fetchAttributionConversion = async (query: AttributionQuery): Promise<any> => {
+  const res: any = await dataServiceReports.getAppMarketAttributionConversion({
+    start_date: query.start_date,
+    end_date: query.end_date,
+    platforms: query.platform === '全部' ? [] : [query.platform],
+  });
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载归因转化率失败');
+  return res.data;
+};
+
 const AttributionConversionPage: React.FC = () => {
   const { dateRange } = useFilterStore();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [platform, setPlatform] = useState<string>('全部');
   // 控制表格展开的行 key（周合计行）
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await dataServiceReports.getAppMarketAttributionConversion({
-        start_date: dateRange.startDate,
-        end_date: dateRange.endDate,
-        platforms: platform === '全部' ? [] : [platform],
-      });
-      if (res?.success) {
-        setData(res.data);
-        setExpandedKeys([]); // 数据更新后重置展开状态
-      } else {
-        message.warning(res?.error || '数据加载失败');
-      }
-    } catch (e: any) {
-      message.error(e.message || '请求失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, loading, load } = useReportData(fetchAttributionConversion, {
+    errorMessage: '加载归因转化率失败',
+  });
 
   useEffect(() => {
-    loadData();
+    load({ start_date: dateRange.startDate, end_date: dateRange.endDate, platform });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.startDate, dateRange.endDate, platform]);
+
+  // 数据更新后重置展开状态
+  useEffect(() => {
+    setExpandedKeys([]);
+  }, [data]);
 
   // 树形表格数据
   const tableData = useMemo<TableRow[]>(() => {
@@ -411,8 +413,8 @@ const AttributionConversionPage: React.FC = () => {
         <FilterBar
           showPlatform={false}
           showAgency={false}
-          onSearch={() => loadData()}
-          onReset={() => loadData()}
+          onSearch={() => load({ start_date: dateRange.startDate, end_date: dateRange.endDate, platform })}
+          onReset={() => load({ start_date: dateRange.startDate, end_date: dateRange.endDate, platform })}
         />
         <Card size="small" style={{ marginBottom: 16, marginTop: 8 }}>
           <Space wrap>

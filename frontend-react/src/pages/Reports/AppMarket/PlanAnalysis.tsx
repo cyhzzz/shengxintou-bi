@@ -30,6 +30,7 @@ import EChartsComponent from '@/components/Chart/ECharts';
 import type { EChartsOption } from 'echarts';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { dataServiceReports } from '@/services/dataService';
+import { useReportData } from '@/hooks/useReportData';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
@@ -76,17 +77,43 @@ interface PlanItem {
   weekly: PlanWeeklyPoint[];
 }
 
+interface PlanAnalysisQuery {
+  filters: {
+    start_date: string;
+    end_date: string;
+    app_market?: string;
+  };
+  top_n: number;
+}
+
+interface PlanAnalysisData {
+  platforms: string[];
+  plan_items: (PlanItem & { row_id: string })[];
+  weekly_totals: PlanWeeklyPoint[];
+  weekly_by_market: any[];
+  market_order: string[];
+  totals: any;
+}
+
+const fetchPlanAnalysis = async (query: PlanAnalysisQuery): Promise<PlanAnalysisData> => {
+  const res: any = await dataServiceReports.getAppMarketPlanAnalysis({ filters: query.filters, top_n: query.top_n });
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载计划分析失败');
+  const d = res.data;
+  return {
+    platforms: d.platforms || [],
+    plan_items: (d.plan_items || []).map((p: PlanItem, idx: number) => ({ ...p, row_id: `${idx}-${p.plan_id}` })),
+    weekly_totals: d.weekly_totals || [],
+    weekly_by_market: d.weekly_by_market || [],
+    market_order: d.market_order || [],
+    totals: d.totals || {},
+  };
+};
+
 const AppMarketPlanAnalysisPage: React.FC = () => {
   const { dateRange } = useFilterStore();
   const [platform, setPlatform] = useState<string | undefined>(undefined); // undefined = 全部
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
-  const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
-  const [weeklyByMarket, setWeeklyByMarket] = useState<any[]>([]);
-  const [marketOrder, setMarketOrder] = useState<string[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0, total_spend: 0 });
-  const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
+  const { data, loading, load } = useReportData(fetchPlanAnalysis, { errorMessage: '加载计划分析失败' });
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -99,25 +126,17 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
     setTopN(30);
   };
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await dataServiceReports.getAppMarketPlanAnalysis({ filters, top_n: topN });
-      if (res?.success) {
-        const d = res.data || {};
-        setPlatforms(d.platforms || []);
-        setPlanItems((d.plan_items || []).map((p: PlanItem, idx: number) => ({ ...p, row_id: `${idx}-${p.plan_id}` })));
-        setWeeklyTotals(d.weekly_totals || []);
-        setWeeklyByMarket(d.weekly_by_market || []);
-        setMarketOrder(d.market_order || []);
-        setTotals(d.totals || {});
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    load({ filters, top_n: topN });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, topN]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, topN]);
+  const platforms = data?.platforms ?? [];
+  const planItems = data?.plan_items ?? [];
+  const weeklyTotals = data?.weekly_totals ?? [];
+  const weeklyByMarket = data?.weekly_by_market ?? [];
+  const marketOrder = data?.market_order ?? [];
+  const totals = data?.totals ?? { total_plans: 0, total_activate: 0, total_new_open: 0, total_valid: 0, total_spend: 0 };
 
   // 周度拿量能力走势（双 Y 轴：左=激活数柱 + 右=开户/新开户数线）
   const volumeOption: EChartsOption = useMemo(() => {
@@ -347,7 +366,7 @@ const AppMarketPlanAnalysisPage: React.FC = () => {
   return (
     <div className={styles.page}>
       <FadeInSection delay={0} duration={0.8}>
-        <FilterBar showPlatform={false} showAgency={false} onSearch={load} onReset={resetFilters}>
+        <FilterBar showPlatform={false} showAgency={false} onSearch={() => load({ filters, top_n: topN })} onReset={resetFilters}>
           <Select
             allowClear
             placeholder="全部平台"
