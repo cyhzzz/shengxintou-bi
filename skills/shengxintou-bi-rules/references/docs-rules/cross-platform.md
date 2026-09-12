@@ -30,6 +30,7 @@
 5. 在 `frontend-react/src/services/http.ts` 修改 `/api/v1/` 拦截逻辑。
 6. 修改 `frontend-react/src/utils/isDesktop.ts` 的 `isMobileClient` / `isPwaClient` / `isDesktopClient`。
 7. 新增页面引用了新的 `/api/v1/*` 端点。
+8. 修改任一双写清单：`backend/utils/table_sync.py` 的 `SYNC_TABLES` / `TABLE_DATE_COLS` / `DIM_TABLES`、`frontend-react/src/services/dataService.ts` 的 `SYNC_TABLE_META`、`frontend-react/src/services/mobileTableSync.ts` 的 `MOBILE_SYNC_TABLES`，或坐席名单 `WEEKLY_ASSISTANTS`（`employee_conversion.py`） / `EMP_WEEKLY_ASSISTANTS`（`mobileHandlers/employee.ts`）。
 
 ## 3. 对账脚本（执行后必须无 ERROR）
 
@@ -39,10 +40,11 @@
 | `python scripts/check_route_drift.py` | `router/index.tsx` 注册的路由 vs `route-health.spec.ts` 的 `PUBLIC_ROUTES` 列表 | 改动路由或 smoke 用例 |
 | `python scripts/check_feature_flags.py` | `features.ts` 中声明的 flag 是否被实际使用；`desktopAndWebFlags` / `mobileFlags` 字段是否对称 | 改动 features.ts 或菜单 |
 | `python scripts/check_mobile_routes_coverage.py` | `mobileRouteHandler.ts` 的 case 分支 vs `test_mobile_routes.py` 测试用例覆盖 | 改动 mobileRouteHandler case 或新增 case |
+| `python scripts/check_sync_tables.py` | 同步表清单三方对账（`table_sync.SYNC_TABLES` vs `dataService.SYNC_TABLE_META` vs `mobileTableSync.MOBILE_SYNC_TABLES`：表名顺序、type、dateCol）+ 坐席名单两端对账（`WEEKLY_ASSISTANTS` vs `EMP_WEEKLY_ASSISTANTS`） | 改动任一双写清单（增删同步表、改 dateCol 或 type、调整坐席名单） |
 | `python scripts/test_mobile_routes.py` | mobileRouteHandler 关键 SQL 在本地 SQLite 上可执行 | 改动 mobileRouteHandler 或后端 SQL |
 | `cd frontend-react && npm run test:smoke` | Playwright 路由健康检查（chunk 加载错误检测） | 改动 lazy 路由 |
 
-CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑前 4 个对账脚本（无数据库依赖，可在任意环境执行）；`test_mobile_routes.py` 因依赖本地 SQLite 数据，仅在本地或发版前手动触发。
+CI（`.github/workflows/ci.yml`）在 push / PR 时自动跑上表中的静态对账脚本（`check_api_contract`、`check_route_drift`、`check_feature_flags`、`check_mobile_routes_coverage`、`check_sync_tables`，均无数据库依赖，可在任意环境执行）；`test_mobile_routes.py` 因依赖本地 SQLite 数据，仅在本地或发版前手动触发。
 
 ## 4. 四端兼容性必查清单
 
