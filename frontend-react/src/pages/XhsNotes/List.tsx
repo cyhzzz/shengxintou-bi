@@ -28,6 +28,7 @@ import type { XhsNotesListItem } from '@/types/api.schemas';
 import styles from './List.module.scss';
 import { FadeInSection, FilterBar } from '@/components';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 
 const { Link } = Typography;
 const { RangePicker } = DatePicker;
@@ -39,11 +40,101 @@ const QUICK_DATE_OPTIONS = [
   { label: '近90天', value: 90 },
 ];
 
+// 组装列表筛选条件（主查询与全量导出共用；数据时间来自全局 store）
+function buildListFilters(
+  f: {
+    publishDateRange: [string, string];
+    selectedCreators: string[];
+    selectedContentTypes: string[];
+    selectedAdStrategies: string[];
+    selectedAccount: string;
+  },
+  startDate: string,
+  endDate: string
+): Record<string, unknown> {
+  const filters: Record<string, unknown> = {};
+
+  // 数据时间范围（全局 store，始终有值）
+  filters.start_date = startDate;
+  filters.end_date = endDate;
+
+  // 发布时间范围
+  if (f.publishDateRange[0] && f.publishDateRange[1]) {
+    filters.publish_start_date = f.publishDateRange[0];
+    filters.publish_end_date = f.publishDateRange[1];
+  }
+
+  // 创作者筛选
+  if (f.selectedCreators.length > 0) {
+    filters.creators = f.selectedCreators;
+  }
+
+  // 内容类型筛选
+  if (f.selectedContentTypes.length > 0) {
+    filters.content_types = f.selectedContentTypes;
+  }
+
+  // 广告策略筛选
+  if (f.selectedAdStrategies.length > 0) {
+    filters.ad_strategies = f.selectedAdStrategies;
+  }
+
+  // 账号筛选
+  if (f.selectedAccount && f.selectedAccount !== '全部') {
+    filters.account = f.selectedAccount;
+  }
+
+  return filters;
+}
+
+// 笔记列表取数：请求格式组装与 notes/pagination 解包收进 fetcher
+interface XhsNotesListArgs {
+  filters: Record<string, unknown>;
+  page: number;
+  page_size: number;
+}
+
+async function fetchXhsNotesList(
+  args: XhsNotesListArgs
+): Promise<{ notes: XhsNotesListItem[]; total: number; page: number; page_size: number }> {
+  const response = await dataService.getXhsNotesList({
+    filters: args.filters,
+    page: args.page,
+    page_size: args.page_size,
+    // v3.1.4: 默认按开户人数 desc 让有数据的笔记排在前
+    sort_field: '开户人数',
+    sort_order: 'desc',
+  } as any);
+
+  // 后端返回格式: { success, notes, pagination: { page, page_size, total, total_pages } }
+  // http 客户端将响应包装在 response.data 中
+  if (!response?.success || !response.data) {
+    throw new Error('获取数据失败');
+  }
+  const responseData = response.data as {
+    notes?: XhsNotesListItem[];
+    pagination?: { page: number; page_size: number; total: number; total_pages?: number };
+  };
+  return {
+    notes: responseData.notes || [],
+    total: responseData.pagination?.total || 0,
+    page: responseData.pagination?.page || 1,
+    page_size: responseData.pagination?.page_size || 50,
+  };
+}
+
 const XhsNotesListPage: React.FC = () => {
-  // 数据状态
-  const [data, setData] = useState<XhsNotesListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  // 数据状态：取数与加载态交给统一模板；page/pageSize 保留本地（按服务端确认分页回写）
+  const {
+    data: listData,
+    loading,
+    load: loadList,
+  } = useReportData<{ notes: XhsNotesListItem[]; total: number; page: number; page_size: number }, XhsNotesListArgs>(
+    fetchXhsNotesList,
+    { errorMessage: '获取数据失败，请重试' }
+  );
+  const notes = useMemo(() => listData?.notes ?? [], [listData]);
+  const total = listData?.total ?? 0;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
@@ -71,10 +162,10 @@ const XhsNotesListPage: React.FC = () => {
   // 前端排序后的数据
   const sortedData = useMemo(() => {
     if (!sorter.field || !sorter.order) {
-      return data;
+      return notes;
     }
 
-    return [...data].sort((a, b) => {
+    return [...notes].sort((a, b) => {
       const aValue = a[sorter.field as keyof XhsNotesListItem];
       const bValue = b[sorter.field as keyof XhsNotesListItem];
 
@@ -94,7 +185,7 @@ const XhsNotesListPage: React.FC = () => {
       const comparison = aStr.localeCompare(bStr);
       return sorter.order === 'ascend' ? comparison : -comparison;
     });
-  }, [data, sorter]);
+  }, [notes, sorter]);
 
   // 使用 ref 来存储最新的筛选条件（用于导出）
   const filtersRef = useRef({
@@ -126,83 +217,23 @@ const XhsNotesListPage: React.FC = () => {
     }
   }, []);
 
-  // 加载数据
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // 更新 filtersRef
-      filtersRef.current = {
-        publishDateRange,
-        selectedCreators,
-        selectedContentTypes,
-        selectedAdStrategies,
-        selectedAccount,
-      };
+  // 加载数据：筛选组装收进 buildListFilters，请求与加载态交给统一模板
+  const fetchData = useCallback(() => {
+    // 更新 filtersRef（导出读取最新已查询筛选）
+    filtersRef.current = {
+      publishDateRange,
+      selectedCreators,
+      selectedContentTypes,
+      selectedAdStrategies,
+      selectedAccount,
+    };
 
-      // 构建筛选条件
-      const filters: Record<string, unknown> = {};
-
-      // 数据时间范围（全局 store，始终有值）
-      filters.start_date = dateRange.startDate;
-      filters.end_date = dateRange.endDate;
-
-      // 发布时间范围
-      if (publishDateRange[0] && publishDateRange[1]) {
-        filters.publish_start_date = publishDateRange[0];
-        filters.publish_end_date = publishDateRange[1];
-      }
-
-      // 创作者筛选
-      if (selectedCreators.length > 0) {
-        filters.creators = selectedCreators;
-      }
-
-      // 内容类型筛选
-      if (selectedContentTypes.length > 0) {
-        filters.content_types = selectedContentTypes;
-      }
-
-      // 广告策略筛选
-      if (selectedAdStrategies.length > 0) {
-        filters.ad_strategies = selectedAdStrategies;
-      }
-
-      // 账号筛选
-      if (selectedAccount && selectedAccount !== '全部') {
-        filters.account = selectedAccount;
-      }
-
-      // 后端期望的请求格式: { filters: {...}, page, page_size }
-      const response = await dataService.getXhsNotesList({
-        filters,
-        page,
-        page_size: pageSize,
-        // v3.1.4: 默认按开户人数 desc 让有数据的笔记排在前
-        sort_field: '开户人数',
-        sort_order: 'desc',
-      } as any);
-
-      // 后端返回格式: { success, notes, pagination: { page, page_size, total, total_pages } }
-      // http 客户端将响应包装在 response.data 中
-      if (response.success && response.data) {
-        const responseData = response.data as {
-          notes?: XhsNotesListItem[];
-          pagination?: { page: number; page_size: number; total: number; total_pages?: number };
-        };
-        setData(responseData.notes || []);
-        setTotal(responseData.pagination?.total || 0);
-        setPage(responseData.pagination?.page || 1);
-        setPageSize(responseData.pagination?.page_size || 50);
-      } else {
-        message.error('获取数据失败');
-      }
-    } catch (error) {
-      console.error('获取笔记列表数据失败:', error);
-      message.error('获取数据失败，请重试');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, dateRange, publishDateRange, selectedCreators, selectedContentTypes, selectedAdStrategies, selectedAccount]);
+    loadList({
+      filters: buildListFilters(filtersRef.current, dateRange.startDate, dateRange.endDate),
+      page,
+      page_size: pageSize,
+    });
+  }, [page, pageSize, dateRange, publishDateRange, selectedCreators, selectedContentTypes, selectedAdStrategies, selectedAccount, loadList]);
 
   // 初始加载
   useEffect(() => {
@@ -212,6 +243,13 @@ const XhsNotesListPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 服务端确认分页：以后端返回的 page/page_size 为准回写（与原成功分支回写一致）
+  useEffect(() => {
+    if (!listData) return;
+    setPage(listData.page);
+    setPageSize(listData.page_size);
+  }, [listData]);
 
   // 处理查询
   const handleSearch = () => {
@@ -229,7 +267,7 @@ const XhsNotesListPage: React.FC = () => {
     setPage(1);
   };
 
-  // 获取筛选后的全部数据（用于导出）
+  // 获取筛选后的全部数据（用于导出）：筛选读 ref（上次查询条件）+ store 实时数据时间，复用 fetchXhsNotesList 翻页拉全量
   const fetchAllDataForExport = useCallback(async (): Promise<XhsNotesListItem[]> => {
     const filters = filtersRef.current;
     const { startDate, endDate } = useFilterStore.getState().dateRange;
@@ -239,57 +277,16 @@ const XhsNotesListPage: React.FC = () => {
     let hasMore = true;
 
     while (hasMore) {
-      const filterParams: Record<string, unknown> = {};
-
-      // 数据时间范围（全局 store 实时值）
-      filterParams.start_date = startDate;
-      filterParams.end_date = endDate;
-
-      if (filters.publishDateRange[0] && filters.publishDateRange[1]) {
-        filterParams.publish_start_date = filters.publishDateRange[0];
-        filterParams.publish_end_date = filters.publishDateRange[1];
-      }
-
-      if (filters.selectedCreators.length > 0) {
-        filterParams.creators = filters.selectedCreators;
-      }
-
-      if (filters.selectedContentTypes.length > 0) {
-        filterParams.content_types = filters.selectedContentTypes;
-      }
-
-      if (filters.selectedAdStrategies.length > 0) {
-        filterParams.ad_strategies = filters.selectedAdStrategies;
-      }
-
-      if (filters.selectedAccount && filters.selectedAccount !== '全部') {
-        filterParams.account = filters.selectedAccount;
-      }
-
-      const response = await dataService.getXhsNotesList({
-        filters: filterParams,
+      const result = await fetchXhsNotesList({
+        filters: buildListFilters(filters, startDate, endDate),
         page: currentPage,
         page_size: exportPageSize,
-        // v3.1.4: 导出也默认按开户人数 desc
-        sort_field: '开户人数',
-        sort_order: 'desc',
-      } as any);
-
-      if (response.success && response.data) {
-        const responseData = response.data as {
-          notes?: XhsNotesListItem[];
-          pagination?: { page: number; page_size: number; total: number; total_pages?: number };
-        };
-        const items = responseData.notes || [];
-        allItems.push(...items);
-        const returnedTotal = responseData.pagination?.total || 0;
-        if (allItems.length >= returnedTotal || items.length < exportPageSize) {
-          hasMore = false;
-        } else {
-          currentPage++;
-        }
-      } else {
+      });
+      allItems.push(...result.notes);
+      if (allItems.length >= result.total || result.notes.length < exportPageSize) {
         hasMore = false;
+      } else {
+        currentPage++;
       }
     }
 
@@ -766,7 +763,7 @@ const XhsNotesListPage: React.FC = () => {
           <span className={styles.tableTitle}>笔记列表</span>
           <Space>
             <span className={styles.statText}>共 {total.toLocaleString()} 条</span>
-            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled={!data.length}>
+            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled={!notes.length}>
               导出
             </Button>
           </Space>

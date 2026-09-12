@@ -26,6 +26,7 @@ import { DateRangePicker } from '@/components/Filter';
 import { getLeadsDetail } from '@/types/api';
 import type { LeadsDetailItem, LeadsDetailResponse } from '@/types/api.schemas';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
 import { FadeInSection } from '@/components';
 
@@ -43,6 +44,51 @@ interface FilterOptionsResponse {
     agencies: FilterOption[];
     employees: FilterOption[];
   };
+}
+
+// 线索明细列表取数：参数组装与 items/total 解包收进 fetcher（主查询与全量导出共用）
+interface LeadsDetailArgs {
+  page: number;
+  pageSize: number;
+  dateRange: [string, string];
+  platforms: string[];
+  agencies: string[];
+  employeeName: string;
+  isOpenedAccount: string;
+}
+
+async function fetchLeadsDetail(args: LeadsDetailArgs): Promise<{ items: LeadsDetailItem[]; total: number }> {
+  const params: Record<string, unknown> = {
+    page: args.page,
+    page_size: args.pageSize,
+  };
+
+  if (args.dateRange[0]) {
+    params.start_date = args.dateRange[0];
+  }
+  if (args.dateRange[1]) {
+    params.end_date = args.dateRange[1];
+  }
+  if (args.platforms.length > 0) {
+    params.platforms = args.platforms.join(',');
+  }
+  if (args.agencies.length > 0) {
+    params.agencies = args.agencies.join(',');
+  }
+  if (args.employeeName) {
+    params.employee_name = args.employeeName;
+  }
+  if (args.isOpenedAccount === 'true') {
+    params.is_opened_account = true;
+  } else if (args.isOpenedAccount === 'false') {
+    params.is_opened_account = false;
+  }
+
+  const response = await getLeadsDetail(params) as unknown as LeadsDetailResponse;
+  if (!response.success || !response.data) {
+    throw new Error(response.message || '获取数据失败');
+  }
+  return { items: response.data.items || [], total: response.data.total || 0 };
 }
 
 const LeadsDetailPage: React.FC = () => {
@@ -64,10 +110,13 @@ const LeadsDetailPage: React.FC = () => {
     { label: '未开户', value: 'false' },
   ];
 
-  // 数据状态
-  const [data, setData] = useState<LeadsDetailItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  // 数据状态：取数与加载态交给统一模板；页面只保留受控分页 state
+  const { data: listData, loading, load: loadRows } = useReportData<{ items: LeadsDetailItem[]; total: number }, LeadsDetailArgs>(
+    fetchLeadsDetail,
+    { errorMessage: '获取数据失败，请重试' }
+  );
+  const rows: LeadsDetailItem[] = listData?.items ?? [];
+  const total = listData?.total ?? 0;
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -114,52 +163,19 @@ const LeadsDetailPage: React.FC = () => {
     loadFilterOptions();
   }, []);
 
-  // 加载数据 - 使用 ref 来避免闭包问题
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const filters = filtersRef.current;
-      const params: Record<string, unknown> = {
-        page: filters.page,
-        page_size: filters.pageSize,
-      };
-
-      if (filters.dateRange[0]) {
-        params.start_date = filters.dateRange[0];
-      }
-      if (filters.dateRange[1]) {
-        params.end_date = filters.dateRange[1];
-      }
-      if (filters.platforms && filters.platforms.length > 0) {
-        params.platforms = filters.platforms.join(',');
-      }
-      if (filters.agencies && filters.agencies.length > 0) {
-        params.agencies = filters.agencies.join(',');
-      }
-      if (filters.employeeName) {
-        params.employee_name = filters.employeeName;
-      }
-      if (filters.isOpenedAccount === 'true') {
-        params.is_opened_account = true;
-      } else if (filters.isOpenedAccount === 'false') {
-        params.is_opened_account = false;
-      }
-
-      const response = await getLeadsDetail(params) as unknown as LeadsDetailResponse;
-
-      if (response.success && response.data) {
-        setData(response.data.items || []);
-        setTotal(response.data.total || 0);
-      } else {
-        message.error(response.message || '获取数据失败');
-      }
-    } catch (error) {
-      console.error('获取线索明细失败:', error);
-      message.error('获取数据失败，请重试');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // 加载数据 - 参数组装收进 fetcher；这里只把 ref 中的最新筛选交给统一模板（ref 避免闭包问题）
+  const fetchData = useCallback(() => {
+    const f = filtersRef.current;
+    loadRows({
+      page: f.page,
+      pageSize: f.pageSize,
+      dateRange: f.dateRange,
+      platforms: f.platforms,
+      agencies: f.agencies,
+      employeeName: f.employeeName,
+      isOpenedAccount: f.isOpenedAccount,
+    });
+  }, [loadRows]);
 
   // 初始加载
   useEffect(() => {
@@ -229,55 +245,30 @@ const LeadsDetailPage: React.FC = () => {
     setDetailModalVisible(true);
   };
 
-  // 获取筛选后的全部数据（用于导出）
+  // 获取筛选后的全部数据（用于导出）：复用 fetchLeadsDetail 翻页拉全量；失败统一抛给 handleExport 提示，不再静默导出半截
   const fetchAllDataForExport = useCallback(async (): Promise<LeadsDetailItem[]> => {
-    const filters = filtersRef.current;
+    const f = filtersRef.current;
+    const baseArgs: LeadsDetailArgs = {
+      page: 1,
+      pageSize: 10000,
+      dateRange: f.dateRange,
+      platforms: f.platforms,
+      agencies: f.agencies,
+      employeeName: f.employeeName,
+      isOpenedAccount: f.isOpenedAccount,
+    };
     const allItems: LeadsDetailItem[] = [];
-    const pageSize = 10000;
     let currentPage = 1;
     let hasMore = true;
 
     while (hasMore) {
-      const params: Record<string, unknown> = {
-        page: currentPage,
-        page_size: pageSize,
-      };
-
-      if (filters.dateRange[0]) {
-        params.start_date = filters.dateRange[0];
-      }
-      if (filters.dateRange[1]) {
-        params.end_date = filters.dateRange[1];
-      }
-      if (filters.platforms && filters.platforms.length > 0) {
-        params.platforms = filters.platforms.join(',');
-      }
-      if (filters.agencies && filters.agencies.length > 0) {
-        params.agencies = filters.agencies.join(',');
-      }
-      if (filters.employeeName) {
-        params.employee_name = filters.employeeName;
-      }
-      if (filters.isOpenedAccount === 'true') {
-        params.is_opened_account = true;
-      } else if (filters.isOpenedAccount === 'false') {
-        params.is_opened_account = false;
-      }
-
-      const response = await getLeadsDetail(params) as unknown as LeadsDetailResponse;
-
-      if (response.success && response.data) {
-        const items = response.data.items || [];
-        allItems.push(...items);
-        const returnedTotal = response.data.total || 0;
-        // 如果已经获取了所有数据，或者返回的数据少于 page_size，说明是最后一页
-        if (allItems.length >= returnedTotal || items.length < pageSize) {
-          hasMore = false;
-        } else {
-          currentPage++;
-        }
-      } else {
+      const result = await fetchLeadsDetail({ ...baseArgs, page: currentPage });
+      allItems.push(...result.items);
+      // 如果已经获取了所有数据，或者返回的数据少于 page_size，说明是最后一页
+      if (allItems.length >= result.total || result.items.length < baseArgs.pageSize) {
         hasMore = false;
+      } else {
+        currentPage++;
       }
     }
 
@@ -584,7 +575,7 @@ const LeadsDetailPage: React.FC = () => {
         </div>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={rows}
           rowKey={(record) =>
             `${record.lead_date}-${record.platform_source}-${record.wechat_nickname}-${record.capital_account}`
           }
