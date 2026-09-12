@@ -39,6 +39,7 @@ import { dataServiceOmniChannel } from '@/services/dataService';
 import { ECHARTS_COLORS, pickEChartsColor } from '@/utils/echartsColors';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
 
 // 4 大类颜色（按实际 SUM 开户降序：合作 > 自然 > 员工 > 互联网）
@@ -80,23 +81,74 @@ interface TrendRow {
   valid: number;
 }
 
-const OmniChannelPage: React.FC = () => {
-  // 日期接入全局筛选 store（自动查询：store 变化 -> useEffect 重载）
-  const { dateRange } = useFilterStore();
-  const [summary, setSummary] = useState<{
+type OmniChannelFilters = {
+  start_date: string | null;
+  end_date: string | null;
+  channel_categories?: string[];
+  sub_channels?: string[];
+};
+
+interface OmniChannelData {
+  summary: {
     totals: { opens: number; deposit: number; valid: number };
     by_category: CategoryRow[];
     top_category?: { channel_category: string; share: number; opens: number } | null;
-  } | null>(null);
-  const [trend, setTrend] = useState<TrendRow[]>([]);
-  const [byChannel, setByChannel] = useState<Record<string, SubRow[]>>({});
-  const [loading, setLoading] = useState(false);
+  };
+  trend: TrendRow[];
+  byChannel: Record<string, SubRow[]>;
+}
+
+// v3.1.11：summary 概览只受日期范围影响，trend + by-channel 才受全部筛选影响
+const fetchOmniChannel = async (args: {
+  summaryFilters: OmniChannelFilters;
+  filters: OmniChannelFilters;
+  categories: string[];
+}): Promise<OmniChannelData> => {
+  const [sumRes, trendRes, channelResponses] = await Promise.all([
+    dataServiceOmniChannel.getOmniChannelSummary({ filters: args.summaryFilters }),
+    dataServiceOmniChannel.getOmniChannelDailyTrend({ filters: args.filters }),
+    Promise.all(
+      args.categories.map((category) =>
+        dataServiceOmniChannel.getOmniChannelByChannel({
+          filters: args.filters,
+          channel_category: category,
+        })
+      )
+    ),
+  ]);
+  if (!sumRes?.success) throw new Error((sumRes as any)?.message || '加载全渠道概览失败');
+  if (!trendRes?.success) throw new Error((trendRes as any)?.message || '加载全渠道趋势失败');
+  const failedCategory = args.categories.find((_, idx) => !channelResponses[idx]?.success);
+  if (failedCategory) throw new Error(`加载「${failedCategory}」渠道明细失败`);
+  const td: any = trendRes.data;
+  const byChannelMap: Record<string, SubRow[]> = {};
+  args.categories.forEach((catName, idx) => {
+    byChannelMap[catName] = (channelResponses[idx].data as any)?.items || [];
+  });
+  return {
+    summary: sumRes.data as OmniChannelData['summary'],
+    trend: td?.daily_trend || td?.trend || [],
+    byChannel: byChannelMap,
+  };
+};
+
+const OmniChannelPage: React.FC = () => {
+  // 日期接入全局筛选 store（自动查询：store 变化 -> useEffect 重载）
+  const { dateRange } = useFilterStore();
 
   // v3.1 §2.5: 页面级渠道类别 + 子渠道多选筛选
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubChannels, setSelectedSubChannels] = useState<string[]>([]);
   const [channelCategoryOptions, setChannelCategoryOptions] = useState<string[]>([]);
   const [subChannelOptions, setSubChannelOptions] = useState<string[]>([]);
+  const { data, loading, load } = useReportData(fetchOmniChannel, {
+    errorMessage: '全渠道数据加载失败，请重试',
+  });
+
+  // 单 data 派生（变量名与原 state 一致，下游零改动）
+  const summary = data?.summary || null;
+  const trend: TrendRow[] = data?.trend || [];
+  const byChannel: Record<string, SubRow[]> = data?.byChannel || {};
 
   // 加载筛选选项
   useEffect(() => {
@@ -135,44 +187,10 @@ const OmniChannelPage: React.FC = () => {
     [selectedCategories]
   );
 
-  // 兼容旧 by-channel 路径：filters 里已有 sub_channels 时 by-channel 也透传
-  const byChannelFilters = filters;
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [sumRes, trendRes, channelResponses] = await Promise.all([
-        dataServiceOmniChannel.getOmniChannelSummary({ filters: summaryFilters }),
-        dataServiceOmniChannel.getOmniChannelDailyTrend({ filters }),
-        Promise.all(
-          activeCategories.map((category) =>
-            dataServiceOmniChannel.getOmniChannelByChannel({
-              filters: byChannelFilters,
-              channel_category: category,
-            })
-          )
-        ),
-      ]);
-      if (sumRes?.success) setSummary(sumRes.data as any);
-      if (trendRes?.success) {
-        const td = trendRes.data as any;
-        setTrend(td?.daily_trend || td?.trend || []);
-      }
-      const map: Record<string, SubRow[]> = {};
-      activeCategories.forEach((catName, idx) => {
-        const res = channelResponses[idx];
-        if (res?.success) map[catName] = (res.data as any)?.items || [];
-      });
-      setByChannel(map);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    load().catch((err) => { message.error('全渠道数据加载失败，请重试'); console.error('[OmniChannel] load failed:', err); });
+    load({ summaryFilters, filters, categories: activeCategories });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summaryFilters, filters, activeCategories, byChannelFilters]);
+  }, [summaryFilters, filters, activeCategories]);
 
   // 重置：日期由 FilterBar 内置 resetAll 重置（全局 store，useEffect 自动重载），这里只清本页渠道筛选
   const resetFilters = () => {
@@ -367,7 +385,7 @@ const OmniChannelPage: React.FC = () => {
         <FilterBar
           showAgency={false}
           showPlatform={false}
-          onSearch={load}
+          onSearch={() => load({ summaryFilters, filters, categories: activeCategories })}
           onReset={resetFilters}
         >
           <span className={styles.label}>渠道类别:</span>

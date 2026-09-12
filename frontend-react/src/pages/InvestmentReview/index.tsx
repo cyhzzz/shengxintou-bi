@@ -18,6 +18,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { useFilterStore } from '@/stores';
 import { http } from '@/services/http';
+import { useReportData } from '@/hooks/useReportData';
 import { pickEChartsColor } from '@/utils/echartsColors';
 import styles from './index.module.scss';
 
@@ -60,12 +61,19 @@ interface ApiResponse {
   };
 }
 
+const fetchInvestmentReview = async (params: Record<string, string>): Promise<ApiResponse['data']> => {
+  const res: any = await http.get('/investment-review', params);
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载投放评审数据失败');
+  return res.data;
+};
+
 const InvestmentReviewPage: React.FC = () => {
-  const [data, setData] = useState<ApiResponse['data'] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [metric, setMetric] = useState<MetricType>('cost');
 
   const { dateRange, selectedPlatforms, selectedAgencies, selectedBusinessModels } = useFilterStore();
+  const { data, loading, load } = useReportData(fetchInvestmentReview, {
+    errorMessage: '加载投放评审数据失败',
+  });
 
   const buildParams = useCallback(() => {
     const params: Record<string, string> = {};
@@ -79,23 +87,10 @@ const InvestmentReviewPage: React.FC = () => {
     return params;
   }, [dateRange, selectedPlatforms, selectedAgencies, selectedBusinessModels]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = (await http.get('/investment-review', buildParams())) as unknown as ApiResponse;
-      if (res?.success && res.data) {
-        setData(res.data);
-      }
-    } catch (err) {
-      console.error('[InvestmentReview] fetch error', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [buildParams]);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    load(buildParams());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildParams]);
 
   const buildTrendOption = useCallback(
     (agency: string): EChartsOption => {
@@ -316,8 +311,8 @@ const InvestmentReviewPage: React.FC = () => {
           showPlatform
           showAgency
           showBusinessModel
-          onSearch={() => fetchData()}
-          onReset={() => fetchData()}
+          onSearch={() => load(buildParams())}
+          onReset={() => load(buildParams())}
         />
       </FadeInSection>
 

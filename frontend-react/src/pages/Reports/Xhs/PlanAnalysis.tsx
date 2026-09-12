@@ -35,6 +35,7 @@ import { FadeInSection, FilterBar } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { compactStackTooltip } from '@/utils/chartTooltip';
 import { useFilterStore } from '@/stores';
+import { useReportData } from '@/hooks/useReportData';
 import styles from '../AppMarket/index.module.scss';
 
 // v3.3.10: 6 阶段漏斗
@@ -72,18 +73,51 @@ interface PlanItem {
 // v3.3.10：业务期望代理商名单（投放评审业务侧固定这 4 家）
 const TARGET_AGENCIES = ['直投', '量子', '绩牛', '美洋'];
 
+interface XhsPlanQuery {
+  filters: { start_date: string | null; end_date: string | null; agency?: string };
+  top_n: number;
+}
+
+interface XhsPlanData {
+  agencies: string[];
+  plan_items: (PlanItem & { row_id: string })[];
+  weekly_totals: PlanWeeklyPoint[];
+  totals: Record<string, number>;
+}
+
+const fetchXhsPlanAnalysis = async (query: XhsPlanQuery): Promise<XhsPlanData> => {
+  const res: any = await dataServiceReports.getXhsPlanAnalysis({ filters: query.filters, top_n: query.top_n });
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载小红书计划分析失败');
+  const d = res.data || {};
+  return {
+    agencies: d.target_agencies && d.target_agencies.length > 0 ? d.target_agencies : TARGET_AGENCIES,
+    plan_items: (d.plan_items || []).map((p: PlanItem, idx: number) => ({
+      ...p,
+      row_id: `${idx}-${p.plan_id}`,
+    })),
+    weekly_totals: d.weekly_totals || [],
+    totals: d.totals || {},
+  };
+};
+
 const XhsPlanAnalysisPage: React.FC = () => {
   // 日期接入全局筛选 store（自动查询：store 变化 -> useEffect 重载）；代理商为投放评审固定名单单选域，保持本页本地筛选
   const { dateRange } = useFilterStore();
   const [agency, setAgency] = useState<string | undefined>(undefined);
-  const [agencies, setAgencies] = useState<string[]>([]);
-  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
-  const [weeklyTotals, setWeeklyTotals] = useState<PlanWeeklyPoint[]>([]);
-  const [totals, setTotals] = useState<any>({ total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0, total_spend: 0 });
-  const [loading, setLoading] = useState(false);
   const [topN, setTopN] = useState(30);
   // v3.3.10: 计划详情表 - 按广告账号多选筛选（仅影响详情表，不影响走势/指标卡）
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+  const { data, loading, load } = useReportData(fetchXhsPlanAnalysis, {
+    errorMessage: '加载小红书计划分析失败',
+  });
+
+  // 单 data 派生（变量名与原 state 一致，下游零改动）
+  const agencies: string[] = data?.agencies || [];
+  const planItems = data?.plan_items || [];
+  const weeklyTotals = data?.weekly_totals || [];
+  const totals: Record<string, number> = data?.totals || {
+    total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0, total_spend: 0,
+  };
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -120,27 +154,10 @@ const XhsPlanAnalysisPage: React.FC = () => {
   // 切换代理商/重置时清空账号选择（账号是代理商下的子集，避免孤儿选项）
   useEffect(() => { setSelectedAccounts([]); }, [agency, planItems]);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res: any = await dataServiceReports.getXhsPlanAnalysis({ filters, top_n: topN });
-      if (res?.success) {
-        const d = res.data || {};
-        const list = d.target_agencies && d.target_agencies.length > 0 ? d.target_agencies : TARGET_AGENCIES;
-        setAgencies(list);
-        setPlanItems((d.plan_items || []).map((p: PlanItem, idx: number) => ({
-          ...p,
-          row_id: `${idx}-${p.plan_id}`,
-        })));
-        setWeeklyTotals(d.weekly_totals || []);
-        setTotals(d.totals || {});
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters, topN]);
+  useEffect(() => {
+    load({ filters, top_n: topN });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, topN]);
 
   // 周度拿量能力走势（双 Y 轴：左=企微柱 + 右=开口/新开户线）
   const volumeOption: EChartsOption = useMemo(() => {
@@ -341,7 +358,7 @@ const XhsPlanAnalysisPage: React.FC = () => {
         <FilterBar
           showAgency={false}
           showPlatform={false}
-          onSearch={load}
+          onSearch={() => load({ filters, top_n: topN })}
           onReset={resetFilters}
         >
           <span className={styles.label}>代理商:</span>

@@ -29,6 +29,7 @@ import { ReportFooter } from '@/components/ReportFooter';
 import { dataServiceReports } from '@/services/dataService';
 import type { ContentEvidencePlatformMonthly, ContentEvidenceXun, DiagnosisItem, DiagnosisResult } from '@/services/dataService';
 import { sanitizeText } from '@/utils/sanitizeText';
+import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
 
 type LevelKey = DiagnosisItem['level'];
@@ -105,34 +106,31 @@ const evidenceColumns: ColumnsType<ContentEvidencePlatformMonthly> = [
   },
 ];
 
+const fetchDiagnosis = async (monthStr: string | undefined): Promise<DiagnosisResult> => {
+  const res: any = await dataServiceReports.getIntelligentDiagnosis(
+    monthStr ? { month: monthStr } : undefined,
+  );
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载诊断数据失败');
+  return res.data;
+};
+
 const DiagnosisPage: React.FC = () => {
   const [month, setMonth] = useState<Dayjs | null>(null);
-  const [data, setData] = useState<DiagnosisResult | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const loadData = useCallback(async (m: Dayjs | null) => {
-    setLoading(true);
-    try {
-      const res = await dataServiceReports.getIntelligentDiagnosis(
-        m ? { month: m.format('YYYY-MM') } : undefined,
-      );
-      if (res?.success) {
-        const result = res.data as DiagnosisResult;
-        setData(result);
-        if (result?.month) {
-          setMonth((prev) => prev ?? dayjs(result.month));
-        }
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, loading, load } = useReportData(fetchDiagnosis, {
+    errorMessage: '加载诊断数据失败',
+  });
 
   useEffect(() => {
-    loadData(null);
-  }, [loadData]);
+    load(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 首次成功加载后，用接口返回的最新月份回填月份选择器
+  useEffect(() => {
+    if (data?.month) {
+      setMonth((prev) => prev ?? dayjs(data.month));
+    }
+  }, [data]);
 
   const items = data?.items || [];
   const overall = data?.summary?.overall;
@@ -280,11 +278,11 @@ const DiagnosisPage: React.FC = () => {
             type="primary"
             icon={<SearchOutlined />}
             loading={loading}
-            onClick={() => loadData(month)}
+            onClick={() => load(month ? month.format('YYYY-MM') : undefined)}
           >
             查询
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => loadData(month)}>
+          <Button icon={<ReloadOutlined />} onClick={() => load(month ? month.format('YYYY-MM') : undefined)}>
             刷新
           </Button>
         </Space>
