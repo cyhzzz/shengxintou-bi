@@ -85,6 +85,8 @@ CASE_ALIASES: Dict[str, str] = {
 # 背景：复合来源均分曾因"后端改了、移动端漏改"导致两端数值不一致。
 # 校验方式：在后端文件与 mobileRouteHandler.ts 中分别统计 backend_pattern / mobile_pattern
 #           的出现次数，要求两端一致（都实现、数量相等）。缺失或数量不等 → drift。
+# 注意：计数式对账只能防「整段增删」，防不了「内容漂移」——内容级一致性由
+#       DATASET_MARKERS（数据集原子比对）兜底，两类防线缺一不可。
 ALGO_MARKERS: List[Dict[str, str]] = [
     {
         'name': '复合来源线索均分（anchor-clusters / anchor-weekly-analysis）',
@@ -109,6 +111,54 @@ ALGO_MARKERS: List[Dict[str, str]] = [
         'backend_file': ROUTES_DIR / 'weekly_reports.py',
         'backend_pattern': r'_is_live_lead_source\(',
         'mobile_pattern': r'isWeeklyLiveLeadSource\(',
+    },
+    {
+        'name': '广告开户复合条件（应用市场漏斗）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
+        'backend_pattern': r'AD_ACCOUNT_CONDITIONS = \(',
+        'mobile_pattern': r'const AD_ACCOUNT_COND = ',
+    },
+    {
+        'name': '广告开户复合条件（周报）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
+        'backend_pattern': r'AD_ACCOUNT_CONDITIONS = \(',
+        'mobile_pattern': r'const WEEKLY_AD_ACCOUNT_COND = ',
+    },
+    {
+        'name': '应用市场漏斗·设备号去重计数',
+        'backend_file': ROUTES_DIR / 'reports' / 'app_market_ad_plan.py',
+        'backend_pattern': r'(?<!def )_count_devices\(',
+        'mobile_pattern': r'COUNT\(DISTINCT CASE WHEN',
+    },
+    {
+        'name': '应用市场漏斗·周五起始周 SQL',
+        'backend_file': ROOT / 'backend' / 'utils' / 'dialect_helpers.py',
+        'backend_pattern': r"func\.date\(col, 'weekday 4', '-6 days'\)",
+        'mobile_pattern': r"date\(\"\$\{col\}\", 'weekday 4', '-6 days'\)",
+    },
+    {
+        'name': '周报·周次计算（周五~次周四）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'weekly_utils.py',
+        'backend_pattern': r'def get_week_info\(',
+        'mobile_pattern': r'function getWeekInfo\(',
+    },
+    {
+        'name': '周报·全年周五列表',
+        'backend_file': ROOT / 'backend' / 'utils' / 'weekly_utils.py',
+        'backend_pattern': r'def get_all_fridays_in_year\(',
+        'mobile_pattern': r'function getAllFridaysInYear\(',
+    },
+    {
+        'name': '周报·广告计划激活设备去重',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'func\.count\(distinct\(FactConvAppmarket\.设备号\)\)',
+        'mobile_pattern': r'COUNT\(DISTINCT "设备号"\) as act_cnt',
+    },
+    {
+        'name': '诊断漏斗·设备号去重',
+        'backend_file': ROOT / 'backend' / 'utils' / 'diagnosis' / 'metrics.py',
+        'backend_pattern': r'func\.count\(func\.distinct\(FactConvAppmarket\.设备号\)\)',
+        'mobile_pattern': r'COUNT\(DISTINCT "设备号"\) AS devices',
     },
 ]
 
@@ -139,6 +189,85 @@ def check_algorithm_consistency() -> List[str]:
             drifts.append(
                 f"[{marker['name']}] 后端 {b_cnt} 处 vs 移动端 {m_cnt} 处，"
                 f"数量不一致，需在 mobileRouteHandler.ts 同步（后端位置见 {b_file.name}）"
+            )
+    return drifts
+
+
+# 数据集级对账：两端常量集合（平台清单/厂商白名单/别名映射等）必须逐项一致。
+# 背景：计数式 marker 只能防「整段增删」，防不了「内容漂移」
+#      （历史上厂商白名单曾单边变更而计数不变）。
+# 校验方式：按 block 正则截取两端定义体（捕获组排除常量名/类型注解差异），
+#          提取标识符原子（剔除 new/Set 语法词）后排序比对。
+DATASET_ATOM_STOPWORDS = {'new', 'Set'}
+DATASET_MARKERS: List[Dict[str, str]] = [
+    {
+        'name': '应用市场·平台清单（7 大市场）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
+        'backend_pattern': r'APP_MARKET_PLATFORMS = (\[[^\]]*\])',
+        'mobile_pattern': r'WEEKLY_APP_MARKET_PLATFORMS = (\[[^\]]*\])',
+    },
+    {
+        'name': '周报·内容平台清单',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'CONTENT_PLATFORMS = (\[[^\]]*\])',
+        'mobile_pattern': r'WEEKLY_CONTENT_PLATFORMS = (\[[^\]]*\])',
+    },
+    {
+        'name': '周报·内容平台展示清单（yj 归并云极）',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'CONTENT_PLATFORMS_DISPLAY = (\[[^\]]*\])',
+        'mobile_pattern': r'WEEKLY_CONTENT_PLATFORMS_DISPLAY = (\[[^\]]*\])',
+    },
+    {
+        'name': '周报·本地生活渠道',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'LOCAL_LIFE_CHANNELS = (\([^)]*\))',
+        'mobile_pattern': r'WEEKLY_LOCAL_LIFE_CHANNELS = (\[[^\]]*\])',
+    },
+    {
+        'name': '周报·平台名别名映射（yj→云极）',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_PLATFORM_ALIAS = (\{[^}]*\})',
+        'mobile_pattern': r'WEEKLY_PLATFORM_ALIAS[^=]*= (\{[^}]*\})',
+    },
+    {
+        'name': '周报·厂商白名单',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_FACTORY_WHITELIST = (\{.*?\n\})',
+        'mobile_pattern': r'WEEKLY_FACTORY_WHITELIST[^=]*= (\{.*?\n\})',
+    },
+    {
+        'name': '周报·全局厂商归并集',
+        'backend_file': ROUTES_DIR / 'weekly_reports.py',
+        'backend_pattern': r'_GLOBAL_FACTORY_MERGE = (\{[^}]*\})',
+        'mobile_pattern': r'WEEKLY_GLOBAL_FACTORY_MERGE = new Set\((\[[^\]]*\])\)',
+    },
+]
+
+
+def _dataset_atoms(block: str) -> List[str]:
+    """从定义体提取标识符原子（中文/字母/数字/下划线），剔除语法词后排序。"""
+    atoms = re.findall(r'[A-Za-z0-9_\u4e00-\u9fff]+', block)
+    return sorted(a for a in atoms if a not in DATASET_ATOM_STOPWORDS)
+
+
+def check_dataset_consistency() -> List[str]:
+    """对账两端常量数据集内容。返回 drift 信息列表（空 = 一致）。"""
+    if not MOBILE_HANDLER.exists():
+        return []
+    mobile_text = read_mobile_text()
+    drifts: List[str] = []
+    for marker in DATASET_MARKERS:
+        b_file = marker['backend_file']
+        b_text = b_file.read_text(encoding='utf-8') if b_file.exists() else ''
+        b_blocks = re.findall(marker['backend_pattern'], b_text, re.DOTALL)
+        if not b_blocks:
+            continue  # 后端未定义该数据集，不比对
+        m_blocks = re.findall(marker['mobile_pattern'], mobile_text, re.DOTALL)
+        if not m_blocks or _dataset_atoms(b_blocks[0]) != _dataset_atoms(m_blocks[0]):
+            drifts.append(
+                f"[{marker['name']}] 两端数据集内容不一致，"
+                f"需同步修改（后端位置见 {b_file.name}）"
             )
     return drifts
 
@@ -377,17 +506,17 @@ def main() -> int:
     if known_drifts:
         print(f'⚠️  有 {len(known_drifts)} 个已知 drift 待逐步补齐（不影响 CI）')
 
-    # ---- 算法一致性检查 ----
-    algo_drifts = check_algorithm_consistency()
+    # ---- 算法与数据集一致性检查 ----
+    algo_drifts = check_algorithm_consistency() + check_dataset_consistency()
     print()
-    print('--- 算法一致性（后端 vs 移动端） ---')
+    print('--- 算法与数据集一致性（后端 vs 移动端） ---')
     if algo_drifts:
         for d in algo_drifts:
             print(f'  ❌ {d}')
-        print('   规则见 docs/rules/business-invariants.md 第 6 节（复合来源线索均分）')
-        print('   两端算法必须逐处对齐，新增/修改均分逻辑需同时更新 mobileRouteHandler.ts')
+        print('   规则见 docs/rules/business-invariants.md 第 6 节、docs/rules/cross-platform.md 第 2 节')
+        print('   两端关键算法/数据集必须逐处对齐，变更需同步 mobileHandlers 并通过本脚本')
         return 1
-    print('  ✅ 关键算法后端与移动端一致')
+    print('  ✅ 关键算法与关键数据集后端、移动端一致')
 
     print('✅ 无新 drift，后端 API 与 mobileRouteHandler 对齐')
     return 0
