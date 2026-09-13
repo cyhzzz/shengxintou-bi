@@ -539,7 +539,6 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     { sql: '"平台来源" = ?', params: ['小红书'] },
     dateClause('线索日期', sd, ed),
   ];
-  if (agency) conditions.push({ sql: '"广告代理商" = ?', params: [String(agency)] });
   const where = buildWhere(conditions);
 
   const sql = `SELECT ${planExpr} as plan_key,
@@ -556,9 +555,8 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
   ORDER BY week_start`;
   const rows = await querySql<Row>(sql, where.params);
 
-  // plan_map + weekly_agg
+  // plan_map（整体周度走势在代理商过滤后由 plan_items 重建）
   const plan_map: Record<string, any> = {};
-  const weekly_agg: Record<string, any> = {};
   for (const r of rows) {
     const plan_key = String(r.plan_key ?? '未归因');
     const week = String(r.week_start ?? '未知周');
@@ -581,8 +579,6 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
       ...vals,
       ...xhsPlanCalcRates(vals['企微'], vals['开口'], vals['有效线索'], vals['有效线索_不含存量'], vals['新开户'], vals['有效户']),
     });
-    if (!weekly_agg[week]) weekly_agg[week] = Object.fromEntries(XHS_PLAN_FUNNEL_KEYS.map(k => [k, 0]));
-    for (const k of XHS_PLAN_FUNNEL_KEYS) weekly_agg[week][k] += vals[k];
   }
 
   // plan_items 加 rates + 排序
@@ -644,14 +640,11 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
       costWeek[`${pid}|${ws}`] = c;
       const t = costTot[pid] = costTot[pid] || { ...coverZero };
       for (const k of metricKeys) t[k] += c[k];
-      const agg = costWeekAgg[ws] = costWeekAgg[ws] || { ...coverZero };
-      for (const k of metricKeys) agg[k] += c[k];
     }
     const pdMetaRows = await querySql<Row>(
       `SELECT "计划ID" as plan_id, MAX("计划名称") as name, MAX("厂商名称") as agency
        FROM fact_plan_daily
        WHERE "计划ID" IN (${numericPlanIds.map(() => '?').join(', ')}) AND "平台" = ?
-         AND "计划名称" IS NOT NULL AND "计划名称" != ''
        GROUP BY "计划ID"`,
       [...numericPlanIds.map(String), '小红书']
     );
@@ -660,25 +653,47 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
       agency: String(r.agency || ''),
     };
   }
-  for (const p of plan_items) {
+  // ---- 代理商筛选（按计划归属）----
+  // 归属规则：fact_plan_daily.厂商名称 非空 → 该厂商；为空 → 直投（无厂商代投）；
+  // 广告ID 无法归一化（未归因）或 fact_plan_daily 无记录 → 无法归属，选任何厂商时都不计入
+  const planAgencyOf = (p: any): string | null => {
+    const pid = Object.prototype.hasOwnProperty.call(pidOf, p.plan_id) ? pidOf[p.plan_id] : null;
+    if (pid === null || !planMeta[pid]) return null;
+    return planMeta[pid].agency || '直投';
+  };
+  const filteredItems = agency
+    ? plan_items.filter(p => planAgencyOf(p) === String(agency))
+    : plan_items;
+
+  for (const p of filteredItems) {
     const pid = Object.prototype.hasOwnProperty.call(pidOf, p.plan_id) ? pidOf[p.plan_id] : null;
     const tl = pid !== null ? (costTot[pid] || { ...coverZero }) : { ...coverZero };
     const meta = pid !== null ? (planMeta[pid] || { plan_name: '', agency: '' }) : { plan_name: '', agency: '' };
     p.plan_name = meta.plan_name;
-    if (meta.agency) p['广告代理商'] = meta.agency;   // 用 fact_plan_daily.厂商名称（直投/量子/绩牛/美洋）作为代理商
+    if (pid !== null && planMeta[pid]) p['广告代理商'] = planMeta[pid].agency || '直投';   // 展示与筛选同源：厂商名称（空=直投）
     for (const k of metricKeys) p.totals[k] = tl[k];
     for (const wpt of p.weekly) {
       const ws = String(wpt.week_start).slice(0, 10);
       const wc = pid !== null ? (costWeek[`${pid}|${ws}`] || { ...coverZero }) : { ...coverZero };
       for (const k of metricKeys) wpt[k] = wc[k];
+      const agg = costWeekAgg[ws] = costWeekAgg[ws] || { ...coverZero };
+      for (const k of metricKeys) agg[k] += wc[k];
     }
   }
 
-  const top_plans = plan_items.slice(0, top_n);
+  const top_plans = filteredItems.slice(0, top_n);
 
-  // 整体周度走势
-  const weekly_totals = Object.keys(weekly_agg).sort().map(week => {
-    const t = weekly_agg[week];
+  // 整体周度走势：由「过滤后的计划」逐周累加，保证与 plan_items / totals 口径一致
+  const weeklyAgg: Record<string, Record<string, number>> = {};
+  for (const p of filteredItems) {
+    for (const wpt of p.weekly) {
+      const ws = String(wpt.week_start).slice(0, 10);
+      const t = weeklyAgg[ws] = weeklyAgg[ws] || Object.fromEntries(XHS_PLAN_FUNNEL_KEYS.map(k => [k, 0]));
+      for (const k of XHS_PLAN_FUNNEL_KEYS) t[k] += wpt[k];
+    }
+  }
+  const weekly_totals = Object.keys(weeklyAgg).sort().map(week => {
+    const t = weeklyAgg[week];
     const ws = String(week).slice(0, 10);
     const cw = costWeekAgg[ws] || { ...coverZero };
     return {
@@ -695,25 +710,24 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     { sql: '"广告代理商" IS NOT NULL AND "广告代理商" != \'\'', params: [] as unknown[] },
     dateClause('线索日期', sd, ed),
   ];
-  if (agency) agCond.push({ sql: '"广告代理商" = ?', params: [String(agency)] });
   const agWhere = buildWhere(agCond);
   const agSql = `SELECT DISTINCT "广告代理商" as v FROM fact_conv_content ${agWhere.clause} ORDER BY "广告代理商"`;
   const agRows = await querySql<Row>(agSql, agWhere.params);
   const agencies = agRows.map(r => r.v).filter(Boolean);
 
   const totals = {
-    total_plans: plan_items.length,
+    total_plans: filteredItems.length,
     top_plans: top_plans.length,
-    total_qiwei: plan_items.reduce((s, p) => s + p.totals['企微'], 0),
-    total_kaihou: plan_items.reduce((s, p) => s + p.totals['开口'], 0),
-    total_youxiao: plan_items.reduce((s, p) => s + p.totals['有效线索'], 0),
-    total_youxiao_bcq: plan_items.reduce((s, p) => s + p.totals['有效线索_不含存量'], 0),
-    total_xinkaihu: plan_items.reduce((s, p) => s + p.totals['新开户'], 0),
-    total_youxiao_hu: plan_items.reduce((s, p) => s + p.totals['有效户'], 0),
-    total_spend: round2(plan_items.reduce((s, p) => s + p.totals['消耗'], 0)),
-    total_impressions: plan_items.reduce((s, p) => s + p.totals['展示'], 0),
-    total_clicks: plan_items.reduce((s, p) => s + p.totals['点击'], 0),
-    total_downloads: plan_items.reduce((s, p) => s + p.totals['下载'], 0),
+    total_qiwei: filteredItems.reduce((s, p) => s + p.totals['企微'], 0),
+    total_kaihou: filteredItems.reduce((s, p) => s + p.totals['开口'], 0),
+    total_youxiao: filteredItems.reduce((s, p) => s + p.totals['有效线索'], 0),
+    total_youxiao_bcq: filteredItems.reduce((s, p) => s + p.totals['有效线索_不含存量'], 0),
+    total_xinkaihu: filteredItems.reduce((s, p) => s + p.totals['新开户'], 0),
+    total_youxiao_hu: filteredItems.reduce((s, p) => s + p.totals['有效户'], 0),
+    total_spend: round2(filteredItems.reduce((s, p) => s + p.totals['消耗'], 0)),
+    total_impressions: filteredItems.reduce((s, p) => s + p.totals['展示'], 0),
+    total_clicks: filteredItems.reduce((s, p) => s + p.totals['点击'], 0),
+    total_downloads: filteredItems.reduce((s, p) => s + p.totals['下载'], 0),
     total_weeks: weekly_totals.length,
   };
 
@@ -725,6 +739,6 @@ export async function handleXhsPlanAnalysis(body: any): Promise<any> {
     plan_items: top_plans,
     totals,
     top_n,
-    all_count: plan_items.length,
+    all_count: filteredItems.length,
   };
 }

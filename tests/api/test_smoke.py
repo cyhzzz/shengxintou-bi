@@ -442,8 +442,11 @@ class ApiSmokeTest(unittest.TestCase):
                 self.assertIn(k, p['totals'], f'plan.totals 缺少阶段 {k}')
 
     def test_49_xhs_plan_analysis_with_agency(self):
-        # v3.3.10 小红书 · 计划分析（指定代理商筛选）
-        payload = {'filters': {'start_date': SAMPLE_START, 'end_date': SAMPLE_END, 'agency': '量子'}, 'top_n': 5}
+        # 小红书 · 计划分析（指定代理商筛选）
+        # 回归：fact_conv_content.广告代理商 95% 为空、无「量子」真值，
+        # 筛选必须按「计划ID → fact_plan_daily.厂商名称」归属，选量子不能返回空。
+        # 日期窗口放宽为超大区间：本用例目的是筛选逻辑本身，不受 SAMPLE 窗口数据有无影响
+        payload = {'filters': {'start_date': '2020-01-01', 'end_date': '2030-12-31', 'agency': '量子'}, 'top_n': 5}
         data = self._ok(
             self._post('/api/v1/reports/xhs/plan-analysis', payload),
             '/reports/xhs/plan-analysis?agency=量子')
@@ -452,6 +455,15 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertEqual(data.get('selected_agency'), '量子')
         # 业务期望代理商名单固定 4 家
         self.assertEqual(set(data.get('target_agencies', [])), {'直投', '量子', '绩牛', '美洋'})
+        # 有业务数据时（CI 空库跳过数值断言）：量子筛选必须非空，且所有计划都归属量子
+        if data.get('totals', {}).get('total_plans', 0) > 0:
+            self.assertGreater(
+                data['totals']['total_qiwei'], 0,
+                '选量子后漏斗顶端为 0（筛选打错字段的老 bug 回归）')
+            for p in data['plan_items']:
+                self.assertEqual(
+                    p.get('广告代理商'), '量子',
+                    f"计划 {p.get('plan_id')} 代理商非量子: {p.get('广告代理商')}")
 
     # ============================================================
     #  员工转化 / 线索明细 / 小红书

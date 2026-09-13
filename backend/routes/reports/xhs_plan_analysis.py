@@ -17,6 +17,9 @@
         - 小红书漏斗无"激活APP"和"入金"概念
   - 维度字段：`广告计划ID / 投放账号` → `广告ID / 广告账号`
   - 筛选维度：`应用市场` → `广告代理商`（直投 / 量子 / 绩牛 / 美洋）
+    注：fact_conv_content.广告代理商 95% 为空、无这 4 个真值，真实归属在
+    fact_plan_daily.厂商名称（计划级）；筛选在 Python 层按「计划ID → 厂商名称」过滤，
+    厂商名称为空视为直投，无法归属（未归因/投放表无记录）在指定厂商时不计入
 
 入参：
   filters: { start_date, end_date, agency (单值字符串，可为 None=全部) }
@@ -58,13 +61,16 @@ TARGET_AGENCIES = ['直投', '量子', '绩牛', '美洋']
 
 
 def _apply_filters(q, filters):
-    """小红书 · 计划分析 通用筛选：日期区间 + 单代理商"""
+    """小红书 · 计划分析 通用筛选：仅日期区间。
+
+    代理商筛选不能打在 fact_conv_content.广告代理商 上（该字段 95% 为空且无
+    「直投/量子/绩牛/美洋」真值，选任何厂商都会 0 匹配返回全空）；
+    统一在 Python 层按「计划ID → fact_plan_daily.厂商名称」归属过滤。
+    """
     sd, ed = filters.get('start_date'), filters.get('end_date')
     if sd and ed:
         q = q.filter(and_(FactConvContent.线索日期 >= sd,
                           FactConvContent.线索日期 <= ed))
-    if filters.get('agency'):
-        q = q.filter(FactConvContent.广告代理商 == str(filters['agency']))
     return q
 
 
@@ -153,9 +159,8 @@ def xhs_plan_analysis():
             '不含存量_有效户率': round(youxiao_hu / youxiao_bcq * 100, 2) if youxiao_bcq > 0 else 0,
         }
 
-    # 按 plan 聚合 weekly
+    # 按 plan 聚合 weekly（整体周度走势在代理商过滤后由 plan_items 重建）
     plan_map = {}
-    weekly_agg = {}
     for r in rows:
         plan_key = str(r.plan_key) if r.plan_key is not None else '未归因'
         week = str(r.week_start) if r.week_start is not None else '未知周'
@@ -177,10 +182,6 @@ def xhs_plan_analysis():
         for k in FUNNEL_KEYS:
             p['totals'][k] += vals[k]
         p['weekly'].append(weekly_point)
-        if week not in weekly_agg:
-            weekly_agg[week] = {k: 0 for k in FUNNEL_KEYS}
-        for k in FUNNEL_KEYS:
-            weekly_agg[week][k] += vals[k]
 
     plan_items = list(plan_map.values())
     for p in plan_items:
@@ -242,20 +243,32 @@ def xhs_plan_analysis():
         ).filter(
             FactPlanDaily.计划ID.in_(numeric_plan_ids),
             FactPlanDaily.平台 == '小红书',
-            FactPlanDaily.计划名称.isnot(None), FactPlanDaily.计划名称 != '',
+            # 不再要求计划名称非空：厂商名称归属不依赖名称是否可取（MAX 自动忽略 NULL）
         ).group_by(FactPlanDaily.计划ID).all():
             plan_meta[int(r.计划ID)] = {
                 'plan_name': r.plan_name or '',
                 'agency': r.agency or '',
             }
 
+    # ---- 代理商筛选（Python 层，按计划归属）----
+    # 归属规则：fact_plan_daily.厂商名称 非空 → 该厂商；为空 → 直投（无厂商代投）；
+    # 广告ID 无法归一化（未归因）或 fact_plan_daily 无记录 → 无法归属，选任何厂商时都不计入
+    def _plan_agency(p):
+        pid = pid_of.get(p['plan_id'])
+        if pid is None or pid not in plan_meta:
+            return None
+        return plan_meta[pid]['agency'] or '直投'
+
+    if agency:
+        plan_items = [p for p in plan_items if _plan_agency(p) == str(agency)]
+
     for p in plan_items:
         pid = pid_of.get(p['plan_id'])
         tl = dict(cost_tot.get(pid, cover_names)) if pid is not None else dict(cover_names)
         meta = plan_meta.get(pid, {}) if pid is not None else {}
         p['plan_name'] = meta.get('plan_name', '')
-        if meta.get('agency'):
-            p['广告代理商'] = meta['agency']   # 用 fact_plan_daily.厂商名称（直投/量子/绩牛/美洋）作为代理商
+        if pid is not None and pid in plan_meta:
+            p['广告代理商'] = meta['agency'] or '直投'   # 展示与筛选同源：厂商名称（空=直投）
         p['totals'] = {**p['totals'], **tl}
         for wpt in p['weekly']:
             ws = str(wpt['week_start'])[:10]
@@ -265,6 +278,15 @@ def xhs_plan_analysis():
             for k in metric_keys: agg[k] += wc[k]
 
     top_plans = plan_items[:top_n]
+
+    # 整体周度走势：由「过滤后的计划」逐周累加，保证与 plan_items / totals 口径一致
+    weekly_agg = {}
+    for p in plan_items:
+        for wpt in p['weekly']:
+            ws = str(wpt['week_start'])[:10]
+            t = weekly_agg.setdefault(ws, {k: 0 for k in FUNNEL_KEYS})
+            for k in FUNNEL_KEYS:
+                t[k] += wpt[k]
 
     weekly_totals = []
     for week, t in sorted(weekly_agg.items()):
