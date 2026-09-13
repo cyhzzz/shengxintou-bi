@@ -143,6 +143,20 @@ CROSS_PLATFORM_SCRIPTS_IN_CI = (
     'scripts/check_mobile_routes_coverage.py',
 )
 
+# Encoding defense (root cause: Windows consoles default to cp1252; a missing
+# PYTHONIOENCODING and a BOM-less Chinese ps1 each caused a real incident).
+# PowerShell 5.1 relies solely on the UTF-8 BOM to decode sources — a
+# Python-style `# -*- coding` comment is ineffective there. Note that .md files
+# are the opposite: read_text() rejects their BOM, so ps1 checks stand alone.
+PS1_DIRS = (
+    ROOT / 'scripts',
+    ROOT / 'android' / 'scripts',
+)
+PYTHON_WINDOWS_WORKFLOWS = (
+    ROOT / '.github' / 'workflows' / 'ci.yml',
+    ROOT / '.github' / 'workflows' / 'release.yml',
+)
+
 HISTORY_RE = re.compile(
     r'^#{1,6}\s+(?:v?\d+\.\d+\.\d+\b.*|.*(?:版本历史|已落地).*)$',
     re.MULTILINE | re.IGNORECASE,
@@ -331,6 +345,54 @@ def check_content(passes: list[str], errors: list[str]) -> None:
         passes.append('topic rules do not copy the current version')
 
 
+def check_encoding_defense(passes: list[str], errors: list[str]) -> None:
+    """ps1 must carry a UTF-8 BOM without fake coding lines; python-running
+    Windows workflows must set PYTHONIOENCODING: utf-8."""
+    ps1_files = sorted(p for d in PS1_DIRS for p in d.glob('*.ps1'))
+    no_bom = [
+        relative(p) for p in ps1_files
+        if not p.read_bytes().startswith(b'\xef\xbb\xbf')
+    ]
+    if no_bom:
+        errors.append(
+            'ps1 scripts missing UTF-8 BOM (PowerShell 5.1 decodes them as ANSI): '
+            + ', '.join(no_bom)
+        )
+    else:
+        passes.append(f'ps1 scripts carry UTF-8 BOM ({len(ps1_files)} checked)')
+
+    fake_coding = [
+        relative(p) for p in ps1_files
+        if re.search(
+            r'^#\s*(-\*-\s*)?coding\s*:',
+            p.read_text(encoding='utf-8-sig', errors='replace'),
+            re.MULTILINE,
+        )
+    ]
+    if fake_coding:
+        errors.append(
+            'ps1 scripts use ineffective Python-style coding lines: '
+            + ', '.join(fake_coding)
+        )
+    else:
+        passes.append('ps1 scripts have no fake coding lines')
+
+    missing_env = [
+        relative(wf) for wf in PYTHON_WINDOWS_WORKFLOWS
+        if 'PYTHONIOENCODING: utf-8' not in wf.read_text(encoding='utf-8')
+    ]
+    if missing_env:
+        errors.append(
+            'python-running Windows workflows missing env PYTHONIOENCODING: utf-8: '
+            + ', '.join(missing_env)
+        )
+    else:
+        passes.append(
+            'python Windows workflows set PYTHONIOENCODING '
+            f'({len(PYTHON_WINDOWS_WORKFLOWS)} checked)'
+        )
+
+
 def main() -> int:
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
@@ -339,6 +401,7 @@ def main() -> int:
     check_files_and_root(passes, errors)
     check_links(passes, errors)
     check_content(passes, errors)
+    check_encoding_defense(passes, errors)
 
     print('Shengxintou BI rule architecture check')
     print('=' * 38)

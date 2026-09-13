@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Android APK 一键编译脚本
 

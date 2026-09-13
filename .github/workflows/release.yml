@@ -23,6 +23,11 @@ on:
         description: '要构建并挂载产物的目标 tag（如 v3.8.4）'
         required: true
 
+# Windows runner 控制台默认 cp1252，统一 UTF-8 防 Python 中文输出/读取崩溃
+# （build-exe/build-apk 在 windows-latest 上跑 pip 与 Python 脚本）
+env:
+  PYTHONIOENCODING: utf-8
+
 permissions:
   contents: write
   actions: read   # gate 需要列 workflow run 判断 CI 是否全绿

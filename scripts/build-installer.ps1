@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-<#
+﻿<#
 .SYNOPSIS
   省心投 BI 安装包打包脚本（PyInstaller + 前端 build + electron-builder NSIS）
 
