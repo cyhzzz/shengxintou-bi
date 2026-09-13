@@ -10,6 +10,11 @@ setlocal enabledelayedexpansion
 
 cd /d %~dp0..
 
+REM Prefer the project venv python; system python may lack backend deps (Flask etc.)
+set "PY=python"
+if exist .venv\Scripts\python.exe set "PY=.venv\Scripts\python.exe"
+echo Using Python: %PY%
+
 echo.
 echo ==========================================
 echo  Shengxintou BI - Pre-commit Check
@@ -20,7 +25,7 @@ set ALL_PASS=1
 
 REM ---- Step 1: rule architecture ----
 echo [1/10] Rule architecture check...
-python scripts\check_rule_architecture.py
+%PY% scripts\check_rule_architecture.py
 set RULE_EXIT=%ERRORLEVEL%
 if %RULE_EXIT%==0 (
     echo [PASS] Rule architecture check passed
@@ -32,7 +37,7 @@ echo.
 
 REM ---- Step 2: cross-platform contract drift ----
 echo [2/10] Cross-platform contract: API vs mobileRouteHandler...
-python scripts\check_api_contract.py
+%PY% scripts\check_api_contract.py
 set CONTRACT_EXIT=%ERRORLEVEL%
 if %CONTRACT_EXIT%==0 (
     echo [PASS] API contract check passed
@@ -43,7 +48,7 @@ if %CONTRACT_EXIT%==0 (
 echo.
 
 echo [3/10] Cross-platform contract: router vs smoke spec...
-python scripts\check_route_drift.py
+%PY% scripts\check_route_drift.py
 set ROUTE_EXIT=%ERRORLEVEL%
 if %ROUTE_EXIT%==0 (
     echo [PASS] Route drift check passed
@@ -54,7 +59,7 @@ if %ROUTE_EXIT%==0 (
 echo.
 
 echo [4/10] Cross-platform contract: featureFlags usage...
-python scripts\check_feature_flags.py
+%PY% scripts\check_feature_flags.py
 set FLAGS_EXIT=%ERRORLEVEL%
 if %FLAGS_EXIT%==0 (
     echo [PASS] featureFlags check passed
@@ -65,7 +70,7 @@ if %FLAGS_EXIT%==0 (
 echo.
 
 echo [5/10] Cross-platform contract: mobileRouteHandler case coverage...
-python scripts\check_mobile_routes_coverage.py
+%PY% scripts\check_mobile_routes_coverage.py
 set COVERAGE_EXIT=%ERRORLEVEL%
 if %COVERAGE_EXIT%==0 (
     echo [PASS] mobileRouteHandler case coverage check passed
@@ -77,7 +82,7 @@ echo.
 
 REM ---- Step 6: sync tables & rosters dual-write drift ----
 echo [6/10] Sync tables dual-write: backend vs mobile vs dataService...
-python scripts\check_sync_tables.py
+%PY% scripts\check_sync_tables.py
 set SYNC_EXIT=%ERRORLEVEL%
 if %SYNC_EXIT%==0 (
     echo [PASS] Sync tables dual-write check passed
@@ -89,7 +94,7 @@ echo.
 
 REM ---- Step 7: FilterBar usage ----
 echo [7/10] Frontend FilterBar usage vs hand-written RangePicker...
-python scripts\check_filter_bar_usage.py
+%PY% scripts\check_filter_bar_usage.py
 set FILTER_EXIT=%ERRORLEVEL%
 if %FILTER_EXIT%==0 (
     echo [PASS] FilterBar usage check passed
@@ -101,7 +106,7 @@ echo.
 
 REM ---- Step 8: data quality audit (aggregate table duplicate rows) ----
 echo [8/10] Data quality audit: aggregate table duplicate rows...
-python scripts\audit_data_quality.py
+%PY% scripts\audit_data_quality.py
 set QUALITY_EXIT=%ERRORLEVEL%
 if %QUALITY_EXIT%==0 (
     echo [PASS] Data quality audit passed
@@ -114,7 +119,7 @@ echo.
 
 REM ---- Step 9: backend API smoke ----
 echo [9/10] Backend API smoke...
-python -m unittest discover -s tests/api -q 2>&1
+%PY% -m unittest discover -s tests/api -q 2>&1
 set API_EXIT=%ERRORLEVEL%
 if %API_EXIT%==0 (
     echo [PASS] Backend API smoke passed

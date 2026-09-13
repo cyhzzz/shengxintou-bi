@@ -193,20 +193,6 @@ export default function TableSyncCard() {
       render: (v: number | null) => (v === null ? '—' : v.toLocaleString()),
     },
     {
-      title: '本地版本',
-      dataIndex: 'localVersion',
-      key: 'localVersion',
-      width: 130,
-      render: (v: string | null) => v || '—',
-    },
-    {
-      title: '云端版本',
-      dataIndex: 'cloudVersion',
-      key: 'cloudVersion',
-      width: 130,
-      render: (v: string | null) => v || '—',
-    },
-    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
@@ -255,12 +241,7 @@ export default function TableSyncCard() {
   ];
 
   return (
-    <Card title={(
-      <Space size="small">
-        <span>逐表同步</span>
-        <Tag color="orange">v3.9.3</Tag>
-      </Space>
-    )}
+    <Card title="逐表同步"
       extra={
         <Button
           size="small"

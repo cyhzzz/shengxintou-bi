@@ -299,6 +299,8 @@ export interface WebdavConfig {
 }
 
 // v3.4.3：双向数据同步（SQLite ↔ Supabase PG）
+// 已封存：前端当前无任何调用方，仅为保留 API 契约以备将来恢复而保留；
+// 后端蓝图由 CLOUD_SYNC_ENABLED 控制（默认 false 不注册）。请勿在新代码中引用。
 export interface SyncStatus {
   available: boolean;
   message?: string;

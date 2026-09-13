@@ -51,8 +51,8 @@ export interface FeatureFlags {
  * 封存期默认行为：
  *   - 走本地 SQLite，无登录，无账号入口
  *   - 保留 WebDAV 备份菜单（坚果云备份功能，与 Supabase 无关）
- *     DatabaseBackup 页面里的「SQLite↔PG 双向同步」卡片在 CLOUD_SYNC_ENABLED=false 时
- *     会因后端蓝图未注册而 404，前端 catch 后静默降级为「未配置」提示
+ *     「SQLite↔PG 双向同步」卡片已移除：后端 data_sync 蓝图仅在 CLOUD_SYNC_ENABLED=true
+ *     时注册（默认 false，封存期不注册），前端无任何入口
  *   - 保留账号管理菜单（平台账号映射，与鉴权无关）
  *
  * 启用 Supabase / 鉴权时需要：

@@ -113,7 +113,9 @@ const XhsPlanAnalysisPage: React.FC = () => {
 
   // 单 data 派生（变量名与原 state 一致，下游零改动）
   const agencies: string[] = data?.agencies || [];
-  const planItems = data?.plan_items || [];
+  // 必须用 useMemo 稳定引用：data 为 null（加载中/加载失败）时若每轮渲染都新建空数组，
+  // 下方清空 effect 的 planItems 依赖每轮变化 -> 无限 setState -> React #185 崩溃（安卓弱机首屏必现）
+  const planItems = useMemo(() => data?.plan_items || [], [data]);
   const weeklyTotals = data?.weekly_totals || [];
   const totals: Record<string, number> = data?.totals || {
     total_plans: 0, total_qiwei: 0, total_xinkaihu: 0, total_youxiao_hu: 0, total_spend: 0,
@@ -151,8 +153,9 @@ const XhsPlanAnalysisPage: React.FC = () => {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
   }, [planItems]);
 
-  // 切换代理商/重置时清空账号选择（账号是代理商下的子集，避免孤儿选项）
-  useEffect(() => { setSelectedAccounts([]); }, [agency, planItems]);
+  // 切换代理商/重置时清空账号选择（账号是代理商下的子集，避免孤儿选项）；
+  // 函数式更新：已是空数组时返回原引用，避免无意义重渲染
+  useEffect(() => { setSelectedAccounts((prev) => (prev.length ? [] : prev)); }, [agency, planItems]);
 
   useEffect(() => {
     load({ filters, top_n: topN });
