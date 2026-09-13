@@ -82,11 +82,11 @@ const DouyinQingniaoReconciliationPage = lazy(() => import('@/pages/DataReconcil
 const InvestmentReviewPage = lazy(() => import('@/pages/InvestmentReview'));
 // v3.3.10: 小红书计划分析（小红书二级菜单）
 const XhsPlanAnalysisPage = lazy(() => import('@/pages/Reports/Xhs/PlanAnalysis'));
-// v3.8.0: 分支KOS转化周报（小红书二级菜单，featureFlags.showKosWeekly 控制注册）
+// v3.8.0: 分支KOS转化周报（小红书二级菜单）
 const XhsKosWeeklyPage = lazy(() => import('@/pages/XhsNotes/KosWeekly'));
 // v4.1.9: 智能诊断（数据健康度按月体检）
 const DiagnosisPage = lazy(() => import('@/pages/Diagnosis'));
-// v4.2.0: 智能分析（LLM 跨月趋势对比；showIntelligentAnalysis 控制注册）
+// v4.2.0: 智能分析（LLM 跨月趋势对比）
 const IntelligentAnalysisPage = lazy(() => import('@/pages/IntelligentAnalysis'));
 
 // v3.5：移动端（Capacitor）使用 HashRouter，跳过登录路由和 ProtectedRoute
@@ -107,12 +107,10 @@ const mainChildren = [
   { path: 'leads-detail', element: withSuspense(LeadsDetailPage) },
   { path: 'anchor-clusters', element: withSuspense(AnchorClusterPage) },
   { path: 'agency-analysis', element: withSuspense(AgencyAnalysisPage) },
-  // v4.1.9: 智能诊断（双端 flags 均开放，无条件注册）
+  // v4.1.9: 智能诊断（双端均开放，无条件注册）
   { path: 'diagnosis', element: withSuspense(DiagnosisPage) },
-  // v4.2.0: 智能分析（仅桌面/Web 开发版注册；移动端首期不覆盖，避免 URL 直访触发未实现的 mobile API）
-  ...(featureFlags.showIntelligentAnalysis
-    ? [{ path: 'intelligent-analysis', element: withSuspense(IntelligentAnalysisPage) }]
-    : []),
+  // v4.2.6: 智能分析（移动端 mobileRouteHandler 已实现，无条件注册）
+  { path: 'intelligent-analysis', element: withSuspense(IntelligentAnalysisPage) },
   {
     path: 'xhs-notes',
     children: [
@@ -120,10 +118,8 @@ const mainChildren = [
       { path: 'operation', element: withSuspense(XhsNotesOperationPage) },
       // v3.3.10: 小红书计划分析
       { path: 'plan-analysis', element: withSuspense(XhsPlanAnalysisPage) },
-      // v3.8.0: 分支KOS转化周报（移动端禁用，避免 URL 直访触发未实现的 mobile API）
-      ...(featureFlags.showKosWeekly
-        ? [{ path: 'kos-weekly', element: withSuspense(XhsKosWeeklyPage) }]
-        : []),
+      // v3.8.0: 分支KOS转化周报（移动端 mobileRouteHandler 已实现，无条件注册）
+      { path: 'kos-weekly', element: withSuspense(XhsKosWeeklyPage) },
     ],
   },
   {
@@ -165,10 +161,8 @@ const mainChildren = [
       { path: 'analyst', element: withSuspense(LiveDirectSalesPage, { liveType: '分析师' }) },
     ],
   },
-  // v3.5.4：报告生成路由仅在有 showReportGeneration 的环境注册（移动端禁用）
-  ...(featureFlags.showReportGeneration
-    ? [{ path: 'report-generation', element: withSuspense(ReportGenerationPage) }]
-    : []),
+  // 报告生成（移动端 mobileRouteHandler 已支持 /reports/weekly/*，无条件注册）
+  { path: 'report-generation', element: withSuspense(ReportGenerationPage) },
   // v3.6.1：抖音青鸟对账路由仅在 showDataReconciliation 环境注册（移动端禁用，避免 URL 直访触发未实现的 mobile API）
   ...(featureFlags.showDataReconciliation
     ? [{ path: 'data-reconciliation/douyin-qingniao', element: withSuspense(DouyinQingniaoReconciliationPage) }]
@@ -190,10 +184,8 @@ const mainChildren = [
       ...(featureFlags.showAccountManagement
         ? [{ path: 'account-management', element: withSuspense(AccountManagementPage) }]
         : []),
-      // v3.5.3：移动端/PWA 端走简化版同步页（避免触发未实现的 /webdav/list 等 API）
-      ...(featureFlags.showDatabaseBackup
-        ? [{ path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) }]
-        : []),
+      // v3.5.3：移动端/PWA 端走简化版同步页（避免触发未实现的 /webdav/list 等 API），无条件注册
+      { path: 'database-backup', element: withSuspense(isMobile ? MobileDatabaseSyncPage : DatabaseBackupPage) },
     ],
   },
 ];

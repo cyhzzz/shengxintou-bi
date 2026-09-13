@@ -15,6 +15,11 @@
  *   - 桌面版（Electron）：preload 注入 window.desktop 对象 → isDesktopClient()=true
  *   - 移动版（Capacitor）：window.Capacitor.isNative → isMobileClient()=true
  *   - Web 开发版：无 preload 注入 → isDesktopClient()=false
+ *
+ * 清理说明（2026-09）：删除 7 个双端恒 true 的旗标（GitHub 同步按钮/数据库备份/报告生成/
+ *   KOS 周报/应用市场归因/智能诊断/智能分析）——两端行为一致无需开关，对应 UI 直接渲染。
+ *   语义提示：「GitHub 同步按钮」实际承载更新下载入口（桌面自动更新/移动端热更新），
+ *   「数据库备份」移动端渲染为简化版数据同步页（MobileDatabaseSyncPage）。
  */
 import { isMobileClient, isPwaClient } from '@/utils/isDesktop';
 
@@ -23,26 +28,12 @@ export interface FeatureFlags {
   showAccountEntry: boolean;
   /** 登录功能（/login 路由 + ProtectedRoute 鉴权拦截） */
   showLoginPage: boolean;
-  /** 关于页 GitHub 代码同步按钮（git pull 自更新） */
-  showGithubSyncButton: boolean;
   /** 侧边栏「数据导入」菜单 */
   showDataImport: boolean;
   /** 侧边栏「账号管理」菜单 */
   showAccountManagement: boolean;
-  /** 侧边栏「数据同步/数据库备份」菜单 */
-  showDatabaseBackup: boolean;
-  /** 侧边栏「报告生成」菜单 */
-  showReportGeneration: boolean;
   /** 侧边栏「抖音青鸟对账」菜单（移动端禁用，依赖上传+对账桌面工作流） */
   showDataReconciliation: boolean;
-  /** 侧边栏「小红书 · 分支KOS转化周报」菜单（移动端已开放，mobileRouteHandler 已实现） */
-  showKosWeekly: boolean;
-  /** 侧边栏「应用市场 · 归因转化率」菜单（移动端已开放，mobileRouteHandler 已实现） */
-  showAppMarketAttribution: boolean;
-  /** 侧边栏「数据体检」菜单（智能诊断引擎，数据健康度按月体检，规则引擎只读聚合） */
-  showIntelligentDiagnosis: boolean;
-  /** 侧边栏「AI 分析报告」菜单（v4.2.0 LLM 跨月趋势分析；v4.2.6 移动端开放，mobileRouteHandler 已实现） */
-  showIntelligentAnalysis: boolean;
 }
 
 /**
@@ -62,42 +53,19 @@ export interface FeatureFlags {
 const desktopAndWebFlags: FeatureFlags = {
   showAccountEntry: false,
   showLoginPage: false,
-  showGithubSyncButton: true,
   showDataImport: true,
   showAccountManagement: true,
-  showDatabaseBackup: true,
-  showReportGeneration: true,
   showDataReconciliation: true,
-  showKosWeekly: true,
-  showAppMarketAttribution: true,
-  showIntelligentDiagnosis: true,
-  // v4.2.0: 智能分析（LLM 跨月趋势对比，桌面/Web 开发版开放）
-  showIntelligentAnalysis: true,
 };
 
 /** 移动版配置（Capacitor Android） */
 const mobileFlags: FeatureFlags = {
   showAccountEntry: false,
   showLoginPage: false,
-  // v3.7.0：移动端开放热更新入口（HelpModal 中的「下载更新包」按钮，走 Capacitor Updater）
-  showGithubSyncButton: true,
   showDataImport: false,
   showAccountManagement: false,
-  // v3.5.3：移动端开放数据同步菜单，进入简化版同步页（仅下载）
-  showDatabaseBackup: true,
-  // v3.5.5：移动端开放报告生成菜单（mobileRouteHandler 已支持 /reports/weekly/*）
-  showReportGeneration: true,
   // v3.6.1：移动端禁用抖音青鸟对账（核心是文件上传+对账桌面工作流，mobileRouteHandler 未实现）
   showDataReconciliation: false,
-  // v3.8.0：移动端开放分支KOS转化周报（已移植到 mobileRouteHandler /xhs/kos-weekly）
-  showKosWeekly: true,
-  // v3.8.1：移动端开放应用市场归因转化率（已移植到 mobileRouteHandler）
-  showAppMarketAttribution: true,
-  // v4.1.9：移动端开放智能诊断（已移植到 mobileRouteHandler /reports/diagnosis，本地 SQLite 只读聚合）
-  showIntelligentDiagnosis: true,
-  // v4.2.6：移动端开放 AI 分析报告（mobileRouteHandler 已实现 /reports/llm-analysis 与 /system/llm-config*，
-  // LLM 请求走全局 fetch（安卓端已被 CapacitorHttp 接管，直连免 CORS），配置存本机 localStorage）
-  showIntelligentAnalysis: true,
 };
 
 /**

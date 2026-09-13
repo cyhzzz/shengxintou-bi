@@ -194,38 +194,15 @@ export default function MainLayout() {
     return (menuItems || []).map(item => {
       if (!item || typeof item !== 'object') return item;
       const it = item as any;
-      // 过滤报告生成
-      if (it.key === '/report-generation' && !featureFlags.showReportGeneration) {
-        return null;
-      }
-      // v4.1.9：过滤智能诊断
-      if (it.key === '/diagnosis' && !featureFlags.showIntelligentDiagnosis) {
-        return null;
-      }
-      // v4.2.0：过滤 AI 分析报告（首期不覆盖移动端）
-      if (it.key === '/intelligent-analysis' && !featureFlags.showIntelligentAnalysis) {
-        return null;
-      }
       // 过滤系统配置子菜单
       if (it.key === 'system' && it.children) {
         const filteredChildren = it.children.filter((c: any) => {
           if (!c) return false;
           if (c.key === '/system/data-import' && !featureFlags.showDataImport) return false;
           if (c.key === '/system/account-management' && !featureFlags.showAccountManagement) return false;
-          if (c.key === '/system/database-backup' && !featureFlags.showDatabaseBackup) return false;
           return true;
         });
         // 如果没有子菜单了，隐藏整个系统配置
-        if (filteredChildren.length === 0) return null;
-        return { ...it, children: filteredChildren };
-      }
-      // v3.8.0：小红书子菜单按 features 过滤（移动端禁用分支KOS转化周报）
-      if (it.key === 'xhs-notes' && it.children) {
-        const filteredChildren = it.children.filter((c: any) => {
-          if (!c) return false;
-          if (c.key === '/xhs-notes/kos-weekly' && !featureFlags.showKosWeekly) return false;
-          return true;
-        });
         if (filteredChildren.length === 0) return null;
         return { ...it, children: filteredChildren };
       }
@@ -234,16 +211,6 @@ export default function MainLayout() {
         const filteredChildren = it.children.filter((c: any) => {
           if (!c) return false;
           if (c.key === '/data-reconciliation/douyin-qingniao' && !featureFlags.showDataReconciliation) return false;
-          return true;
-        });
-        if (filteredChildren.length === 0) return null;
-        return { ...it, children: filteredChildren };
-      }
-      // v3.8.1：应用市场子菜单按 features 过滤（归因转化率）
-      if (it.key === 'app-market' && it.children) {
-        const filteredChildren = it.children.filter((c: any) => {
-          if (!c) return false;
-          if (c.key === '/app-market/attribution-conversion' && !featureFlags.showAppMarketAttribution) return false;
           return true;
         });
         if (filteredChildren.length === 0) return null;

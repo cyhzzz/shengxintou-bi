@@ -4,7 +4,6 @@ import { QuestionCircleOutlined, SyncOutlined, CloudDownloadOutlined, CheckCircl
 import { dataService } from "@/services";
 import { DataFreshnessIndicator, type DataFreshnessIndicatorRef } from "@/components/DataFreshness";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
-import { featureFlags } from "@/config/features";
 import { isDesktopClient, isMobileClient } from "@/utils/isDesktop";
 import styles from "./index.module.scss";
 
@@ -550,8 +549,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                             : "，可用 git pull 拉取最新代码"}
                         </Text>
                       </div>
-                      {featureFlags.showGithubSyncButton && (
-                        isDesktopClient() ? (
+                      {isDesktopClient() ? (
                           <Space direction="vertical" size={8} style={{ width: "100%" }}>
                             {autoUpdate?.enabled && hasUpdate && (
                               <div className={styles.autoUpdateBanner}>
@@ -634,7 +632,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ className }) => {
                             {gitStatus?.dirty ? "强制更新（stash 本地改动）" : "从 GitHub 更新代码"}
                           </Button>
                         )
-                      )}
+                      }
                     </div>
 
                   </div>
