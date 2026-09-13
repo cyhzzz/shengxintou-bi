@@ -5,6 +5,7 @@ from sqlalchemy import func, and_
 from backend.models_v2 import AggXhsNote
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import agency_lead_clause, AGENCY_UNATTRIBUTED
 
 bp = Blueprint('xhs_notes', __name__)
 
@@ -28,12 +29,12 @@ def _process(params):
     if isinstance(creators, str):
         creators = [creators]
     if creators:
-        q = q.filter(AggXhsNote.创作者.in_([str(c) for c in creators]))
+        q = q.filter(agency_lead_clause(AggXhsNote.创作者, [str(c) for c in creators]))
     if filters.get('ad_strategies'):
         ads = filters['ad_strategies']
         if isinstance(ads, str):
             ads = [ads]
-        q = q.filter(AggXhsNote.广告策略.in_([str(a) for a in ads]))
+        q = q.filter(agency_lead_clause(AggXhsNote.广告策略, [str(a) for a in ads]))
     if filters.get('content_types'):
         cts = filters['content_types']
         if isinstance(cts, str):
@@ -88,9 +89,9 @@ def _process(params):
             'notes': notes,
             'pagination': {'page': page, 'page_size': page_size, 'total': total, 'total_pages': (total + page_size - 1) // page_size},
             'filters': {
-                'creators': [r.创作者 for r in db.session.query(AggXhsNote.创作者).distinct().filter(AggXhsNote.创作者.isnot(None)).all() if r.创作者],
+                'creators': [r.创作者 for r in db.session.query(AggXhsNote.创作者).distinct().filter(AggXhsNote.创作者.isnot(None)).all() if r.创作者] + [AGENCY_UNATTRIBUTED],
                 'content_types': [r.内容类型 for r in db.session.query(AggXhsNote.内容类型).distinct().filter(AggXhsNote.内容类型.isnot(None)).all() if r.内容类型],
-                'ad_strategies': [r.广告策略 for r in db.session.query(AggXhsNote.广告策略).distinct().filter(AggXhsNote.广告策略.isnot(None)).all() if r.广告策略],
+                'ad_strategies': [r.广告策略 for r in db.session.query(AggXhsNote.广告策略).distinct().filter(AggXhsNote.广告策略.isnot(None)).all() if r.广告策略] + [AGENCY_UNATTRIBUTED],
                 'publish_accounts': [r.笔记账号 for r in db.session.query(AggXhsNote.笔记账号).distinct().filter(AggXhsNote.笔记账号.isnot(None)).all() if r.笔记账号],
             }
         }
@@ -131,9 +132,9 @@ def get_filter_options():
     return jsonify({
         'success': True,
         'data': {
-            'creators': distinct(AggXhsNote.创作者, '创作者'),
+            'creators': distinct(AggXhsNote.创作者, '创作者') + [{'value': AGENCY_UNATTRIBUTED, 'label': AGENCY_UNATTRIBUTED}],
             'content_types': distinct(AggXhsNote.内容类型, '内容类型'),
-            'ad_strategies': distinct(AggXhsNote.广告策略, '广告策略'),
+            'ad_strategies': distinct(AggXhsNote.广告策略, '广告策略') + [{'value': AGENCY_UNATTRIBUTED, 'label': AGENCY_UNATTRIBUTED}],
             'publish_accounts': distinct(AggXhsNote.笔记账号, '账号'),
         }
     })

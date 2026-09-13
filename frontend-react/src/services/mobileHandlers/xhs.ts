@@ -4,7 +4,7 @@
  * 由 mobileRouteHandler.ts 按报表域拆分而来，SQL 口径与 Flask 后端保持一致。
  */
 import { querySql } from '../mobileSqlite';
-import { toInt, toFloat, round2, dateClause, inClause, buildWhere, getFilters, getDateRange, parseQueryParams, type Row } from './shared';
+import { toInt, toFloat, round2, dateClause, inClause, buildWhere, getFilters, getDateRange, parseQueryParams, agencyLeadClause, AGENCY_UNATTRIBUTED, type Row } from './shared';
 // ============================================================================
 // 小红书笔记列表 (xhs-notes-list / xhs-notes/list)
 // ============================================================================
@@ -53,8 +53,8 @@ export async function handleXhsNotesList(url: string, body: any): Promise<any> {
   } else if (publish_end) {
     conditions.push({ sql: '"发布时间" <= ?', params: [publish_end] });
   }
-  if (filters.creators) conditions.push(inClause('创作者', filters.creators));
-  if (filters.ad_strategies) conditions.push(inClause('广告策略', filters.ad_strategies));
+  if (filters.creators) conditions.push(agencyLeadClause('创作者', filters.creators));
+  if (filters.ad_strategies) conditions.push(agencyLeadClause('广告策略', filters.ad_strategies));
   if (filters.content_types) conditions.push(inClause('内容类型', filters.content_types));
   if (filters.account) conditions.push({ sql: '"笔记账号" = ?', params: [filters.account] });
   const where = buildWhere(conditions);
@@ -121,10 +121,11 @@ export async function handleXhsNotesFilterOptions(): Promise<any> {
     );
     return rows.map(r => ({ value: r.v, label: String(r.v) }));
   };
+  const withUnattributed = (opts: { value: string; label: string }[]) => [...opts, { value: AGENCY_UNATTRIBUTED, label: AGENCY_UNATTRIBUTED }];
   return {
-    creators: await mkOpts('创作者'),
+    creators: withUnattributed(await mkOpts('创作者')),
     content_types: await mkOpts('内容类型'),
-    ad_strategies: await mkOpts('广告策略'),
+    ad_strategies: withUnattributed(await mkOpts('广告策略')),
     publish_accounts: await mkOpts('笔记账号'),
   };
 }
@@ -235,7 +236,7 @@ export async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
   const creator_content: Record<string, any> = {};
   const creator_conversion: Record<string, any> = {};
   for (const n of notes) {
-    const c = n['创作者'] || '未知';
+    const c = n['创作者'] || AGENCY_UNATTRIBUTED;
     if (!creator_content[c]) {
       creator_content[c] = { note_count: 0, total_impressions: 0, total_clicks: 0, total_interactions: 0, total_cost: 0 };
     }
@@ -280,7 +281,7 @@ export async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
     by_month[m].impressions += toInt(n['总展现量']);
     by_month[m].interactions += toInt(n['总互动量']);
     by_month[m].cost += toFloat(n['消费金额']);
-    const prod = n['创作者'] || '未知';
+    const prod = n['创作者'] || AGENCY_UNATTRIBUTED;
     if (!by_month_producer[m]) by_month_producer[m] = {};
     by_month_producer[m][prod] = (by_month_producer[m][prod] || 0) + 1;
   }
@@ -337,7 +338,7 @@ export async function handleXhsNotesOperationAnalysis(body: any): Promise<any> {
   // ---- creator_annual_ranking（前 50，按 total_score desc） ----
   const by_creator: Record<string, any> = {};
   for (const n of creator_annual_subset) {
-    const c = n['创作者'] || '未知';
+    const c = n['创作者'] || AGENCY_UNATTRIBUTED;
     if (!by_creator[c]) {
       by_creator[c] = { cost: 0, lead_users: 0, opened: 0, interactions: 0, note_count: 0, total_impressions: 0, total_clicks: 0, total_private_messages: 0 };
     }

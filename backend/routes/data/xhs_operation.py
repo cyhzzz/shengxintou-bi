@@ -15,6 +15,7 @@ from sqlalchemy import func, and_
 from backend.models_v2 import AggXhsNote, FactConvContent, AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
+from backend.utils.agency_mapper import AGENCY_UNATTRIBUTED
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -142,7 +143,7 @@ def get_xhs_notes_operation_analysis():
                                                'private_messages': 0, 'customer_mouth_users': 0,
                                                'valid_lead_users': 0, 'valid_customer_users': 0})
     for n in notes:
-        c = n.创作者 or '未知'
+        c = n.创作者 or AGENCY_UNATTRIBUTED
         creator_content[c]['note_count'] += 1
         creator_content[c]['total_impressions'] += i(n.总展现量)
         creator_content[c]['total_clicks'] += i(n.点击量)
@@ -176,7 +177,7 @@ def get_xhs_notes_operation_analysis():
         by_month[m]['impressions'] += i(n.总展现量)
         by_month[m]['interactions'] += i(n.总互动量)
         by_month[m]['cost'] += f(n.消费金额)
-        by_month_producer[m][n.创作者 or '未知'] += 1
+        by_month_producer[m][n.创作者 or AGENCY_UNATTRIBUTED] += 1
     sorted_months = sorted(trend_dates)
     # 按笔记数 top10 创作者 + 其他聚合
     producer_total = defaultdict(int)
@@ -220,7 +221,7 @@ def get_xhs_notes_operation_analysis():
                                        'note_count': 0, 'total_impressions': 0, 'total_clicks': 0,
                                        'total_private_messages': 0})
     for n in creator_annual_subset:
-        c = n.创作者 or '未知'
+        c = n.创作者 or AGENCY_UNATTRIBUTED
         by_creator[c]['cost'] += f(n.消费金额)
         by_creator[c]['lead_users'] += i(n.添加企微人数)
         by_creator[c]['opened'] += i(n.开户人数)

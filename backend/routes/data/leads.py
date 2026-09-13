@@ -9,7 +9,7 @@ from sqlalchemy import and_, or_
 from backend.models_v2 import FactConvContent
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.utils.agency_mapper import full_to_short
+from backend.utils.agency_mapper import full_to_short, agency_lead_clause, AGENCY_UNATTRIBUTED
 from backend.utils.anchor_attribution import (
     compute_anchor_cluster_items,
     build_anchor_clusters_payload,
@@ -83,7 +83,10 @@ def get_leads_detail():
     if platforms:
         q = q.filter(FactConvContent.平台来源.in_(platforms))
     if agencies:
-        q = q.filter(FactConvContent.广告代理商.in_(agencies))
+        # "未归因"翻译为 NULL/空串条件，其余按简称精确匹配（共享实现见 agency_mapper）
+        clause = agency_lead_clause(FactConvContent.广告代理商, agencies)
+        if clause is not None:
+            q = q.filter(clause)
     if employee_name:
         q = q.filter(FactConvContent.添加员工姓名 == employee_name)
     if is_opened_account == 'true':
@@ -115,6 +118,8 @@ def get_filter_options():
                 .filter(FactConvContent.广告代理商.isnot(None), FactConvContent.广告代理商 != '')
                 .order_by(FactConvContent.广告代理商).all()]
     agencies = sorted(set(full_to_short(a) for a in agencies_raw))
+    # 未归因（NULL/空代理商）是合理业务分组，需可选可看
+    agencies = sorted(set(agencies) | {AGENCY_UNATTRIBUTED})
     employees = [r[0] for r in db.session.query(FactConvContent.添加员工姓名).distinct()
                  .filter(FactConvContent.添加员工姓名.isnot(None), FactConvContent.添加员工姓名 != '')
                  .order_by(FactConvContent.添加员工姓名).all()]

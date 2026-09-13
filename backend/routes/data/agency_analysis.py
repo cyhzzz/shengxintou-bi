@@ -11,7 +11,7 @@ from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.utils.agency_mapper import enrich_items, expand_short_to_fulls, full_to_short
+from backend.utils.agency_mapper import enrich_items, full_to_short
 
 bp = Blueprint('agency_analysis', __name__)
 

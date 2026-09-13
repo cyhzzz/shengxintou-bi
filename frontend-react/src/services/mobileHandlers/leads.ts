@@ -4,7 +4,7 @@
  * 由 mobileRouteHandler.ts 按报表域拆分而来，SQL 口径与 Flask 后端保持一致。
  */
 import { querySql } from '../mobileSqlite';
-import { toInt, toFloat, round2, dateClause, inClause, buildWhere, parseQueryParams, type Row } from './shared';
+import { toInt, toFloat, round2, dateClause, inClause, agencyLeadClause, AGENCY_UNATTRIBUTED, buildWhere, parseQueryParams, type Row } from './shared';
 export async function handleLeadsDetail(url: string): Promise<any> {
   const q = parseQueryParams(url);
   const page = Math.max(1, toInt(q.page) || 1);
@@ -20,7 +20,8 @@ export async function handleLeadsDetail(url: string): Promise<any> {
   const conditions: ({ sql: string; params: unknown[] } | null)[] = [
     dateClause('线索日期', sd, ed),
     inClause('平台来源', platforms),
-    inClause('广告代理商', agencies),
+    // "未归因"翻译为 NULL/空串条件（fact_conv_content.广告代理商），与后端 leads 明细口径一致
+    agencyLeadClause('广告代理商', agencies),
   ];
   if (employee_name) {
     conditions.push({ sql: '"添加员工姓名" = ?', params: [employee_name] });
@@ -113,9 +114,14 @@ export async function handleLeadsDetailFilterOptions(): Promise<any> {
      ORDER BY "添加员工姓名"`
   );
   // 注：移动端不做 full_to_short 简称归一化（无 dim_account 表），直接返回全称
+  const agencyOptions = agencies.map(r => ({ value: r.v, label: r.v }));
+  // 未归因（NULL/空代理商）是合理业务分组，需可选可看（与 Web 端 filter-options 对齐）
+  if (!agencyOptions.some(o => o.value === AGENCY_UNATTRIBUTED)) {
+    agencyOptions.push({ value: AGENCY_UNATTRIBUTED, label: AGENCY_UNATTRIBUTED });
+  }
   return {
     platforms: platforms.map(r => ({ value: r.v, label: r.v })),
-    agencies: agencies.map(r => ({ value: r.v, label: r.v })),
+    agencies: agencyOptions,
     employees: employees.map(r => ({ value: r.v, label: r.v })),
   };
 }
@@ -217,7 +223,8 @@ export async function handleAnchorClusters(body: any): Promise<any> {
     { sql: '"客户来源" IS NOT NULL AND "客户来源" != \'\'', params: [] as unknown[] },
     dateClause('线索日期', sd, ed),
     inClause('平台来源', platforms_filter),
-    inClause('广告代理商', agencies_filter),
+    // "未归因"翻译为 NULL/空串条件，与后端 anchor-clusters 口径一致
+    agencyLeadClause('广告代理商', agencies_filter),
   ]);
 
   const sql = `SELECT
@@ -444,7 +451,8 @@ export async function handleAnchorClustersTrend(body: any): Promise<any> {
     ...sourceConds,
     dateClause('线索日期', sd, ed),
     inClause('平台来源', platforms_filter),
-    inClause('广告代理商', agencies_filter),
+    // "未归因"翻译为 NULL/空串条件，与后端 anchor-clusters-trend 口径一致
+    agencyLeadClause('广告代理商', agencies_filter),
   ]);
 
   const sql = `SELECT

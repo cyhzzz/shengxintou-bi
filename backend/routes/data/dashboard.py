@@ -13,7 +13,6 @@ from sqlalchemy import func, and_, case
 from backend.models_v2 import AggVendorDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.utils.agency_mapper import expand_short_to_fulls
 from backend.utils.dialect_helpers import make_period_expr
 from datetime import datetime, timedelta
 

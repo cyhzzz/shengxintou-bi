@@ -17,6 +17,7 @@ from backend.database import db
 from backend.models_v2 import FactConvContent, DimAnchorLiveType
 from backend.utils.calibers import CONTENT_NON_STOCK
 from backend.utils.dialect_helpers import make_friday_week_start_expr, make_period_expr
+from backend.utils.agency_mapper import agency_lead_clause
 
 # 主播聚类正则: (平台)引流-(主播名)
 ANCHOR_SOURCE_PATTERN = re.compile(r"^(视频号直播|视频号|抖音|小红书|快手|财联社|腾讯|微信)引流-(.+?)$")
@@ -139,7 +140,10 @@ def compute_anchor_cluster_items(sd, ed, platforms_filter, agencies_filter, live
     if platforms_filter:
         base_q = base_q.filter(FactConvContent.平台来源.in_(platforms_filter))
     if agencies_filter:
-        base_q = base_q.filter(FactConvContent.广告代理商.in_(agencies_filter))
+        # "未归因"翻译为 NULL/空串条件（fact_conv_content.广告代理商），与 leads 明细口径一致
+        clause = agency_lead_clause(FactConvContent.广告代理商, agencies_filter)
+        if clause is not None:
+            base_q = base_q.filter(clause)
 
     base_q = base_q.group_by(FactConvContent.客户来源, FactConvContent.平台来源)
     rows = base_q.all()
@@ -397,7 +401,10 @@ def anchor_clusters_trend_response(granularity, filters):
     if platforms_filter:
         q = q.filter(FactConvContent.平台来源.in_(platforms_filter))
     if agencies_filter:
-        q = q.filter(FactConvContent.广告代理商.in_(agencies_filter))
+        # "未归因"翻译为 NULL/空串条件（fact_conv_content.广告代理商），与聚类口径一致
+        clause = agency_lead_clause(FactConvContent.广告代理商, agencies_filter)
+        if clause is not None:
+            q = q.filter(clause)
 
     # 若启用 live_types 筛选，从已加载映射构建 wanted_tokens
     # （包含纯人名 token，仅 is_active，与 get_anchor_clusters 口径一致）

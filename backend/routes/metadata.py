@@ -6,7 +6,9 @@ from sqlalchemy import distinct, func
 from datetime import datetime, date
 import logging
 from backend.utils.decorators import handle_exceptions
-from backend.utils.agency_mapper import get_all_shorts, expand_short_to_fulls
+from backend.utils.agency_mapper import (
+    get_all_shorts, expand_short_to_fulls, get_app_market_vendors, AGENCY_UNATTRIBUTED,
+)
 
 bp = Blueprint('metadata', __name__)
 logger = logging.getLogger(__name__)
@@ -26,8 +28,12 @@ def get_metadata():
 
     try:
         agencies = get_all_shorts()
+        # 应用市场包干厂商（dim_account 未覆盖，见 agency_market_channels.json）合并进下拉
+        agencies = sorted(set(agencies) | set(get_app_market_vendors().keys()))
     except Exception:
         agencies = []
+    # 未归因（NULL/空厂商）是合理业务分组，与移动端 DISTINCT 行为对齐，需可选可看
+    agencies = sorted(set(agencies) | {AGENCY_UNATTRIBUTED})
 
     try:
         bms = set(r[0] for r in db.session.query(distinct(AggVendorDaily.业务模式))
