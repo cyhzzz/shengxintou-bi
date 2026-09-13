@@ -109,6 +109,7 @@ cd android && .\gradlew.bat assembleDebug --no-daemon  # 3. Gradle 编译
 - `JAVA_HOME` 指向 `tools/jdk17/`（JDK 21 会导致插件 build.gradle 编译失败）
 - `GRADLE_USER_HOME` 指向 `android/gradle-home/`（避免沙箱拦截 `~/.gradle`）
 - `cap sync` 后必须运行 `post-sync-patch.ps1`（重新注入镜像/JDK17/全屏/横屏/内置DB/图标/中文名）
+- **含中文的 PowerShell 脚本必须保留 UTF-8 BOM**：无 BOM 时 CI 英文系统按 cp1252 误读，中文串中 UTF-8 尾字节 `0x93/0x94` 会变成弯引号导致字符串提前截断、解析爆炸（本地中文系统按 GBK 读不会复现，只有 CI 会炸）；编辑脚本后若 diff 显示文件头 BOM 丢失必须补回
 - **WebDAV 凭据安全**：APK 不再内置 `WEBDAV_*` 凭据，`vite.config.ts` 已移除构建期 `define` 注入；用户在 App 内「数据同步」页面填写并经 `@capacitor/preferences` 持久化。根 `.env` 的 `WEBDAV_*` 仅桌面版后端消费，不会随 APK 打包。
 
 ## 3. Android 真机调试

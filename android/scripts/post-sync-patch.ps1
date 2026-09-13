@@ -1,4 +1,4 @@
-# Capacitor sync 后自动 patch 脚本
+﻿# Capacitor sync 后自动 patch 脚本
 # 用法：npx cap sync android 后运行此脚本
 # 作用：
 #   1. AndroidManifest.xml 加 screenOrientation=landscape
