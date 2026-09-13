@@ -10,6 +10,11 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0.."
 
+REM Prefer the project venv python; system python may lack backend deps (Flask etc.)
+set "PY=python"
+if exist .venv\Scripts\python.exe set "PY=.venv\Scripts\python.exe"
+echo Using Python: %PY%
+
 echo.
 echo ==========================================
 echo  省心投 BI - 全量功能测试
@@ -22,7 +27,7 @@ set ALL_PASS=1
 
 REM ---- 步骤 1：后端 API 冒烟测试 ----
 echo [1/3] 后端 API 冒烟测试...
-python -m unittest discover -s tests/api -q 2>&1
+%PY% -m unittest discover -s tests/api -q 2>&1
 set API_EXIT=%ERRORLEVEL%
 if %API_EXIT%==0 (
     echo [PASS] 后端 API 冒烟测试通过
