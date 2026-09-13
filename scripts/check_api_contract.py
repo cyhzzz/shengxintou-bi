@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUTES_DIR = ROOT / 'backend' / 'routes'
@@ -205,7 +205,7 @@ def check_algorithm_consistency() -> List[str]:
 # 校验方式：按 block 正则截取两端定义体（捕获组排除常量名/类型注解差异），
 #          提取标识符原子（剔除 new/Set 语法词）后排序比对。
 DATASET_ATOM_STOPWORDS = {'new', 'Set'}
-DATASET_MARKERS: List[Dict[str, str]] = [
+DATASET_MARKERS: List[Dict[str, Any]] = [
     {
         'name': '应用市场·平台清单（7 大市场）',
         'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
@@ -248,6 +248,26 @@ DATASET_MARKERS: List[Dict[str, str]] = [
         'backend_pattern': r'_GLOBAL_FACTORY_MERGE = (\{[^}]*\})',
         'mobile_pattern': r'WEEKLY_GLOBAL_FACTORY_MERGE = new Set\((\[[^\]]*\])\)',
     },
+    # 广告开户复合条件内容级对账：两端语法形态天然不同（后端 SQLAlchemy 表达式、
+    # 移动端 SQL 字符串），无法精确原子比对，退化为 required_atoms 模式——
+    # 关键业务原子在后端块与移动端块中必须同时存在。后端经 INTERNET_CHANNEL
+    # 常量引用、移动端为字面量，故分端指定原子清单。
+    {
+        'name': '广告开户复合条件（appMarket.ts）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
+        'backend_pattern': r'AD_ACCOUNT_CONDITIONS = \((.*?)\n\)',
+        'mobile_pattern': r'const AD_ACCOUNT_COND = ([^;]+);',
+        'backend_required_atoms': ['是否创建完资金账号', '渠道类型', 'INTERNET_CHANNEL', '是否新开户'],
+        'mobile_required_atoms': ['是否创建完资金账号', '渠道类型', '互联网引流', '是否新开户'],
+    },
+    {
+        'name': '广告开户复合条件（weekly.ts）',
+        'backend_file': ROOT / 'backend' / 'utils' / 'calibers.py',
+        'backend_pattern': r'AD_ACCOUNT_CONDITIONS = \((.*?)\n\)',
+        'mobile_pattern': r'const WEEKLY_AD_ACCOUNT_COND = ([^;]+);',
+        'backend_required_atoms': ['是否创建完资金账号', '渠道类型', 'INTERNET_CHANNEL', '是否新开户'],
+        'mobile_required_atoms': ['是否创建完资金账号', '渠道类型', '互联网引流', '是否新开户'],
+    },
 ]
 
 
@@ -258,7 +278,12 @@ def _dataset_atoms(block: str) -> List[str]:
 
 
 def check_dataset_consistency() -> List[str]:
-    """对账两端常量数据集内容。返回 drift 信息列表（空 = 一致）。"""
+    """对账两端常量数据集内容。返回 drift 信息列表（空 = 一致）。
+
+    默认：两端原子集合完全一致。
+    required_atoms 模式：两端语法形态不同（如 SQLAlchemy 表达式 vs SQL 字符串）时，
+    只要求关键业务原子在各自定义块中同时存在。
+    """
     if not MOBILE_HANDLER.exists():
         return []
     mobile_text = read_mobile_text()
@@ -270,7 +295,30 @@ def check_dataset_consistency() -> List[str]:
         if not b_blocks:
             continue  # 后端未定义该数据集，不比对
         m_blocks = re.findall(marker['mobile_pattern'], mobile_text, re.DOTALL)
-        if not m_blocks or _dataset_atoms(b_blocks[0]) != _dataset_atoms(m_blocks[0]):
+        if not m_blocks:
+            drifts.append(
+                f"[{marker['name']}] 移动端缺失该数据集定义，"
+                f"需同步修改（后端位置见 {b_file.name}）"
+            )
+            continue
+        b_required: List[str] = marker.get('backend_required_atoms') or []
+        m_required: List[str] = marker.get('mobile_required_atoms') or []
+        if b_required or m_required:
+            b_atoms = set(_dataset_atoms(b_blocks[0]))
+            m_atoms = set(_dataset_atoms(m_blocks[0]))
+            missing_b = [a for a in b_required if a not in b_atoms]
+            missing_m = [a for a in m_required if a not in m_atoms]
+            if missing_b or missing_m:
+                parts = []
+                if missing_b:
+                    parts.append(f"后端缺失 {'、'.join(missing_b)}")
+                if missing_m:
+                    parts.append(f"移动端缺失 {'、'.join(missing_m)}")
+                drifts.append(
+                    f"[{marker['name']}] 关键口径原子不一致（{'；'.join(parts)}），"
+                    f"需同步修改（后端位置见 {b_file.name}）"
+                )
+        elif _dataset_atoms(b_blocks[0]) != _dataset_atoms(m_blocks[0]):
             drifts.append(
                 f"[{marker['name']}] 两端数据集内容不一致，"
                 f"需同步修改（后端位置见 {b_file.name}）"
