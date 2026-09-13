@@ -15,8 +15,8 @@
  * - 非存量 = 是否为存量客户==0 OR IS NULL，其开户/有效户/资产计入 new_* 主指标
  * - 新开户作为核心获客产出，存量客户线索与资产作为辅助呈现
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Select, Space, Spin, Table, Tag, Button, Tooltip, Empty, message } from 'antd';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Card, Select, Space, Spin, Table, Tag, Button, Tooltip, Empty } from 'antd';
 import {
   VideoCameraOutlined, UserOutlined,
   RiseOutlined, DollarOutlined, DownloadOutlined, AimOutlined, CheckCircleOutlined,
@@ -26,6 +26,7 @@ import { dataServiceLeadsAnchor } from '@/services/dataService';
 import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
+import { useReportData } from '@/hooks/useReportData';
 import { useFilterStore } from '@/stores';
 import { sanitizeText, sanitizeList } from '@/utils/sanitizeText';
 import type { ApiResponse } from '@/types';
@@ -114,16 +115,22 @@ interface AnchorClustersRespData {
   live_type_breakdown?: LiveTypeBreakdown[];
 }
 
+// 请求参数（filters 由全局日期/平台 + 页面直播类型筛选派生）
+interface AnchorClustersQuery {
+  filters: {
+    start_date: string;
+    end_date: string;
+    platforms?: string[];
+    live_types?: LiveType[];
+  };
+  top_n: number;
+}
+
 const AnchorClusterPage: React.FC = () => {
   const { dateRange, selectedPlatforms } = useFilterStore();
   const [anchorFilter, setAnchorFilter] = useState<string[]>([]);
   // v3.3.0: 直播类型筛选
   const [liveTypeFilter, setLiveTypeFilter] = useState<LiveType[]>([]);
-  const [items, setItems] = useState<AnchorItem[]>([]);
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [liveTypeOptions, setLiveTypeOptions] = useState<string[]>([]);
-  const [breakdown, setBreakdown] = useState<LiveTypeBreakdown[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const filters = useMemo(() => ({
     start_date: dateRange.startDate,
@@ -139,27 +146,27 @@ const AnchorClusterPage: React.FC = () => {
     setLiveTypeFilter([]);
   };
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await dataServiceLeadsAnchor.getAnchorClusters({ filters, top_n: 200 }) as ApiResponse<AnchorClustersRespData>;
-      if (res?.success && res.data) {
-        setItems(res.data.items || []);
-        setPlatforms(res.data.platforms || []);
-        setLiveTypeOptions(res.data.live_types || []);
-        setBreakdown(res.data.live_type_breakdown || []);
-      }
-    } catch (err) {
-      console.error('[AnchorCluster] load failed:', err);
-      message.error('主播分析数据加载失败，请重试');
-      setItems([]);
-      setBreakdown([]);
-    } finally {
-      setLoading(false);
+  const fetcher = useCallback(async (query: AnchorClustersQuery): Promise<AnchorClustersRespData> => {
+    const res = await dataServiceLeadsAnchor.getAnchorClusters(query) as ApiResponse<AnchorClustersRespData>;
+    if (!res?.success || !res.data) {
+      throw new Error(res?.error || '主播分析数据加载失败');
     }
-  };
+    return res.data;
+  }, []);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filters]);
+  // items/platforms/liveTypeOptions/breakdown 统一由 useReportData 管理：失败时保留旧数据，表格不闪空
+  const { data, loading, load } = useReportData<AnchorClustersRespData, AnchorClustersQuery>(fetcher, {
+    errorMessage: '主播分析数据加载失败，请重试',
+  });
+
+  const items = useMemo(() => data?.items || [], [data]);
+  const platforms = useMemo(() => data?.platforms || [], [data]);
+  const liveTypeOptions = useMemo(() => data?.live_types || [], [data]);
+  const breakdown = useMemo(() => data?.live_type_breakdown || [], [data]);
+
+  useEffect(() => {
+    load({ filters, top_n: 200 });
+  }, [filters, load]);
 
   // 同名主播跨平台聚合
   const anchorAggRows: AnchorAggRow[] = useMemo(() => {
@@ -345,7 +352,7 @@ const AnchorClusterPage: React.FC = () => {
         <FilterBar
           showAgency={false}
           platformOptions={platforms.map((p) => ({ label: p, value: p }))}
-          onSearch={load}
+          onSearch={() => load({ filters, top_n: 200 })}
           onReset={resetFilters}
         >
           <span className={styles.label}>直播类型:</span>

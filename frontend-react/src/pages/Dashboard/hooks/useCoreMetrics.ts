@@ -1,10 +1,8 @@
 /**
  * useCoreMetrics Hook
- * 获取数据概览核心指标的自定义 Hook
- * 使用自动生成的 API 函数
+ * 获取数据概览核心指标的自定义 Hook（已收编 useReportData 统一取数范式）
  */
-import { useState, useCallback } from 'react';
-import { message } from 'antd';
+import { useCallback, useMemo } from 'react';
 import { postDashboardCoreMetrics } from '@/types/api';
 import type {
   CoreMetrics,
@@ -12,6 +10,7 @@ import type {
   PostDashboardCoreMetricsBody,
   CoreMetricsResponseAllOfData,
 } from '@/types/api.schemas';
+import { useReportData } from '@/hooks/useReportData';
 
 export interface UseCoreMetricsResult {
   /** 核心指标数据 */
@@ -44,44 +43,33 @@ export interface UseCoreMetricsResult {
  * ```
  */
 export const useCoreMetrics = (): UseCoreMetricsResult => {
-  const [coreMetrics, setCoreMetrics] = useState<CoreMetrics | null>(null);
-  const [wowChanges, setWowChanges] = useState<WowChange | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchCoreMetrics = useCallback(async (params: PostDashboardCoreMetricsBody) => {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const fetcher = useCallback(
+    async (params: PostDashboardCoreMetricsBody): Promise<CoreMetricsResponseAllOfData> => {
       const response = await postDashboardCoreMetrics(params);
-
-      if (response.success && response.data) {
-        // HTTP client extracts data.data, so response.data is CoreMetricsResponseAllOfData
-        const responseData = response.data as CoreMetricsResponseAllOfData;
-        setCoreMetrics(responseData.core_metrics || null);
-        setWowChanges(responseData.wow_changes || null);
-      } else {
-        const errorMsg = response.error || '获取核心指标失败';
-        setError(errorMsg);
-        message.error(errorMsg);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || '获取核心指标失败');
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : '获取核心指标失败';
-      setError(errorMsg);
-      message.error(errorMsg);
-      console.error('[useCoreMetrics] 获取核心指标失败:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      // HTTP client extracts data.data, so response.data is CoreMetricsResponseAllOfData
+      return response.data as CoreMetricsResponseAllOfData;
+    },
+    []
+  );
 
-  const reset = useCallback(() => {
-    setCoreMetrics(null);
-    setWowChanges(null);
-    setLoading(false);
-    setError(null);
-  }, []);
+  const { data, loading, error, load, reset } = useReportData<
+    CoreMetricsResponseAllOfData,
+    PostDashboardCoreMetricsBody
+  >(fetcher, { errorMessage: '获取核心指标失败' });
+
+  // 响应字段拆解为两个对外字段（派生自统一 data）
+  const coreMetrics = useMemo(() => data?.core_metrics || null, [data]);
+  const wowChanges = useMemo(() => data?.wow_changes || null, [data]);
+
+  const fetchCoreMetrics = useCallback(
+    async (params: PostDashboardCoreMetricsBody): Promise<void> => {
+      await load(params);
+    },
+    [load]
+  );
 
   return {
     coreMetrics,

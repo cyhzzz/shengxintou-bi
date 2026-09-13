@@ -1,10 +1,8 @@
 /**
  * useTrendData Hook
- * 获取数据概览趋势数据的自定义 Hook
- * 使用自动生成的 API 函数
+ * 获取数据概览趋势数据的自定义 Hook（已收编 useReportData 统一取数范式）
  */
-import { useState, useCallback } from 'react';
-import { message } from 'antd';
+import { useCallback, useMemo } from 'react';
 import { postDashboardTrendData } from '@/types/api';
 import type {
   PostDashboardTrendDataBody,
@@ -12,6 +10,7 @@ import type {
 } from '@/types/api.schemas';
 import type { DashboardTrendData } from '@/types';
 import { transformDashboardTrendData } from '@/types';
+import { useReportData } from '@/hooks/useReportData';
 
 export interface UseTrendDataResult {
   /** 趋势数据（适配前端图表格式） */
@@ -47,44 +46,35 @@ export interface UseTrendDataResult {
  * ```
  */
 export const useTrendData = (): UseTrendDataResult => {
-  const [rawTrendData, setRawTrendData] = useState<DashboardTrendDataResponseAllOfData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // 转换后的趋势数据（适配前端图表格式）
-  const trendData = rawTrendData ? transformDashboardTrendData(rawTrendData) : null;
-
-  const fetchTrendData = useCallback(async (params: PostDashboardTrendDataBody) => {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const fetcher = useCallback(
+    async (params: PostDashboardTrendDataBody): Promise<DashboardTrendDataResponseAllOfData> => {
       const response = await postDashboardTrendData(params);
-
-      if (response.success && response.data) {
-        // HTTP client extracts data.data, so response.data is DashboardTrendDataResponseAllOfData
-        const responseData = response.data as DashboardTrendDataResponseAllOfData;
-        setRawTrendData(responseData);
-      } else {
-        const errorMsg = response.error || '获取趋势数据失败';
-        setError(errorMsg);
-        message.error(errorMsg);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || '获取趋势数据失败');
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : '获取趋势数据失败';
-      setError(errorMsg);
-      message.error(errorMsg);
-      console.error('[useTrendData] 获取趋势数据失败:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      // HTTP client extracts data.data, so response.data is DashboardTrendDataResponseAllOfData
+      return response.data as DashboardTrendDataResponseAllOfData;
+    },
+    []
+  );
 
-  const reset = useCallback(() => {
-    setRawTrendData(null);
-    setLoading(false);
-    setError(null);
-  }, []);
+  const { data: rawTrendData, loading, error, load, reset } = useReportData<
+    DashboardTrendDataResponseAllOfData,
+    PostDashboardTrendDataBody
+  >(fetcher, { errorMessage: '获取趋势数据失败' });
+
+  // 转换后的趋势数据（适配前端图表格式）；useMemo 避免无关渲染时重复 transform
+  const trendData = useMemo(
+    () => (rawTrendData ? transformDashboardTrendData(rawTrendData) : null),
+    [rawTrendData]
+  );
+
+  const fetchTrendData = useCallback(
+    async (params: PostDashboardTrendDataBody): Promise<void> => {
+      await load(params);
+    },
+    [load]
+  );
 
   return {
     trendData,
