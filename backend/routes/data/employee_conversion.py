@@ -8,7 +8,7 @@ from backend.routes.data.employee_conversion_helpers import (
     get_employee_list, get_platform_overview, get_latest_data_week_range,
     get_qualified_employees, get_yearly_breakdown
 )
-from backend.utils.calibers import CONTENT_NON_STOCK
+from backend.utils.calibers import CONTENT_NON_STOCK, INTERNET_CHANNEL
 from backend.utils.decorators import handle_exceptions
 
 logger = logging.getLogger(__name__)
@@ -171,7 +171,7 @@ def get_employee_analysis_channel_overview():
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
         func.coalesce(func.sum(AggDailyChannelOpen.入金户数), 0).label('deposit'),
         func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
-    ).filter(AggDailyChannelOpen.渠道类别 == '互联网引流')
+    ).filter(AggDailyChannelOpen.渠道类别 == INTERNET_CHANNEL)
     if sd and ed:
         chan_q = chan_q.filter(and_(AggDailyChannelOpen.时间区间 >= sd, AggDailyChannelOpen.时间区间 <= ed))
     cr = chan_q.first()

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""口径中心回归测试：锁定 backend/utils/calibers.py 三常量的字面量与 SQL 编译形态，防止口径被无意改动。"""
+"""口径中心回归测试：锁定 backend/utils/calibers.py 全部常量的字面量与 SQL 编译形态，防止口径被无意改动。"""
 import os
 import sys
 import logging
@@ -13,7 +13,13 @@ logging.disable(logging.CRITICAL)
 
 from sqlalchemy.dialects import sqlite
 
-from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS, CONTENT_NON_STOCK
+from backend.utils.calibers import (
+    AD_ACCOUNT_CONDITIONS,
+    APP_MARKET_PLATFORMS,
+    CONTENT_NON_STOCK,
+    FUNNEL_CHANNEL_FILTER,
+    INTERNET_CHANNEL,
+)
 
 
 class TestCalibers(unittest.TestCase):
@@ -32,6 +38,17 @@ class TestCalibers(unittest.TestCase):
         self.assertIn('渠道类型', sql)
         self.assertIn('互联网引流', sql)
         self.assertIn('是否新开户', sql)
+
+    def test_internet_channel_literal(self):
+        """渠道类别权威值锁定：应用市场漏斗与渠道汇总表共用同一值。"""
+        self.assertEqual(INTERNET_CHANNEL, '互联网引流')
+
+    def test_funnel_channel_filter_sql(self):
+        """漏斗前置过滤 = 渠道类型 = 互联网引流（literal_binds 渲染字面量）。"""
+        sql = str(FUNNEL_CHANNEL_FILTER.compile(
+            dialect=sqlite.dialect(), compile_kwargs={'literal_binds': True}))
+        self.assertIn('渠道类型', sql)
+        self.assertIn('互联网引流', sql)
 
     def test_content_non_stock_sql(self):
         """内容平台非存量条件 = IS NULL OR = 0（业务不变式）。"""

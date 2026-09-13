@@ -26,7 +26,7 @@ from backend.models_v2 import (
     FactConvAppmarket,
     FactConvContent,
 )
-from backend.utils.calibers import CONTENT_NON_STOCK
+from backend.utils.calibers import CONTENT_NON_STOCK, FUNNEL_CHANNEL_FILTER
 from backend.utils.diagnosis.engine import shift_month
 from backend.utils.diagnosis.metrics import ratio
 
@@ -377,7 +377,7 @@ def _appmarket_store_expr():
 
 def _appmarket_internet_filter():
     # 获客口径：漏斗只看互联网引流（对齐 _funnel_filters；新开户是末段指标不过滤）
-    return FactConvAppmarket.渠道类型 == '互联网引流'
+    return FUNNEL_CHANNEL_FILTER
 
 
 APPMARKET_FUNNEL_FIELDS = (

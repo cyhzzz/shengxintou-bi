@@ -12,7 +12,7 @@ from backend.models_v2 import AggVendorDaily, FactConvContent, FactConvAppmarket
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
 from backend.utils.agency_mapper import expand_short_to_fulls
-from backend.utils.calibers import CONTENT_NON_STOCK
+from backend.utils.calibers import CONTENT_NON_STOCK, FUNNEL_CHANNEL_FILTER
 
 bp = Blueprint('cost_analysis', __name__)
 
@@ -239,7 +239,7 @@ def get_conversion_funnel_split():
     # 「新开户」作为漏斗阶段(开户成功→新开户)呈现存量剔除,而非 WHERE 过滤——
     # 否则 是否新开户=1 的设备行其前置阶段字段(激活APP/开户注册/.../开户成功)全部=1,
     # SUM 后激活APP~开户成功全部相等,漏斗变平。存量客户=开户成功-新开户,在漏斗中自然递减。
-    aq = aq.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    aq = aq.filter(FUNNEL_CHANNEL_FILTER)
     ar = aq.first()
     counts = {name: int(getattr(ar, name) or 0) for name, _ in stage_cols}
     base = counts['激活APP']
@@ -260,7 +260,7 @@ def get_conversion_funnel_split():
     )
     if sd and ed:
         app_asset_q = app_asset_q.filter(and_(FactConvAppmarket.下载日期 >= sd, FactConvAppmarket.下载日期 <= ed))
-    app_asset_q = app_asset_q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    app_asset_q = app_asset_q.filter(FUNNEL_CHANNEL_FILTER)
     app_asset_q = app_asset_q.filter(FactConvAppmarket.是否新开户 == 1)
     app_asset_r = app_asset_q.first()
     appmarket_new_open_assets = round(float(app_asset_r.new_open_assets or 0), 2)

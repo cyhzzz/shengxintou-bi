@@ -13,7 +13,7 @@ from sqlalchemy import func, and_, case, or_, cast, String, type_coerce
 from backend.models_v2 import FactConvAppmarket, FactPlanDaily
 from backend.database import db
 from backend.utils.decorators import handle_exceptions
-from backend.utils.calibers import APP_MARKET_PLATFORMS
+from backend.utils.calibers import APP_MARKET_PLATFORMS, FUNNEL_CHANNEL_FILTER
 
 bp = Blueprint('app_market_report', __name__, url_prefix='/api/v1/reports/app-market')
 
@@ -62,7 +62,7 @@ def _funnel_filters(q, filters, date_col=None):
     # 否则 是否新开户=1 的设备行其前置阶段字段全部=1,SUM 后漏斗变平。
     # date_col 默认=资金账号创建完成时间（开户数口径）；开户漏斗传 下载日期 做下载 cohort。
     q = _apply_filters(q, filters, date_col=date_col)
-    q = q.filter(FactConvAppmarket.渠道类型 == '互联网引流')
+    q = q.filter(FUNNEL_CHANNEL_FILTER)
     return q
 
 
@@ -407,7 +407,7 @@ def app_market_plan_analysis():
     platform_rows = db.session.query(FactConvAppmarket.应用市场).distinct().filter(
         FactConvAppmarket.应用市场.isnot(None),
         FactConvAppmarket.应用市场 != '',
-        FactConvAppmarket.渠道类型 == '互联网引流',
+        FUNNEL_CHANNEL_FILTER,
     ).order_by(FactConvAppmarket.应用市场).all()
     platforms = [r[0] for r in platform_rows]
 

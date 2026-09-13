@@ -16,7 +16,7 @@ from backend.models_v2 import (
     FactConvContent,
     FactPlanDaily,
 )
-from backend.utils.calibers import CONTENT_NON_STOCK
+from backend.utils.calibers import CONTENT_NON_STOCK, FUNNEL_CHANNEL_FILTER
 
 SNAPSHOT_SOURCES = [
     {'key': 'agg_vendor_daily', 'name': '厂商日聚合', 'model': AggVendorDaily, 'column': '日期'},
@@ -220,7 +220,7 @@ def fetch_appmarket_monthly(months):
         func.sum(case((FactConvAppmarket.是否新开户 == 1, FactConvAppmarket.总资产), else_=0)).label('new_assets'),
     ).filter(
         month_expr.in_(months),
-        FactConvAppmarket.渠道类型 == '互联网引流',
+        FUNNEL_CHANNEL_FILTER,
     ).group_by(month_expr).all()
     result = {}
     for row in rows:

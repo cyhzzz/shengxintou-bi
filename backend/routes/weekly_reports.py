@@ -26,7 +26,7 @@ from backend.utils.anchor_attribution import (
     compute_anchor_cluster_items,
     load_live_type_mappings,
 )
-from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS, INTERNET_CHANNEL
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ def _query_metrics(sd, ed):
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('opens'),
         func.coalesce(func.sum(AggDailyChannelOpen.有效户数), 0).label('valid'),
     ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.渠道类别 == INTERNET_CHANNEL,
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
     )).first()
@@ -105,7 +105,7 @@ def _query_metrics(sd, ed):
     opens_app = db.session.query(
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0)
     ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.渠道类别 == INTERNET_CHANNEL,
         AggDailyChannelOpen.渠道名称.in_(APP_MARKET_CHANNELS),
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
@@ -192,7 +192,7 @@ def get_weekly_data():
         AggDailyChannelOpen.渠道名称.label('channel'),
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('val'),
     ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.渠道类别 == INTERNET_CHANNEL,
         AggDailyChannelOpen.时间区间 >= sd,
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
@@ -202,7 +202,7 @@ def get_weekly_data():
         AggDailyChannelOpen.渠道名称.label('channel'),
         func.coalesce(func.sum(AggDailyChannelOpen.开户成功人数), 0).label('val'),
     ).filter(and_(
-        AggDailyChannelOpen.渠道类别 == '互联网引流',
+        AggDailyChannelOpen.渠道类别 == INTERNET_CHANNEL,
         AggDailyChannelOpen.时间区间 >= year_start,
         AggDailyChannelOpen.时间区间 <= ed,
     )).group_by(AggDailyChannelOpen.时间区间, AggDailyChannelOpen.渠道名称).all()
@@ -728,7 +728,7 @@ def _live_detail(sd, ed):
     return out
 
 
-def _weekly_opens_by_channels(week_list, channels, category='互联网引流'):
+def _weekly_opens_by_channels(week_list, channels, category=INTERNET_CHANNEL):
     """按周次聚合各渠道开户数（agg_daily_channel_open 权威底表）。
 
     week_list 为 /data 构建的周次列表（[{week, sd, ed}]）；返回

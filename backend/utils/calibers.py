@@ -11,11 +11,17 @@ from backend.models_v2 import FactConvAppmarket, FactConvContent
 # 应用市场白名单：7 大市场；OPPO/VIVO 源表大写，导入层落库前统一 .lower()
 APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果']
 
+# 渠道类型「互联网引流」：应用市场漏斗与渠道开户汇总表（渠道类别）共用的唯一权威值
+INTERNET_CHANNEL = '互联网引流'
+
+# 应用市场漏斗前置过滤（v3.1.24 业务规则：漏斗端点只看互联网引流）
+FUNNEL_CHANNEL_FILTER = FactConvAppmarket.渠道类型 == INTERNET_CHANNEL
+
 # 应用市场「广告开户」复合条件（v3.5.7 口径修正后的权威定义）：
 # 资金账号创建完成 且 渠道类型=互联网引流 且 属于新开户
 AD_ACCOUNT_CONDITIONS = (
     (FactConvAppmarket.是否创建完资金账号 == 1)
-    & (FactConvAppmarket.渠道类型 == '互联网引流')
+    & (FactConvAppmarket.渠道类型 == INTERNET_CHANNEL)
     & (FactConvAppmarket.是否新开户 == 1)
 )
 

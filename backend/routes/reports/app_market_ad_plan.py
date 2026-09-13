@@ -47,7 +47,7 @@ from sqlalchemy import case, distinct, func
 
 from backend.models_v2 import DimAdPlanClass, FactConvAppmarket, AggVendorDaily, FactPlanDaily
 from backend.database import db
-from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS
+from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS as ALLOWED_PLATFORMS, FUNNEL_CHANNEL_FILTER
 from backend.utils.decorators import handle_exceptions
 from backend.utils.dialect_helpers import make_friday_week_start_expr
 
@@ -422,7 +422,7 @@ def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
             _count_devices(AD_ACCOUNT_CONDITIONS).label('ad_account'),
         ).filter(
             FactConvAppmarket.广告计划ID.in_(plan_ids),
-            FactConvAppmarket.渠道类型 == '互联网引流',
+            FUNNEL_CHANNEL_FILTER,
         )
         if start_date:
             fact_q = fact_q.filter(FactConvAppmarket.下载日期 >= start_date)
