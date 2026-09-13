@@ -129,6 +129,7 @@ database/tmp_*.db.gz
 
 # transient scripts (one-shot patch / sync helpers — per AGENTS.md § 8 / § 10，不要入索引)
 scripts/_*.py
+database/_*.py
 
 
 
