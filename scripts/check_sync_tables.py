@@ -33,6 +33,12 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+# CI 打包机（Windows cp1252 控制台）无法编码中文输出，统一强制 UTF-8
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_TABLE_SYNC = ROOT / 'backend' / 'utils' / 'table_sync.py'
 MOBILE_TABLE_SYNC = ROOT / 'frontend-react' / 'src' / 'services' / 'mobileTableSync.ts'
