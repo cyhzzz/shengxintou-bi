@@ -25,8 +25,9 @@ concurrency:
 
 jobs:
   deploy:
-    # tag 推送不部署 Pages（github-pages 环境禁止 tag 部署），仅 main 分支推送部署
-    if: github.ref_type == 'branch'
+    # main 与 v* 标签推送均部署。标签部署依赖仓库 Settings → Environments → github-pages
+    # 中「Deployment branches and tags」放行 v* 标签的策略（属仓库设置，不在本文件内）；
+    # 缺失时标签 run 会被环境拒绝，回该页面补加 v* 标签策略即可
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

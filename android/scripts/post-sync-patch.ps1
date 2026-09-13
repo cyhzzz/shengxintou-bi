@@ -1,4 +1,4 @@
-﻿# Capacitor sync 后自动 patch 脚本
+# Capacitor sync 后自动 patch 脚本
 # 用法：npx cap sync android 后运行此脚本
 # 作用：
 #   1. AndroidManifest.xml 加 screenOrientation=landscape
@@ -157,8 +157,13 @@ if (Test-Path $stylesPath) {
 # ========== 5. settings.gradle 注入阿里云镜像 ==========
 # v3.5.3：国内网络无法访问 maven.apache.org / plugins.gradle.org
 #         每次 cap sync 会重新生成 settings.gradle，必须重新注入镜像
+# v4.3.5：GitHub Actions 海外机房访问阿里云镜像常 502，曾导致 v4.3.4
+#         Release 打包 51 个依赖全部解析失败；CI 环境跳过注入，直接用官方源
 $settingsPath = Join-Path $androidNativeDir "settings.gradle"
-if (Test-Path $settingsPath) {
+if ($env:GITHUB_ACTIONS -eq 'true') {
+    Write-Output "[skip] settings.gradle: CI env, keep official repos (aliyun mirrors 502 for overseas runners)"
+}
+elseif (Test-Path $settingsPath) {
     $settings = Read-FileNoBom $settingsPath
     if ($settings -notmatch 'maven.aliyun.com') {
         $aliyunBlock = @"

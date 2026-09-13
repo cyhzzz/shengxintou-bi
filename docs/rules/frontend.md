@@ -43,6 +43,7 @@
 - 副接口需要静默失败（不打扰全局错误弹窗）时，在 fetcher 内 `catch` 返回 `null` 且永不 `throw`，hook 的报错提示便不会触发。
 - 已知例外：`IntelligentAnalysis`（SSE 流式，整页不接 hook）；上传进度轮询等非查询逻辑保留页面层。
 - 禁止在报表页恢复手写 `setData`/`setLoading` 式三态组；迁移或新写报表页的验证三件套为 typecheck + lint + build。
+- 页面内基于 `data` 的派生集合进 effect 依赖前必须 `useMemo` 稳定引用，防无限渲染循环，详见第 5 节。
 
 ## 3. 表格和详情
 
@@ -72,6 +73,7 @@
 - 文件使用 UTF-8；出现模块导出异常时检查 BOM、NUL 和替换字符。
 - 不用 `any` 绕过可表达的 API 类型；边界响应若确实不稳定，在 service/mutator 层集中适配。
 - Orval 双层响应包装的兼容处理集中在现有 mutator 和共享类型，不在页面重复断言链。
+- effect 依赖数组禁止包含 `data` 未返回时每轮渲染新建的派生引用（如 `data?.items || []`）：引用每轮变化 + effect 内 `setState(新引用)` = 无限渲染循环，触顶即崩（Minified React error #185）。安卓本地查询慢必现（先转满上限），桌面接口快常被数据到达掩盖。派生集合必须 `useMemo(() => data?.items || [], [data])` 稳定引用；effect 内清空状态用函数式更新（`prev => prev.length ? [] : prev`）幂等兜底。典型案例：小红书计划分析页崩溃。
 
 ## 6. 布局与样式
 

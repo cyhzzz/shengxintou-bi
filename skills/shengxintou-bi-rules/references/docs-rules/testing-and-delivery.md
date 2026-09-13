@@ -45,7 +45,7 @@
 
 ### 快速提交前检查
 
-`scripts/pre-commit-check.bat` 是 Windows 快速入口，执行规则架构检查、后端 API smoke 和前端构建。脚本有变更时，确保每个步骤只执行一次并保留真实退出码。
+`scripts/pre-commit-check.bat` 是 Windows 快速入口，执行规则架构检查、后端 API smoke 和前端构建。脚本有变更时，确保每个步骤只执行一次并保留真实退出码。解释器由脚本头部 `%PY%` 统一选择：存在 `.venv\Scripts\python.exe` 时优先用 .venv，否则退回系统 `python`（系统 Python 常缺 Flask 等依赖，会让 API smoke 误报）。`check_rule_architecture.py` 的 `INTEGRATIONS` 字典对 bat 内容做字面量子串校验：修改 bat 内检查命令写法（如 `python` → `%PY%`）必须同步更新对应标记，并重跑完整 pre-commit 而非只跑单项。
 
 ### 全量功能检查
 
@@ -97,7 +97,7 @@
 - 普通功能开发不在规则文件追加“已落地”章节。
 - 发版脚本 `scripts/release.bat` / `release.sh` 会修改版本、commit、tag 和 push，属于高副作用操作；只有用户明确要求发版时运行。
 - 发布前先让用户补全 changelog，不接受脚本生成的"待补"占位条目作为正式发布说明。
-- **发布走 CI 自动打包（四端统一）**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push。push tag 后 GitHub Actions 同时触发 `release.yml`（gate → build-exe/build-apk → publish 三级流水线，产物自动挂载到 Release）和 `pages.yml`（监听 `tags: ['v*']` + `paths` 含 version.json → 重建部署 PWA）。四端（exe/APK/frontend-dist.zip/PWA）一次发版全更新，无需本地构建。
+- **发布走 CI 自动打包（四端统一）**：`scripts/release.bat` / `release.sh` 只负责改版本号、commit、tag、push；发版需同时 push main 和 push tag（缺 tag 则四端资产不打包，缺 main 则主干基线漂移）。push tag 触发 `release.yml`（gate 等 CI 全绿 → build-exe/build-apk → publish 三级流水线，产物自动挂载到 Release）和 `pages.yml` 重建部署 PWA（push main 同样触发 pages.yml）。tag 部署 PWA 依赖仓库 Settings → Environments → github-pages 的「Deployment branches and tags」放行 `v*` 标签策略——属仓库设置、代码里不可见，且必须选 **tag 类型**（branch 型 `v*` 永不匹配、等于没配，曾因此 tag run 全部被跳过而被误记为「环境禁止 tag 部署」）；若 tag 的 Pages run 被环境拒绝或跳过，先回该页面核对策略类型。四端（exe/APK/frontend-dist.zip/PWA）一次发版全更新，无需本地构建。
 - **Release 说明自动生成**：`release.yml` publish 步骤读取 `version.json.changelog` 当前版本条目 + `release_date` + 资产清单生成 release body（`body_path: release_body.md`）。发版前先补全 `version.json.changelog` 即为最终 release 文案，无需手动编辑 release 说明。
 - Release 失败时优先查 GitHub Actions 日志（`release.yml` 的 build-exe/build-apk/publish 步骤），确认编译或挂载阶段的具体错误。本地 `logs/build-installer-vX.Y.Z.log` 和 `logs/build-apk-vX.Y.Z.log` 作为调试回退。
 
