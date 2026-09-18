@@ -11,6 +11,8 @@
  *   一、筛选器（应用市场多选 + 全部 + 日期范围，默认全部）
  *   二、开户概览（总开户 / 总消耗 / 总开户成本）
  *   三、按周开户量柱状图（每周广告开户量，图上显示数值）
+ *   三(a)、按日开户量柱状图（自然日·按市场堆叠·副坐标=当日开户成本）
+ *   三(b)、每日消耗量柱状图（自然日·按市场堆叠，来源 agg_vendor_daily.花费）
  *   四、按周分计划分析（周度筛选，各计划按该周消耗降序，含完整漏斗指标）
  *   五、广告聚类分析（周度筛选：版位 / 子版位 / 版位+子版位 / 出价 × 消耗 / 广告开户量 / 广告开户成本）
  *   六、分计划分析（每条计划一个模块：汇总数据 + 「+」按周展开逐周明细）
@@ -75,6 +77,18 @@ interface WeeklySpendPoint {
   market?: string;
   week_start: string;
   week_end: string;
+  spend: number;
+}
+
+interface DailyOpenPoint {
+  market?: string;
+  date: string;
+  open_count: number;
+}
+
+interface DailySpendPoint {
+  market?: string;
+  date: string;
   spend: number;
 }
 
@@ -334,6 +348,8 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   const byMarket: AggRow[] = data?.by_market || [];
   const weeklyOpen: WeeklyOpenPoint[] = data?.weekly_open || [];
   const weeklySpend: WeeklySpendPoint[] = data?.weekly_spend || [];
+  const dailyOpen: DailyOpenPoint[] = data?.daily_open || [];
+  const dailySpend: DailySpendPoint[] = data?.daily_spend || [];
   const weeks: string[] = data?.weeks || [];
   const planWeekDetail: PlanWeekDetail[] = data?.plan_week_detail || [];
 
@@ -433,6 +449,18 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     }
     return [...acc.values()].sort((a, b) => (a.week_start > b.week_start ? 1 : -1));
   }, [weeklySpend, activeMarkets]);
+
+  // ---- 按日开户量（堆叠柱状图）：保留 per-market 明细，按 activeMarkets 过滤，不聚合为单一序列 ----
+  const displayedDailyOpen: DailyOpenPoint[] = useMemo(
+    () => dailyOpen.filter((w) => w.market && activeMarkets.has(w.market)),
+    [dailyOpen, activeMarkets],
+  );
+
+  // ---- 每日消耗量（堆叠柱状图）：保留 per-market 明细，按 activeMarkets 过滤 ----
+  const displayedDailySpend: DailySpendPoint[] = useMemo(
+    () => dailySpend.filter((w) => w.market && activeMarkets.has(w.market)),
+    [dailySpend, activeMarkets],
+  );
 
   // ---- 分计划展开（按所选应用市场筛选） ----
   const displayedPlanWeekDetail: PlanWeekDetail[] = useMemo(
@@ -586,6 +614,118 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     };
   }, [displayedWeeklyOpen, displayedWeeklySpend]);
 
+  // ---- 按日开户量（堆叠柱状图 + 当日开户成本副坐标折线）
+  // 主坐标（柱，按市场堆叠）= 各市场自然日开户量；副坐标（线）= 当日开户成本 = 当日总消耗 ÷ 当日总开户量。
+  // 二者均按自然日与同一日期区间筛选，口径统一；日期粒度细，故加 dataZoom 滑块便于缩放。
+  const dailyOpenChartOption: EChartsOption = useMemo(() => {
+    const opens = displayedDailyOpen;
+    const spends = displayedDailySpend;
+    if (!opens.length && !spends.length) return {};
+    const dateSet = new Set<string>();
+    opens.forEach((o) => dateSet.add(o.date));
+    spends.forEach((s) => dateSet.add(s.date));
+    const dates = [...dateSet].sort();
+    const mSet = new Set<string>();
+    opens.forEach((o) => o.market && mSet.add(o.market));
+    const markets = [...mSet];
+    const openMap = new Map<string, number>();
+    opens.forEach((o) => openMap.set(`${o.market}|${o.date}`, o.open_count));
+    const spendMap = new Map<string, number>();
+    spends.forEach((s) => spendMap.set(`${s.market}|${s.date}`, s.spend));
+    const totalOpen = new Map<string, number>();
+    const totalSpend = new Map<string, number>();
+    dates.forEach((d) => { totalOpen.set(d, 0); totalSpend.set(d, 0); });
+    opens.forEach((o) => totalOpen.set(o.date, (totalOpen.get(o.date) || 0) + o.open_count));
+    spends.forEach((s) => totalSpend.set(s.date, Math.round(((totalSpend.get(s.date) || 0) + s.spend) * 100) / 100));
+
+    const openSeries = markets.map((m, i) => ({
+      name: m,
+      type: 'bar' as const,
+      stack: 'open',
+      yAxisIndex: 0,
+      data: dates.map((d) => openMap.get(`${m}|${d}`) || 0),
+      itemStyle: { color: pickEChartsColor(i % 12), opacity: 0.9 },
+      barMaxWidth: 26,
+    }));
+    const costData = dates.map((d) => {
+      const oc = totalOpen.get(d) || 0;
+      const sp = totalSpend.get(d) || 0;
+      if (!sp) return null; // 当日无消耗数据（厂商投放数据未覆盖该日）→ 不可核算开户成本，显示 '-'
+      return oc > 0 ? Math.round((sp / oc) * 100) / 100 : null;
+    });
+    const costColor = pickEChartsColor(markets.length % 12);
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const i = params?.[0]?.dataIndex ?? -1;
+          const d = dates[i];
+          if (!d) return '';
+          const oc = totalOpen.get(d) || 0;
+          const sp = totalSpend.get(d) || 0;
+          const cost = sp && oc > 0 ? fmtMoney(Math.round((sp / oc) * 100) / 100) : '-';
+          return `${d}<br/>开户量：<strong>${oc.toLocaleString()}</strong><br/>消耗：<strong>${fmtMoney(sp)}</strong><br/>当日开户成本：<strong>${cost}</strong>`;
+        },
+      },
+      legend: { data: [...markets, '当日开户成本'], top: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '16%', top: '12%', containLabel: true },
+      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
+      yAxis: [
+        { type: 'value', name: '开户量', position: 'left' },
+        { type: 'value', name: '开户成本(元)', position: 'right', axisLabel: { formatter: (v: number) => `¥${v}` }, splitLine: { show: false } },
+      ],
+      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
+      series: [
+        ...openSeries,
+        {
+          name: '当日开户成本',
+          type: 'line',
+          yAxisIndex: 1,
+          data: costData,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: { color: costColor },
+          lineStyle: { width: 2 },
+          label: { show: true, position: 'top', fontSize: 10, color: costColor, formatter: (p: any) => (p.value == null ? '' : fmtMoney(p.value)) },
+        },
+      ],
+    };
+  }, [displayedDailyOpen, displayedDailySpend]);
+
+  // ---- 每日消耗量（按市场堆叠柱状图）：自然日 × 市场 的消耗叠加；来源 agg_vendor_daily.花费 ----
+  const dailySpendChartOption: EChartsOption = useMemo(() => {
+    const spends = displayedDailySpend;
+    if (!spends.length) return {};
+    const dateSet = new Set<string>();
+    spends.forEach((s) => dateSet.add(s.date));
+    const dates = [...dateSet].sort();
+    const mSet = new Set<string>();
+    spends.forEach((s) => s.market && mSet.add(s.market));
+    const markets = [...mSet];
+    const spendMap = new Map<string, number>();
+    spends.forEach((s) => spendMap.set(`${s.market}|${s.date}`, s.spend));
+    const series = markets.map((m, i) => ({
+      name: m,
+      type: 'bar' as const,
+      stack: 'spend',
+      yAxisIndex: 0,
+      data: dates.map((d) => Math.round((spendMap.get(`${m}|${d}`) || 0) * 100) / 100),
+      itemStyle: { color: pickEChartsColor(i % 12), opacity: 0.9 },
+      barMaxWidth: 26,
+    }));
+    return {
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { data: markets, top: 0, type: 'scroll' },
+      grid: { left: '3%', right: '4%', bottom: '16%', top: '12%', containLabel: true },
+      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
+      yAxis: [{ type: 'value', name: '消耗(元)', position: 'left' }],
+      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
+      series,
+    };
+  }, [displayedDailySpend]);
+
   const exportPlanCsv = () => {
     if (!displayedPlanDetail.length) return;
     const headers = ['应用市场', '广告分组ID', '广告分组名称', '版位', '子版位', '出价', '开户数', '消耗', '开户成本'];
@@ -688,6 +828,42 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
           >
             {displayedWeeklyOpen.length > 0 || displayedWeeklySpend.length > 0 ? <EChartsComponent option={weeklyChartOption} height={340} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
             <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+          </Card>
+        </FadeInSection>
+
+        {/* 三(a)、按日开户量（堆叠柱状图 + 当日开户成本副坐标） */}
+        <FadeInSection delay={0.35} duration={0.8}>
+          <Card
+            size="small"
+            className={styles.tableCard}
+            title={
+              <Space size={8} align="center">
+                <CalendarOutlined style={{ color: 'var(--color-brand)' }} />
+                <span>按日开户量</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 副坐标=当日开户成本(消耗÷开户量) · 可拖动下方滑块缩放</span>
+              </Space>
+            }
+          >
+            {displayedDailyOpen.length > 0 || displayedDailySpend.length > 0 ? <EChartsComponent option={dailyOpenChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无按日开户数据'} />}
+            <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+          </Card>
+        </FadeInSection>
+
+        {/* 三(b)、每日消耗量（按市场堆叠柱状图） */}
+        <FadeInSection delay={0.4} duration={0.8}>
+          <Card
+            size="small"
+            className={styles.tableCard}
+            title={
+              <Space size={8} align="center">
+                <FundOutlined style={{ color: 'var(--color-error)' }} />
+                <span>每日消耗量</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 来源 agg_vendor_daily.花费 · 可拖动下方滑块缩放</span>
+              </Space>
+            }
+          >
+            {displayedDailySpend.length > 0 ? <EChartsComponent option={dailySpendChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无每日消耗数据'} />}
+            <SourceLine keys={['vendor_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 

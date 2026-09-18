@@ -19,6 +19,8 @@
   一、市场筛选（前端多选 + 全部，默认全部 7 大应用市场）
   二、开户概览：总开户 / 总消耗 / 总开户成本
   三、按周开户量柱状图（每周广告开户量，上周五~本周四）
+  三(a)、按日开户量柱状图（自然日，按市场堆叠；副坐标=当日开户成本）
+  三(b)、每日消耗量柱状图（自然日，按市场堆叠，来源 agg_vendor_daily.花费）
   四、按周分计划分析：周度筛选（默认最新一周），各计划按该周消耗降序，
      展示 消耗/展示/点击/点击率/下载量/下载率/激活量/激活率/开户注册量/开户注册率/
      身份证上传量/身份证上传率/银行卡上传量/银行卡上传率/开户提交量/开户提交率/
@@ -56,7 +58,7 @@ bp = Blueprint('app_market_ad_plan', __name__, url_prefix='/api/v1/reports/app-m
 _META = {
     'version': 'v3.8.2',
     'source': 'dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily + fact_plan_daily',
-    'note': '广告计划分析：开户概览 + 按周开户量（含周度开户成本副坐标）+ 按周分计划 + 分计划展开（周度=上周五~本周四）',
+    'note': '广告计划分析：开户概览 + 按周开户量（含周度开户成本副坐标）+ 按日开户量（自然日·按市场堆叠·副坐标=当日开户成本）+ 每日消耗量（自然日·按市场堆叠）+ 按周分计划 + 分计划展开（周度=上周五~本周四）',
     'open_condition': '是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1',
     'spend_source': 'agg_vendor_daily.花费（按 平台=应用市场 聚合）；分计划消耗/展示/点击/下载 = fact_plan_daily 按 计划ID 聚合',
     'open_source': 'fact_conv_appmarket（按 应用市场 聚合，广告开户节点）',
@@ -366,6 +368,65 @@ def _weekly_spend(markets, start_date, end_date):
     return out
 
 
+def _daily_open(markets, start_date, end_date):
+    """按天（自然日）的广告开户量（per-market，便于前端按市场堆叠）。
+
+    与「按周开户量」口径一致：开户量 = AD_ACCOUNT_CONDITIONS（是否创建完资金账号=1
+    & 渠道类型=互联网引流 & 是否新开户=1），按 资金账号创建完成时间 的自然日聚合。
+    """
+    if not markets:
+        return []
+    q = db.session.query(
+        FactConvAppmarket.应用市场.label('market'),
+        FactConvAppmarket.资金账号创建完成时间.label('date'),
+        func.coalesce(
+            func.sum(case((AD_ACCOUNT_CONDITIONS, 1), else_=0)), 0
+        ).label('open_count'),
+    ).filter(FactConvAppmarket.应用市场.in_(markets))
+    if start_date:
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 >= start_date)
+    if end_date:
+        q = q.filter(FactConvAppmarket.资金账号创建完成时间 <= end_date)
+    q = q.group_by(FactConvAppmarket.应用市场, FactConvAppmarket.资金账号创建完成时间) \
+         .order_by(FactConvAppmarket.应用市场, FactConvAppmarket.资金账号创建完成时间)
+    out = []
+    for r in q.all():
+        out.append({
+            'market': r.market,
+            'date': _ws_str(r.date),
+            'open_count': int(r.open_count or 0),
+        })
+    return out
+
+
+def _daily_spend(markets, start_date, end_date):
+    """按天（自然日）的消耗（per-market，便于前端按市场堆叠）。
+
+    与「总消耗」口径一致：agg_vendor_daily.花费 按 平台=应用市场 聚合，按 日期 自然日聚合。
+    """
+    if not markets:
+        return []
+    q = db.session.query(
+        AggVendorDaily.平台.label('market'),
+        AggVendorDaily.日期.label('date'),
+        func.coalesce(func.sum(AggVendorDaily.花费), 0).label('spend'),
+    ).filter(AggVendorDaily.平台.in_(markets), AggVendorDaily.花费 > 0)
+    if start_date:
+        q = q.filter(AggVendorDaily.日期 >= start_date)
+    if end_date:
+        q = q.filter(AggVendorDaily.日期 <= end_date)
+    q = q.group_by(AggVendorDaily.平台, AggVendorDaily.日期) \
+         .order_by(AggVendorDaily.平台, AggVendorDaily.日期)
+    out = []
+    for r in q.all():
+        out.append({
+            'market': r.market,
+            'date': _ws_str(r.date),
+            'spend': round(float(r.spend or 0), 2),
+        })
+    return out
+
+
 def _plan_week_analysis(markets, start_date, end_date, week_start, plans):
     """按周分计划分析 + 分计划展开（周五起始周）。
 
@@ -530,6 +591,8 @@ def ad_plan_analysis():
     )
     weekly_open = _weekly_open(markets, start_date, end_date)
     weekly_spend = _weekly_spend(markets, start_date, end_date)
+    daily_open = _daily_open(markets, start_date, end_date)
+    daily_spend = _daily_spend(markets, start_date, end_date)
     weeks, selected_week, week_plans, plan_week_detail = _plan_week_analysis(
         markets, start_date, end_date, week_start, plans
     )
@@ -545,6 +608,8 @@ def ad_plan_analysis():
             'by_market': by_market,
             'weekly_open': weekly_open,
             'weekly_spend': weekly_spend,
+            'daily_open': daily_open,
+            'daily_spend': daily_spend,
             'weeks': weeks,
             'selected_week': selected_week,
             'week_plans': week_plans,

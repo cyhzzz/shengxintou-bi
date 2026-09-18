@@ -940,6 +940,34 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     return { market: r.market, week_start: ws, week_end: _adWeekEnd(ws), spend: round2(toFloat(r.spend)) };
   });
 
+  // ---- 按日开户量（自然日），per-market：与 weekly_open 同口径（应用市场 + 资金账号创建完成时间 日期区间）----
+  const dailyOpenRows = await querySql<Row>(
+    `SELECT "应用市场" as market, substr("资金账号创建完成时间", 1, 10) as date,
+       COALESCE(SUM(CASE WHEN ${AD_ACCOUNT_COND} THEN 1 ELSE 0 END), 0) as open_count
+     FROM fact_conv_appmarket ${marketWhere.clause}
+     GROUP BY "应用市场", date ORDER BY "应用市场", date`,
+    marketWhere.params
+  );
+  const daily_open = dailyOpenRows.map(r => ({
+    market: r.market,
+    date: String(r.date).slice(0, 10),
+    open_count: toInt(r.open_count),
+  }));
+
+  // ---- 每日消耗量（自然日），per-market：与 weekly_spend 同口径（平台 + 花费>0 + 日期区间）----
+  const dailySpendRows = await querySql<Row>(
+    `SELECT "平台" as market, substr("日期", 1, 10) as date,
+       COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台", date ORDER BY "平台", date`,
+    platformWhere.params
+  );
+  const daily_spend = dailySpendRows.map(r => ({
+    market: r.market,
+    date: String(r.date).slice(0, 10),
+    spend: round2(toFloat(r.spend)),
+  }));
+
   // ---- 按周分计划 + 分计划展开 ----
   const aggBy: Record<string, { spend: number; impressions: number; clicks: number; downloads: number }> = {};
   const factBy: Record<string, { activate: number; register: number; id_card: number; bank_card: number; submit: number; success: number; ad_account: number }> = {};
@@ -1058,6 +1086,8 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     by_market,
     weekly_open,
     weekly_spend,
+    daily_open,
+    daily_spend,
     weeks,
     selected_week: selected,
     week_plans,
