@@ -731,7 +731,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
 
 // ============================================================================
 // 应用市场 · 广告计划分析 (reports/app-market/ad-plan-analysis)
-// 结合四个数据源：dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily(市场级) + fact_plan_daily(计划级)
+// 结合三个数据源：dim_ad_plan_class + fact_conv_appmarket + fact_plan_daily（市场级消耗 + 计划级消耗/展示/点击/下载）
 // 复刻 backend/routes/reports/app_market_ad_plan.py（周度口径：上周五~本周四）
 // ============================================================================
 
@@ -820,7 +820,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
 
   const spendRows = await querySql<Row>(
     `SELECT "平台" as platform, COALESCE(SUM("花费"), 0) as spend
-     FROM agg_vendor_daily ${platformWhere.clause}
+     FROM fact_plan_daily ${platformWhere.clause}
      GROUP BY "平台"`,
     platformWhere.params
   );
@@ -927,11 +927,11 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   });
 
   // ---- 按周消耗（周五起始周），per-market：与 weekly_open 同口径对齐（同一周五起始周 + 同一日期区间）----
-  // 消耗口径与开户概览一致：agg_vendor_daily.花费 按 平台 + 日期 的周五起始周聚合（platformWhere 已含 平台/花费>0/日期区间）
+  // 消耗口径与开户概览一致：fact_plan_daily.花费 按 平台 + 日期 的周五起始周聚合（platformWhere 已含 平台/花费>0/日期区间）
   const weeklySpendRows = await querySql<Row>(
     `SELECT "平台" as market, ${fridayWeekExpr('日期')} as week_start,
        COALESCE(SUM("花费"), 0) as spend
-     FROM agg_vendor_daily ${platformWhere.clause}
+     FROM fact_plan_daily ${platformWhere.clause}
      GROUP BY "平台", week_start ORDER BY "平台", week_start`,
     platformWhere.params
   );
@@ -958,7 +958,7 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   const dailySpendRows = await querySql<Row>(
     `SELECT "平台" as market, substr("日期", 1, 10) as date,
        COALESCE(SUM("花费"), 0) as spend
-     FROM agg_vendor_daily ${platformWhere.clause}
+     FROM fact_plan_daily ${platformWhere.clause}
      GROUP BY "平台", date ORDER BY "平台", date`,
     platformWhere.params
   );

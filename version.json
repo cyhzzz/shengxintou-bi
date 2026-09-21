@@ -1,9 +1,10 @@
 {
-    "version": "4.3.7",
-    "release_date": "2026-09-18",
+    "version": "4.3.8",
+    "release_date": "2026-09-21",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v4.3.8 应用市场·广告计划分析消耗/成本数据源切换为明细：开户概览/按周开户量/按日开户量/每日消耗量四块报表的消耗与开户成本由厂商广告投放分析(agg_vendor_daily)改为广告计划维度明细(fact_plan_daily)——后端 ad_plan_analysis._market_spend_map/_weekly_spend/_daily_spend 改用 FactPlanDaily 聚合、前端 SourceLine 来源键 vendor_daily→fact_plan_daily、移动端 handler 三处同步保持跨端契约一致；明细覆盖至 2026-09-19 比聚合表更全、各市场消耗数值整体上调，口径更准（独立的「成本分析」报表仍用 agg_vendor_daily，不在本次范围）",
         "v4.3.7 应用市场·广告计划分析新增「按日开户量」与「每日消耗量」两块图表：按日开户量为主坐标各应用市场按自然日累积叠加开户量柱状图、副坐标为当天开户成本折线（口径=是否创建完资金账号=是 & 渠道类型=互联网引流 & 是否新开户=是，按资金账号创建完成时间自然日聚合），每日消耗量为各市场消耗叠加柱状图（agg_vendor_daily.花费按日期聚合）；两块图表下方均新增「数据来源 + 更新日期」小字（拉取 /api/v1/data-freshness）；后端 ad_plan_analysis 新增 _daily_open/_daily_spend、移动端 handler 同步返回 daily_open/daily_spend 保持跨端契约一致",
         "v4.3.6 筛选「未归因」全维度落地（Web+移动双端）：新增 agency_lead_clause 跨端共享翻译——筛选「未归因」翻译为字段 IS NULL OR 空串条件，选未归因能查到代理商/创作者信息缺失的真实数据而非 0 行，线索明细/主播聚类/主播趋势/小红书笔记创作者/广告策略等筛选与下拉选项两端同步补「未归因」；厂商与广告代理商字段实测口径修正——上游 ETL 已按 dim_account 归一化存简称，SQL 过滤直接简称恒等匹配即可，expand_short_to_fulls 标注仅展示用途禁入 WHERE IN（规避小红书计划分析 v4.3.5 同类全空事故的潜在复发）；新增 agency_market_channels.json 应用市场包干厂商映射（有米/哇棒/kiwi 三家按市场包干投放、dim_account 无记录致厂商下拉选不到，metadata 下拉合并补充）；小红书运营展示兜底「未知」统一为「未归因」6 处；平台维度实测无 NULL 数据不设选项避免「选了查 0 行」空转；本地真实数据端到端实测（创作者未归因 516 行/广告策略未归因 355 行/组合 669 行），unittest 159 + 跨端契约对账 84 端点 + typecheck + build 全绿",
         "v4.3.5 小红书-计划分析厂商筛选全空修复：筛选此前打在 fact_conv_content.广告代理商（该列 95% 为空、无绩牛/量子真值）导致选任何厂商 0 匹配全空（git 考古确认自报表初版即存在，非近期回归），改为按「计划ID（广告ID 归一化）→ fact_plan_daily.厂商名称」归属过滤（厂商名称空=直投，无法归属的计划仅「全部」视图保留），Web 后端与移动端 handler 双端同步修复，移动端顺带修复周走势消耗未随厂商过滤而虚高的隐藏 bug，筛选与表格「广告代理商」列展示同源；新增回归测试（选量子必须非空且计划全归属量子，本地真实数据实测绩牛 130 计划/2734 企微/232 万消耗）+ 报表口径说明同步",

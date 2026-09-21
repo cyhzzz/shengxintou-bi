@@ -5,14 +5,14 @@
  *   结合三个数据源做广告计划维度的获客与成本分析：
  *   1. 应用市场计划分解 (dim_ad_plan_class) —— 计划的分类维度（版位/子版位/出价）
  *   2. 应用市场下载链路 (fact_conv_appmarket) —— 各计划下载链路各阶段（去重设备号）
- *   3. 厂商广告投放分析 (agg_vendor_daily) —— 各计划的消耗/展示/点击（花费）
+ *   3. 广告计划维度明细 (fact_plan_daily) —— 应用市场消耗统一来源（市场级 + 计划级 消耗/展示/点击）
  *
  * 页面结构（周度口径统一：上周五 → 本周四）：
  *   一、筛选器（应用市场多选 + 全部 + 日期范围，默认全部）
  *   二、开户概览（总开户 / 总消耗 / 总开户成本）
  *   三、按周开户量柱状图（每周广告开户量，图上显示数值）
  *   三(a)、按日开户量柱状图（自然日·按市场堆叠·副坐标=当日开户成本）
- *   三(b)、每日消耗量柱状图（自然日·按市场堆叠，来源 agg_vendor_daily.花费）
+ *   三(b)、每日消耗量柱状图（自然日·按市场堆叠，来源 fact_plan_daily.花费）
  *   四、按周分计划分析（周度筛选，各计划按该周消耗降序，含完整漏斗指标）
  *   五、广告聚类分析（周度筛选：版位 / 子版位 / 版位+子版位 / 出价 × 消耗 / 广告开户量 / 广告开户成本）
  *   六、分计划分析（每条计划一个模块：汇总数据 + 「+」按周展开逐周明细）
@@ -436,7 +436,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   }, [weeklyOpen, activeMarkets]);
 
   // ---- 按周消耗（柱状图副坐标）：weekly_spend 是 per-market，按 activeMarkets 周内求和 ----
-  // 消耗周起始 = agg_vendor_daily.日期 的周五起始周，与开户量（资金账号创建完成时间）同为周五起始周，
+  // 消耗周起始 = fact_plan_daily.日期 的周五起始周，与开户量（资金账号创建完成时间）同为周五起始周，
   // 按周标签对齐即可保证「周度开户成本 = 消耗 ÷ 开户量」的口径统一。
   const displayedWeeklySpend: WeeklySpendPoint[] = useMemo(() => {
     if (!weeklySpend.length) return [];
@@ -537,7 +537,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
 
   // ---- 按周开户量柱状图 + 周度开户成本（副坐标折线）
   // 开户量（左轴，柱）来自 displayedWeeklyOpen；周度开户成本 = 消耗 ÷ 开户量（右轴，线）来自 displayedWeeklySpend。
-  // 二者均按周五起始周（开户量=资金账号创建完成时间周，消耗=agg_vendor_daily.日期周）与同一日期区间筛选，口径统一。
+  // 二者均按周五起始周（开户量=资金账号创建完成时间周，消耗=fact_plan_daily.日期周）与同一日期区间筛选，口径统一。
   const weeklyChartOption: EChartsOption = useMemo(() => {
     if (!displayedWeeklyOpen.length && !displayedWeeklySpend.length) return {};
     // 合并两周集合（同一周五起始周标签对齐）
@@ -694,7 +694,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     };
   }, [displayedDailyOpen, displayedDailySpend]);
 
-  // ---- 每日消耗量（按市场堆叠柱状图）：自然日 × 市场 的消耗叠加；来源 agg_vendor_daily.花费 ----
+  // ---- 每日消耗量（按市场堆叠柱状图）：自然日 × 市场 的消耗叠加；来源 fact_plan_daily.花费 ----
   const dailySpendChartOption: EChartsOption = useMemo(() => {
     const spends = displayedDailySpend;
     if (!spends.length) return {};
@@ -780,7 +780,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
         <FadeInSection delay={0.2} duration={0.8}>
           <MetricSection
             title={`${currentMarketLabel} · 开户概览`}
-            description="总开户=广告开户节点(资金账号完成+互联网引流+新开户)；总消耗=所选应用市场 agg_vendor_daily.花费 合计"
+            description="总开户=广告开户节点(资金账号完成+互联网引流+新开户)；总消耗=所选应用市场 fact_plan_daily.花费 合计"
           >
             <MetricCard
               title="总开户"
@@ -797,7 +797,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               formatter="currency"
               valueColor="var(--color-error)"
               icon={<MoneyCollectOutlined style={{ color: 'var(--color-error)' }} />}
-              description="所选应用市场 agg_vendor_daily.花费 合计（平台级）"
+              description="所选应用市场 fact_plan_daily.花费 合计（平台级）"
               showWowChange={false}
             />
             <MetricCard
@@ -810,7 +810,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               showWowChange={false}
             />
           </MetricSection>
-          <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+          <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
         </FadeInSection>
 
         {/* 三、按周开户量柱状图 */}
@@ -827,7 +827,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             }
           >
             {displayedWeeklyOpen.length > 0 || displayedWeeklySpend.length > 0 ? <EChartsComponent option={weeklyChartOption} height={340} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
-            <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+            <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -845,7 +845,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             }
           >
             {displayedDailyOpen.length > 0 || displayedDailySpend.length > 0 ? <EChartsComponent option={dailyOpenChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无按日开户数据'} />}
-            <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+            <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -858,12 +858,12 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               <Space size={8} align="center">
                 <FundOutlined style={{ color: 'var(--color-error)' }} />
                 <span>每日消耗量</span>
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 来源 agg_vendor_daily.花费 · 可拖动下方滑块缩放</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 来源 fact_plan_daily.花费 · 可拖动下方滑块缩放</span>
               </Space>
             }
           >
             {displayedDailySpend.length > 0 ? <EChartsComponent option={dailySpendChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无每日消耗数据'} />}
-            <SourceLine keys={['vendor_daily']} freshness={freshness} />
+            <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -1052,7 +1052,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                   { title: '开户成本', key: 'ocst', align: 'right', width: 120, sorter: (a: AggRow, b: AggRow) => (a.open_cost || 0) - (b.open_cost || 0), render: (_: any, r: AggRow) => fmtMoney(r.open_cost) },
                 ]}
               />
-              <SourceLine keys={['fact_conv_appmarket', 'vendor_daily']} freshness={freshness} />
+              <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
             </Card>
           </div>
         </FadeInSection>
@@ -1061,15 +1061,15 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       <FadeInSection delay={1.0} duration={0.8}>
         <ReportFooter
           sources={[
-            { label: '数据源', value: 'dim_ad_plan_class（应用市场计划分解）+ fact_conv_appmarket（应用市场下载链路）+ agg_vendor_daily（厂商广告投放分析）' },
+            { label: '数据源', value: 'dim_ad_plan_class（应用市场计划分解）+ fact_conv_appmarket（应用市场下载链路）+ fact_plan_daily（广告计划维度明细）' },
             { label: '端点', value: 'POST /api/v1/reports/app-market/ad-plan-analysis' },
             { label: '总开户口径', value: '是否创建完资金账号=是 AND 渠道类型=互联网引流 AND 是否新开户=是（广告开户节点）' },
-            { label: '总消耗口径', value: '所选应用市场 agg_vendor_daily.花费 之和（平台=应用市场）' },
+            { label: '总消耗口径', value: '所选应用市场 fact_plan_daily.花费 之和（平台=应用市场）' },
             { label: '周度口径', value: '上周五 ~ 本周四（页面内所有按周统计均为此口径）' },
-            { label: '漏斗量口径', value: '分计划各阶段量 = 应用市场下载链路按 计划+周 统计去重设备号；消耗/展示/点击 = agg_vendor_daily' },
+            { label: '漏斗量口径', value: '分计划各阶段量 = 应用市场下载链路按 计划+周 统计去重设备号；消耗/展示/点击 = fact_plan_daily（广告计划维度明细）' },
             { label: '转化率口径', value: '步骤间转化：点击率=点击/展示、下载率=下载/点击、激活率=激活/下载、开户注册率=开户注册/激活、身份证上传率=身份证/开户注册、银行卡上传率=银行卡/身份证、开户提交率=开户提交/银行卡、开户成功率=开户成功/开户提交、广告开户率=广告开户/开户成功' },
             { label: '广告开户成本', value: '消耗 ÷ 广告开户量（广告开户量为 0 时不可计算，展示 -）' },
-            { label: '周度开户成本(副坐标)', value: '按周五起始周：该周消耗(agg_vendor_daily.花费，按 平台 + 日期 的周五起始周聚合) ÷ 该周开户量(资金账号创建完成时间 的周五起始周聚合)；两者均按同一周五起始周 + 同一日期区间筛选，消耗日期与开户量日期统一' },
+            { label: '周度开户成本(副坐标)', value: '按周五起始周：该周消耗(fact_plan_daily.花费，按 平台 + 日期 的周五起始周聚合) ÷ 该周开户量(资金账号创建完成时间 的周五起始周聚合)；两者均按同一周五起始周 + 同一日期区间筛选，消耗日期与开户量日期统一' },
           ]}
           notes="广告计划分析将「计划分解维度」与「下载链路开户」和「投放消耗」打通：开户概览与按周开户量看整体量能与节奏；按周分计划看各计划每周消耗与全链路转化表现（默认最新一周，可切换）；广告聚类分析按所选周对版位/子版位/出价做 消耗·广告开户量·广告开户成本 的聚类对比；分计划展开可下钻每条计划的逐周明细。周度口径统一为上周五~本周四。注意：苹果/鸿蒙无计划分解，仅参与市场级统计，不进入计划级明细。"
         />
