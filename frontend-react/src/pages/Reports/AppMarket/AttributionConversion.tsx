@@ -15,6 +15,7 @@ import { RiseOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection, ReportFooter, FilterBar } from '@/components';
 import { dataServiceReports } from '@/services/dataService';
+import { metadataService, type DataFreshness } from '@/services/metadataService';
 import { useReportData } from '@/hooks/useReportData';
 import { useFilterStore } from '@/stores';
 import type { EChartsOption } from 'echarts';
@@ -170,6 +171,23 @@ const fetchAttributionConversion = async (query: AttributionQuery): Promise<any>
   return res.data;
 };
 
+// 数据来源 + 更新日期小字（复用广告计划分析的 SourceLine 样式）
+const SourceLine: React.FC<{ keys: string[]; freshness: DataFreshness }> = ({ keys, freshness }) => {
+  const parts = keys.map((k) => {
+    if (k === 'dim_ad_plan_class') return 'dim_ad_plan_class（计划分解维度）';
+    const f = freshness[k];
+    if (!f) return null;
+    const date = f.latest_date ? `（更新至 ${f.latest_date}）` : '（暂无数据）';
+    return `${f.name}${date}`;
+  }).filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <div style={{ marginTop: 8, color: 'var(--color-text-tertiary)', fontSize: '12px', lineHeight: 1.5 }}>
+      数据来源：{parts.join('；')}
+    </div>
+  );
+};
+
 const AttributionConversionPage: React.FC = () => {
   const { dateRange } = useFilterStore();
   const [platform, setPlatform] = useState<string>('全部');
@@ -183,6 +201,14 @@ const AttributionConversionPage: React.FC = () => {
     load({ start_date: dateRange.startDate, end_date: dateRange.endDate, platform });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.startDate, dateRange.endDate, platform]);
+
+  // 数据来源 + 更新日期（拉取 /api/v1/data-freshness，仅挂载时取一次）
+  const [freshness, setFreshness] = useState<DataFreshness>({});
+  useEffect(() => {
+    metadataService.getDataFreshness().then((r: any) => {
+      if (r?.success) setFreshness(r.data || {});
+    });
+  }, []);
 
   // 数据更新后重置展开状态
   useEffect(() => {
@@ -466,6 +492,7 @@ const AttributionConversionPage: React.FC = () => {
             ) : (
               <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无周度数据</div>
             )}
+            <SourceLine keys={['fact_conv_appmarket']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -511,6 +538,7 @@ const AttributionConversionPage: React.FC = () => {
                 row.rowType === 'weekly' ? 'weekly-summary-row' : 'daily-row'
               }
             />
+            <SourceLine keys={['fact_conv_appmarket']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
