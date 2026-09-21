@@ -3,7 +3,7 @@
  * 数据源: agg_vendor_daily
  * 4 部分: 总览指标卡 → 分市场表格 → 月度柱状图 → 周度柱状图
  */
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Spin, Table, Tag } from 'antd';
 import { MoneyCollectOutlined, TeamOutlined, AimOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
@@ -12,6 +12,7 @@ import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import type { EChartsOption } from 'echarts';
 import { dataServiceReports } from '@/services/dataService';
+import { metadataService, type DataFreshness } from '@/services/metadataService';
 import { useFilterStore } from '@/stores';
 import { useReportData } from '@/hooks/useReportData';
 import styles from './index.module.scss';
@@ -24,6 +25,22 @@ const PLATFORM_COLORS: Record<string, string> = {
   'vivo': '#A8A8C9', // 莫兰迪薰衣草灰
   '苹果': '#C4C4C4', // 莫兰迪浅灰
   '鸿蒙': '#E0B0A0', // 莫兰迪粉杏
+};
+
+// 数据来源 + 更新截止日期小字（与广告计划分析/归因转化率一致的 SourceLine 样式）
+const SourceLine: React.FC<{ keys: string[]; freshness: DataFreshness }> = ({ keys, freshness }) => {
+  const parts = keys.map((k) => {
+    const f = freshness[k];
+    if (!f) return null;
+    const date = f.latest_date ? `（更新至 ${f.latest_date}）` : '（暂无数据）';
+    return `${f.name}${date}`;
+  }).filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <div style={{ marginTop: 8, color: 'var(--color-text-tertiary)', fontSize: '12px', lineHeight: 1.5 }}>
+      数据来源：{parts.join('；')}
+    </div>
+  );
 };
 
 interface CostQuery {
@@ -48,6 +65,14 @@ const CostAnalysisPage: React.FC = () => {
     load({ startDate: dateRange.startDate, endDate: dateRange.endDate });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.startDate, dateRange.endDate]);
+
+  // 数据来源 + 更新截止日期（拉取 /api/v1/data-freshness）
+  const [freshness, setFreshness] = useState<DataFreshness>({});
+  useEffect(() => {
+    metadataService.getDataFreshness().then((r: any) => {
+      if (r?.success) setFreshness(r.data || {});
+    }).catch(() => {});
+  }, []);
 
   // ---- Part 3: 月度柱状图 ----
   const monthChartOption: EChartsOption = useMemo(() => {
@@ -245,7 +270,7 @@ const CostAnalysisPage: React.FC = () => {
       <Spin spinning={loading}>
         {/* Part 1: 总览指标卡 */}
         <FadeInSection>
-          <MetricSection title="消耗和成本概览" description="总消耗=agg_vendor_daily.花费；总开户=广告开户节点（资金账号+互联网引流+新开户，fact_conv_appmarket）">
+          <MetricSection title="消耗和成本概览" description="总消耗=fact_plan_daily.花费（广告计划维度明细）；总开户=广告开户节点（资金账号+互联网引流+新开户，fact_conv_appmarket）">
             <MetricCard
               title="总消耗"
               value={data?.summary.total_spend}
@@ -276,6 +301,7 @@ const CostAnalysisPage: React.FC = () => {
               showWowChange={false}
             />
           </MetricSection>
+          <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
         </FadeInSection>
 
         {/* Part 2: 分市场表格 */}
@@ -288,6 +314,7 @@ const CostAnalysisPage: React.FC = () => {
               pagination={false}
               size="small"
             />
+            <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -299,6 +326,7 @@ const CostAnalysisPage: React.FC = () => {
             ) : (
               <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无月度数据</div>
             )}
+            <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
@@ -310,13 +338,14 @@ const CostAnalysisPage: React.FC = () => {
             ) : (
               <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>暂无周度数据</div>
             )}
+            <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
           </Card>
         </FadeInSection>
 
         <FadeInSection>
           <ReportFooter
             sources={[
-              { label: '数据源', value: 'agg_vendor_daily.花费（消耗）+ fact_conv_appmarket 广告开户节点（开户数）' },
+              { label: '数据源', value: 'fact_plan_daily.花费（消耗，广告计划维度明细）+ fact_conv_appmarket 广告开户节点（开户数）' },
               { label: '端点', value: 'POST /api/v1/reports/app-market/cost-analysis（backend/routes/reports/app_market_cost.py）' },
               { label: '口径', value: '过滤 花费 > 0 且 平台 ∈ 7 大应用市场（含鸿蒙）；开户成本 = 花费 ÷ 广告开户量（资金账号完成+互联网引流+新开户）' },
               { label: '移动端', value: 'mobileRouteHandler.ts::handleAppMarketCostAnalysis 同口径 SQL（SQLite 本地查询）' },

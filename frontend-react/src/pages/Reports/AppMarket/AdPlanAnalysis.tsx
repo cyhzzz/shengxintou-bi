@@ -36,6 +36,7 @@ import { MetricCard, MetricSection } from '@/components/MetricCard';
 import { ReportFooter } from '@/components/ReportFooter';
 import { FadeInSection, FilterBar } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
+import { downloadCsv } from '@/utils/downloadCsv';
 import { useFilterStore } from '@/stores';
 import styles from './index.module.scss';
 
@@ -706,7 +707,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     const markets = [...mSet];
     const spendMap = new Map<string, number>();
     spends.forEach((s) => spendMap.set(`${s.market}|${s.date}`, s.spend));
-    const series = markets.map((m, i) => ({
+    const series: any[] = markets.map((m, i) => ({
       name: m,
       type: 'bar' as const,
       stack: 'spend',
@@ -715,6 +716,32 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       itemStyle: { color: pickEChartsColor(i % 12), opacity: 0.9 },
       barMaxWidth: 26,
     }));
+    // 每日消耗合计：透明叠层系列（独立 stack + barGap 重叠），仅在柱顶展示当日合计值
+    const dailySpendTotals = dates.map((d) => {
+      let t = 0;
+      markets.forEach((m) => { t += spendMap.get(`${m}|${d}`) || 0; });
+      return Math.round(t * 100) / 100;
+    });
+    series.push({
+      name: '每日消耗合计',
+      type: 'bar',
+      stack: 'spendTotal',
+      data: dailySpendTotals,
+      barGap: '-100%',
+      itemStyle: { color: 'transparent' as const, opacity: 0 },
+      label: {
+        show: true,
+        position: 'top',
+        formatter: (p: any) => fmtMoney(p.value),
+        color: '#333',
+        fontWeight: 'bold',
+        fontSize: 11,
+      },
+      tooltip: { show: false },
+      silent: true,
+      z: 11,
+      barMaxWidth: 26,
+    });
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { data: markets, top: 0, type: 'scroll' },
@@ -741,6 +768,50 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     link.download = `广告计划分析_${selected.length ? selected.join('-') : '全部'}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  // ---- 图表「下载」：导出各图表对应的明细数据（需求：每个图表右上角下载按钮） ----
+  const exportWeeklyCsv = () => {
+    const weekSet = new Set<string>();
+    displayedWeeklyOpen.forEach((w) => weekSet.add(w.week_start));
+    displayedWeeklySpend.forEach((w) => weekSet.add(w.week_start));
+    const weeks = [...weekSet].sort();
+    const openMap = new Map(displayedWeeklyOpen.map((w) => [w.week_start, w]));
+    const spendMap = new Map(displayedWeeklySpend.map((w) => [w.week_start, w]));
+    const headers = ['周起始', '周结束', '开户量', '消耗(元)', '周度开户成本(元)'];
+    const rows = weeks.map((ws) => {
+      const o = openMap.get(ws);
+      const s = spendMap.get(ws);
+      const open = o?.open_count || 0;
+      const spend = s?.spend || 0;
+      const cost = s && open > 0 ? Math.round((spend / open) * 100) / 100 : null;
+      return [ws, o?.week_end || s?.week_end || '', open, Math.round(spend * 100) / 100, cost];
+    });
+    downloadCsv(`广告计划分析_按周开户量_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
+  const exportDailyOpenCsv = () => {
+    const spendMap = new Map<string, number>();
+    displayedDailySpend.forEach((s) => spendMap.set(`${s.market}|${s.date}`, s.spend));
+    const seen = new Set<string>();
+    const headers = ['日期', '应用市场', '开户量', '消耗(元)'];
+    const rows: (string | number | undefined)[][] = displayedDailyOpen.map((o) => {
+      seen.add(`${o.market}|${o.date}`);
+      return [o.date, o.market, o.open_count, Math.round((spendMap.get(`${o.market}|${o.date}`) || 0) * 100) / 100];
+    });
+    displayedDailySpend.forEach((s) => {
+      if (!seen.has(`${s.market}|${s.date}`)) rows.push([s.date, s.market, 0, Math.round(s.spend * 100) / 100]);
+    });
+    rows.sort((a, b) => (a[0] as string).localeCompare(b[0] as string));
+    downloadCsv(`广告计划分析_按日开户量_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
+  const exportDailySpendCsv = () => {
+    const headers = ['日期', '应用市场', '消耗(元)'];
+    const rows = displayedDailySpend
+      .map((s) => [s.date, s.market, Math.round(s.spend * 100) / 100])
+      .sort((a, b) => (a[0] as string).localeCompare(b[0] as string));
+    downloadCsv(`广告计划分析_每日消耗量_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
   const currentMarketLabel =
@@ -825,6 +896,11 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>周度口径：上周五 ~ 本周四 · 广告开户节点 · 副坐标=周度开户成本(消耗÷开户量)</span>
               </Space>
             }
+            extra={
+              <Tooltip title="下载图表数据">
+                <Button size="small" icon={<DownloadOutlined />} onClick={exportWeeklyCsv} disabled={!displayedWeeklyOpen.length && !displayedWeeklySpend.length}>下载</Button>
+              </Tooltip>
+            }
           >
             {displayedWeeklyOpen.length > 0 || displayedWeeklySpend.length > 0 ? <EChartsComponent option={weeklyChartOption} height={340} /> : <Empty description={loading ? '加载中...' : '暂无周度开户数据'} />}
             <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
@@ -843,6 +919,11 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 副坐标=当日开户成本(消耗÷开户量) · 可拖动下方滑块缩放</span>
               </Space>
             }
+            extra={
+              <Tooltip title="下载图表数据">
+                <Button size="small" icon={<DownloadOutlined />} onClick={exportDailyOpenCsv} disabled={!displayedDailyOpen.length && !displayedDailySpend.length}>下载</Button>
+              </Tooltip>
+            }
           >
             {displayedDailyOpen.length > 0 || displayedDailySpend.length > 0 ? <EChartsComponent option={dailyOpenChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无按日开户数据'} />}
             <SourceLine keys={['fact_conv_appmarket', 'fact_plan_daily']} freshness={freshness} />
@@ -860,6 +941,11 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
                 <span>每日消耗量</span>
                 <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>自然日 · 按市场堆叠 · 来源 fact_plan_daily.花费 · 可拖动下方滑块缩放</span>
               </Space>
+            }
+            extra={
+              <Tooltip title="下载图表数据">
+                <Button size="small" icon={<DownloadOutlined />} onClick={exportDailySpendCsv} disabled={!displayedDailySpend.length}>下载</Button>
+              </Tooltip>
             }
           >
             {displayedDailySpend.length > 0 ? <EChartsComponent option={dailySpendChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无每日消耗数据'} />}

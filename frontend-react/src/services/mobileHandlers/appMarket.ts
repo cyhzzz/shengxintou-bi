@@ -88,7 +88,7 @@ export async function handleAppMarketFilterOptions(): Promise<any> {
 // ============================================================================
 // 应用市场消耗和成本 (app-market/cost-analysis)
 // ============================================================================
-const APP_MARKET_PLATFORMS = ['华为', '小米', '荣耀', 'oppo', 'vivo', '苹果'];
+const APP_MARKET_PLATFORMS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
 
 function _weekStart(dateStr: string): string {
   const d = new Date(dateStr);
@@ -104,29 +104,45 @@ export async function handleAppMarketCostAnalysis(body: any): Promise<any> {
   const ed = filters.end_date || '2026-12-31';
 
   // Part 1 & 2: 总体 + 分市场聚合
+  // 消耗（花费）来自 fact_plan_daily（广告计划维度明细），与后端/Web 口径统一；
+  // 开户数（开户人数）agg_vendor_daily 中为空，沿用其原列占位（移动端开户数以 Web 后端 fact_conv_appmarket 为准）。
   const marketWhere = buildWhere([
     dateClause('日期', sd, ed),
     { sql: '"花费" > 0', params: [] },
     inClause('平台', APP_MARKET_PLATFORMS),
   ]);
 
-  const marketSql = `SELECT "平台",
-    COALESCE(SUM("花费"), 0) as total_spend,
-    COALESCE(SUM("开户人数"), 0) as total_open
-    FROM agg_vendor_daily ${marketWhere.clause}
+  const spendSql = `SELECT "平台",
+    COALESCE(SUM("花费"), 0) as total_spend
+    FROM fact_plan_daily ${marketWhere.clause}
     GROUP BY "平台" ORDER BY "平台"`;
-  const marketRows = await querySql<Row>(marketSql, marketWhere.params);
+  const spendRows = await querySql<Row>(spendSql, marketWhere.params);
+  const spendMap: Record<string, number> = {};
+  for (const r of spendRows) spendMap[r['平台']] = round2(toFloat(r.total_spend));
+
+  const openWhere = buildWhere([
+    dateClause('日期', sd, ed),
+    { sql: '"花费" > 0', params: [] },
+    inClause('平台', APP_MARKET_PLATFORMS),
+  ]);
+  const openSql = `SELECT "平台",
+    COALESCE(SUM("开户人数"), 0) as total_open
+    FROM agg_vendor_daily ${openWhere.clause}
+    GROUP BY "平台" ORDER BY "平台"`;
+  const openRows = await querySql<Row>(openSql, openWhere.params);
+  const openMap: Record<string, number> = {};
+  for (const r of openRows) openMap[r['平台']] = toInt(r.total_open);
 
   const by_market: any[] = [];
   let total_spend = 0;
   let total_open = 0;
-  for (const r of marketRows) {
-    const spend = round2(toFloat(r.total_spend));
-    const openCnt = toInt(r.total_open);
+  for (const p of APP_MARKET_PLATFORMS) {
+    const spend = spendMap[p] || 0;
+    const openCnt = openMap[p] || 0;
     total_spend += spend;
     total_open += openCnt;
     by_market.push({
-      platform: r['平台'],
+      platform: p,
       total_spend: spend,
       total_open: openCnt,
       cost_per_open: openCnt > 0 ? round2(spend / openCnt) : 0,
@@ -142,7 +158,7 @@ export async function handleAppMarketCostAnalysis(body: any): Promise<any> {
   // Part 3: 月度消耗
   const monthSql = `SELECT substr("日期", 1, 7) as month, "平台",
     COALESCE(SUM("花费"), 0) as spend
-    FROM agg_vendor_daily ${marketWhere.clause}
+    FROM fact_plan_daily ${marketWhere.clause}
     GROUP BY month, "平台" ORDER BY month, "平台"`;
   const monthRows = await querySql<Row>(monthSql, marketWhere.params);
   const by_month = monthRows.map(r => ({
@@ -154,7 +170,7 @@ export async function handleAppMarketCostAnalysis(body: any): Promise<any> {
   // Part 4: 周度消耗（按 Python 侧周起始逻辑，查询日数据后按周聚合）
   const weekSql = `SELECT "日期", "平台",
     COALESCE(SUM("花费"), 0) as spend
-    FROM agg_vendor_daily ${marketWhere.clause}
+    FROM fact_plan_daily ${marketWhere.clause}
     GROUP BY "日期", "平台" ORDER BY "日期"`;
   const weekRows = await querySql<Row>(weekSql, marketWhere.params);
 

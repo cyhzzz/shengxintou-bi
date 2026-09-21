@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""应用市场 · 消耗和成本分析（v3.6.3）
+"""应用市场 · 消耗和成本分析（v4.4.0）
 
 数据源：
-  - 消耗：agg_vendor_daily（厂商日聚合，平台=应用市场）
+  - 消耗：fact_plan_daily（广告计划维度明细，平台=应用市场）
   - 开户数：fact_conv_appmarket 广告开户节点（是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1）
 维度：平台 ∈ {oppo, vivo, 荣耀, 小米, 华为, 鸿蒙, 苹果}（7 大应用市场）
 
@@ -14,7 +14,7 @@
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, and_, case
-from backend.models_v2 import AggVendorDaily, FactConvAppmarket
+from backend.models_v2 import FactPlanDaily, FactConvAppmarket
 from backend.database import db
 from backend.utils.calibers import AD_ACCOUNT_CONDITIONS, APP_MARKET_PLATFORMS
 from backend.utils.decorators import handle_exceptions
@@ -22,9 +22,9 @@ from backend.utils.decorators import handle_exceptions
 bp = Blueprint('app_market_cost', __name__, url_prefix='/api/v1/reports/app-market')
 
 _META = {
-    'version': 'v3.6.3',
-    'source_table': 'agg_vendor_daily + fact_conv_appmarket',
-    'note': '消耗来自 agg_vendor_daily.花费；开户数来自 fact_conv_appmarket 广告开户节点（资金账号+互联网引流+新开户）',
+    'version': 'v4.4.0',
+    'source_table': 'fact_plan_daily + fact_conv_appmarket',
+    'note': '消耗来自 fact_plan_daily.花费（广告计划维度明细）；开户数来自 fact_conv_appmarket 广告开户节点（资金账号+互联网引流+新开户）',
 }
 
 
@@ -58,17 +58,17 @@ def _app_market_open_map(platforms, sd, ed):
 
 
 def _base_query(sd, ed, platforms=None):
-    q = db.session.query(AggVendorDaily).filter(
+    q = db.session.query(FactPlanDaily).filter(
         and_(
-            AggVendorDaily.日期 >= sd,
-            AggVendorDaily.日期 <= ed,
-            AggVendorDaily.花费 > 0,
+            FactPlanDaily.日期 >= sd,
+            FactPlanDaily.日期 <= ed,
+            FactPlanDaily.花费 > 0,
         )
     )
     if platforms:
-        q = q.filter(AggVendorDaily.平台.in_(platforms))
+        q = q.filter(FactPlanDaily.平台.in_(platforms))
     else:
-        q = q.filter(AggVendorDaily.平台.in_(APP_MARKET_PLATFORMS))
+        q = q.filter(FactPlanDaily.平台.in_(APP_MARKET_PLATFORMS))
     return q
 
 
@@ -114,20 +114,20 @@ def cost_analysis():
 
     # ---- Part 1 & 2: 总体 + 分市场聚合 ----
     market_q = db.session.query(
-        AggVendorDaily.平台,
-        func.sum(AggVendorDaily.花费).label('total_spend'),
+        FactPlanDaily.平台,
+        func.sum(FactPlanDaily.花费).label('total_spend'),
     ).filter(
         and_(
-            AggVendorDaily.日期 >= sd,
-            AggVendorDaily.日期 <= ed,
-            AggVendorDaily.花费 > 0,
+            FactPlanDaily.日期 >= sd,
+            FactPlanDaily.日期 <= ed,
+            FactPlanDaily.花费 > 0,
         )
     )
     if platforms:
-        market_q = market_q.filter(AggVendorDaily.平台.in_(platforms))
+        market_q = market_q.filter(FactPlanDaily.平台.in_(platforms))
     else:
-        market_q = market_q.filter(AggVendorDaily.平台.in_(APP_MARKET_PLATFORMS))
-    market_q = market_q.group_by(AggVendorDaily.平台).order_by(AggVendorDaily.平台)
+        market_q = market_q.filter(FactPlanDaily.平台.in_(APP_MARKET_PLATFORMS))
+    market_q = market_q.group_by(FactPlanDaily.平台).order_by(FactPlanDaily.平台)
 
     spend_map = {row.平台: round(float(row.total_spend or 0), 2) for row in market_q.all()}
 
@@ -155,21 +155,21 @@ def cost_analysis():
 
     # ---- Part 3: 月度消耗 ----
     month_q = db.session.query(
-        func.substr(AggVendorDaily.日期, 1, 7).label('month'),
-        AggVendorDaily.平台,
-        func.sum(AggVendorDaily.花费).label('spend'),
+        func.substr(FactPlanDaily.日期, 1, 7).label('month'),
+        FactPlanDaily.平台,
+        func.sum(FactPlanDaily.花费).label('spend'),
     ).filter(
         and_(
-            AggVendorDaily.日期 >= sd,
-            AggVendorDaily.日期 <= ed,
-            AggVendorDaily.花费 > 0,
+            FactPlanDaily.日期 >= sd,
+            FactPlanDaily.日期 <= ed,
+            FactPlanDaily.花费 > 0,
         )
     )
     if platforms:
-        month_q = month_q.filter(AggVendorDaily.平台.in_(platforms))
+        month_q = month_q.filter(FactPlanDaily.平台.in_(platforms))
     else:
-        month_q = month_q.filter(AggVendorDaily.平台.in_(APP_MARKET_PLATFORMS))
-    month_q = month_q.group_by('month', AggVendorDaily.平台).order_by('month', AggVendorDaily.平台)
+        month_q = month_q.filter(FactPlanDaily.平台.in_(APP_MARKET_PLATFORMS))
+    month_q = month_q.group_by('month', FactPlanDaily.平台).order_by('month', FactPlanDaily.平台)
 
     by_month = []
     for row in month_q.all():
@@ -182,21 +182,21 @@ def cost_analysis():
     # ---- Part 4: 周度消耗 ----
     # 由于数据库没有周字段，用 Python 侧按日期聚合
     week_rows = db.session.query(
-        AggVendorDaily.日期,
-        AggVendorDaily.平台,
-        func.sum(AggVendorDaily.花费).label('spend'),
+        FactPlanDaily.日期,
+        FactPlanDaily.平台,
+        func.sum(FactPlanDaily.花费).label('spend'),
     ).filter(
         and_(
-            AggVendorDaily.日期 >= sd,
-            AggVendorDaily.日期 <= ed,
-            AggVendorDaily.花费 > 0,
+            FactPlanDaily.日期 >= sd,
+            FactPlanDaily.日期 <= ed,
+            FactPlanDaily.花费 > 0,
         )
     )
     if platforms:
-        week_rows = week_rows.filter(AggVendorDaily.平台.in_(platforms))
+        week_rows = week_rows.filter(FactPlanDaily.平台.in_(platforms))
     else:
-        week_rows = week_rows.filter(AggVendorDaily.平台.in_(APP_MARKET_PLATFORMS))
-    week_rows = week_rows.group_by(AggVendorDaily.日期, AggVendorDaily.平台).order_by(AggVendorDaily.日期)
+        week_rows = week_rows.filter(FactPlanDaily.平台.in_(APP_MARKET_PLATFORMS))
+    week_rows = week_rows.group_by(FactPlanDaily.日期, FactPlanDaily.平台).order_by(FactPlanDaily.日期)
 
     week_agg = {}
     for row in week_rows.all():

@@ -10,12 +10,13 @@
  *   3. 归因转化率明细（按周折叠，可展开查看每日，降序排列）
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Card, Spin, Table, Tag, Select, Button, Space } from 'antd';
-import { RiseOutlined } from '@ant-design/icons';
+import { Card, Spin, Table, Tag, Select, Button, Space, Tooltip } from 'antd';
+import { RiseOutlined, DownloadOutlined } from '@ant-design/icons';
 import EChartsComponent from '@/components/Chart/ECharts';
 import { FadeInSection, ReportFooter, FilterBar } from '@/components';
 import { dataServiceReports } from '@/services/dataService';
 import { metadataService, type DataFreshness } from '@/services/metadataService';
+import { downloadCsv } from '@/utils/downloadCsv';
 import { useReportData } from '@/hooks/useReportData';
 import { useFilterStore } from '@/stores';
 import type { EChartsOption } from 'echarts';
@@ -432,6 +433,41 @@ const AttributionConversionPage: React.FC = () => {
     },
   ];
 
+  // ---- 图表「下载」：导出各图表对应数据（需求：每个图表右上角下载按钮） ----
+  const exportStepCsv = (step: typeof rateSteps[number]) => {
+    if (!sortedWeekly.length) return;
+    const headers = ['周起始', '周结束', `${step.name}(%)`];
+    const rows = sortedWeekly.map((w: WeeklyRow) => {
+      const v = (w[step.key as keyof WeeklyRow] as number) || 0;
+      return [w.week_start, w.week_end, Math.round(v * 10000) / 100];
+    });
+    downloadCsv(`归因转化率_${step.name}_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
+  const exportDetailCsv = () => {
+    if (!tableData.length) return;
+    const headers = [
+      '类型', '下载日期', '星期', '周',
+      '激活', '开户注册', '身份证', '银行卡', '提交开户', '开户成功', '广告开户',
+      '激活→开户注册(%)', '开户注册→身份证(%)', '身份证→银行卡(%)', '银行卡→提交开户(%)', '提交开户→开户成功(%)', '开户成功→广告开户(%)',
+    ];
+    const pct = (v: number) => Math.round((v || 0) * 10000) / 100;
+    const rows2: (string | number)[][] = [];
+    const pushRow = (r: TableRow, type: string) => {
+      rows2.push([
+        type, r.date, r.weekday, r.weekLabel,
+        r.activate, r.register, r.id_card, r.bank_card, r.submit, r.success, r.ad_account,
+        pct(r.rate_activate_register), pct(r.rate_register_idcard), pct(r.rate_idcard_bankcard),
+        pct(r.rate_bankcard_submit), pct(r.rate_submit_success), pct(r.rate_success_adaccount),
+      ]);
+    };
+    tableData.forEach((r) => {
+      pushRow(r, '周合计');
+      (r.children || []).forEach((c) => pushRow(c, '每日'));
+    });
+    downloadCsv(`归因转化率_明细_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows2);
+  };
+
   return (
     <div className={styles.page}>
       {/* 筛选器：FilterBar（日期范围 + 查询/重置）+ 平台单选 */}
@@ -479,11 +515,16 @@ const AttributionConversionPage: React.FC = () => {
               <>
                 {rateSteps.map((step, i) => (
                   <div key={step.key} style={{ marginBottom: i < rateSteps.length - 1 ? 14 : 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 600, marginBottom: 2, paddingLeft: 8,
-                      color: step.color, borderLeft: `3px solid ${step.color}`,
-                    }}>
-                      {step.name}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, paddingLeft: 8,
+                        color: step.color, borderLeft: `3px solid ${step.color}`,
+                      }}>
+                        {step.name}
+                      </div>
+                      <Tooltip title="下载该指标数据">
+                        <Button size="small" type="text" icon={<DownloadOutlined />} onClick={() => exportStepCsv(step)} />
+                      </Tooltip>
                     </div>
                     <EChartsComponent option={chartOptions[i]} style={{ height: 200 }} />
                   </div>
@@ -512,6 +553,9 @@ const AttributionConversionPage: React.FC = () => {
                 <span style={{ color: '#999', fontSize: 12 }}>
                   共 {allParentKeys.length} 周
                 </span>
+                <Tooltip title="下载明细数据">
+                  <Button size="small" icon={<DownloadOutlined />} onClick={exportDetailCsv} disabled={!tableData.length}>下载</Button>
+                </Tooltip>
                 <Button
                   size="small"
                   onClick={() => {
