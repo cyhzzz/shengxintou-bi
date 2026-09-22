@@ -734,35 +734,35 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       itemStyle: { color: pickEChartsColor(i % 12), opacity: 0.9 },
       barMaxWidth: 26,
     }));
-    // 每日消耗合计：用 markPoint 在每根堆叠柱顶部标注当日合计值。
-    // 关键点：原方案用「透明叠层柱(opacity:0)+label」在本项目 Canvas 渲染器 + LabelLayout 下标签会被吞掉；
-    // markPoint 是独立图形元素，不受 LabelLayout 隐藏、也不依赖透明柱渲染，跨渲染器稳定。
+    // 每日消耗合计：用独立 stack + barGap:'-100%' 的透明叠层柱，仅在柱顶显示当日合计标签。
+    // 注意：itemStyle 只设 color:'transparent'，不要加 opacity:0；ECharts Canvas 渲染器下 opacity:0 会连 label 一起吞掉。
     const dailySpendTotals = dates.map((d) => {
       let t = 0;
       markets.forEach((m) => { t += spendMap.get(`${m}|${d}`) || 0; });
       return Math.round(t * 100) / 100;
     });
-    if (series.length) {
-      series[0] = {
-        ...series[0],
-        markPoint: {
-          symbol: 'circle',
-          symbolSize: 0,
-          itemStyle: { opacity: 0 },
-          label: {
-            show: true,
-            position: 'top',
-            formatter: (p: any) => fmtMoney(p.value),
-            color: '#333',
-            fontWeight: 'bold',
-            fontSize: 11,
-          },
-          tooltip: { show: false },
-          silent: true,
-          data: dates.map((d, i) => ({ coord: [d, dailySpendTotals[i]], value: dailySpendTotals[i] })),
-        },
-      };
-    }
+    series.push({
+      name: '每日消耗合计',
+      type: 'bar' as const,
+      stack: 'spendTotal',
+      data: dailySpendTotals,
+      barGap: '-100%',
+      itemStyle: { color: 'transparent' as const },
+      label: {
+        show: true,
+        position: 'top',
+        formatter: (p: any) => fmtMoney(p.value),
+        color: '#333',
+        fontWeight: 'bold',
+        fontSize: 11,
+      },
+      tooltip: { show: false },
+      silent: true,
+      z: 11,
+      barMaxWidth: 26,
+      emphasis: { disabled: true },
+      labelLayout: { hideOverlap: true },
+    });
     return {
       tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       legend: { data: markets, top: 0, type: 'scroll' },

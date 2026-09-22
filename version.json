@@ -1,10 +1,10 @@
 {
-    "version": "4.4.2",
+    "version": "4.4.3",
     "release_date": "2026-09-22",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
-        "v4.4.2 修复「每日消耗量」柱顶当日消耗合计标签在 Canvas 环境不显示：v4.4.0 引入的「透明叠层柱(opacity:0)+柱顶 label」套路在本项目 Canvas 渲染器 + LabelLayout 特性下标签被吞（此前仅 SVG SSR 验证误判为生效）；改用 series[0].markPoint 在每根堆叠柱顶部按(日期,当日合计)标注合计值，markPoint 为独立图形元素、不受 LabelLayout 隐藏且不依赖透明柱渲染，跨渲染器稳定。纯前端改动（AdPlanAnalysis.tsx），后端/路由/跨端契约未变",
+        "v4.4.3 修复「每日消耗量」柱顶合计标签真正可显示：v4.4.0 用「透明叠层柱」但 itemStyle 带了 opacity:0，v4.4.2 改用 markPoint(symbolSize:0/opacity:0)，两者在 Canvas 渲染器下都会把标签吞掉；实测根因是「opacity:0 或 symbolSize:0 会使标签一起不可见」。改为独立 stack + barGap:'-100%' 的透明叠层柱，itemStyle 仅 color:'transparent'（不加 opacity:0），柱顶 label 正常显示；同时加 labelLayout:{hideOverlap:true}，日期范围大时自动隐藏重叠标签、缩放后可看清。纯前端改动（AdPlanAnalysis.tsx），后端/路由/跨端契约未变",
         "v4.4.1 应用市场·广告计划分析下载能力增强：按周分计划分析卡片右上角新增下载按钮（导出所选周全部计划数据，含市场/计划名与 21 项漏斗指标，不受前端分页限制）；分计划分析每张计划卡片右上角新增下载按钮（导出该计划「汇总数据 + 逐周明细」到同一份 CSV，两段以空行分隔）。每日消耗量柱顶当日消耗合计值已于 v4.4.0 落地，本次不重复。纯前端改动（AdPlanAnalysis.tsx），后端/路由/跨端契约未变",
         "v4.4.0 应用市场三处优化合并发版：①广告计划分析/归因转化率每个图表右上角新增下载按钮（导出对应 CSV，归因转化率 6 张趋势图各自独立下载、明细表独立下载）；②广告计划分析·每日消耗量柱状图每个柱顶新增当日消耗合计值；③消耗和成本报表消耗数据由厂商广告投放分析(agg_vendor_daily)切换为广告计划维度明细(fact_plan_daily)，与广告计划分析口径统一（后端 ad_market_cost + 移动端 handler 同步切换消耗查询、开户数沿用 fact_conv_appmarket 复合条件），并补齐「数据来源 + 截止日期」溯源，明细覆盖至 2026-09-19 比聚合表更全、各市场消耗数值整体上调",
         "v4.3.9 应用市场·归因转化率报表新增数据溯源：周度转化率趋势与归因转化率明细两块图表下方各新增「数据来源 + 更新截止日期」小字（复用 SourceLine 组件、拉取 /api/v1/data-freshness 的 fact_conv_appmarket 最新日期），纯前端展示、三端契约不变",
