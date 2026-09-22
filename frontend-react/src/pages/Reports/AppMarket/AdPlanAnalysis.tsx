@@ -278,6 +278,19 @@ const fetchAdPlanAnalysis = async (query: AdPlanQuery): Promise<any> => {
 // 分计划分析：单条计划卡片（React.memo 隔离，避免切换周/聚类等无关状态变化导致全员重渲染）。
 // 汇总用单行 Table，周明细用 Collapse（antd 默认展开时才会挂载子表 → 惰性渲染，不展开不产生额外 DOM）。
 const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
+  // 需求3：每条计划卡片右上角下载按钮 —— 导出该计划的「汇总数据」+「逐周明细」到同一 CSV
+  const exportPlanCsv = () => {
+    const sumHeaders = ['应用市场', '广告分组名称', '广告分组ID', '版位', '子版位', '出价', ...METRIC_COLS.map((c) => c.title)];
+    const sumRow = [
+      pl.market, pl.plan_name, pl.plan_id, pl.placement, pl.sub_placement, pl.bid,
+      ...METRIC_COLS.map((c) => pl.summary[c.key] ?? ''),
+    ];
+    const weekHeader = ['周（上周五~本周四）', ...METRIC_COLS.map((c) => c.title)];
+    const weekRows = pl.weeks.map((w) => [weekLabel(w.week_start, w.week_end), ...METRIC_COLS.map((c) => (w as any)[c.key] ?? '')]);
+    // 单一 CSV 内两段：先计划汇总（单行），空行分隔，再逐周明细
+    const rows: (string | number | null)[][] = [sumRow, [''], weekHeader, ...weekRows];
+    downloadCsv(`广告计划分析_分计划_${sanitizeText(pl.plan_name)}_${pl.plan_id}_${new Date().toISOString().slice(0, 10)}.csv`, sumHeaders, rows);
+  };
   return (
     <Card
       size="small"
@@ -290,6 +303,11 @@ const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
             ID: {pl.plan_id} · 版位: {sanitizeText(pl.placement)} / {sanitizeText(pl.sub_placement)} · 出价: {sanitizeText(pl.bid)}
           </span>
         </Space>
+      }
+      extra={
+        <Tooltip title="下载该计划的汇总与逐周明细">
+          <Button size="small" icon={<DownloadOutlined />} onClick={exportPlanCsv}>下载</Button>
+        </Tooltip>
       }
     >
       <div style={{ marginBottom: 6, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
@@ -814,6 +832,15 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     downloadCsv(`广告计划分析_每日消耗量_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
+  // 需求2：按周分计划分析 —— 下载「所选周」的全部计划数据（不受前端分页限制，导出完整列表）
+  const exportWeekPlanCsv = () => {
+    const headers = ['应用市场', '广告分组名称', ...METRIC_COLS.map((c) => c.title)];
+    const rows = (selectedWeekPlans || []).map((r) => [
+      r.market, r.plan_name, ...METRIC_COLS.map((c) => (r as any)[c.key] ?? ''),
+    ]);
+    downloadCsv(`广告计划分析_按周分计划_${selectedWeek || '全部'}_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
   const currentMarketLabel =
     markets.length && selected.length === markets.length
       ? '全部应用市场'
@@ -966,13 +993,18 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               </Space>
             }
             extra={
-              <Select
-                style={{ width: 190 }}
-                value={selectedWeek}
-                placeholder="选择周"
-                onChange={(v) => setSelectedWeek(v)}
-                options={(weeks || []).map((ws) => ({ label: `${weekLabel(ws)}（周五起）`, value: ws }))}
-              />
+              <Space size={8}>
+                <Select
+                  style={{ width: 190 }}
+                  value={selectedWeek}
+                  placeholder="选择周"
+                  onChange={(v) => setSelectedWeek(v)}
+                  options={(weeks || []).map((ws) => ({ label: `${weekLabel(ws)}（周五起）`, value: ws }))}
+                />
+                <Tooltip title="下载所选周的计划分析数据">
+                  <Button size="small" icon={<DownloadOutlined />} onClick={exportWeekPlanCsv} disabled={!selectedWeekPlans.length}>下载</Button>
+                </Tooltip>
+              </Space>
             }
           >
             <Table
