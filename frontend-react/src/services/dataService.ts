@@ -363,6 +363,10 @@ export const dataServiceReports = {
   }) => {
     return http.post('/reports/app-market/ad-plan-analysis', params);
   },
+  // v4.4.4 应用市场 · A股成交金额（系统自主从东方财富获取，无需上传）
+  getAppMarketAshareTurnover: async (start_date: string, end_date: string) => {
+    return http.post('/reports/app-market/ashare-turnover', { filters: { start_date, end_date } });
+  },
   // v4.1.9 智能辅助诊断（数据健康度按月体检，只读聚合）
   getIntelligentDiagnosis: async (params?: { month?: string }) => {
     return http.get('/reports/diagnosis', params);

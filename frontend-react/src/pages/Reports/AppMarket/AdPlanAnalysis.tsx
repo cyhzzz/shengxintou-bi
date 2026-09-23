@@ -13,6 +13,7 @@
  *   三、按周开户量柱状图（每周广告开户量，图上显示数值）
  *   三(a)、按日开户量柱状图（自然日·按市场堆叠·副坐标=当日开户成本）
  *   三(b)、每日消耗量柱状图（自然日·按市场堆叠，来源 fact_plan_daily.花费）
+ *   三(c)、每日开户量 vs A股成交额（双坐标：主=每日总计广告开户量，副=当日A股成交金额，东方财富自主获取）
  *   四、按周分计划分析（周度筛选，各计划按该周消耗降序，含完整漏斗指标）
  *   五、广告聚类分析（周度筛选：版位 / 子版位 / 版位+子版位 / 出价 × 消耗 / 广告开户量 / 广告开户成本）
  *   六、分计划分析（每条计划一个模块：汇总数据 + 「+」按周展开逐周明细）
@@ -275,6 +276,18 @@ const fetchAdPlanAnalysis = async (query: AdPlanQuery): Promise<any> => {
   return res.data;
 };
 
+// v4.4.4 A股成交金额：系统自主从东方财富公开行情接口拉取（后端代理 + 缓存），无需用户上传。
+// 返回 data.data.{ turnover:[{date, amount}], source, note }。
+const fetchAshareTurnover = async (query: AdPlanQuery): Promise<any> => {
+  const res: any = await dataServiceReports.getAppMarketAshareTurnover(query.start_date, query.end_date);
+  if (!res?.success || !res.data) throw new Error(res?.message || '加载A股成交金额失败');
+  return res.data;
+};
+
+// 金额（元）→ 亿元 文本，A股成交额量级大，统一以「亿」展示
+const fmtYi = (v: number | null | undefined) =>
+  v == null ? '-' : `¥${Number(v / 1e8).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}亿`;
+
 // 分计划分析：单条计划卡片（React.memo 隔离，避免切换周/聚类等无关状态变化导致全员重渲染）。
 // 汇总用单行 Table，周明细用 Collapse（antd 默认展开时才会挂载子表 → 惰性渲染，不展开不产生额外 DOM）。
 const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
@@ -360,6 +373,11 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     errorMessage: '加载广告计划分析失败',
   });
 
+  // v4.4.4 A股成交金额（自主从东方财富获取，随日期区间变化重拉）
+  const { data: ashareData, loading: ashareLoading, load: loadAshare } = useReportData(fetchAshareTurnover, {
+    errorMessage: '加载A股成交金额失败',
+  });
+
   // 主取数：单 data 派生全部报表数据（接口字段映射为页面变量名，下游零改动）
   const markets: string[] = data?.platforms || INITIAL_MARKETS;
   const overview: Overview = data?.overview || { total_open: 0, total_spend: 0, total_open_cost: null };
@@ -375,6 +393,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   // 仅日期范围变化触发重查；应用市场切换完全本地过滤（瞬时响应）
   useEffect(() => {
     load({ start_date: dateRange.startDate, end_date: dateRange.endDate });
+    loadAshare({ start_date: dateRange.startDate, end_date: dateRange.endDate });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.startDate, dateRange.endDate]);
 
@@ -480,6 +499,23 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
     () => dailySpend.filter((w) => w.market && activeMarkets.has(w.market)),
     [dailySpend, activeMarkets],
   );
+
+  // ---- v4.4.4 每日总计广告开户量（主坐标）：跨所选市场按自然日求和 ----
+  const dailyOpenTotal: DailyOpenPoint[] = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const o of displayedDailyOpen) {
+      acc.set(o.date, (acc.get(o.date) || 0) + o.open_count);
+    }
+    return [...acc.entries()].map(([date, open_count]) => ({ date, open_count })).sort((a, b) => (a.date > b.date ? 1 : -1));
+  }, [displayedDailyOpen]);
+
+  // ---- v4.4.4 A股成交金额（副坐标）：按日期索引，取自主从东方财富获取的值 ----
+  const ashareMap: Map<string, number | null> = useMemo(() => {
+    const m = new Map<string, number | null>();
+    const list: any[] = (ashareData as any)?.turnover || [];
+    for (const r of list) m.set(r.date, r.amount ?? null);
+    return m;
+  }, [ashareData]);
 
   // ---- 分计划展开（按所选应用市场筛选） ----
   const displayedPlanWeekDetail: PlanWeekDetail[] = useMemo(
@@ -770,9 +806,81 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
       yAxis: [{ type: 'value', name: '消耗(元)', position: 'left' }],
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
-      series,
+    series,
+  };
+}, [displayedDailySpend]);
+
+  // ---- v4.4.4 每日开户量 vs A股成交额（双坐标）：主坐标=每日总计广告开户量(柱)，副坐标=当日A股成交金额(线) ----
+  // 主坐标按自然日、所选市场合计；副坐标 A 股成交额由系统自主从东方财富获取（按日期对齐，非交易日为断点）。
+  const dailyOpenVsAshareOption: EChartsOption = useMemo(() => {
+    const opens = dailyOpenTotal;
+    if (!opens.length) return {};
+    const dates = opens.map((o) => o.date);
+    const openData = opens.map((o) => o.open_count);
+    const ashareData = dates.map((d) => {
+      const v = ashareMap.get(d);
+      return v == null ? null : Math.round(v); // 元；折线轴 formatter 转「亿」
+    });
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const i = params?.[0]?.dataIndex ?? -1;
+          const d = dates[i];
+          if (!d) return '';
+          const oc = opens[i]?.open_count || 0;
+          const av = ashareMap.get(d);
+          return `${d}<br/>广告开户量：<strong>${oc.toLocaleString()}</strong>`
+            + `<br/>A股成交金额：<strong>${av == null ? '非交易日' : fmtYi(av)}</strong>`;
+        },
+      },
+      legend: { data: ['广告开户量', 'A股成交金额'], top: 0 },
+      grid: { left: '3%', right: '4%', bottom: '16%', top: '12%', containLabel: true },
+      xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } },
+      yAxis: [
+        { type: 'value', name: '广告开户量', position: 'left' },
+        {
+          type: 'value',
+          name: 'A股成交金额(亿元)',
+          position: 'right',
+          axisLabel: { formatter: (v: number) => `${(v / 1e8).toFixed(0)}亿` },
+          splitLine: { show: false },
+        },
+      ],
+      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 4 }],
+      series: [
+        {
+          name: '广告开户量',
+          type: 'bar',
+          yAxisIndex: 0,
+          data: openData,
+          barMaxWidth: 26,
+          itemStyle: { color: pickEChartsColor(0), opacity: 0.85, borderRadius: [4, 4, 0, 0] },
+          label: { show: true, position: 'top', fontSize: 10, formatter: (p: any) => Number(p.value || 0).toLocaleString() },
+        },
+        {
+          name: 'A股成交金额',
+          type: 'line',
+          yAxisIndex: 1,
+          data: ashareData,
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          connectNulls: false, // 非交易日断点
+          itemStyle: { color: pickEChartsColor(1) },
+          lineStyle: { width: 2 },
+          label: {
+            show: true,
+            position: 'bottom',
+            fontSize: 10,
+            color: pickEChartsColor(1),
+            formatter: (p: any) => (p.value == null ? '' : fmtYi(p.value)),
+          },
+        },
+      ],
     };
-  }, [displayedDailySpend]);
+  }, [dailyOpenTotal, ashareMap]);
 
   const exportPlanCsv = () => {
     if (!displayedPlanDetail.length) return;
@@ -833,6 +941,21 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
       .map((s) => [s.date, s.market, Math.round(s.spend * 100) / 100])
       .sort((a, b) => (a[0] as string).localeCompare(b[0] as string));
     downloadCsv(`广告计划分析_每日消耗量_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  };
+
+  // v4.4.4 每日开户量 vs A股成交额：下载合并明细（日期、广告开户量、A股成交金额(元/亿元)）
+  const exportOpenVsAshareCsv = () => {
+    const headers = ['日期', '广告开户量', 'A股成交金额(元)', 'A股成交金额(亿元)'];
+    const rows = dailyOpenTotal.map((o) => {
+      const av = ashareMap.get(o.date);
+      return [
+        o.date,
+        o.open_count,
+        av == null ? '' : Math.round(av),
+        av == null ? '' : Math.round((av / 1e8) * 100) / 100,
+      ];
+    });
+    downloadCsv(`广告计划分析_每日开户量vsA股成交额_${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   };
 
   // 需求2：按周分计划分析 —— 下载「所选周」的全部计划数据（不受前端分页限制，导出完整列表）
@@ -980,6 +1103,35 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
           >
             {displayedDailySpend.length > 0 ? <EChartsComponent option={dailySpendChartOption} height={380} /> : <Empty description={loading ? '加载中...' : '暂无每日消耗数据'} />}
             <SourceLine keys={['fact_plan_daily']} freshness={freshness} />
+          </Card>
+        </FadeInSection>
+
+        {/* 三(c)、每日开户量 vs A股成交额（双坐标：主=每日总计广告开户量，副=当日A股成交金额） */}
+        <FadeInSection delay={0.45} duration={0.8}>
+          <Card
+            size="small"
+            className={styles.tableCard}
+            title={
+              <Space size={8} align="center">
+                <FundOutlined style={{ color: 'var(--color-brand)' }} />
+                <span>每日开户量 vs A股成交额</span>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--text-sm)' }}>主坐标=每日总计广告开户量(柱) · 副坐标=当日A股成交金额(线，自主从东方财富获取) · 可拖动下方滑块缩放</span>
+              </Space>
+            }
+            extra={
+              <Tooltip title="下载图表数据">
+                <Button size="small" icon={<DownloadOutlined />} onClick={exportOpenVsAshareCsv} disabled={!dailyOpenTotal.length}>下载</Button>
+              </Tooltip>
+            }
+          >
+            {dailyOpenTotal.length > 0 ? (
+              <EChartsComponent option={dailyOpenVsAshareOption} height={380} />
+            ) : (
+              <Empty description={loading || ashareLoading ? '加载中...' : '暂无每日开户数据'} />
+            )}
+            <div style={{ marginTop: 8, color: 'var(--color-text-tertiary)', fontSize: '12px', lineHeight: 1.5 }}>
+              数据来源：广告开户量 = fact_conv_appmarket（资金账号创建完成时间·所选市场合计）；A股成交金额 = 东方财富（上证指数 + 深证成指 成交额，系统自主联网获取并缓存，无需上传）。非交易日 A 股无成交，折线自动断点。
+            </div>
           </Card>
         </FadeInSection>
 
@@ -1192,7 +1344,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             { label: '广告开户成本', value: '消耗 ÷ 广告开户量（广告开户量为 0 时不可计算，展示 -）' },
             { label: '周度开户成本(副坐标)', value: '按周五起始周：该周消耗(fact_plan_daily.花费，按 平台 + 日期 的周五起始周聚合) ÷ 该周开户量(资金账号创建完成时间 的周五起始周聚合)；两者均按同一周五起始周 + 同一日期区间筛选，消耗日期与开户量日期统一' },
           ]}
-          notes="广告计划分析将「计划分解维度」与「下载链路开户」和「投放消耗」打通：开户概览与按周开户量看整体量能与节奏；按周分计划看各计划每周消耗与全链路转化表现（默认最新一周，可切换）；广告聚类分析按所选周对版位/子版位/出价做 消耗·广告开户量·广告开户成本 的聚类对比；分计划展开可下钻每条计划的逐周明细。周度口径统一为上周五~本周四。注意：苹果/鸿蒙无计划分解，仅参与市场级统计，不进入计划级明细。"
+          notes="广告计划分析将「计划分解维度」与「下载链路开户」和「投放消耗」打通：开户概览与按周开户量看整体量能与节奏；按周分计划看各计划每周消耗与全链路转化表现（默认最新一周，可切换）；广告聚类分析按所选周对版位/子版位/出价做 消耗·广告开户量·广告开户成本 的聚类对比；分计划展开可下钻每条计划的逐周明细。每日消耗量(三b) 看投放花费节奏，「每日开户量 vs A股成交额(三c)」叠加 A 股大盘成交金额（东方财富，系统自主联网获取并缓存，无需上传），用于对比当日开户效果与市场热度。周度口径统一为上周五~本周四。注意：苹果/鸿蒙无计划分解，仅参与市场级统计，不进入计划级明细。"
         />
       </FadeInSection>
     </div>

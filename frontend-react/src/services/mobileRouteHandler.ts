@@ -10,7 +10,7 @@
  * - 内容平台存量剔除：是否为存量客户 = 0 OR IS NULL
  */
 import { handleOmniChannelSummary, handleOmniChannelFilterOptions, handleOmniChannelDailyCalendar, handleOmniChannelDailyTrend, handleOmniChannelByChannel } from './mobileHandlers/omniChannel';
-import { handleAppMarketFunnel, handleAppMarketFilterOptions, handleAppMarketSummary, handleAppMarketDetail, handleAppMarketCostAnalysis, handleAppMarketAttributionConversion, handleAppMarketPlanAnalysis, handleAppMarketCreative, handleAppMarketAdPlanAnalysis } from './mobileHandlers/appMarket';
+import { handleAppMarketFunnel, handleAppMarketFilterOptions, handleAppMarketSummary, handleAppMarketDetail, handleAppMarketCostAnalysis, handleAppMarketAttributionConversion, handleAppMarketPlanAnalysis, handleAppMarketCreative, handleAppMarketAdPlanAnalysis, handleAppMarketAshareTurnover } from './mobileHandlers/appMarket';
 import { handleDashboardCoreMetrics, handleDashboardTrendData } from './mobileHandlers/dashboard';
 import { handleCostAnalysis } from './mobileHandlers/costAnalysis';
 import { handleAgencyAnalysis } from './mobileHandlers/agencyAnalysis';
@@ -123,6 +123,9 @@ export async function mobileRouteHandler(url: string, body: any, method?: string
     // 广告计划分析（计划周粒度漏斗，结合 dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily）
     case 'reports/app-market/ad-plan-analysis':
       return handleAppMarketAdPlanAnalysis(body);
+    // 应用市场 · A股成交金额（自主从东方财富获取，无需上传）
+    case 'reports/app-market/ashare-turnover':
+      return handleAppMarketAshareTurnover(body);
     case 'reports/app-market/attribution-conversion':
       return handleAppMarketAttributionConversion(body);
 

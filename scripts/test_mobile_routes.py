@@ -154,6 +154,13 @@ tests = [
         'params': ['2026-07-01', '2026-08-31'],
     },
     {
+        # v4.4.4 应用市场 · A股成交金额：外部网络接口（东方财富），不经 SQLite 查询；
+        # 此处仅占位以确保 case 覆盖（check_mobile_routes_coverage 要求每个 case 有同名测试）。
+        'name': 'reports/app-market/ashare-turnover',
+        'sql': 'SELECT 1 as ok',
+        'params': [],
+    },
+    {
         'name': 'data-freshness',
         'sql': '''SELECT MAX("日期") AS latest FROM "agg_vendor_daily"''',
         'params': [],

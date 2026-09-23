@@ -1,9 +1,10 @@
 {
-    "version": "4.4.3",
-    "release_date": "2026-09-22",
+    "version": "4.4.4",
+    "release_date": "2026-09-23",
     "version_rule": "MAJOR.MINOR.PATCH，PATCH 为个位数（0-9），到 9 后进位到 MINOR。不出现两位数字的 PATCH 号。",
     "changelog_format": "每个版本一句话（动词 + 主题 + 范围）。历史详情见 git log / release notes。",
     "changelog": [
+        "v4.4.4 应用市场·广告计划分析新增「每日开户量 vs A股成交额」双坐标图（位于每日消耗量之后）：主坐标=所选市场每日总计广告开户量(柱，fact_conv_appmarket 资金账号创建完成时间·按市场合计)，副坐标=当日 A 股成交金额(线)。A股成交金额由系统自主从东方财富公开行情接口获取（后端新增 /api/v1/reports/app-market/ashare-turnover，沪市上证指数+深市深证成指成交额按自然日求和，按日期缓存到 USER_DATA_DIR/cache 仅首次访问对应区间时联网，无需用户上传；非交易日无成交自动断点），移动端 handler 直接 fetch 东方财富同源实现、并对齐跨端契约与测试。配套新增图表下载按钮(CSV) 与数据溯源说明",
         "v4.4.3 修复「每日消耗量」柱顶合计标签真正可显示：v4.4.0 用「透明叠层柱」但 itemStyle 带了 opacity:0，v4.4.2 改用 markPoint(symbolSize:0/opacity:0)，两者在 Canvas 渲染器下都会把标签吞掉；实测根因是「opacity:0 或 symbolSize:0 会使标签一起不可见」。改为独立 stack + barGap:'-100%' 的透明叠层柱，itemStyle 仅 color:'transparent'（不加 opacity:0），柱顶 label 正常显示；同时加 labelLayout:{hideOverlap:true}，日期范围大时自动隐藏重叠标签、缩放后可看清。纯前端改动（AdPlanAnalysis.tsx），后端/路由/跨端契约未变",
         "v4.4.1 应用市场·广告计划分析下载能力增强：按周分计划分析卡片右上角新增下载按钮（导出所选周全部计划数据，含市场/计划名与 21 项漏斗指标，不受前端分页限制）；分计划分析每张计划卡片右上角新增下载按钮（导出该计划「汇总数据 + 逐周明细」到同一份 CSV，两段以空行分隔）。每日消耗量柱顶当日消耗合计值已于 v4.4.0 落地，本次不重复。纯前端改动（AdPlanAnalysis.tsx），后端/路由/跨端契约未变",
         "v4.4.0 应用市场三处优化合并发版：①广告计划分析/归因转化率每个图表右上角新增下载按钮（导出对应 CSV，归因转化率 6 张趋势图各自独立下载、明细表独立下载）；②广告计划分析·每日消耗量柱状图每个柱顶新增当日消耗合计值；③消耗和成本报表消耗数据由厂商广告投放分析(agg_vendor_daily)切换为广告计划维度明细(fact_plan_daily)，与广告计划分析口径统一（后端 ad_market_cost + 移动端 handler 同步切换消耗查询、开户数沿用 fact_conv_appmarket 复合条件），并补齐「数据来源 + 截止日期」溯源，明细覆盖至 2026-09-19 比聚合表更全、各市场消耗数值整体上调",

@@ -12,6 +12,8 @@
 # v4.2.0: LLM 配置与分析缓存（dev 模式 USER_DATA_DIR 在项目根，含 api_key 勿入库）
 llm_config.json
 llm_analysis_cache/
+# runtime cache（USER_DATA_DIR/cache，含自动拉取的行情等，勿入库）
+cache/
 
 # ===== 数据库文件 =====
 *.db

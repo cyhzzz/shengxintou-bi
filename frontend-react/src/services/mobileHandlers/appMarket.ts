@@ -1110,3 +1110,67 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     plan_week_detail,
   };
 }
+
+// ============================================================================
+// 应用市场 · A股成交金额 (reports/app-market/ashare-turnover)
+// 系统自主从东方财富公开行情接口拉取（沪市上证指数 + 深市深证成指 成交额），无需上传。
+// 与 backend/routes/reports/app_market_ashare.py 口径一致；移动端 webview 直接 fetch 第三方接口。
+// 仅返回纯数据对象（http.ts 移动端路径会包装为 { success, data }）。
+// ============================================================================
+
+function _ashareDateRange(sd: string, ed: string): string[] {
+  const out: string[] = [];
+  const start = new Date(sd + 'T00:00:00');
+  const end = new Date(ed + 'T00:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+async function _ashareFetchOne(secid: string, beg: string, end: string): Promise<Record<string, number>> {
+  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}`
+    + `&fields1=f1,f2,f3&fields2=f51,f57&klt=101&fqt=1&beg=${beg}&end=${end}`;
+  const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://quote.eastmoney.com/' } });
+  const json = await resp.json();
+  const klines: string[] = (json?.data?.klines) || [];
+  const out: Record<string, number> = {};
+  for (const k of klines) {
+    const parts = String(k).split(',');
+    if (parts.length >= 2) {
+      const v = parseFloat(parts[1]);
+      if (!isNaN(v)) out[parts[0]] = v;
+    }
+  }
+  return out;
+}
+
+export async function handleAppMarketAshareTurnover(body: any): Promise<any> {
+  const filters = body?.filters || {};
+  const sd = filters.start_date || body?.start_date;
+  const ed = filters.end_date || body?.end_date;
+  if (!sd || !ed) {
+    return { turnover: [], source: '东方财富', note: '缺少 start_date / end_date' };
+  }
+
+  const dates = _ashareDateRange(sd, ed);
+  const cache: Record<string, number> = {};
+  try {
+    const sh = await _ashareFetchOne('1.000001', sd.replace(/-/g, ''), ed.replace(/-/g, ''));
+    const sz = await _ashareFetchOne('0.399001', sd.replace(/-/g, ''), ed.replace(/-/g, ''));
+    for (const d of new Set([...Object.keys(sh), ...Object.keys(sz)])) {
+      cache[d] = round2((sh[d] || 0) + (sz[d] || 0));
+    }
+  } catch (e) {
+    console.warn('[mobileRouteHandler] ashare fetch failed:', e);
+  }
+
+  const turnover = dates.map((d) => ({ date: d, amount: cache[d] ?? null }));
+  return {
+    turnover,
+    source: '东方财富（上证指数 + 深证成指 成交额，系统自主获取）',
+    cached_dates: Object.keys(cache).length,
+    updated_at: new Date().toISOString().slice(0, 19),
+    note: 'A股成交金额由系统自主从东方财富公开行情接口按自然日拉取，无需手动上传；非交易日无成交，折线自动断点。',
+  };
+}
