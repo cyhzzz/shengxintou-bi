@@ -834,14 +834,21 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
   const openMap: Record<string, number> = {};
   for (const r of openRows) openMap[r.market] = toInt(r.open_cnt);
 
+  // 消耗优先 fact_plan_daily；该表该区间无数据时优雅回退 agg_vendor_daily（与 Web 后端口径一致），避免数据源缺失导致消耗全空
   const spendRows = await querySql<Row>(
     `SELECT "平台" as platform, COALESCE(SUM("花费"), 0) as spend
      FROM fact_plan_daily ${platformWhere.clause}
      GROUP BY "平台"`,
     platformWhere.params
   );
+  const spendRowsFinal = spendRows.length > 0 ? spendRows : await querySql<Row>(
+    `SELECT "平台" as platform, COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台"`,
+    platformWhere.params
+  );
   const spendMap: Record<string, number> = {};
-  for (const r of spendRows) spendMap[r.platform] = toFloat(r.spend);
+  for (const r of spendRowsFinal) spendMap[r.platform] = toFloat(r.spend);
 
   const total_open = Object.values(openMap).reduce((s, v) => s + v, 0);
   const total_spend = round2(Object.values(spendMap).reduce((s, v) => s + v, 0));
@@ -951,7 +958,14 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
      GROUP BY "平台", week_start ORDER BY "平台", week_start`,
     platformWhere.params
   );
-  const weekly_spend = weeklySpendRows.map(r => {
+  const weeklySpendRowsFinal = weeklySpendRows.length > 0 ? weeklySpendRows : await querySql<Row>(
+    `SELECT "平台" as market, ${fridayWeekExpr('日期')} as week_start,
+       COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台", week_start ORDER BY "平台", week_start`,
+    platformWhere.params
+  );
+  const weekly_spend = weeklySpendRowsFinal.map(r => {
     const ws = String(r.week_start).slice(0, 10);
     return { market: r.market, week_start: ws, week_end: _adWeekEnd(ws), spend: round2(toFloat(r.spend)) };
   });
@@ -978,7 +992,14 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
      GROUP BY "平台", date ORDER BY "平台", date`,
     platformWhere.params
   );
-  const daily_spend = dailySpendRows.map(r => ({
+  const dailySpendRowsFinal = dailySpendRows.length > 0 ? dailySpendRows : await querySql<Row>(
+    `SELECT "平台" as market, substr("日期", 1, 10) as date,
+       COALESCE(SUM("花费"), 0) as spend
+     FROM agg_vendor_daily ${platformWhere.clause}
+     GROUP BY "平台", date ORDER BY "平台", date`,
+    platformWhere.params
+  );
+  const daily_spend = dailySpendRowsFinal.map(r => ({
     market: r.market,
     date: String(r.date).slice(0, 10),
     spend: round2(toFloat(r.spend)),
