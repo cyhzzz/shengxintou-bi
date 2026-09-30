@@ -592,6 +592,7 @@ const AttributionConversionPage: React.FC = () => {
               { label: '数据源', value: 'fact_conv_appmarket 数据库表（1 行=1 APP 下载）' },
               { label: '端点', value: 'POST /api/v1/reports/app-market/attribution-conversion' },
               { label: '口径', value: '按下载日期做下载 cohort（与应用市场漏斗口径一致，避免按开户完成时间切出的幸存者偏差），统计各步骤"是"的数量；转化率 = 下一步数量 ÷ 上一步数量；周按周一~周日划分。"开户成功→广告开户"为复合节点：是否创建完资金账号=是 且 渠道类型=互联网引流 且 是否新开户=是' },
+              { label: '归因口径', value: '应用市场为兜底归因渠道：客户跨渠道触达时优先归内容平台（小红书/腾讯等），仅无其他渠道归属才落应用市场；上游日报表（agg_vendor_daily）为多渠道去重归因，开户合计通常低于本明细口径约 4%-6%，属预期而非数据缺失' },
               { label: '移动端', value: '已支持（mobileRouteHandler 同步实现）' },
             ]}
           />
