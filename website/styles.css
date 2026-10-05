@@ -1615,3 +1615,25 @@ body {
     transition: none !important;
   }
 }
+
+/* 系统架构图模块 */
+.arch-frame {
+  border: 1px solid var(--border-medium);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-paper);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.arch-frame iframe {
+  display: block;
+  width: 100%;
+  height: min(78vh, 820px);
+  border: 0;
+}
+
+.arch-actions {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+}

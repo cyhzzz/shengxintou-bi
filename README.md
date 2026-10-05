@@ -73,13 +73,9 @@ cd frontend-react && npm run dev
 
 ## 数据流与架构
 
-```mermaid
-flowchart LR
-    A["上游 ETL<br/>mapping / 清洗 / 漏斗预计算"] -->|Excel xlsx| B["v2 原样导入<br/>pandas.to_sql(replace)"]
-    B --> C[("SQLite<br/>shengxintou.db")]
-    C --> D["Flask API<br/>/api/v1/*"]
-    D --> E["React 报表<br/>Ant Design + ECharts"]
-```
+![省心投 BI 系统架构总览](docs/images/architecture.png)
+
+> 图按上中下三层呈现——功能层：13 个业务模块按侧栏菜单三段分组，React 报表前端与多端客户端（Web / 桌面 / Android / PWA）作为统一承载；服务层：Flask 单体服务（数据导入 + REST API）；数据层：上游 ETL 文件、SQLite / PostgreSQL 业务库、坚果云 WebDAV。交互版（可缩放、点击节点查看源码出处）见官网「架构图」模块，对应仓库文件 `website/architecture.html`。
 
 **技术栈**
 

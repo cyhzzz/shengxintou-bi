@@ -45,6 +45,7 @@
       <nav class="nav-links" aria-label="主导航">
         <a href="#features">核心能力</a>
         <a href="#showcase">界面预览</a>
+        <a href="#architecture">架构图</a>
         <a href="#dev">开发者</a>
         <a href="#download">下载</a>
         <a href="https://github.com/cyhzzz/shengxintou-bi" target="_blank" rel="noopener" class="nav-gh">
@@ -298,6 +299,26 @@
             <h3>iOS PWA</h3>
             <p>Safari 打开即用，无需安装应用，数据本地离线保存。</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 系统架构 -->
+    <section class="section section-arch" id="architecture">
+      <div class="container">
+        <div class="section-header reveal">
+          <span class="section-eyebrow">系统架构</span>
+          <h2 class="section-title">三层架构，<br />一张图看清</h2>
+          <p class="section-lead">上中下三层视角：功能层是 13 个业务模块与多端统一入口，服务层是 Flask 单体服务（数据导入 + REST API），数据层承接上游 ETL 文件、业务库与坚果云备份。图内可缩放、拖拽，点击节点可查看对应源码位置。</p>
+        </div>
+        <div class="arch-frame reveal" data-reveal="1">
+          <iframe src="architecture.html" title="省心投 BI 系统架构总览" loading="lazy"></iframe>
+        </div>
+        <div class="arch-actions reveal" data-reveal="2">
+          <a href="architecture.html" target="_blank" rel="noopener" class="btn btn-ghost">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+            全屏查看架构图
+          </a>
         </div>
       </div>
     </section>
