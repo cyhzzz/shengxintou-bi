@@ -747,7 +747,7 @@ export async function handleAppMarketCreative(body: any): Promise<any> {
 
 // ============================================================================
 // 应用市场 · 广告计划分析 (reports/app-market/ad-plan-analysis)
-// 结合三个数据源：dim_ad_plan_class + fact_conv_appmarket + fact_plan_daily（市场级消耗 + 计划级消耗/展示/点击/下载）
+// 结合三个数据源：fact_plan_daily（计划清单权威源 + 市场级/计划级消耗） + dim_ad_plan_class（版位/子版位/出价维度，仅聚类分析/按版位聚合） + fact_conv_appmarket（下载链路）
 // 复刻 backend/routes/reports/app_market_ad_plan.py（周度口径：上周五~本周四）
 // ============================================================================
 
@@ -864,24 +864,38 @@ export async function handleAppMarketAdPlanAnalysis(body: any): Promise<any> {
     return { market: m, open_count: oc, spend: sp, open_cost: oc ? round2(sp / oc) : null };
   }).sort((a, b) => b.open_count - a.open_count);
 
-  // ---- 计划分解维度 (dim_ad_plan_class) ----
-  const planRows = await querySql<Row>(
-    `SELECT "应用市场" as market, "广告分组ID" as plan_id, "广告分组名称" as plan_name,
-       "版位" as placement, "子版位" as sub_placement, "出价" as bid
-     FROM dim_ad_plan_class ${buildWhere([marketIn('应用市场')]).clause}`,
-    buildWhere([marketIn('应用市场')]).params
+  // ---- 计划清单：以 fact_plan_daily 为权威枚举源（含不在 dim 的计划）----
+  const planBaseRows = await querySql<Row>(
+    `SELECT "计划ID" as plan_id, MAX("计划名称") as plan_name, "平台" as market
+     FROM fact_plan_daily ${buildWhere([marketIn('平台'), { sql: '"计划ID" IS NOT NULL', params: [] }]).clause}
+     GROUP BY "计划ID"`,
+    buildWhere([marketIn('平台'), { sql: '"计划ID" IS NOT NULL', params: [] }]).params
   );
-  const plans = planRows.map(r => ({
-    plan_id: Number(r.plan_id),
-    market: r.market,
-    plan_name: r.plan_name,
-    placement: r.placement,
-    sub_placement: r.sub_placement,
-    bid: r.bid,
-  }));
-  const planIds = Array.from(new Set(plans.map(p => p.plan_id)));
+  const planIds = Array.from(new Set(planBaseRows.map(r => Number(r.plan_id)))).filter(id => !isNaN(id));
   // SQLite 中整数列与字符串参数比较会做数值转换，IN 参数统一传字符串
   const planIdStrs = planIds.map(String);
+
+  // 版位/子版位/出价 维度（仅聚类分析 / 按版位聚合 使用）：LEFT JOIN dim_ad_plan_class，缺失→未分类
+  const dimRows = planIdStrs.length > 0 ? await querySql<Row>(
+    `SELECT "广告分组ID" as plan_id, "版位" as placement, "子版位" as sub_placement, "出价" as bid
+     FROM dim_ad_plan_class ${buildWhere([inClause('广告分组ID', planIdStrs)]).clause}`,
+    buildWhere([inClause('广告分组ID', planIdStrs)]).params
+  ) : [];
+  const dimMap: Record<number, Row> = {};
+  for (const d of dimRows) dimMap[Number(d.plan_id)] = d;
+
+  const plans = planBaseRows.map(r => {
+    const pid = Number(r.plan_id);
+    const d = dimMap[pid];
+    return {
+      plan_id: pid,
+      market: r.market,
+      plan_name: r.plan_name,
+      placement: d ? d.placement : '未分类',
+      sub_placement: d ? d.sub_placement : '未分类',
+      bid: d ? d.bid : null,
+    };
+  });
 
   // ---- 计划级 开户 / 消耗 映射（plan 分解 5 大市场）----
   const poMap: Record<number, number> = {};

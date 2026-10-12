@@ -2,10 +2,14 @@
 """应用市场 · 广告计划分析（v3.8.2）
 
 结合三个数据源：
-  1. dim_ad_plan_class（应用市场计划分解，1 行=1 广告分组）
-     → 应用市场 / 广告分组ID / 广告分组名称 / 版位 / 子版位 / 出价
-     → 仅用于「计划明细 / 按版位聚合 / 按周分计划 / 分计划展开」（5 大市场有分解，苹果/鸿蒙无分解）
-  2. fact_conv_appmarket（应用市场下载链路，1 行=1 APP 下载）
+  1. fact_plan_daily（广告计划维度明细 9.3，应用市场消耗统一来源 + 计划清单权威源）
+     → 计划清单：以 fact_plan_daily 全量枚举（含所有有消耗的计划，不再因缺失 dim 而整行丢弃）
+     → 市场级：按 平台(应用市场) 聚合 消耗（花费）
+     → 计划级：按 计划ID + 周五周 统计 计划级 消耗/展示/点击/下载
+  2. dim_ad_plan_class（应用市场计划分解，1 行=1 广告分组）
+     → 仅提供 版位 / 子版位 / 出价 维度，用于「广告聚类分析」与「按版位聚合」
+     → 计划不在 dim 时回退 '未分类' / None（归入未分类组，不再整行丢弃该计划）
+  3. fact_conv_appmarket（应用市场下载链路，1 行=1 APP 下载）
      → 按 应用市场 直接聚合 广告开户（渠道类型=互联网引流 & 是否新开户=1 & 是否创建完资金账号=1）
      → 按 广告计划ID + 周五周 统计下载链路各阶段（下载/激活/开户注册/身份证/银行卡/开户提交/开户成功/广告开户，按设备号去重）
      → 漏斗 cohort 口径：下载链路各阶段均按「下载日期」做下载 cohort（与《周度转化率趋势》一致），
@@ -57,8 +61,8 @@ bp = Blueprint('app_market_ad_plan', __name__, url_prefix='/api/v1/reports/app-m
 
 _META = {
     'version': 'v3.8.2',
-    'source': 'dim_ad_plan_class + fact_conv_appmarket + fact_plan_daily',
-    'note': '广告计划分析：开户概览 + 按周开户量（含周度开户成本副坐标）+ 按日开户量（自然日·按市场堆叠·副坐标=当日开户成本）+ 每日消耗量（自然日·按市场堆叠）+ 按周分计划 + 分计划展开（周度=上周五~本周四）',
+    'source': 'fact_plan_daily（计划清单权威源）+ dim_ad_plan_class（版位/子版位/出价维度，仅聚类分析/按版位聚合）+ fact_conv_appmarket',
+    'note': '广告计划分析：开户概览 + 按周开户量（含周度开户成本副坐标）+ 按日开户量（自然日·按市场堆叠·副坐标=当日开户成本）+ 每日消耗量（自然日·按市场堆叠）+ 按周分计划 + 分计划展开（周度=上周五~本周四）。计划清单自 2026-10 起改为从 fact_plan_daily 全量枚举，不再因缺失 dim 分解而丢弃计划。',
     'open_condition': '是否创建完资金账号=1 AND 渠道类型=互联网引流 AND 是否新开户=1',
     'spend_source': 'fact_plan_daily.花费（按 平台=应用市场 聚合，市场级与计划级消耗统一来源；分计划消耗/展示/点击/下载 = fact_plan_daily 按 计划ID 聚合）',
     'open_source': 'fact_conv_appmarket（按 应用市场 聚合，广告开户节点）',
@@ -157,22 +161,51 @@ def _market_spend_map(markets, start_date, end_date):
 
 
 # ---------------------------------------------------------------------------
-# 计划级（dim_ad_plan_class）聚合：仅 5 大市场有 plan 分解
+# 计划级聚合：计划清单权威源 = fact_plan_daily（含不在 dim 的计划）
+# dim_ad_plan_class 仅提供 版位/子版位/出价 维度（聚类分析 / 按版位聚合用）
 # ---------------------------------------------------------------------------
 def _load_plans(markets):
-    """加载应用市场计划分解维度（按 markets 过滤），返回 plan 列表。"""
-    q = db.session.query(DimAdPlanClass)
+    """加载广告计划清单。
+
+    枚举权威源 = fact_plan_daily（广告计划维度明细）：包含全部有消耗的广告计划，
+    不再依赖 dim_ad_plan_class 是否存在该计划（修复「新计划有消耗但不在 dim 而被整行丢弃」）。
+
+    版位 / 子版位 / 出价 维度仅来自 dim_ad_plan_class（原设计用于聚类分析 / 按版位聚合）；
+    计划不在 dim 时回退 '未分类' / None，保证聚类分析与按版位聚合仍可用，只是归入未分类组。
+    """
+    # 1) fact_plan_daily 作为计划枚举权威源（一个 计划ID 一行，取代表名称与平台）
+    fp_q = db.session.query(
+        FactPlanDaily.计划ID,
+        func.max(FactPlanDaily.计划名称).label('计划名称'),
+        func.max(FactPlanDaily.平台).label('平台'),
+    ).filter(FactPlanDaily.计划ID.isnot(None))
     if markets:
-        q = q.filter(DimAdPlanClass.应用市场.in_(markets))
+        fp_q = fp_q.filter(FactPlanDaily.平台.in_(markets))
+    fp_q = fp_q.group_by(FactPlanDaily.计划ID)
+    rows = fp_q.all()
+
+    # 2) dim 仅提供 版位/子版位/出价 维度（聚类分析用），缺失→未分类
+    dim_map = {}
+    ids = [int(r.计划ID) for r in rows if r.计划ID is not None]
+    if ids:
+        for d in db.session.query(DimAdPlanClass).filter(
+            DimAdPlanClass.广告分组ID.in_(ids)
+        ).all():
+            dim_map[d.广告分组ID] = d
+
     plans = []
-    for r in q.all():
+    for r in rows:
+        pid = int(r.计划ID) if r.计划ID is not None else None
+        if pid is None:
+            continue
+        d = dim_map.get(pid)
         plans.append({
-            'plan_id': r.广告分组ID,
-            'market': r.应用市场,
-            'plan_name': r.广告分组名称,
-            'placement': r.版位,
-            'sub_placement': r.子版位,
-            'bid': r.出价,
+            'plan_id': pid,
+            'market': r.平台,
+            'plan_name': r.计划名称 or '',
+            'placement': d.版位 if d else '未分类',
+            'sub_placement': d.子版位 if d else '未分类',
+            'bid': d.出价 if d else None,
         })
     return plans
 

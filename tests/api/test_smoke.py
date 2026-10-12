@@ -404,9 +404,11 @@ class ApiSmokeTest(unittest.TestCase):
             '/reports/app-market/ad-plan-analysis?platforms=苹果')
         bm_markets = [m['market'] for m in data['by_market']]
         self.assertEqual(bm_markets, ['苹果'])
-        # smoke 只验证结构（CI 用空库，不验证业务数值）；苹果无 plan 分解
+        # plan_detail 现以 fact_plan_daily 为枚举源（含所有有消耗的计划，不再依赖 dim 分解）；
+        # 空库 CI 下为 0，真实数据下含 苹果 计划。此处仅校验筛选生效（市场归属均为 苹果）。
         self.assertIn('total_spend', data['overview'])
-        self.assertEqual(len(data['plan_detail']), 0)
+        self.assertIsInstance(data['plan_detail'], list)
+        self.assertTrue(all(p['market'] == '苹果' for p in data['plan_detail']))
 
     def test_48_xhs_plan_analysis(self):
         # v3.3.10 小红书 · 计划分析（仿应用市场 plan-analysis）
