@@ -1187,7 +1187,7 @@ body {
 }
 
 /* =========================================================
-   品牌影片
+   首屏影片区块
    ========================================================= */
 .section-film {
   background: var(--bg-cream);
@@ -1208,6 +1208,8 @@ body {
   height: auto;
   aspect-ratio: 16 / 9;
   background: #f4f4f6;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 .film-meta {
