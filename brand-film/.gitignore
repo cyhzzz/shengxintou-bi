@@ -1,0 +1,10 @@
+# 渲染中间产物与生成音频不入库（根 .gitignore 已覆盖 node_modules/ 与 .venv）
+film/renders/
+film/render*.log
+film/.debug/
+audio/score.wav
+# 依赖与虚拟环境
+node_modules/
+.venv/
+# 临时下载的第三方数据（simple-icons 全量 JSON，非工程文件）
+si.json

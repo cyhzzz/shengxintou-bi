@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="assets/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Noto"; font-weight: 400; src: url("assets/fonts/sans-400.woff2") format("woff2"); }
+      @font-face { font-family: "Noto"; font-weight: 700; src: url("assets/fonts/sans-700.woff2") format("woff2"); }
+      @font-face { font-family: "Noto"; font-weight: 900; src: url("assets/fonts/sans-900.woff2") format("woff2"); }
+
+      /* 省心投 BI — 券商广告投放 + 开户转化分析平台
+         base #F4F4F6 · fg #15171C · accent #1890ff · secondary #40a9ff / #096dd9
+         S 形河流 = 品牌标志，数据粒子沿其汇流同一屏 */
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #F4F4F6; }
+      body { font-family: "Noto", sans-serif; color: #15171C; }
+      #root { position: absolute; inset: 0; overflow: hidden; background: #F4F4F6; }
+      .scene { position: absolute; inset: 0; overflow: hidden; }
+      .cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+      .abs { position: absolute; }
+      .line { overflow: hidden; }
+      .line > span { display: inline-block; }
+
+      /* hidden initial states (CSS, not the timeline) */
+      #s2, #s3, #s4, #s5 { opacity: 0; }
+      #a1h1, #a1h2, #a2h, #a2sub, #a3h, #a3sub, #a4h, #a4sub, #a1hook, #lockTag { opacity: 0; }
+      #badges .badge, #metrics .mchip, #heatmap .hm, #s2tabs .tab,
+      #refresh .rb, #devs .dev, #devs .dimg, #lockName,
+      #lockCta, #lockUrl, #river, #sConnect, #syncBar, #a2n0, #a2n1, #a2n2, #a2n3 { opacity: 0; }
+
+      /* texture: grain (animated crawl) + radial falloff */
+      #grain { position: absolute; inset: -40px; z-index: 40; pointer-events: none; opacity: 0.20; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.10 0 0 0 0 0.13 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E"); }
+      #falloff { position: absolute; inset: 0; z-index: 39; pointer-events: none;
+        background: radial-gradient(120% 100% at 50% 45%, rgba(244,244,246,0) 58%, rgba(210,214,222,0.25) 100%); }
+      #night { position: absolute; inset: 0; z-index: 38; pointer-events: none; opacity: 0;
+        background: radial-gradient(110% 90% at 68% 32%, rgba(24,144,255,0.12), rgba(21,23,28,0.10)); }
+
+      /* background depth shared by every act */
+      #dots { position: absolute; inset: -60px; z-index: 0; opacity: 0.5;
+        background-image: radial-gradient(circle, rgba(21,23,28,0.16) 2px, transparent 2.5px); background-size: 56px 56px; }
+      #glow { position: absolute; z-index: 1; left: 460px; top: 60px; width: 1300px; height: 1000px; border-radius: 50%;
+        background: radial-gradient(closest-side, rgba(24,144,255,0.26), rgba(24,144,255,0)); }
+      #ghost { position: absolute; z-index: 1; left: 60px; top: 560px; font-weight: 900; font-size: 320px; line-height: 1; color: #15171C; opacity: 0.05; white-space: nowrap; }
+
+      /* the persistent S river — brand mark as a flowing curve, behind the scenes */
+      #river { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+      #river path { fill: none; stroke: #1890ff; stroke-width: 22; stroke-linecap: round; opacity: 0.42; }
+      #river .spark { fill: #1890ff; opacity: 0.9; }
+      #pings { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+      .ping { position: absolute; left: 960px; top: 540px; width: 900px; height: 900px; margin: -450px 0 0 -450px;
+        border-radius: 50%; border: 9px solid #1890ff; opacity: 0; }
+
+      /* ============ ACT 1 · 散落 ============ */
+      #a1h1 { left: 120px; top: 210px; font-size: 108px; font-weight: 900; line-height: 1.1; white-space: nowrap; }
+      #a1h2 { left: 120px; top: 372px; font-size: 108px; font-weight: 900; line-height: 1.1; white-space: nowrap; color: #1890ff; }
+      #a1h1 span, #a1h2 span { will-change: transform; }
+      #a1hook { left: 124px; top: 560px; font-size: 46px; font-weight: 700; color: #15171C; white-space: nowrap; }
+      #a1hook span { will-change: transform; }
+      /* 真实平台 logo 徽章：白底卡片 + 品牌色 logo（simple-icons 官方路径注入品牌色；
+         抖音为官方配色重构的音符标——蓝 #2D8CFF / 红 #EE1C25 色差 + #15171C 核心） */
+      .badge { position: absolute; z-index: 6; width: 156px; height: 156px; border-radius: 26px;
+        background: #FFFFFF; border: 2px solid rgba(24,144,255,0.16); box-shadow: 0 24px 60px rgba(24,60,120,0.16);
+        display: flex; align-items: center; justify-content: center; }
+      .badge .bl { width: 116px; height: 104px; object-fit: contain; display: block; }
+      .mchip { position: absolute; z-index: 6; min-width: 150px; padding: 18px 22px; border-radius: 18px;
+        background: #FFFFFF; border: 2px solid rgba(24,144,255,0.18); box-shadow: 0 18px 44px rgba(24,60,120,0.10); }
+      .mchip .mv { display: block; font-size: 52px; font-weight: 900; color: #1890ff; line-height: 1; }
+      .mchip .ml { display: block; margin-top: 8px; font-size: 22px; color: #5F6370; }
+      #sSymbol { position: absolute; z-index: 7; left: 1120px; top: 300px; width: 260px; height: 260px;
+        transform-origin: 50% 50%; }
+      #sSymbol img { width: 260px; height: 260px; display: block; }
+      .pt { position: absolute; z-index: 7; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+        border-radius: 50%; background: #1890ff; box-shadow: 0 0 18px rgba(24,144,255,0.6); }
+
+      /* ============ ACT 2 · 聚合 ============ */
+      #s2grid { position: absolute; inset: 0; z-index: 2;
+        background-image: linear-gradient(rgba(21,23,28,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(21,23,28,0.05) 1px, transparent 1px);
+        background-size: 80px 80px; }
+      #s2panel { position: absolute; z-index: 3; left: 760px; top: 300px; width: 1120px; height: 720px; border-radius: 24px;
+        background: #FFFFFF; border: 1px solid rgba(21,23,28,0.08); box-shadow: 0 40px 100px rgba(24,60,120,0.16); overflow: hidden; }
+      #s2panel .ptitle { position: absolute; left: 32px; top: 26px; font-size: 30px; font-weight: 700; }
+      .pcard { position: absolute; background: #F7F9FC; border: 1px solid rgba(21,23,28,0.06); border-radius: 16px; }
+      .pcard .plabel { position: absolute; left: 24px; top: 18px; font-size: 24px; font-weight: 700; color: #15171C; }
+      #cardChart { left: 32px; top: 120px; width: 480px; height: 480px; }
+      #cardHeat { left: 540px; top: 120px; width: 540px; height: 480px; }
+      #s2chart { position: absolute; left: 52px; top: 208px; width: 440px; height: 372px; }
+      #s2chart .ax { stroke: rgba(21,23,28,0.10); stroke-width: 1.5; }
+      #s2chart .area { fill: rgba(24,144,255,0.16); }
+      #s2chart .ln { fill: none; stroke: #1890ff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+      #s2chart .ln2 { fill: none; stroke: #096dd9; stroke-width: 3; stroke-dasharray: 10 8; opacity: 0.8; }
+      #s2chart .dot { fill: #1890ff; }
+      #heatmap { position: absolute; z-index: 3; }
+      .hm { position: absolute; border-radius: 6px; }
+      .hml { position: absolute; display: flex; align-items: center; justify-content: center;
+        font-size: 17px; color: #8A8F9C; white-space: nowrap; }
+      .hmleg { position: absolute; display: flex; align-items: center; gap: 8px; font-size: 19px; color: #5F6370; }
+      .hmleg i { display: block; width: 22px; height: 22px; border-radius: 5px; }
+      #a2h { left: 120px; top: 120px; font-size: 88px; font-weight: 900; white-space: nowrap; }
+      #a2h span { will-change: transform; }
+      #a2sub { left: 124px; top: 300px; font-size: 44px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+      #a2sub span { will-change: transform; }
+      #s2tabs { position: absolute; z-index: 4; left: 1150px; top: 930px; display: flex; gap: 18px; }
+      .tab { padding: 14px 26px; border-radius: 14px; background: #FFFFFF; border: 1px solid rgba(24,144,255,0.22);
+        font-size: 26px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+      #a2n0, #a2n1, #a2n2, #a2n3 { position: absolute; z-index: 4; font-size: 46px; font-weight: 900; color: #15171C; }
+      #a2n0 { left: 124px; top: 800px; } #a2n1 { left: 288px; top: 800px; }
+      #a2n2 { left: 452px; top: 800px; } #a2n3 { left: 616px; top: 800px; }
+      #pulseRing { position: absolute; z-index: 4; left: 1600px; top: 590px; width: 200px; height: 200px; margin: -100px 0 0 -100px;
+        border-radius: 50%; border: 4px solid #1890ff; opacity: 0; }
+
+      /* ============ ACT 3 · 双漏斗 ============ */
+      .funnel { position: absolute; z-index: 3; top: 420px; width: 360px; }
+      .funnel.l { left: 200px; } .funnel.r { left: 1360px; }
+      .funnel .ftitle { position: absolute; top: -70px; left: 0; width: 360px; text-align: center; font-size: 40px; font-weight: 900; }
+      .funnel.l .ftitle { color: #1890ff; } .funnel.r .ftitle { color: #096dd9; }
+      .flayer { position: absolute; left: 50%; height: 42px; display: flex; align-items: center; justify-content: center;
+        font-size: 24px; font-weight: 800; color: #FFFFFF; letter-spacing: 3px; }
+      .flayer span { display: block; }
+      #a3h { left: 200px; top: 115px; font-size: 96px; font-weight: 900; white-space: nowrap; }
+      #a3h span { will-change: transform; }
+      #a3sub { left: 204px; top: 265px; font-size: 46px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+      #a3sub span { will-change: transform; }
+      #marker { position: absolute; z-index: 5; left: 960px; top: 660px; width: 220px; height: 220px; margin: -110px 0 0 -110px; }
+      #marker .core { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(24,144,255,0.30), rgba(24,144,255,0)); }
+      #marker .ring { position: absolute; inset: 0; border-radius: 50%; border: 4px solid #1890ff; }
+      #marker .lab { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 900; }
+      #sConnect { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+      #sConnect path { fill: none; stroke: #1890ff; stroke-width: 4; stroke-linecap: round; opacity: 0.7; }
+      #funnelWrap { position: absolute; inset: 0; z-index: 2; perspective: 1800px; transform-style: preserve-3d; }
+
+      /* ============ ACT 4 · 四端 ============ */
+      #devs { position: absolute; inset: 0; z-index: 3; perspective: 2000px; }
+      .dev { position: absolute; border-radius: 18px; background: #FFFFFF; border: 2px solid rgba(21,23,28,0.10);
+        box-shadow: 0 36px 90px rgba(24,60,120,0.18); overflow: hidden; transform-style: preserve-3d; }
+      .dev .dbar { position: absolute; left: 0; right: 0; top: 0; height: 40px; background: #F4F4F6; border-bottom: 1px solid rgba(21,23,28,0.10); }
+      .dev .dimg { position: absolute; left: 0; right: 0; top: 40px; bottom: 40px; width: 100%; height: auto; object-fit: cover; }
+      #s4 .archbg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.10; pointer-events: none; }
+      .dev .dtitle { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; display: flex; align-items: center; justify-content: center;
+        font-size: 22px; font-weight: 700; background: #F4F4F6; }
+      #a4h { left: 120px; top: 150px; font-size: 92px; font-weight: 900; white-space: nowrap; }
+      #a4h span { will-change: transform; }
+      #a4sub { left: 124px; top: 270px; font-size: 36px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+      #a4box { position: absolute; left: 120px; top: 280px; font-size: 56px; font-weight: 900; color: #15171C; white-space: nowrap; }
+      #a4box .ch { opacity: 0; }
+      #connSvg { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+      #connSvg path { fill: none; stroke: #40a9ff; stroke-width: 4; stroke-linecap: round; opacity: 0.8; }
+      #syncBar { position: absolute; z-index: 5; left: 120px; top: 540px; width: 520px; height: 16px; border-radius: 8px;
+        background: rgba(21,23,28,0.10); }
+      #syncBar i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 8px; background: #1890ff; transform-origin: 0 50%; transform: scaleX(0.12); }
+      #syncVal { position: absolute; z-index: 5; left: 660px; top: 512px; font-size: 56px; font-weight: 900; color: #1890ff; }
+      #refresh { position: absolute; inset: 0; z-index: 5; }
+      .rb { position: absolute; width: 84px; height: 84px; border-radius: 50%; background: #1890ff; color: #FFFFFF;
+        display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 900; }
+      #travel { position: absolute; z-index: 6; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+        border-radius: 50%; background: #1890ff; box-shadow: 0 0 22px rgba(24,144,255,0.8); }
+
+      /* ============ ACT 5 · 锁屏 ============ */
+      #lockLogo { position: absolute; z-index: 6; left: 760px; top: 250px; width: 400px; height: 400px; transform-origin: 50% 50%; }
+      #lockLogo img { width: 400px; height: 400px; display: block; }
+      #lockName { left: 0; width: 1920px; top: 700px; text-align: center; font-size: 92px; font-weight: 900; white-space: nowrap; }
+      #lockTag { left: 0; width: 1920px; top: 820px; text-align: center; font-size: 56px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+      #lockTag span { will-change: transform; }
+      #lockCta { left: 0; width: 1920px; top: 910px; text-align: center; font-size: 36px; font-weight: 700; color: #15171C; white-space: nowrap; }
+      #lockUrl { left: 0; width: 1920px; top: 968px; text-align: center; font-size: 28px; color: #5F6370; font-family: "Noto", monospace; white-space: nowrap; }
+      #lockRule { left: 760px; top: 690px; width: 400px; height: 3px; background: #1890ff; transform-origin: 50% 50%; }
+      .opt { position: absolute; z-index: 6; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px;
+        border-radius: 50%; background: #40a9ff; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="shengxintou-bi" data-start="0" data-duration="30" data-width="1920" data-height="1080">
+
+      <!-- persistent background depth -->
+      <div id="dots" class="abs"></div>
+      <div id="glow" class="abs"></div>
+      <div id="ghost" class="abs">投放</div>
+
+      <!-- persistent S river (brand mark) — lives behind the scenes, data sparks flow along it -->
+      <svg id="river" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+        <path id="riverPath" d="M 200 200 C 700 120, 760 520, 1180 520 C 1600 520, 1640 880, 1200 940" />
+        <circle class="spark" id="sp0" r="13" /><circle class="spark" id="sp1" r="13" />
+        <circle class="spark" id="sp2" r="13" /><circle class="spark" id="sp3" r="13" />
+        <circle class="spark" id="sp4" r="13" /><circle class="spark" id="sp5" r="13" />
+        <circle class="spark" id="sp6" r="13" /><circle class="spark" id="sp7" r="13" />
+        <circle class="spark" id="sp8" r="13" /><circle class="spark" id="sp9" r="13" />
+        <circle class="spark" id="sp10" r="13" /><circle class="spark" id="sp11" r="13" />
+      </svg>
+
+      <!-- persistent sonar pings — data radar sweeping out from centre, behind every scene -->
+      <div id="pings" class="abs">
+        <div class="ping" id="pg0"></div>
+        <div class="ping" id="pg1"></div>
+        <div class="ping" id="pg2"></div>
+      </div>
+
+      <!-- ============ ACT 1 · 散落 ============ -->
+      <div class="scene" id="s1">
+        <div class="cam" id="cam1">
+          <div id="a1h1" class="abs line"><span>券商财富管理场景</span></div>
+          <div id="a1h2" class="abs line"><span>广告投放 + 开户转化</span></div>
+          <div id="a1hook" class="abs line"><span>投放散落四处，转化却像黑盒？</span></div>
+          <div id="badges" class="abs"><div class="badge" id="bdg0" style="left:880px;top:470px"><img class="bl" src="assets/logos/douyin.svg" alt="抖音" /></div>
+<div class="badge" id="bdg1" style="left:940px;top:640px"><img class="bl" src="assets/logos/tencentqq.svg" alt="腾讯" /></div>
+<div class="badge" id="bdg2" style="left:1420px;top:350px"><img class="bl" src="assets/logos/xiaohongshu.svg" alt="小红书" /></div>
+<div class="badge" id="bdg3" style="left:1240px;top:560px"><img class="bl" src="assets/logos/kuaishou.svg" alt="快手" /></div>
+<div class="badge" id="bdg4" style="left:1600px;top:470px"><img class="bl" src="assets/logos/xiaomi.svg" alt="小米" /></div>
+<div class="badge" id="bdg5" style="left:880px;top:760px"><img class="bl" src="assets/logos/huawei.svg" alt="华为" /></div>
+<div class="badge" id="bdg6" style="left:1080px;top:850px"><img class="bl" src="assets/logos/oppo.svg" alt="OPPO" /></div>
+<div class="badge" id="bdg7" style="left:1250px;top:750px"><img class="bl" src="assets/logos/vivo.svg" alt="VIVO" /></div>
+<div class="badge" id="bdg8" style="left:1430px;top:640px"><img class="bl" src="assets/logos/honor.svg" alt="荣耀" /></div>
+<div class="badge" id="bdg9" style="left:1600px;top:640px"><img class="bl" src="assets/logos/apple.svg" alt="苹果" /></div></div>
+          <div id="metrics" class="abs"><div class="mchip" id="m0" style="left:360px;top:720px"><span class="mv">×××</span><span class="ml">线索成本</span></div>
+<div class="mchip" id="m1" style="left:660px;top:720px"><span class="mv">×××</span><span class="ml">开户成本</span></div>
+<div class="mchip" id="m2" style="left:360px;top:840px"><span class="mv">×××</span><span class="ml">有效户成本</span></div>
+<div class="mchip" id="m3" style="left:660px;top:840px"><span class="mv">××%</span></div></div>
+          <div id="sSymbol" class="abs"><img src="assets/logo-symbol.png" alt="" /></div>
+          <div id="particles" class="abs"><div class="pt" id="p0"></div>
+<div class="pt" id="p1"></div>
+<div class="pt" id="p2"></div>
+<div class="pt" id="p3"></div>
+<div class="pt" id="p4"></div>
+<div class="pt" id="p5"></div>
+<div class="pt" id="p6"></div>
+<div class="pt" id="p7"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ACT 2 · 聚合 ============ -->
+      <div class="scene" id="s2">
+        <div class="cam" id="cam2">
+          <div id="s2grid" class="abs"></div>
+          <div id="s2panel" class="abs">
+            <div class="ptitle">互联网渠道数据概览</div>
+            <div class="pcard" id="cardChart">
+              <div class="plabel">趋势分析</div>
+              <svg id="s2chart" viewBox="0 0 440 372" preserveAspectRatio="none">
+                <line class="ax" x1="16" y1="40" x2="16" y2="336" />
+                <line class="ax" x1="16" y1="336" x2="424" y2="336" />
+                <line class="ax" x1="16" y1="150" x2="424" y2="150" />
+                <line class="ax" x1="16" y1="240" x2="424" y2="240" />
+                <path class="area" id="chartArea" d="M16 300 C 60 290, 90 250, 130 255 C 170 260, 195 300, 235 285 C 275 270, 300 200, 340 180 C 380 160, 405 130, 424 96 L424 336 L16 336 Z" />
+                <path class="ln2" id="chartLine2" d="M16 322 C 70 316, 110 288, 160 292 C 210 296, 250 262, 300 240 C 350 218, 390 200, 424 176" />
+                <path class="ln" id="chartLine" d="M16 300 C 60 290, 90 250, 130 255 C 170 260, 195 300, 235 285 C 275 270, 300 200, 340 180 C 380 160, 405 130, 424 96" />
+                <circle class="dot" cx="424" cy="96" r="7" />
+              </svg>
+            </div>
+            <div class="pcard" id="cardHeat">
+              <div class="plabel">开户日历热力图</div>
+            </div>
+          </div>
+          <div id="heatmap" class="abs"><div class="hml" style="left:1345px;top:478px;width:52px;height:24px">1月</div>
+<div class="hml" style="left:1384px;top:478px;width:52px;height:24px">2月</div>
+<div class="hml" style="left:1423px;top:478px;width:52px;height:24px">3月</div>
+<div class="hml" style="left:1462px;top:478px;width:52px;height:24px">4月</div>
+<div class="hml" style="left:1501px;top:478px;width:52px;height:24px">5月</div>
+<div class="hml" style="left:1540px;top:478px;width:52px;height:24px">6月</div>
+<div class="hml" style="left:1579px;top:478px;width:52px;height:24px">7月</div>
+<div class="hml" style="left:1618px;top:478px;width:52px;height:24px">8月</div>
+<div class="hml" style="left:1657px;top:478px;width:52px;height:24px">9月</div>
+<div class="hml" style="left:1696px;top:478px;width:52px;height:24px">10月</div>
+<div class="hml" style="left:1735px;top:478px;width:52px;height:24px">11月</div>
+<div class="hml" style="left:1774px;top:478px;width:52px;height:24px">12月</div>
+<div class="hml" style="left:1320px;top:512px;width:26px;height:35px">一</div>
+<div class="hml" style="left:1320px;top:551px;width:26px;height:35px">二</div>
+<div class="hml" style="left:1320px;top:590px;width:26px;height:35px">三</div>
+<div class="hml" style="left:1320px;top:629px;width:26px;height:35px">四</div>
+<div class="hml" style="left:1320px;top:668px;width:26px;height:35px">五</div>
+<div class="hml" style="left:1320px;top:707px;width:26px;height:35px">六</div>
+<div class="hml" style="left:1320px;top:746px;width:26px;height:35px">日</div>
+<div class="hm" id="cell0" style="left:1354px;top:512px;width:35px;height:35px;background:#096DD9"></div>
+<div class="hm" id="cell1" style="left:1393px;top:512px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell2" style="left:1432px;top:512px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell3" style="left:1471px;top:512px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell4" style="left:1510px;top:512px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell5" style="left:1549px;top:512px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell6" style="left:1588px;top:512px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell7" style="left:1627px;top:512px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell8" style="left:1666px;top:512px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell9" style="left:1705px;top:512px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell10" style="left:1744px;top:512px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell11" style="left:1783px;top:512px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell12" style="left:1354px;top:551px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell13" style="left:1393px;top:551px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell14" style="left:1432px;top:551px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell15" style="left:1471px;top:551px;width:35px;height:35px;background:#096DD9"></div>
+<div class="hm" id="cell16" style="left:1510px;top:551px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell17" style="left:1549px;top:551px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell18" style="left:1588px;top:551px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell19" style="left:1627px;top:551px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell20" style="left:1666px;top:551px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell21" style="left:1705px;top:551px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell22" style="left:1744px;top:551px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell23" style="left:1783px;top:551px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell24" style="left:1354px;top:590px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell25" style="left:1393px;top:590px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell26" style="left:1432px;top:590px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell27" style="left:1471px;top:590px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell28" style="left:1510px;top:590px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell29" style="left:1549px;top:590px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell30" style="left:1588px;top:590px;width:35px;height:35px;background:#096DD9"></div>
+<div class="hm" id="cell31" style="left:1627px;top:590px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell32" style="left:1666px;top:590px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell33" style="left:1705px;top:590px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell34" style="left:1744px;top:590px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell35" style="left:1783px;top:590px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell36" style="left:1354px;top:629px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell37" style="left:1393px;top:629px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell38" style="left:1432px;top:629px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell39" style="left:1471px;top:629px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell40" style="left:1510px;top:629px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell41" style="left:1549px;top:629px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell42" style="left:1588px;top:629px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell43" style="left:1627px;top:629px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell44" style="left:1666px;top:629px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell45" style="left:1705px;top:629px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell46" style="left:1744px;top:629px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell47" style="left:1783px;top:629px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell48" style="left:1354px;top:668px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell49" style="left:1393px;top:668px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell50" style="left:1432px;top:668px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell51" style="left:1471px;top:668px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell52" style="left:1510px;top:668px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell53" style="left:1549px;top:668px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell54" style="left:1588px;top:668px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell55" style="left:1627px;top:668px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell56" style="left:1666px;top:668px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell57" style="left:1705px;top:668px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell58" style="left:1744px;top:668px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell59" style="left:1783px;top:668px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell60" style="left:1354px;top:707px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell61" style="left:1393px;top:707px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell62" style="left:1432px;top:707px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell63" style="left:1471px;top:707px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell64" style="left:1510px;top:707px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell65" style="left:1549px;top:707px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell66" style="left:1588px;top:707px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell67" style="left:1627px;top:707px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell68" style="left:1666px;top:707px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell69" style="left:1705px;top:707px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell70" style="left:1744px;top:707px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell71" style="left:1783px;top:707px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell72" style="left:1354px;top:746px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell73" style="left:1393px;top:746px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell74" style="left:1432px;top:746px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell75" style="left:1471px;top:746px;width:35px;height:35px;background:#40A9FF"></div>
+<div class="hm" id="cell76" style="left:1510px;top:746px;width:35px;height:35px;background:#1890FF"></div>
+<div class="hm" id="cell77" style="left:1549px;top:746px;width:35px;height:35px;background:#096DD9"></div>
+<div class="hm" id="cell78" style="left:1588px;top:746px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell79" style="left:1627px;top:746px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell80" style="left:1666px;top:746px;width:35px;height:35px;background:#E6F4FF"></div>
+<div class="hm" id="cell81" style="left:1705px;top:746px;width:35px;height:35px;background:#BAE0FF"></div>
+<div class="hm" id="cell82" style="left:1744px;top:746px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hm" id="cell83" style="left:1783px;top:746px;width:35px;height:35px;background:#91D5FF"></div>
+<div class="hmleg" style="left:1354px;top:811px"><span>少</span><i style="background:#E6F4FF"></i><i style="background:#BAE0FF"></i><i style="background:#91D5FF"></i><i style="background:#40A9FF"></i><i style="background:#1890FF"></i><i style="background:#096DD9"></i><span>多</span></div></div>
+          <div id="a2h" class="abs line"><span>一屏聚合跨渠道开户数据</span></div>
+          <div id="a2sub" class="abs line"><span>告别多后台手工对账</span></div>
+          <div id="a2n0" class="abs">×××</div>
+          <div id="a2n1" class="abs">×××</div>
+          <div id="a2n2" class="abs">×××</div>
+          <div id="a2n3" class="abs">××%</div>
+          <div id="s2tabs" class="abs">
+            <div class="tab">线索成本</div><div class="tab">开户成本</div><div class="tab">有效户成本</div>
+          </div>
+          <div id="pulseRing" class="abs"></div>
+        </div>
+      </div>
+
+      <!-- ============ ACT 3 · 双漏斗 ============ -->
+      <div class="scene" id="s3">
+        <div class="cam" id="cam3">
+          <div id="funnelWrap" class="abs">
+            <div class="funnel l" id="funnelL"><div class="ftitle">内容平台 8 阶段</div></div>
+            <div class="funnel r" id="funnelR"><div class="ftitle">应用市场 9 阶段</div></div>
+          </div>
+          <div id="a3h" class="abs line"><span>双链路 双漏斗</span></div>
+          <div id="a3sub" class="abs line"><span>定位转化卡点</span></div>
+          <div id="marker" class="abs"><div class="core"></div><div class="ring"></div><div class="lab">卡点</div></div>
+          <svg id="sConnect" viewBox="0 0 1920 1080"><path id="sConnPath" d="M 540 600 C 720 540, 820 540, 960 620 C 1100 700, 1200 540, 1380 600" /></svg>
+        </div>
+      </div>
+
+      <!-- ============ ACT 4 · 四端 ============ -->
+      <div class="scene" id="s4">
+        <div class="cam" id="cam4">
+          <img class="archbg" src="assets/architecture.png" alt="" />
+          <div id="a4h" class="abs line"><span>一处数据，四端同步</span></div>
+          <div id="a4box" class="abs"><span class="ch">W</span><span class="ch">e</span><span class="ch">b</span><span class="ch">&nbsp;</span><span class="ch">·</span><span class="ch">&nbsp;</span><span class="ch">桌</span><span class="ch">面</span><span class="ch">&nbsp;</span><span class="ch">·</span><span class="ch">&nbsp;</span><span class="ch">安</span><span class="ch">卓</span><span class="ch">&nbsp;</span><span class="ch">·</span><span class="ch">&nbsp;</span><span class="ch">P</span><span class="ch">W</span><span class="ch">A</span></div>
+          <div id="devs" class="abs"><div class="dev" id="dev0" data-kind="laptop" style="left:200px;top:430px;width:560px;height:360px"><div class="dbar"></div><img class="dimg" src="assets/dashboard-preview.png" alt="" /><div class="dtitle">互联网渠道数据概览</div></div>
+<div class="dev" id="dev1" data-kind="desktop" style="left:820px;top:470px;width:520px;height:340px"><div class="dbar"></div><img class="dimg" src="assets/dashboard-preview.png" alt="" /><div class="dtitle">趋势分析</div></div>
+<div class="dev" id="dev2" data-kind="phone" style="left:1180px;top:620px;width:250px;height:390px"><img class="dimg" src="assets/dashboard-preview.png" alt="" /><div class="dtitle">开户转化</div></div>
+<div class="dev" id="dev3" data-kind="pwa" style="left:1480px;top:450px;width:360px;height:320px"><div class="dbar"></div><img class="dimg" src="assets/dashboard-preview.png" alt="" /><div class="dtitle">Web 看板</div></div></div>
+          <svg id="connSvg" viewBox="0 0 1920 1080">
+            <path id="conn0" d="M 480 610 L 1080 640" />
+            <path id="conn1" d="M 1080 640 L 1300 915" />
+            <path id="conn2" d="M 1300 915 L 1660 610" />
+            <path id="conn3" d="M 1660 610 L 960 620" />
+          </svg>
+          <div id="syncBar" class="abs"><i></i></div>
+          <div id="syncVal" class="abs">××%</div>
+          <div id="refresh" class="abs">
+            <div class="rb" id="rb0" style="left:450px;top:560px">↻</div>
+            <div class="rb" id="rb1" style="left:1060px;top:600px">↻</div>
+            <div class="rb" id="rb2" style="left:1280px;top:870px">↻</div>
+            <div class="rb" id="rb3" style="left:1640px;top:560px">↻</div>
+          </div>
+          <div id="travel" class="abs"></div>
+        </div>
+      </div>
+
+      <!-- ============ ACT 5 · 锁屏 ============ -->
+      <div class="scene" id="s5">
+        <div class="cam" id="cam5">
+          <div id="lockLogo" class="abs"><img src="assets/logo-vertical.png" alt="" /></div>
+          <div id="lockRule" class="abs"></div>
+          <div id="lockName" class="abs">省心投 <span style="color:#1890ff">SimpliAds</span></div>
+          <div id="lockTag" class="abs line"><span>让每分投放，都算得清</span></div>
+          <div id="lockCta" class="abs">开源 · 数据私有 · 一键部署</div>
+          <div id="lockUrl" class="abs">github.com/cyhzzz/shengxintou-bi</div>
+          <div id="orbit" class="abs"><div class="opt" id="op0"></div>
+<div class="opt" id="op1"></div>
+<div class="opt" id="op2"></div>
+<div class="opt" id="op3"></div>
+<div class="opt" id="op4"></div>
+<div class="opt" id="op5"></div>
+<div class="opt" id="op6"></div>
+<div class="opt" id="op7"></div></div>
+        </div>
+      </div>
+
+      <div id="night"></div>
+      <div id="falloff"></div>
+      <div id="grain"></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      var B = 0.5; // one beat = 0.5s (120 BPM); every cut lands on the grid
+
+      /* ---------- texture: grain crawls, never slides ---------- */
+      tl.to("#grain", { x: 70, y: -46, duration: 30, ease: "steps(160)" }, 0);
+      // river ribbon lives behind every scene: the container must be revealed, not just its path
+      tl.fromTo("#river", { opacity: 0 }, { opacity: 1, duration: 1.2, ease: "power2.out" }, 0.1);
+      tl.to("#riverPath", { strokeDashoffset: 0, duration: 10, ease: "none" }, 0); // river ribbon draws in, then sparks flow
+      // initial dash state set in CSS via attribute below
+
+      /* ===================================================================
+         ACT 1 · 散落 (0 – 6.0)
+         =================================================================== */
+      tl.fromTo("#cam1", { scale: 1.05 }, { scale: 1.0, duration: 3.0, ease: "power2.out" }, 0);
+      tl.fromTo("#ghost", { x: 60 }, { x: -80, duration: 30, ease: "none" }, 0);
+      tl.fromTo("#dots", { x: 0, y: 0 }, { x: -140, y: -70, duration: 30, ease: "none" }, 0);
+      tl.fromTo("#glow", { scale: 0.7, opacity: 0.4 }, { scale: 1.15, opacity: 1, duration: 2.6, ease: "sine.inOut" }, 0);
+      tl.to("#glow", { scale: 1.06, duration: 4.0, ease: "sine.inOut", yoyo: true, repeat: -1 }, 2.6);
+      tl.fromTo("#a1h1", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.9, ease: "expo.out" }, 0.2);
+      tl.fromTo("#a1h2", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.9, ease: "expo.out" }, 0.5);
+      tl.fromTo("#a1hook", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.9, ease: "expo.out" }, 1.6);
+      // 10 scattered channel badges, staggered scale pop
+      for (var i = 0; i < 10; i++) {
+        var t = 0.9 + i * 0.13;
+        tl.fromTo("#bdg" + i, { opacity: 0, scale: 0.4, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "back.out(2)" }, t);
+      }
+      // S symbol: blur-in + scale pop, the persistent brand mark
+      tl.fromTo("#sSymbol", { opacity: 0, scale: 0.6, filter: "blur(10px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.7, ease: "power3.out" }, 2.3);
+      tl.to("#sSymbol", { opacity: 0.5, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 }, 3.0);
+      // 8 data particles converge toward the S
+      for (var i = 0; i < 8; i++) {
+        var a = i * (Math.PI / 4);
+        var x0 = 960 + Math.cos(a) * 760, y0 = 540 + Math.sin(a) * 540;
+        tl.fromTo("#p" + i, { x: x0 - 960, y: y0 - 540, opacity: 0, scale: 0 }, { x: 1250 - 960 + Math.cos(a) * 120 - 7, y: 430 - 540 + Math.sin(a) * 120 - 7, opacity: 1, scale: 1, duration: 2.2, ease: "power2.inOut" }, 2.8);
+      }
+      // 4 small metric chips
+      for (var i = 0; i < 4; i++) {
+        tl.fromTo("#m" + i, { opacity: 0, scale: 0.5, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "back.out(2)" }, 3.6 + i * 0.1);
+      }
+      // camera push toward the S (dolly + slight right pan keeps the left-hand copy inside the 48px safe area)
+      tl.fromTo("#cam1", { scale: 1.0 }, { scale: 1.10, x: 80, duration: 1.6, ease: "power2.inOut", immediateRender: false }, 4.4);
+      // persistent breathing: solid badges keep the frame alive through the act
+      for (var i = 0; i < 10; i++) {
+        tl.to("#bdg" + i, { opacity: 0.45, duration: 0.6, ease: "sine.inOut", yoyo: true, repeat: -1 }, 1.8 + i * 0.1);
+      }
+      // S path stroke draw along the river
+      (function () {
+        var p = document.getElementById("riverPath");
+        var len = p.getTotalLength();
+        p.setAttribute("stroke-dasharray", len + " " + len);
+        p.setAttribute("stroke-dashoffset", len);
+      })();
+      // data sparks flow along the S river, forever (persistent motion behind every act)
+      (function () {
+        var path = document.getElementById("riverPath");
+        var len = path.getTotalLength();
+        for (var i = 0; i < 12; i++) {
+          (function (k) {
+            var o = { t: k / 12 };
+            tl.to(o, { t: k / 12 + 1, duration: 5.5, ease: "none", repeat: -1, onUpdate: function () {
+              var m = path.getPointAtLength((((o.t % 1) + 1) % 1) * len);
+              var el = document.getElementById("sp" + k);
+              el.setAttribute("cx", m.x); el.setAttribute("cy", m.y);
+            } }, 0);
+          })(i);
+        }
+        tl.to("#riverPath", { opacity: 0.62, duration: 2.0, ease: "sine.inOut", yoyo: true, repeat: -1 }, 0);
+      })();
+      // sonar pings sweep out from centre, forever (persistent motion across every act)
+      for (var i = 0; i < 3; i++) {
+        tl.fromTo("#pg" + i, { scale: 0.15, opacity: 0.5 }, { scale: 1.1, opacity: 0, duration: 3.0, ease: "none", repeat: -1 }, i * 1.0);
+      }
+
+      /* ===================================================================
+         ACT 2 · 聚合 (6.0 – 12.0)  — persistent hand-off + S-swirl (signature)
+         =================================================================== */
+      // the S symbol docks and shrinks into the dashboard world
+      tl.to("#sSymbol", { x: -160, y: -180, scale: 0.42, duration: 0.6, ease: "expo.inOut" }, 5.6);
+      tl.to("#s1", { opacity: 0, duration: 0.4, ease: "power1.in" }, 5.8);
+      tl.set("#s2", { opacity: 1 }, 5.9);
+      tl.fromTo("#cam2", { scale: 0.94 }, { scale: 1.0, duration: 1.0, ease: "expo.out" }, 5.9);
+      // 4 metric cards / clusters fly in
+      tl.fromTo("#s2panel", { opacity: 0, rotationY: -26, rotationX: 8, z: -500, x: 60 }, { opacity: 1, rotationY: -8, rotationX: 3, z: 0, x: 0, duration: 0.8, ease: "expo.out" }, 6.0);
+      tl.fromTo("#heatmap", { opacity: 0, rotationY: 24, z: -400, x: -40 }, { opacity: 1, rotationY: 10, z: -120, x: 0, duration: 0.8, ease: "expo.out" }, 6.4);
+      tl.fromTo("#a2h", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8, ease: "expo.out" }, 6.1);
+      tl.fromTo("#a2sub", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8, ease: "expo.out" }, 6.5);
+      // chart: axes, line, area fill
+      (function () {
+        var la = document.getElementById("chartLine"), len = la.getTotalLength();
+        la.setAttribute("stroke-dasharray", len + " " + len);
+        la.setAttribute("stroke-dashoffset", len);
+        tl.fromTo("#chartLine", { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.0, ease: "power2.inOut" }, 7.2);
+      })();
+      tl.fromTo("#chartArea", { scaleY: 0, transformOrigin: "50% 100%" }, { scaleY: 1, duration: 0.6, ease: "power2.out" }, 7.6);
+      // metric numbers count-up (container numbers need their own reveal)
+      tl.fromTo(["#a2n0", "#a2n1", "#a2n2", "#a2n3"], { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out", stagger: 0.08 }, 7.4);
+      // metric readouts: deterministic mask scramble settling on a masked value.
+      // No readable digits on screen; the glyph table is fixed because frames are
+      // seeked out of order (Math.random in the timeline is banned by film_audit).
+      var a2els = ["#a2n0", "#a2n1", "#a2n2", "#a2n3"];
+      var a2fin = ["×××", "×××", "×××", "××%"];
+      var a2len = [3, 3, 3, 2];
+      var MASK = "×＊*";
+      var MTBL = [];
+      for (var i = 0; i < 4; i++) { var _r = []; for (var k = 0; k < 32; k++) _r.push(MASK[(i * 5 + k * 3) % MASK.length]); MTBL.push(_r); }
+      for (var i = 0; i < 4; i++) {
+        (function (i) {
+          var el = document.querySelector(a2els[i]);
+          var o = { p: 0 };
+          tl.to(o, { p: 1, duration: 0.9, ease: "power2.out", onUpdate: function () {
+            var step = Math.min(31, Math.floor(o.p * 32));
+            if (o.p < 0.72) {
+              var s = "";
+              for (var k = 0; k < a2len[i]; k++) s += MTBL[i][(step + k * 7) % 32];
+              el.textContent = s + (i === 3 ? "%" : "");
+            } else { el.textContent = a2fin[i]; }
+          } }, 7.6 + i * 0.1);
+        })(i);
+      }
+      // heatmap cells: staggered scale pop, then a gentle wave so the intensity ramp stays readable
+      var hmCells = document.querySelectorAll("#heatmap .hm");
+      for (var i = 0; i < 84; i++) {
+        tl.fromTo(hmCells[i], { opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.25, ease: "back.out(1.5)" }, 6.3 + i * 0.02);
+      }
+      // persistent heat wave: cells keep breathing after they settle
+      for (var i = 0; i < 84; i++) {
+        tl.to(hmCells[i], { opacity: 0.55, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: -1 }, 7.1 + (i % 12) * 0.05 + Math.floor(i / 12) * 0.04);
+      }
+      // the chart body keeps breathing under the line
+      tl.to("#chartArea", { opacity: 0.55, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 }, 7.4);
+      // platform tabs blur-in (staggered, single tween per tab)
+      for (var i = 0; i < 3; i++) {
+        tl.fromTo("#s2tabs .tab:nth-child(" + (i + 1) + ")", { opacity: 0, filter: "blur(8px)", x: 20 }, { opacity: 1, filter: "blur(0px)", x: 0, duration: 0.4, ease: "power2.out", immediateRender: false }, 7.8 + i * 0.12);
+      }
+      // camera slow push (continuous through the act)
+      tl.fromTo("#cam2", { scale: 1.0 }, { scale: 1.08, duration: 4.6, ease: "power1.out", immediateRender: false }, 6.9);
+      // sync pulse ring (immediateRender off: the ring must stay hidden until 10.4)
+      tl.fromTo("#pulseRing", { opacity: 0.9, scale: 0.6 }, { opacity: 0, scale: 3.2, duration: 0.7, ease: "power2.out", immediateRender: false }, 10.4);
+      // dashboard exit: lateral whip + S-swirl
+      tl.to("#cam2", { x: -760, opacity: 0, duration: 0.55, ease: "power3.in" }, 11.5);
+
+      /* ===================================================================
+         ACT 3 · 双漏斗 (12.0 – 19.0) — lateral whip + S-swirl (signature)
+         =================================================================== */
+      tl.set("#s3", { opacity: 1 }, 11.85);
+      tl.fromTo("#cam3", { x: 760 }, { x: 0, duration: 0.85, ease: "expo.out" }, 11.85);
+      tl.fromTo("#a3h", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.7, ease: "expo.out" }, 12.1);
+      tl.fromTo("#a3sub", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.7, ease: "expo.out" }, 12.4);
+      // build the two funnels as tapered trapezoid layers — 8 left / 9 right, matching the titles.
+      // Stage names are the product's real funnel calibres (frontend ConversionFunnel /
+      // backend app_market.py FUNNEL_STAGES), one word on EVERY layer.
+      (function () {
+        var L = document.getElementById("funnelL"), R = document.getElementById("funnelR");
+        var WORDS_L = ["广告曝光", "客户点击", "客户线索", "客户开口", "有效线索", "剔除存量", "成功开户", "有效户"];
+        var WORDS_R = ["激活APP", "开户注册", "注册身份证", "注册银行卡", "提交开户", "开户成功", "新开户", "入金", "有效户"];
+        var RAMP = ["#1890FF", "#1273E0", "#0A5AA8", "#084B8C"];   // deep enough for white stage words
+        var LH = 42, GAP = 7, TOPW = 340, BOTW = 120;
+        function build(host, n, prefix, t0, words) {
+          for (var i = 0; i < n; i++) {
+            var w = TOPW + (BOTW - TOPW) * i / (n - 1);
+            var w2 = (i === n - 1) ? BOTW : TOPW + (BOTW - TOPW) * (i + 1) / (n - 1);
+            var b = document.createElement("div");
+            b.className = "flayer"; b.id = prefix + i;
+            b.style.top = (i * (LH + GAP)) + "px";
+            b.style.width = TOPW + "px";
+            b.style.marginLeft = (-TOPW / 2) + "px";
+            b.style.background = RAMP[Math.min(3, Math.floor(i * 4 / n))];
+            // clip-path % is relative to the element's own width (TOPW), not the container
+            b.style.clipPath = "polygon(" + ((1 - w / TOPW) * 50) + "% 0," + ((1 + w / TOPW) * 50) + "% 0,"
+              + ((1 + w2 / TOPW) * 50) + "% 100%," + ((1 - w2 / TOPW) * 50) + "% 100%)";
+            var word = words[i];
+            b.innerHTML = "<span>" + word + "</span>";
+            // shrink the type until the word fits the visible mid-height width of the taper
+            var mid = (w + w2) / 2, fs = 24;
+            while (fs > 15 && word.length * fs * 1.04 + (word.length - 1) * 2 > mid - 22) fs -= 1;
+            b.style.fontSize = fs + "px";
+            host.appendChild(b);
+            tl.fromTo(b, { scaleY: 0, transformOrigin: "50% 100%" }, { scaleY: 1, duration: 0.45, ease: "power3.out" }, t0 + i * 0.06);
+          }
+        }
+        build(L, 8, "lf", 13.0, WORDS_L);
+        build(R, 9, "rf", 13.4, WORDS_R);
+      })();
+      // persistent pulse: alternating layers breathe so the funnel never goes still
+      (function () {
+        var layers = document.querySelectorAll(".flayer");
+        for (var i = 0; i < layers.length; i++) {
+          tl.to(layers[i], { opacity: i % 2 ? 0.62 : 1, duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: -1 }, 14.6 + i * 0.05);
+        }
+      })();
+      // bottleneck marker pulse + scale
+      tl.fromTo("#marker", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2)" }, 14.2);
+      tl.fromTo("#marker .ring", { opacity: 0.9, scale: 0.6 }, { opacity: 0, scale: 3.2, duration: 0.7, ease: "power2.out" }, 14.6);
+      // funnels rotate 3D
+      tl.fromTo("#funnelWrap", { rotationY: 0 }, { rotationY: 8, duration: 1.0, ease: "power1.inOut" }, 16.0);
+      // S particle connects funnels (stroke draw)
+      (function () {
+        var p = document.getElementById("sConnPath"), len = p.getTotalLength();
+        p.setAttribute("stroke-dasharray", len + " " + len);
+        p.setAttribute("stroke-dashoffset", len);
+        tl.fromTo("#sConnPath", { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.2, ease: "power2.inOut" }, 16.6);
+        tl.fromTo("#sConnect", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 16.5);
+      })();
+      // continuous slow drift across the hold, then zoom-through to the marker
+      tl.fromTo("#cam3", { scale: 1.0 }, { scale: 1.04, duration: 4.3, ease: "none", immediateRender: false }, 12.7);
+      tl.fromTo("#cam3", { scale: 1.04 }, { scale: 1.12, duration: 1.2, ease: "power2.inOut", immediateRender: false }, 17.2);
+      tl.fromTo("#marker .core", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "sine.inOut", yoyo: true, repeat: -1 }, 18.4);
+
+      /* ===================================================================
+         ACT 4 · 四端 (19.0 – 25.0) — zoom-through (signature)
+         =================================================================== */
+      tl.to("#cam3", { scale: 3.2, x: -1500, y: -150, duration: 0.45, ease: "power3.in" }, 18.5);
+      tl.to("#cam3", { opacity: 0, duration: 0.2, ease: "power1.in" }, 18.9);
+      tl.set("#s4", { opacity: 1 }, 18.95);
+      tl.fromTo("#cam4", { scale: 0.88 }, { scale: 1.0, duration: 1.0, ease: "expo.out" }, 18.95);
+      tl.fromTo("#a4h", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8, ease: "expo.out" }, 19.1);
+      // typed platform line, one span per character
+      var tchars = document.querySelectorAll("#a4box .ch");
+      var T_TYPE = 19.7, PER = 2.0 / tchars.length;
+      tchars.forEach(function (c, i) { tl.set(c, { opacity: 1 }, T_TYPE + i * PER); });
+      // four device frames 3D fly-in
+      var dpos = [[200,430],[820,470],[1180,700],[1480,450]];
+      for (var i = 0; i < 4; i++) {
+        tl.fromTo("#dev" + i, { opacity: 0, rotationY: -28, rotationX: 10, z: -400, y: 60 }, { opacity: 1, rotationY: -8, rotationX: 4, z: 0, y: 0, duration: 0.7, ease: "expo.out" }, 19.7 + i * 0.12);
+      }
+      // screens mask reveal
+      tl.fromTo("#devs .dimg", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.out" }, 20.9);
+      // persistent parallax: live screens keep drifting inside their frames
+      tl.to("#devs .dimg", { scale: 1.1, x: -22, duration: 1.8, ease: "sine.inOut", yoyo: true, repeat: -1 }, 21.4);
+      // connection lines stroke draw
+      ["#conn0", "#conn1", "#conn2", "#conn3"].forEach(function (p, k) {
+        var el = document.querySelector(p), len = el.getTotalLength();
+        el.setAttribute("stroke-dasharray", len + " " + len);
+        el.setAttribute("stroke-dashoffset", len);
+        tl.fromTo(p, { strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.6, ease: "power2.out" }, 21.2 + k * 0.12);
+      });
+      // sync progress + bar fill (reveal the track container first)
+      tl.fromTo("#syncBar", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 21.5);
+      var prog = { v: 12 };
+      tl.to(prog, { v: 100, duration: 1.4, ease: "power1.inOut", onUpdate: function () {
+        document.getElementById("syncVal").textContent = "××%";
+        document.querySelector("#syncBar i").style.transform = "scaleX(" + (prog.v / 100) + ")";
+      } }, 21.6);
+      // traveling dot along connection
+      (function () {
+        var path = document.getElementById("conn0"), len = path.getTotalLength();
+        tl.to("#travel", { duration: 1.0, ease: "none", onUpdate: function () {
+          var m = path.getPointAtLength((1 - (tl.time() - 21.6) / 1.0) * 0 + (tl.time() - 21.6) / 1.0 * len);
+          document.getElementById("travel").setAttribute("transform", "translate(" + m.x + "," + m.y + ")");
+        } }, 22.2);
+      })();
+      // refresh badges scale pop
+      for (var i = 0; i < 4; i++) {
+        tl.fromTo("#rb" + i, { opacity: 0, scale: 0.4 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2)" }, 22.8 + i * 0.1);
+      }
+      // camera pull (continuous through the act)
+      tl.fromTo("#cam4", { scale: 1.0 }, { scale: 0.97, duration: 4.4, ease: "power1.out", immediateRender: false }, 20.0);
+      // devices tilt
+      tl.fromTo("#devs", { rotationY: 0 }, { rotationY: -3, duration: 0.8, ease: "power1.inOut" }, 24.0);
+      // collapse to point + S-swirl into the logo
+      tl.to(["#dev0", "#dev1", "#dev2", "#dev3"], { scale: 0.2, opacity: 0, duration: 0.45, ease: "power3.in", stagger: 0.04 }, 24.4);
+      tl.to("#a4h", { opacity: 0, y: -30, duration: 0.35, ease: "power2.in" }, 24.4);
+
+      /* ===================================================================
+         ACT 5 · 锁屏 (25.0 – 30.0) — collapse to point + S-swirl (signature)
+         =================================================================== */
+      tl.set("#s5", { opacity: 1 }, 24.9);
+      tl.to("#s4", { opacity: 0, duration: 0.4, ease: "power1.in" }, 24.9);
+      tl.fromTo("#lockLogo", { opacity: 0, scale: 2.4, rotation: -6 }, { opacity: 1, scale: 1, rotation: -2, duration: 0.25, ease: "power4.in" }, 25.1);
+      tl.to("#lockLogo", { scale: 1.14, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: -1 }, 25.4);
+      tl.fromTo("#lockName", { opacity: 0, x: 80, filter: "blur(10px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.9, ease: "expo.out" }, 25.4);
+      tl.fromTo("#lockTag", { yPercent: 105, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8, ease: "expo.out" }, 25.8);
+      tl.fromTo("#lockCta", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 26.2);
+      tl.fromTo("#lockUrl", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 26.6);
+      tl.fromTo("#lockRule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "expo.inOut" }, 26.8);
+      // final gentle breathing push (continuous from the lockup)
+      tl.to("#cam5", { scale: 1.04, duration: 2.4, ease: "sine.inOut", yoyo: true, repeat: -1 }, 25.5);
+      // orbiting particles yoyo path (continuous)
+      ["#op0", "#op1", "#op2", "#op3", "#op4", "#op5", "#op6", "#op7"].forEach(function (p, k) {
+        var a = k * (Math.PI / 4);
+        tl.fromTo(p, { x: 960 - 12 + Math.cos(a) * 540, y: 450 - 12 + Math.sin(a) * 210, opacity: 0, scale: 0 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(2)" }, 25.8 + k * 0.04);
+        tl.to(p, { x: 960 - 12 + Math.cos(a + Math.PI) * 540, y: 450 - 12 + Math.sin(a + Math.PI) * 210, duration: 1.25, ease: "sine.inOut", yoyo: true, repeat: -1 }, 26.2 + k * 0.04);
+      });
+
+      tl.seek(0);
+      window.__timelines["shengxintou-bi"] = tl;
+    </script>
+  </body>
+</html>
