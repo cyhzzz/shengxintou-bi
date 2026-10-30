@@ -1187,6 +1187,48 @@ body {
 }
 
 /* =========================================================
+   首屏影片区块
+   ========================================================= */
+.section-film {
+  background: var(--bg-cream);
+}
+
+.film-stage {
+  margin-top: 48px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-paper);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-elevated);
+}
+
+.film-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #f4f4f6;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.film-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 768px) {
+  .film-stage {
+    margin-top: 32px;
+    border-radius: 12px;
+  }
+}
+
+/* =========================================================
    三端支持
    ========================================================= */
 .section-platforms {

@@ -81,6 +81,41 @@
   </header>
 
   <main>
+    <section class="section section-film" id="film">
+      <div class="container">
+        <div class="showcase-header reveal">
+          <h2 class="section-title">30 秒，<br />看懂省心投</h2>
+          <p class="section-lead">投放散落多处、转化看不清——省心投把跨渠道数据聚到一屏，用双漏斗定位卡点，四端同步同一份数据。</p>
+        </div>
+
+        <div class="film-stage reveal" data-reveal="1">
+          <video class="film-video" autoplay loop muted playsinline webkit-playsinline preload="auto"
+                 poster="assets/film/poster.jpg" aria-label="省心投 BI 品牌宣传片">
+            <source src="assets/film/shengxintou-brand-film.mp4" type="video/mp4" />
+          </video>
+          <script>
+            (function () {
+              var v = document.querySelector('.film-video');
+              if (!v) return;
+              // 首屏静音自动播放（浏览器策略要求），随后尝试补播声音
+              var p = v.play();
+              if (p && p.catch) { p.catch(function () { v.muted = true; v.play(); }); }
+              // 用户首次交互后恢复配乐声音，并去除静音
+              function unmute() {
+                if (v.muted) { v.muted = false; var r = v.play(); if (r && r.catch) r.catch(function () {}); }
+                document.removeEventListener('click', unmute);
+                document.removeEventListener('touchstart', unmute);
+                document.removeEventListener('keydown', unmute);
+              }
+              document.addEventListener('click', unmute, { once: true });
+              document.addEventListener('touchstart', unmute, { once: true });
+              document.addEventListener('keydown', unmute, { once: true });
+            })();
+          </script>
+        </div>
+      </div>
+    </section>
+
     <!-- Hero -->
     <section class="hero" id="top">
       <div class="hero-geometry" aria-hidden="true">

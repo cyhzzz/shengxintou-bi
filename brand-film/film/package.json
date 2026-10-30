@@ -1,0 +1,10 @@
+{
+  "name": "shengxintou-brand-film",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "devDependencies": {
+    "hyperframes": "0.8.78",
+    "puppeteer-core": "^25.10.0"
+  }
+}
