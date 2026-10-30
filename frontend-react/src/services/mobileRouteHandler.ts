@@ -122,6 +122,14 @@ export async function mobileRouteHandler(url: string, body: any, method?: string
       return handleAppMarketCostAnalysis(body);
     // 广告计划分析（计划周粒度漏斗，结合 dim_ad_plan_class + fact_conv_appmarket + agg_vendor_daily）
     case 'reports/app-market/ad-plan-analysis':
+    // v4.4.7：按市场下挂子模块（URL 携带 :market slug，移动端同组件渲染，参数仅前端筛选）
+    case 'reports/app-market/ad-plan-analysis/huawei':
+    case 'reports/app-market/ad-plan-analysis/xiaomi':
+    case 'reports/app-market/ad-plan-analysis/honor':
+    case 'reports/app-market/ad-plan-analysis/oppo':
+    case 'reports/app-market/ad-plan-analysis/vivo':
+    case 'reports/app-market/ad-plan-analysis/apple':
+    case 'reports/app-market/ad-plan-analysis/harmony':
       return handleAppMarketAdPlanAnalysis(body);
     // 应用市场 · A股成交金额（自主从东方财富获取，无需上传）
     case 'reports/app-market/ashare-turnover':

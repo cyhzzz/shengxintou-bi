@@ -153,6 +153,71 @@ tests = [
           GROUP BY "应用市场" ORDER BY "应用市场"''',
         'params': ['2026-07-01', '2026-08-31'],
     },
+    # v4.4.7 广告计划分析·按市场子模块（:market slug）：移动端同组件渲染，底层数据与桌面同源，
+    # 与 backend/routes/reports/app_market_ad_plan.py 口径一致；以下 7 个厂商 case 共用同一 handler 与取数。
+    {
+        'name': 'reports/app-market/ad-plan-analysis/huawei',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/xiaomi',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/honor',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/oppo',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/vivo',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/apple',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
+    {
+        'name': 'reports/app-market/ad-plan-analysis/harmony',
+        'sql': '''SELECT "应用市场",
+            COALESCE(SUM(CASE WHEN "是否创建完资金账号"=1 AND "渠道类型"='互联网引流' AND "是否新开户"=1 THEN 1 ELSE 0 END), 0) as ad_open
+          FROM fact_conv_appmarket
+          WHERE "下载日期" >= ? AND "下载日期" <= ?
+          GROUP BY "应用市场" ORDER BY "应用市场"''',
+        'params': ['2026-07-01', '2026-08-31'],
+    },
     {
         # v4.4.4 应用市场 · A股成交金额：外部网络接口（东方财富），不经 SQLite 查询；
         # 此处仅占位以确保 case 覆盖（check_mobile_routes_coverage 要求每个 case 有同名测试）。

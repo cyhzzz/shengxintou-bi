@@ -8,7 +8,7 @@
  *   3. 广告计划维度明细 (fact_plan_daily) —— 应用市场消耗统一来源（市场级 + 计划级 消耗/展示/点击）
  *
  * 页面结构（周度口径统一：上周五 → 本周四）：
- *   一、筛选器（应用市场多选 + 全部 + 日期范围，默认全部）
+ *   一、筛选器（应用市场多选 + 全部 + 日期范围，默认全部；v4.4.7 起支持菜单按市场下挂子模块，单市场视图锁定筛选）
  *   二、开户概览（总开户 / 总消耗 / 总开户成本）
  *   三、按周开户量柱状图（每周广告开户量，图上显示数值）
  *   三(a)、按日开户量柱状图（自然日·按市场堆叠·副坐标=当日开户成本）
@@ -39,6 +39,7 @@ import { FadeInSection, FilterBar } from '@/components';
 import { sanitizeText } from '@/utils/sanitizeText';
 import { downloadCsv } from '@/utils/downloadCsv';
 import { useFilterStore } from '@/stores';
+import { useParams, useNavigate } from 'react-router-dom';
 import styles from './index.module.scss';
 
 interface PlanDetailRow {
@@ -261,6 +262,18 @@ const SourceLine: React.FC<{ keys: string[]; freshness: DataFreshness }> = ({ ke
 // 与后端 ALLOWED_PLATFORMS 对齐：首屏默认全选，避免初次加载前 Select 为空的闪烁
 const INITIAL_MARKETS = ['oppo', 'vivo', '荣耀', '小米', '华为', '鸿蒙', '苹果'];
 
+// v4.4.7：路由参数 :market 的 slug → 数据中的市场标签（与 INITIAL_MARKETS 严格一致）
+// 菜单下挂「按市场子模块」时，URL 形如 /app-market/ad-plan-analysis/oppo
+const MARKET_SLUG_TO_LABEL: Record<string, string> = {
+  huawei: '华为',
+  xiaomi: '小米',
+  honor: '荣耀',
+  oppo: 'oppo',
+  vivo: 'vivo',
+  apple: '苹果',
+  harmony: '鸿蒙',
+};
+
 interface AdPlanQuery {
   start_date: string;
   end_date: string;
@@ -359,7 +372,11 @@ const PlanCard = React.memo(function PlanCard({ pl }: { pl: PlanWeekDetail }) {
 });
 
 const AppMarketAdPlanAnalysisPage: React.FC = () => {
-  const [selected, setSelected] = useState<string[]>(INITIAL_MARKETS);
+  // v4.4.7：菜单下挂「按市场子模块」时，URL 携带 :market slug，锁定单市场视图
+  const { market: marketSlug } = useParams<{ market?: string }>();
+  const lockedMarket = marketSlug ? MARKET_SLUG_TO_LABEL[marketSlug] : undefined;
+  const navigate = useNavigate();
+  const [selected, setSelected] = useState<string[]>(lockedMarket ? [lockedMarket] : INITIAL_MARKETS);
   const [selectedWeek, setSelectedWeek] = useState<string | undefined>(undefined);
   const [clusterWeek, setClusterWeek] = useState<string | undefined>(undefined);
   // Issue 2：各数据块下方展示「数据来源 + 更新日期」，来自 /api/v1/data-freshness
@@ -413,9 +430,25 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
   }, []);
 
   const resetFilters = () => {
+    // v4.4.7：单市场锁定视图下，「重置」即返回全部市场汇总视图
+    if (lockedMarket) {
+      navigate('/app-market/ad-plan-analysis');
+      return;
+    }
     setSelected(markets.length ? markets : INITIAL_MARKETS);
     resetDateRange(); // 同时重置日期范围，避免周度选择器被持久化的旧日期裁掉（按钮名“重置(全部)”应含日期）
   };
+
+  // v4.4.7：路由参数锁定单市场（菜单下挂按市场子模块进入；切换市场不重挂载，需 effect 同步 selection）
+  useEffect(() => {
+    if (lockedMarket) {
+      setSelected([lockedMarket]);
+    } else {
+      setSelected(INITIAL_MARKETS);
+    }
+    // 仅随路由参数变化；不依赖 markets，避免日期重查后清空选择
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketSlug]);
 
   // ---- 应用市场筛选集合（去除重复/已不存在的市场） ----
   const activeMarkets = useMemo(() => {
@@ -987,6 +1020,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
             <Select
               mode="multiple"
               allowClear
+              disabled={!!lockedMarket}
               placeholder="全部应用市场"
               value={selected}
               onChange={(v) => setSelected(v || [])}
@@ -994,6 +1028,7 @@ const AppMarketAdPlanAnalysisPage: React.FC = () => {
               maxTagCount="responsive"
               options={markets.map((m) => ({ label: m, value: m }))}
             />
+            {lockedMarket && <Tag color="blue">{lockedMarket}（单市场视图）</Tag>}
             <Button icon={<ReloadOutlined />} onClick={resetFilters}>重置(全部)</Button>
           </Space>
         </Card>

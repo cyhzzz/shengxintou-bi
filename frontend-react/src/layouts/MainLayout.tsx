@@ -102,8 +102,22 @@ const menuItems: MenuProps['items'] = [
       { key: '/app-market/cost-analysis', label: '消耗和成本', icon: <DollarOutlined /> },
       // v3.7.3: 归因转化率分析
       { key: '/app-market/attribution-conversion', label: '归因转化率', icon: <RiseOutlined /> },
-      // v3.9.1: 广告计划分析（计划分解 + 下载链路 + 消耗）
-      { key: '/app-market/ad-plan-analysis', label: '广告计划分析', icon: <FileDoneOutlined /> },
+      // v4.4.7: 广告计划分析（下挂「按市场」子模块：全部市场 + 各厂商独立入口）
+      {
+        key: 'app-market-ad-plan-analysis-group',
+        icon: <FileDoneOutlined />,
+        label: '广告计划分析',
+        children: [
+          { key: '/app-market/ad-plan-analysis', label: '全部市场', icon: <AppstoreOutlined /> },
+          { key: '/app-market/ad-plan-analysis/huawei', label: '华为' },
+          { key: '/app-market/ad-plan-analysis/xiaomi', label: '小米' },
+          { key: '/app-market/ad-plan-analysis/honor', label: '荣耀' },
+          { key: '/app-market/ad-plan-analysis/oppo', label: 'OPPO' },
+          { key: '/app-market/ad-plan-analysis/vivo', label: 'VIVO' },
+          { key: '/app-market/ad-plan-analysis/apple', label: '苹果' },
+          { key: '/app-market/ad-plan-analysis/harmony', label: '鸿蒙' },
+        ],
+      },
     ],
   },
   {

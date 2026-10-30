@@ -147,6 +147,8 @@ const mainChildren = [
       { path: 'attribution-conversion', element: withSuspense(AppMarketAttributionConversionPage) },
       // v3.9.1: 广告计划分析
       { path: 'ad-plan-analysis', element: withSuspense(AppMarketAdPlanAnalysisPage) },
+      // v4.4.7: 广告计划分析·按市场下挂子模块（URL 携带 :market slug，页面锁定单市场视图）
+      { path: 'ad-plan-analysis/:market', element: withSuspense(AppMarketAdPlanAnalysisPage) },
     ],
   },
   // 直播 v3.1 占位
